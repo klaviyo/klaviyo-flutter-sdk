@@ -198,6 +198,25 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
       }
       print("❌ Push token error received in plugin: \(error)")
       result(nil)
+      
+    case "onPushNotificationOpened":
+      // Called from AppDelegate when a push notification is opened
+      guard let args = call.arguments as? [String: Any],
+        let userInfo = args["userInfo"] as? [String: Any]
+      else {
+        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid notification data", details: nil))
+        return
+      }
+      print("📱 Push notification opened in plugin: \(userInfo)")
+      
+      // Notify Flutter side via event sink if available
+      if let eventSink = self.eventSink {
+        eventSink([
+          "type": "push_notification_opened",
+          "data": userInfo
+        ])
+      }
+      result(nil)
 
     default:
       result(FlutterMethodNotImplemented)

@@ -237,12 +237,25 @@ class KlaviyoSDK {
     _nativeWrapper.setLogLevel(logLevel.toString());
   }
 
+  /// Get push notification events stream
+  Stream<Map<String, dynamic>> get onPushNotification =>
+      _nativeWrapper.onPushNotification;
+
+  /// Get form events stream
+  Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
+
   /// Set up native event listeners
   void _setupNativeEventListeners() {
     // Listen for push notification events from native SDK
     _nativeWrapper.onPushNotification.listen((eventData) {
       _logger.info('Native push notification event: $eventData');
-      // Handle push notification events
+      final eventType = eventData['type'] as String? ?? '';
+
+      if (eventType == 'push_notification_opened') {
+        final userInfo = eventData['data'] as Map<String, dynamic>? ?? {};
+        _logger.info('Push notification opened with data: $userInfo');
+        // The event is automatically forwarded via the stream
+      }
     });
 
     // Listen for form events from native SDK

@@ -34,6 +34,9 @@ class _MyAppState extends State<MyApp> {
       );
       print('✅ Klaviyo initialization completed');
 
+      // Set up push notification listeners
+      _setupPushNotificationListeners();
+
       setState(() {
         _isInitialized = true;
         _status = 'Initialized successfully';
@@ -44,6 +47,23 @@ class _MyAppState extends State<MyApp> {
         _status = 'Initialization failed: $e';
       });
     }
+  }
+
+  void _setupPushNotificationListeners() {
+    // Listen for push notification opens
+    _klaviyo.onPushNotification.listen((eventData) {
+      final eventType = eventData['type'] as String? ?? '';
+      print('📱 Received push notification event: $eventType');
+
+      if (eventType == 'push_notification_opened') {
+        final userInfo = eventData['data'] as Map<String, dynamic>? ?? {};
+        print('🎯 Push notification opened: $userInfo');
+
+        setState(() {
+          _status = 'Push notification opened! Data: ${userInfo.toString()}';
+        });
+      }
+    });
   }
 
   Future<void> _setProfile() async {
