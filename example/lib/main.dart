@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -163,8 +164,19 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  Future<void> _requestNotificationPermission() async {
+    final status = await Permission.notification.request();
+    if (!status.isGranted) {
+      setState(() {
+        _status = 'Notification permission denied';
+      });
+      throw Exception('Notification permission denied');
+    }
+  }
+
   Future<void> _registerForPush() async {
     try {
+      await _requestNotificationPermission();
       await _klaviyo.registerForPushNotifications();
       setState(() {
         _status = 'Registered for push notifications';
