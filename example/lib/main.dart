@@ -45,10 +45,10 @@ class _MyAppState extends State<MyApp> {
   Future<void> _setProfile() async {
     try {
       final profile = KlaviyoProfile(
-        email: 'ajay@klaviyo.com',
+        email: 'ajay.subra@klaviyo.com',
         firstName: 'Ajay',
-        lastName: 'Kumar',
-        phoneNumber: '+1234567890',
+        lastName: 'Subra',
+        phoneNumber: '+1234567899',
         properties: {
           'plan': 'premium',
           'signup_date': DateTime.now().toIso8601String(),
@@ -225,34 +225,6 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  Future<void> _showForm() async {
-    try {
-      final success = await _klaviyo.showForm('newsletter_signup',
-          customData: {'source': 'flutter_example'});
-
-      setState(() {
-        _status = success ? 'Form shown successfully' : 'Failed to show form';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to show form: $e';
-      });
-    }
-  }
-
-  Future<void> _hideForm() async {
-    try {
-      final success = await _klaviyo.hideForm('newsletter_signup');
-      setState(() {
-        _status = success ? 'Form hidden successfully' : 'Failed to hide form';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to hide form: $e';
-      });
-    }
-  }
-
   Future<void> _setLogLevel() async {
     try {
       _klaviyo.setLogLevel(KlaviyoLogLevel.info);
@@ -347,8 +319,6 @@ class _MyAppState extends State<MyApp> {
               // In-App Forms Section
               _buildSectionHeader('In-App Forms'),
               _buildButton('Register for Forms', _registerForForms),
-              _buildButton('Show Form', _showForm),
-              _buildButton('Hide Form', _hideForm),
 
               const SizedBox(height: 16),
 

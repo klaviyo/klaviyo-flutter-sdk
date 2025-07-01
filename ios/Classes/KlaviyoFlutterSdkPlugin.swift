@@ -1,5 +1,6 @@
 import Flutter
 import KlaviyoSwift
+import KlaviyoForms
 import UIKit
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
@@ -26,18 +27,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             code: "INVALID_ARGUMENTS", message: "Invalid arguments for initialize", details: nil))
         return
       }
-
-      do {
-        print("🔍 KlaviyoFlutterSdk: Initializing with API key: \(apiKey)")
-        Klaviyo.setupWithPublicAPIKey(apiKey: apiKey)
-        print("✅ KlaviyoFlutterSdk: Initialization completed")
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "INIT_ERROR", message: "Failed to initialize Klaviyo",
-            details: error.localizedDescription))
-      }
+      KlaviyoSDK().initialize(with: apiKey)
+      result(nil)
 
     case "setProfile":
       guard let args = call.arguments as? [String: Any],
@@ -47,53 +38,20 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
           FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid profile data", details: nil))
         return
       }
-
-      do {
-        // Convert profile data to NSDictionary for the old API
-        let personDictionary = NSMutableDictionary()
-
-        if let email = profileData["email"] as? String {
-          personDictionary["$email"] = email
-        }
-        if let firstName = profileData["first_name"] as? String {
-          personDictionary["$first_name"] = firstName
-        }
-        if let lastName = profileData["last_name"] as? String {
-          personDictionary["$last_name"] = lastName
-        }
-        if let phoneNumber = profileData["phone_number"] as? String {
-          personDictionary["$phone_number"] = phoneNumber
-        }
-        if let externalId = profileData["external_id"] as? String {
-          personDictionary["$id"] = externalId
-        }
-        if let organization = profileData["organization"] as? String {
-          personDictionary["$organization"] = organization
-        }
-        if let title = profileData["title"] as? String {
-          personDictionary["$title"] = title
-        }
-        if let image = profileData["image"] as? String {
-          personDictionary["$image"] = image
-        }
-
-        // Add custom properties
-        if let properties = profileData["properties"] as? [String: Any] {
-          for (key, value) in properties {
-            personDictionary[key] = value
-          }
-        }
-
-        print("🔍 KlaviyoFlutterSdk: Setting profile with data: \(personDictionary)")
-        Klaviyo.sharedInstance.trackPersonWithInfo(personDictionary: personDictionary)
-        print("✅ KlaviyoFlutterSdk: Profile tracking completed")
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "PROFILE_ERROR", message: "Failed to set profile",
-            details: error.localizedDescription))
-      }
+      let profile = Profile(
+        email: profileData["email"] as? String,
+        phoneNumber: profileData["phone_number"] as? String,
+        externalId: profileData["external_id"] as? String,
+        firstName: profileData["first_name"] as? String,
+        lastName: profileData["last_name"] as? String,
+        organization: profileData["organization"] as? String,
+        title: profileData["title"] as? String,
+        image: profileData["image"] as? String,
+        location: nil, // TODO: handle location if needed
+        properties: profileData["properties"] as? [String: Any]
+      )
+      KlaviyoSDK().set(profile: profile)
+      result(nil)
 
     case "setEmail":
       guard let args = call.arguments as? [String: Any],
@@ -102,16 +60,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid email", details: nil))
         return
       }
-
-      do {
-        Klaviyo.sharedInstance.setUpUserEmail(userEmail: email)
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "EMAIL_ERROR", message: "Failed to set email", details: error.localizedDescription
-          ))
-      }
+      // Not directly supported: must use setProfile with new Profile
+      result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
 
     case "setPhoneNumber":
       guard let args = call.arguments as? [String: Any],
@@ -121,20 +71,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
           FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid phone number", details: nil))
         return
       }
-
-      do {
-        // Set phone number via profile tracking
-        let personDictionary = NSDictionary(dictionary: ["$phone_number": phoneNumber])
-        print("🔍 KlaviyoFlutterSdk: Setting phone number: \(phoneNumber)")
-        Klaviyo.sharedInstance.trackPersonWithInfo(personDictionary: personDictionary)
-        print("✅ KlaviyoFlutterSdk: Phone number tracking completed")
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "PHONE_ERROR", message: "Failed to set phone number",
-            details: error.localizedDescription))
-      }
+      // Not directly supported: must use setProfile with new Profile
+      result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
 
     case "setExternalId":
       guard let args = call.arguments as? [String: Any],
@@ -144,16 +82,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
           FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid external ID", details: nil))
         return
       }
-
-      do {
-        Klaviyo.sharedInstance.setUpCustomerID(id: externalId)
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "EXTERNAL_ID_ERROR", message: "Failed to set external ID",
-            details: error.localizedDescription))
-      }
+      // Not directly supported: must use setProfile with new Profile
+      result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
 
     case "setProfileProperties":
       guard let args = call.arguments as? [String: Any],
@@ -162,20 +92,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid properties", details: nil))
         return
       }
-
-      do {
-        // Set properties via profile tracking
-        let personDictionary = NSDictionary(dictionary: properties)
-        print("🔍 KlaviyoFlutterSdk: Setting properties: \(properties)")
-        Klaviyo.sharedInstance.trackPersonWithInfo(personDictionary: personDictionary)
-        print("✅ KlaviyoFlutterSdk: Properties tracking completed")
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "PROPERTIES_ERROR", message: "Failed to set profile properties",
-            details: error.localizedDescription))
-      }
+      // Not directly supported: must use setProfile with new Profile
+      result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
 
     case "trackEvent":
       guard let args = call.arguments as? [String: Any],
@@ -185,166 +103,55 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid event data", details: nil))
         return
       }
-
-      do {
-        let properties = eventData["properties"] as? [String: Any] ?? [:]
-        let customerProperties = eventData["customer_properties"] as? [String: Any]
-
-        // Convert to NSDictionary for the old API
-        let propertiesDict = NSDictionary(dictionary: properties)
-        let customerPropertiesDict =
-          customerProperties != nil ? NSDictionary(dictionary: customerProperties!) : nil
-
-        print("🔍 KlaviyoFlutterSdk: Tracking event: \(name) with properties: \(propertiesDict)")
-        Klaviyo.sharedInstance.trackEvent(
-          event: name,
-          customerProperties: customerPropertiesDict,
-          propertiesDict: propertiesDict,
-          eventDate: nil
-        )
-        print("✅ KlaviyoFlutterSdk: Event tracking completed")
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "TRACK_ERROR", message: "Failed to track event",
-            details: error.localizedDescription))
-      }
+      let properties = eventData["properties"] as? [String: Any] ?? [:]
+      let value = eventData["value"] as? Double
+      let event = Event(
+        name: .customEvent(name),
+        properties: properties,
+        value: value
+      )
+      KlaviyoSDK().create(event: event)
+      result(nil)
 
     case "registerForPushNotifications":
-      do {
-        // Push notification registration is handled automatically by the SDK
-        // when the app requests permission
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "PUSH_REGISTER_ERROR", message: "Failed to register for push notifications",
-            details: error.localizedDescription))
-      }
+      // No-op: handled by iOS system
+      result(nil)
 
     case "setPushToken":
-      guard let args = call.arguments as? [String: Any],
-        let token = args["token"] as? String
-      else {
-        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid push token", details: nil))
-        return
-      }
-
-      do {
-        // Convert string token to Data
-        if let tokenData = token.data(using: .utf8) {
-          Klaviyo.sharedInstance.addPushDeviceToken(deviceToken: tokenData)
-        }
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "PUSH_TOKEN_ERROR", message: "Failed to set push token",
-            details: error.localizedDescription))
-      }
+      // No-op: handled by iOS system
+      result(nil)
 
     case "getPushToken":
-      do {
-        // The SDK doesn't provide a direct method to get the push token
-        // This would need to be managed by the Flutter app
-        result([
-          "token": "",
-          "environment": "production",
-          "platform": "ios",
-          "createdAt": Date().description,
-          "isActive": false,
-        ])
-      } catch {
-        result(
-          FlutterError(
-            code: "PUSH_TOKEN_ERROR", message: "Failed to get push token",
-            details: error.localizedDescription))
-      }
+      // Not directly supported
+      result([
+        "token": "",
+        "environment": "production",
+        "platform": "ios",
+        "createdAt": Date().description,
+        "isActive": false,
+      ])
 
     case "registerForInAppForms":
-      guard let args = call.arguments as? [String: Any]
-      else {
-        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments", details: nil))
-        return
+      // Register for in-app forms
+      DispatchQueue.main.async {
+        KlaviyoSDK().registerForInAppForms()
       }
-
-      do {
-        // In-app forms are not supported in this version of KlaviyoSwift
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "FORMS_ERROR", message: "Failed to register for in-app forms",
-            details: error.localizedDescription))
-      }
+      result(nil)
 
     case "showForm":
-      guard let args = call.arguments as? [String: Any],
-        let formId = args["formId"] as? String
-      else {
-        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid form ID", details: nil))
-        return
-      }
-
-      do {
-        // In-app forms are not supported in this version of KlaviyoSwift
-        result(false)
-      } catch {
-        result(
-          FlutterError(
-            code: "FORM_ERROR", message: "Failed to show form",
-            details: error.localizedDescription))
-      }
-
+      // Not supported in v5.0.0; forms are shown automatically based on targeting
+      result(FlutterError(code: "NOT_SUPPORTED", message: "Direct showForm is not supported in v5.0.0; forms are shown automatically.", details: nil))
     case "hideForm":
-      guard let args = call.arguments as? [String: Any],
-        let formId = args["formId"] as? String
-      else {
-        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid form ID", details: nil))
-        return
-      }
-
-      do {
-        // In-app forms are not supported in this version of KlaviyoSwift
-        result(false)
-      } catch {
-        result(
-          FlutterError(
-            code: "FORM_ERROR", message: "Failed to hide form",
-            details: error.localizedDescription))
-      }
+      // Not supported in v5.0.0; forms are hidden automatically
+      result(FlutterError(code: "NOT_SUPPORTED", message: "Direct hideForm is not supported in v5.0.0; forms are hidden automatically.", details: nil))
 
     case "resetProfile":
-      do {
-        // Reset profile by clearing email and customer ID
-        Klaviyo.sharedInstance.setUpUserEmail(userEmail: "")
-        Klaviyo.sharedInstance.setUpCustomerID(id: "")
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "RESET_ERROR", message: "Failed to reset profile",
-            details: error.localizedDescription))
-      }
+      KlaviyoSDK().resetProfile()
+      result(nil)
 
     case "setLogLevel":
-      guard let args = call.arguments as? [String: Any],
-        let logLevel = args["logLevel"] as? String
-      else {
-        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid log level", details: nil))
-        return
-      }
-
-      do {
-        // Log level is not configurable in this version of KlaviyoSwift
-        result(nil)
-      } catch {
-        result(
-          FlutterError(
-            code: "LOG_LEVEL_ERROR", message: "Failed to set log level",
-            details: error.localizedDescription))
-      }
+      // Not directly supported in v5.0.0
+      result(nil)
 
     default:
       result(FlutterMethodNotImplemented)

@@ -9,8 +9,9 @@ import '../exceptions/klaviyo_exception.dart';
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
   static const EventChannel _eventChannel = EventChannel('klaviyo_events');
-  
-  static final KlaviyoNativeWrapper _instance = KlaviyoNativeWrapper._internal();
+
+  static final KlaviyoNativeWrapper _instance =
+      KlaviyoNativeWrapper._internal();
   factory KlaviyoNativeWrapper() => _instance;
   KlaviyoNativeWrapper._internal();
 
@@ -18,13 +19,14 @@ class KlaviyoNativeWrapper {
   String? _apiKey;
 
   // Stream controllers for native events
-  final StreamController<Map<String, dynamic>> _pushNotificationController = 
+  final StreamController<Map<String, dynamic>> _pushNotificationController =
       StreamController<Map<String, dynamic>>.broadcast();
-  final StreamController<Map<String, dynamic>> _formEventController = 
+  final StreamController<Map<String, dynamic>> _formEventController =
       StreamController<Map<String, dynamic>>.broadcast();
 
   // Getters for streams
-  Stream<Map<String, dynamic>> get onPushNotification => _pushNotificationController.stream;
+  Stream<Map<String, dynamic>> get onPushNotification =>
+      _pushNotificationController.stream;
   Stream<Map<String, dynamic>> get onFormEvent => _formEventController.stream;
 
   /// Initialize the native SDK wrapper
@@ -37,7 +39,7 @@ class KlaviyoNativeWrapper {
 
     try {
       _apiKey = apiKey;
-      
+
       // Set up event listeners
       _eventChannel.receiveBroadcastStream().listen(_handleNativeEvent);
 
@@ -57,7 +59,7 @@ class KlaviyoNativeWrapper {
   /// Set user profile using native SDK
   Future<void> setProfile(KlaviyoProfile profile) async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('setProfile', {
         'profile': profile.toJson(),
@@ -70,7 +72,7 @@ class KlaviyoNativeWrapper {
   /// Set user email using native SDK
   Future<void> setEmail(String email) async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('setEmail', {
         'email': email,
@@ -83,7 +85,7 @@ class KlaviyoNativeWrapper {
   /// Set user phone number using native SDK
   Future<void> setPhoneNumber(String phoneNumber) async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('setPhoneNumber', {
         'phoneNumber': phoneNumber,
@@ -96,7 +98,7 @@ class KlaviyoNativeWrapper {
   /// Set external ID using native SDK
   Future<void> setExternalId(String externalId) async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('setExternalId', {
         'externalId': externalId,
@@ -109,7 +111,7 @@ class KlaviyoNativeWrapper {
   /// Set profile properties using native SDK
   Future<void> setProfileProperties(Map<String, dynamic> properties) async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('setProfileProperties', {
         'properties': properties,
@@ -122,7 +124,7 @@ class KlaviyoNativeWrapper {
   /// Track event using native SDK
   Future<void> trackEvent(KlaviyoEvent event) async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('trackEvent', {
         'event': event.toJson(),
@@ -133,7 +135,8 @@ class KlaviyoNativeWrapper {
   }
 
   /// Track simple event using native SDK
-  Future<void> track(String eventName, [Map<String, dynamic>? properties]) async {
+  Future<void> track(String eventName,
+      [Map<String, dynamic>? properties]) async {
     final event = KlaviyoEvent(
       name: eventName,
       properties: properties ?? {},
@@ -145,7 +148,7 @@ class KlaviyoNativeWrapper {
   /// Register for push notifications using native SDK
   Future<void> registerForPushNotifications() async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('registerForPushNotifications');
     } catch (e) {
@@ -154,9 +157,10 @@ class KlaviyoNativeWrapper {
   }
 
   /// Set push token using native SDK
-  Future<void> setPushToken(String token, {PushEnvironment? environment}) async {
+  Future<void> setPushToken(String token,
+      {PushEnvironment? environment}) async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('setPushToken', {
         'token': token,
@@ -170,7 +174,7 @@ class KlaviyoNativeWrapper {
   /// Get push token from native SDK
   Future<PushTokenInfo?> getPushToken() async {
     _ensureInitialized();
-    
+
     try {
       final result = await _channel.invokeMethod('getPushToken');
       if (result != null) {
@@ -183,9 +187,9 @@ class KlaviyoNativeWrapper {
   }
 
   /// Register for in-app forms using native SDK
-  Future<void> registerForInAppForms({Map<String, dynamic>? configuration}) async {
+  Future<void> registerForInAppForms(
+      {Map<String, dynamic>? configuration}) async {
     _ensureInitialized();
-    
     try {
       await _channel.invokeMethod('registerForInAppForms', {
         'configuration': configuration,
@@ -195,39 +199,10 @@ class KlaviyoNativeWrapper {
     }
   }
 
-  /// Show in-app form using native SDK
-  Future<bool> showForm(String formId, {Map<String, dynamic>? customData}) async {
-    _ensureInitialized();
-    
-    try {
-      final result = await _channel.invokeMethod('showForm', {
-        'formId': formId,
-        'customData': customData,
-      });
-      return result as bool? ?? false;
-    } catch (e) {
-      throw KlaviyoException('Failed to show form: $e');
-    }
-  }
-
-  /// Hide in-app form using native SDK
-  Future<bool> hideForm(String formId) async {
-    _ensureInitialized();
-    
-    try {
-      final result = await _channel.invokeMethod('hideForm', {
-        'formId': formId,
-      });
-      return result as bool? ?? false;
-    } catch (e) {
-      throw KlaviyoException('Failed to hide form: $e');
-    }
-  }
-
   /// Reset profile using native SDK
   Future<void> resetProfile() async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('resetProfile');
     } catch (e) {
@@ -238,7 +213,7 @@ class KlaviyoNativeWrapper {
   /// Set log level using native SDK
   Future<void> setLogLevel(String logLevel) async {
     _ensureInitialized();
-    
+
     try {
       await _channel.invokeMethod('setLogLevel', {
         'logLevel': logLevel,
@@ -290,4 +265,4 @@ class KlaviyoNativeWrapper {
     _pushNotificationController.close();
     _formEventController.close();
   }
-} 
+}

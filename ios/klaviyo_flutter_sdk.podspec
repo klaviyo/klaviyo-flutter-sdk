@@ -11,7 +11,8 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'KlaviyoSwift'  # Commented out for demo with mock implementation
+  s.dependency 'KlaviyoSwift', '~> 5.0.0'
+  s.dependency 'KlaviyoForms', '~> 5.0.0'
   s.platform = :ios, '13.0'
 
   # Flutter.framework does not contain a i386 slice.

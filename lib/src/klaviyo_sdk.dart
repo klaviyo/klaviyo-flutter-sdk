@@ -26,7 +26,7 @@ class KlaviyoSDK {
   bool _isInitialized = false;
   String? _apiKey;
   KlaviyoProfile? _currentProfile;
-  final StreamController<KlaviyoProfile?> _profileController = 
+  final StreamController<KlaviyoProfile?> _profileController =
       StreamController<KlaviyoProfile?>.broadcast();
 
   // Getters
@@ -49,11 +49,11 @@ class KlaviyoSDK {
 
     try {
       _apiKey = apiKey;
-      
+
       // Initialize logger
       _logger = Logger();
       _logger.setLogLevel(logLevel);
-      
+
       // Initialize native wrapper
       _nativeWrapper = KlaviyoNativeWrapper();
       await _nativeWrapper.initialize(
@@ -70,7 +70,7 @@ class KlaviyoSDK {
 
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
-      
+
       return this;
     } catch (e) {
       throw KlaviyoException('Failed to initialize SDK: $e');
@@ -80,14 +80,14 @@ class KlaviyoSDK {
   /// Set user profile information
   Future<void> setProfile(KlaviyoProfile profile) async {
     _ensureInitialized();
-    
+
     try {
       _currentProfile = profile;
       _profileController.add(_currentProfile);
-      
+
       await _persistProfile(profile);
       await _nativeWrapper.setProfile(profile);
-      
+
       _logger.info('Profile updated: ${profile.email}');
     } catch (e) {
       throw KlaviyoException('Failed to set profile: $e');
@@ -97,17 +97,17 @@ class KlaviyoSDK {
   /// Set profile email
   Future<void> setEmail(String email) async {
     _ensureInitialized();
-    
-    final profile = _currentProfile?.copyWith(email: email) ?? 
-        KlaviyoProfile(email: email);
+
+    final profile =
+        _currentProfile?.copyWith(email: email) ?? KlaviyoProfile(email: email);
     await setProfile(profile);
   }
 
   /// Set profile phone number
   Future<void> setPhoneNumber(String phoneNumber) async {
     _ensureInitialized();
-    
-    final profile = _currentProfile?.copyWith(phoneNumber: phoneNumber) ?? 
+
+    final profile = _currentProfile?.copyWith(phoneNumber: phoneNumber) ??
         KlaviyoProfile(phoneNumber: phoneNumber);
     await setProfile(profile);
   }
@@ -115,8 +115,8 @@ class KlaviyoSDK {
   /// Set external ID for the profile
   Future<void> setExternalId(String externalId) async {
     _ensureInitialized();
-    
-    final profile = _currentProfile?.copyWith(externalId: externalId) ?? 
+
+    final profile = _currentProfile?.copyWith(externalId: externalId) ??
         KlaviyoProfile(externalId: externalId);
     await setProfile(profile);
   }
@@ -124,20 +124,21 @@ class KlaviyoSDK {
   /// Set profile properties
   Future<void> setProfileProperties(Map<String, dynamic> properties) async {
     _ensureInitialized();
-    
+
     final profile = _currentProfile?.copyWith(properties: {
-      ...(_currentProfile?.properties ?? {}),
-      ...properties,
-    }) ?? KlaviyoProfile(properties: properties);
-    
+          ...(_currentProfile?.properties ?? {}),
+          ...properties,
+        }) ??
+        KlaviyoProfile(properties: properties);
+
     await setProfile(profile);
   }
 
   /// Set profile location
   Future<void> setLocation(KlaviyoLocation location) async {
     _ensureInitialized();
-    
-    final profile = _currentProfile?.copyWith(location: location) ?? 
+
+    final profile = _currentProfile?.copyWith(location: location) ??
         KlaviyoProfile(location: location);
     await setProfile(profile);
   }
@@ -145,7 +146,7 @@ class KlaviyoSDK {
   /// Track an event
   Future<void> trackEvent(KlaviyoEvent event) async {
     _ensureInitialized();
-    
+
     try {
       await _nativeWrapper.trackEvent(event);
       _logger.info('Event tracked: ${event.name}');
@@ -155,7 +156,8 @@ class KlaviyoSDK {
   }
 
   /// Track event with just name and properties
-  Future<void> track(String eventName, [Map<String, dynamic>? properties]) async {
+  Future<void> track(String eventName,
+      [Map<String, dynamic>? properties]) async {
     final event = KlaviyoEvent(
       name: eventName,
       properties: properties ?? {},
@@ -171,7 +173,8 @@ class KlaviyoSDK {
   }
 
   /// Set push token
-  Future<void> setPushToken(String token, {PushEnvironment? environment}) async {
+  Future<void> setPushToken(String token,
+      {PushEnvironment? environment}) async {
     _ensureInitialized();
     await _nativeWrapper.setPushToken(token, environment: environment);
   }
@@ -184,14 +187,16 @@ class KlaviyoSDK {
   }
 
   /// Handle push notification received
-  Future<void> handlePushNotificationReceived(Map<String, dynamic> userInfo) async {
+  Future<void> handlePushNotificationReceived(
+      Map<String, dynamic> userInfo) async {
     _ensureInitialized();
     // Native SDK handles this automatically
     _logger.info('Push notification received');
   }
 
   /// Handle push notification opened
-  Future<void> handlePushNotificationOpened(Map<String, dynamic> userInfo) async {
+  Future<void> handlePushNotificationOpened(
+      Map<String, dynamic> userInfo) async {
     _ensureInitialized();
     // Native SDK handles this automatically
     _logger.info('Push notification opened');
@@ -205,18 +210,6 @@ class KlaviyoSDK {
     );
   }
 
-  /// Show in-app form
-  Future<bool> showForm(String formId, {Map<String, dynamic>? customData}) async {
-    _ensureInitialized();
-    return await _nativeWrapper.showForm(formId, customData: customData);
-  }
-
-  /// Hide in-app form
-  Future<bool> hideForm(String formId) async {
-    _ensureInitialized();
-    return await _nativeWrapper.hideForm(formId);
-  }
-
   /// Unregister from in-app forms
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
@@ -227,13 +220,13 @@ class KlaviyoSDK {
   /// Reset the current profile (useful for logout)
   Future<void> resetProfile() async {
     _ensureInitialized();
-    
+
     _currentProfile = null;
     _profileController.add(null);
-    
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('klaviyo_profile');
-    
+
     await _nativeWrapper.resetProfile();
     _logger.info('Profile reset');
   }
@@ -270,7 +263,7 @@ class KlaviyoSDK {
     try {
       final prefs = await SharedPreferences.getInstance();
       final profileJson = prefs.getString('klaviyo_profile');
-      
+
       if (profileJson != null) {
         _currentProfile = KlaviyoProfile.fromJsonString(profileJson);
         _profileController.add(_currentProfile);
@@ -295,4 +288,4 @@ class KlaviyoSDK {
     _profileController.close();
     _nativeWrapper.dispose();
   }
-} 
+}

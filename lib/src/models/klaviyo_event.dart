@@ -40,7 +40,7 @@ class KlaviyoEvent {
   /// Convert to JSON for API requests
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
-      'event': name,
+      'name': name,
       'properties': Map<String, dynamic>.from(properties),
       'time': timestamp.toIso8601String(),
     };
@@ -48,11 +48,11 @@ class KlaviyoEvent {
     if (customerProperties != null) {
       data['customer_properties'] = customerProperties;
     }
-    
+
     if (value != null) {
       data['properties']['value'] = value;
     }
-    
+
     if (uniqueId != null) {
       data['unique_id'] = uniqueId;
     }
@@ -88,7 +88,7 @@ class KlaviyoEvent {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    
+
     return other is KlaviyoEvent &&
         other.name == name &&
         other.timestamp == timestamp &&
@@ -107,4 +107,4 @@ class KlaviyoEvent {
       uniqueId,
     );
   }
-} 
+}

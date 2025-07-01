@@ -46,13 +46,14 @@ class PushTokenInfo {
   /// Create from JSON
   factory PushTokenInfo.fromJson(Map<String, dynamic> json) {
     return PushTokenInfo(
-      token: json['token'] as String,
-      platform: json['platform'] as String,
+      token: json['token'] as String? ?? '',
+      platform: json['platform'] as String? ?? '',
       environment: PushEnvironment.values.firstWhere(
-        (e) => e.name == json['environment'],
+        (e) => e.name == (json['environment'] as String? ?? ''),
         orElse: () => PushEnvironment.production,
       ),
-      createdAt: DateTime.parse(json['enabled_datetime'] as String),
+      createdAt: DateTime.tryParse(json['enabled_datetime'] as String? ?? '') ??
+          DateTime.now(),
       isActive: json['is_active'] as bool? ?? true,
     );
   }
@@ -65,7 +66,7 @@ class PushTokenInfo {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    
+
     return other is PushTokenInfo &&
         other.token == token &&
         other.environment == environment &&
@@ -84,4 +85,4 @@ class PushTokenInfo {
       isActive,
     );
   }
-} 
+}
