@@ -1,0 +1,20 @@
+Pod::Spec.new do |s|
+  s.name             = 'klaviyo_flutter_sdk'
+  s.version          = '1.0.0'
+  s.summary          = 'A Flutter plugin for Klaviyo SDK integration'
+  s.description      = <<-DESC
+A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS and Android.
+                       DESC
+  s.homepage         = 'https://github.com/klaviyo/klaviyo-flutter-sdk'
+  s.license          = { :file => '../LICENSE' }
+  s.author           = { 'Klaviyo' => 'support@klaviyo.com' }
+  s.source           = { :path => '.' }
+  s.source_files     = 'Classes/**/*'
+  s.dependency 'Flutter'
+  s.dependency 'KlaviyoSwift'  # Commented out for demo with mock implementation
+  s.platform = :ios, '13.0'
+
+  # Flutter.framework does not contain a i386 slice.
+  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
+  s.swift_version = '5.0'
+end 
