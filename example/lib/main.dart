@@ -26,17 +26,20 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initializeKlaviyo() async {
     try {
+      print('🚀 Starting Klaviyo initialization...');
       await _klaviyo.initialize(
         apiKey: 'Xr5bFG',
         logLevel: KlaviyoLogLevel.debug,
         environment: PushEnvironment.development,
       );
+      print('✅ Klaviyo initialization completed');
 
       setState(() {
         _isInitialized = true;
         _status = 'Initialized successfully';
       });
     } catch (e) {
+      print('❌ Klaviyo initialization failed: $e');
       setState(() {
         _status = 'Initialization failed: $e';
       });
@@ -69,11 +72,16 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _setEmail() async {
     try {
-      await _klaviyo.setEmail('newemail@klaviyo.com');
+      final randomEmail =
+          'user_${DateTime.now().millisecondsSinceEpoch}@klaviyo.com';
+      print('📧 Setting email: $randomEmail');
+      await _klaviyo.setEmail(randomEmail);
+      print('✅ Email set successfully');
       setState(() {
-        _status = 'Email set successfully';
+        _status = 'Email set successfully: $randomEmail';
       });
     } catch (e) {
+      print('❌ Failed to set email: $e');
       setState(() {
         _status = 'Failed to set email: $e';
       });
@@ -190,13 +198,14 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _setPushToken() async {
     try {
-      await _klaviyo.setPushToken('mock_device_token_12345');
+      // Instead of setting a mock token, let's get the actual token info
+      final tokenInfo = await _klaviyo.getPushToken();
       setState(() {
-        _status = 'Push token set successfully';
+        _status = 'Push Token Info: ${tokenInfo.toString()}';
       });
     } catch (e) {
       setState(() {
-        _status = 'Failed to set push token: $e';
+        _status = 'Failed to get push token info: ${e.toString()}';
       });
     }
   }
@@ -263,6 +272,35 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  Future<void> _registerForPushNative() async {
+    try {
+      // Use the native Klaviyo SDK push registration
+      await _requestNotificationPermission();
+      await _klaviyo.registerForPushNotifications();
+      setState(() {
+        _status = 'Registered for push notifications (native)';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to register for push: $e';
+      });
+    }
+  }
+
+  Future<void> _getPushTokenNative() async {
+    try {
+      // For now, this is a placeholder since getPushToken doesn't return real tokens
+      final tokenInfo = await _klaviyo.getPushToken();
+      setState(() {
+        _status = 'Push token info: $tokenInfo';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to get push token: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -322,9 +360,9 @@ class _MyAppState extends State<MyApp> {
 
               // Push Notifications Section
               _buildSectionHeader('Push Notifications'),
-              _buildButton('Register for Push', _registerForPush),
-              _buildButton('Set Push Token', _setPushToken),
-              _buildButton('Get Push Token', _getPushToken),
+              _buildButton('Register for Push', _registerForPushNative),
+              _buildButton('Get Push Token Info', _setPushToken),
+              _buildButton('Get Push Token', _getPushTokenNative),
 
               const SizedBox(height: 16),
 

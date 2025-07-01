@@ -5,6 +5,8 @@ import UIKit
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
   private var eventSink: FlutterEventSink?
+  private var lastPushToken: String?
+  private var tokenReceivedDate: Date?
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: registrar.messenger())
@@ -114,21 +116,41 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
       result(nil)
 
     case "registerForPushNotifications":
-      // No-op: handled by iOS system
+      // iOS requires manual APNs registration
+      DispatchQueue.main.async {
+        UIApplication.shared.registerForRemoteNotifications()
+      }
       result(nil)
 
     case "setPushToken":
-      // No-op: handled by iOS system
+      guard let args = call.arguments as? [String: Any],
+        let token = args["token"] as? String
+      else {
+        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid push token", details: nil))
+        return
+      }
+      
+      // Store the token for later retrieval
+      lastPushToken = token
+      
+      // Convert hex string back to Data if needed, or handle string token directly
+      if let tokenData = Data(hexString: token) {
+        KlaviyoSDK().set(pushToken: tokenData)
+      } else {
+        // Handle as string token (for cross-platform compatibility)
+        result(FlutterError(code: "INVALID_TOKEN_FORMAT", message: "Invalid token format", details: nil))
+        return
+      }
       result(nil)
 
     case "getPushToken":
-      // Not directly supported
+      // Return stored push token info
       result([
-        "token": "",
+        "token": lastPushToken ?? "",
         "environment": "production",
         "platform": "ios",
-        "createdAt": Date().description,
-        "isActive": false,
+        "createdAt": tokenReceivedDate?.description ?? "Not received",
+        "isActive": lastPushToken != nil,
       ])
 
     case "registerForInAppForms":
@@ -153,6 +175,30 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
       // Not directly supported in v5.0.0
       result(nil)
 
+    case "onPushTokenReceived":
+      // Called from AppDelegate when a push token is received
+      guard let args = call.arguments as? [String: Any],
+        let token = args["token"] as? String
+      else {
+        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid token data", details: nil))
+        return
+      }
+      lastPushToken = token
+      tokenReceivedDate = Date()
+      print("✅ Push token stored in plugin: \(token)")
+      result(nil)
+      
+    case "onPushTokenError":
+      // Called from AppDelegate when push token registration fails
+      guard let args = call.arguments as? [String: Any],
+        let error = args["error"] as? String
+      else {
+        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid error data", details: nil))
+        return
+      }
+      print("❌ Push token error received in plugin: \(error)")
+      result(nil)
+
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -170,5 +216,26 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
   public func onCancel(withArguments arguments: Any?) -> FlutterError? {
     self.eventSink = nil
     return nil
+  }
+}
+
+extension Data {
+  init?(hexString: String) {
+    let cleanString = hexString.replacingOccurrences(of: " ", with: "")
+    let length = cleanString.count
+    guard length % 2 == 0 else { return nil }
+    
+    var data = Data(capacity: length / 2)
+    var index = cleanString.startIndex
+    
+    for _ in 0..<(length / 2) {
+      let nextIndex = cleanString.index(index, offsetBy: 2)
+      let byteString = cleanString[index..<nextIndex]
+      guard let byte = UInt8(byteString, radix: 16) else { return nil }
+      data.append(byte)
+      index = nextIndex
+    }
+    
+    self = data
   }
 }
