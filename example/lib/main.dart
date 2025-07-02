@@ -15,20 +15,31 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
+  final TextEditingController _apiKeyController = TextEditingController();
   bool _isInitialized = false;
-  String _status = 'Not initialized';
+  String _status = 'Enter your Klaviyo API key to initialize';
 
   @override
   void initState() {
     super.initState();
-    _initializeKlaviyo();
+    // Set default API key for demo purposes
+    _apiKeyController.text = 'Xr5bFG';
   }
 
   Future<void> _initializeKlaviyo() async {
+    final apiKey = _apiKeyController.text.trim();
+
+    if (apiKey.isEmpty) {
+      setState(() {
+        _status = 'Please enter a valid API key';
+      });
+      return;
+    }
+
     try {
-      print('🚀 Starting Klaviyo initialization...');
+      print('🚀 Starting Klaviyo initialization with API key: $apiKey');
       await _klaviyo.initialize(
-        apiKey: 'Xr5bFG',
+        apiKey: apiKey,
         logLevel: KlaviyoLogLevel.debug,
         environment: PushEnvironment.development,
       );
@@ -39,7 +50,7 @@ class _MyAppState extends State<MyApp> {
 
       setState(() {
         _isInitialized = true;
-        _status = 'Initialized successfully';
+        _status = 'Initialized successfully with API key: $apiKey';
       });
     } catch (e) {
       print('❌ Klaviyo initialization failed: $e');
@@ -63,6 +74,13 @@ class _MyAppState extends State<MyApp> {
           _status = 'Push notification opened! Data: ${userInfo.toString()}';
         });
       }
+    });
+  }
+
+  void _resetSdk() {
+    setState(() {
+      _isInitialized = false;
+      _status = 'SDK reset. Enter a new API key to reinitialize.';
     });
   }
 
@@ -339,6 +357,67 @@ class _MyAppState extends State<MyApp> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // API Key Input Section
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Klaviyo API Key',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _apiKeyController,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter your Klaviyo API key (e.g., Xr5bFG)',
+                          border: OutlineInputBorder(),
+                          helperText:
+                              'You can find this in your Klaviyo account settings',
+                        ),
+                        enabled: !_isInitialized,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed:
+                                  _isInitialized ? null : _initializeKlaviyo,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Theme.of(context).primaryColor,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text(_isInitialized
+                                  ? 'Initialized'
+                                  : 'Initialize SDK'),
+                            ),
+                          ),
+                          if (_isInitialized) ...[
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: _resetSdk,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Reset'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Status Card
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -434,6 +513,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
+    _apiKeyController.dispose();
     _klaviyo.dispose();
     super.dispose();
   }

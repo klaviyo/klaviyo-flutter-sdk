@@ -171,8 +171,17 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initializeKlaviyo() async {
+    final apiKey = _apiKeyController.text.trim();
+    
+    if (apiKey.isEmpty) {
+      setState(() {
+        _status = 'Please enter a valid API key';
+      });
+      return;
+    }
+
     await _klaviyo.initialize(
-      apiKey: 'YOUR_API_KEY',
+      apiKey: apiKey, // Use user-provided API key
       logLevel: KlaviyoLogLevel.debug,
       environment: PushEnvironment.production,
     );

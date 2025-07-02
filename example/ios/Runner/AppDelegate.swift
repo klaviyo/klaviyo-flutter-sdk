@@ -11,8 +11,8 @@ import UserNotifications
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     
-    // Initialize Klaviyo SDK (optional - can also be done from Flutter)
-    KlaviyoSDK().initialize(with: "Xr5bFG")
+    // Initialize Klaviyo SDK from Flutter with user-provided API key
+    // KlaviyoSDK().initialize(with: "API_KEY") // Now handled from Flutter
     
     // Set up notification center delegate for push open tracking
     UNUserNotificationCenter.current().delegate = self
