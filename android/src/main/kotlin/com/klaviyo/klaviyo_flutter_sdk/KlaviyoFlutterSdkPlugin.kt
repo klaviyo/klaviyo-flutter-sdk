@@ -2,11 +2,18 @@ package com.klaviyo.klaviyo_flutter_sdk
 
 import androidx.annotation.NonNull
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.EventChannel
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.util.Log
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.Event
@@ -15,23 +22,34 @@ import com.klaviyo.analytics.model.InAppForm
 import org.json.JSONObject
 import org.json.JSONArray
 
-class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler {
+class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var channel : MethodChannel
   private lateinit var eventChannel: EventChannel
   private lateinit var eventSink: EventChannel.EventSink
   private lateinit var applicationContext: android.content.Context
+  private var activity: Activity? = null
+  private lateinit var sharedPreferences: SharedPreferences
+
+  companion object {
+    private const val PREFS_NAME = "KlaviyoFlutterSDKPrefs"
+    private const val KEY_PUSH_TOKEN = "push_token"
+    private const val KEY_TOKEN_TIMESTAMP = "token_timestamp"
+    private const val TAG = "KlaviyoFlutter"
+  }
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     applicationContext = flutterPluginBinding.applicationContext
+    sharedPreferences = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
     channel.setMethodCallHandler(this)
-    
+
     eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, "klaviyo_events")
     eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
       override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         eventSink = events!!
       }
-      
+
       override fun onCancel(arguments: Any?) {
         // Handle cancellation
       }
@@ -165,17 +183,60 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler {
       
       "getPushToken" -> {
         try {
-          // The SDK doesn't provide a direct method to get the push token
-          // This would need to be managed by the Flutter app
+          val token = sharedPreferences.getString(KEY_PUSH_TOKEN, "") ?: ""
+          val timestamp = sharedPreferences.getLong(KEY_TOKEN_TIMESTAMP, 0L)
+
           result.success(mapOf(
-            "token" to "",
+            "token" to token,
             "environment" to "production",
             "platform" to "android",
-            "createdAt" to System.currentTimeMillis().toString(),
-            "isActive" to false
+            "createdAt" to timestamp.toString(),
+            "isActive" to token.isNotEmpty()
           ))
         } catch (e: Exception) {
           result.error("PUSH_TOKEN_ERROR", "Failed to get push token", e.message)
+        }
+      }
+
+      "onPushTokenReceived" -> {
+        val token = call.argument<String>("token")
+
+        try {
+          if (token != null) {
+            // Store token in SharedPreferences
+            sharedPreferences.edit().apply {
+              putString(KEY_PUSH_TOKEN, token)
+              putLong(KEY_TOKEN_TIMESTAMP, System.currentTimeMillis())
+              apply()
+            }
+
+            Log.d(TAG, "FCM token stored: $token")
+            result.success(null)
+          } else {
+            result.error("TOKEN_ERROR", "Token cannot be null", null)
+          }
+        } catch (e: Exception) {
+          result.error("TOKEN_STORAGE_ERROR", "Failed to store token", e.message)
+        }
+      }
+
+      "onPushNotificationOpened" -> {
+        val userInfo = call.argument<Map<String, Any>>("userInfo")
+
+        try {
+          Log.d(TAG, "Push opened: $userInfo")
+
+          // Forward to Flutter via EventChannel
+          if (::eventSink.isInitialized) {
+            eventSink.success(mapOf(
+              "type" to "push_notification_opened",
+              "data" to userInfo
+            ))
+          }
+
+          result.success(null)
+        } catch (e: Exception) {
+          result.error("PUSH_OPEN_ERROR", "Failed to handle push open", e.message)
         }
       }
       
@@ -244,5 +305,77 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler {
 
   override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
     channel.setMethodCallHandler(null)
+  }
+
+  // ActivityAware implementation
+  override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+    activity = binding.activity
+
+    // Handle the intent that launched this activity (cold start)
+    binding.activity.intent?.let { intent ->
+      handleIntent(intent)
+    }
+
+    // Listen for new intents (warm start)
+    binding.addOnNewIntentListener { intent ->
+      handleIntent(intent)
+      false // Return false to allow other listeners
+    }
+  }
+
+  override fun onDetachedFromActivityForConfigChanges() {
+    activity = null
+  }
+
+  override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+    activity = binding.activity
+
+    binding.addOnNewIntentListener { intent ->
+      handleIntent(intent)
+      false
+    }
+  }
+
+  override fun onDetachedFromActivity() {
+    activity = null
+  }
+
+  private fun handleIntent(intent: Intent) {
+    try {
+      // Let Klaviyo SDK handle push notification opens
+      Klaviyo.handlePush(intent)
+
+      // Extract notification data from the intent
+      val extras = intent.extras
+      if (extras != null && extras.containsKey("_k")) {
+        // This is a Klaviyo push notification
+        val notificationData = mutableMapOf<String, Any?>()
+
+        // Extract all extras from the notification
+        for (key in extras.keySet()) {
+          val value = extras.get(key)
+          notificationData[key] = when (value) {
+            is String -> value
+            is Int -> value
+            is Long -> value
+            is Double -> value
+            is Boolean -> value
+            else -> value?.toString()
+          }
+        }
+
+        Log.d(TAG, "Push notification opened: $notificationData")
+
+        // Forward to Flutter via EventChannel
+        if (::eventSink.isInitialized) {
+          eventSink.success(mapOf(
+            "type" to "push_notification_opened",
+            "data" to notificationData
+          ))
+        }
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Error handling push: ${e.message}", e)
+    }
   }
 } 
