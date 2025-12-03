@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
@@ -12,7 +11,8 @@ import 'utils/logger.dart';
 import 'exceptions/klaviyo_exception.dart';
 
 /// Main Klaviyo SDK class for Flutter applications
-/// This SDK acts as a wrapper around the native Klaviyo SDKs
+/// This SDK acts as a thin wrapper around the native Klaviyo SDKs
+/// All state is managed by the native SDKs - this class only forwards calls
 class KlaviyoSDK {
   static final KlaviyoSDK _instance = KlaviyoSDK._internal();
   factory KlaviyoSDK() => _instance;
@@ -25,15 +25,10 @@ class KlaviyoSDK {
   // State
   bool _isInitialized = false;
   String? _apiKey;
-  KlaviyoProfile? _currentProfile;
-  final StreamController<KlaviyoProfile?> _profileController =
-      StreamController<KlaviyoProfile?>.broadcast();
 
   // Getters
   bool get isInitialized => _isInitialized;
   String? get apiKey => _apiKey;
-  KlaviyoProfile? get currentProfile => _currentProfile;
-  Stream<KlaviyoProfile?> get profileStream => _profileController.stream;
 
   /// Initialize the Klaviyo SDK with your public API key
   Future<KlaviyoSDK> initialize({
@@ -65,9 +60,6 @@ class KlaviyoSDK {
       // Set up native event listeners
       _setupNativeEventListeners();
 
-      // Load persisted profile
-      await _loadPersistedProfile();
-
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
 
@@ -78,16 +70,12 @@ class KlaviyoSDK {
   }
 
   /// Set user profile information
+  /// Profile state is managed by the native SDK
   Future<void> setProfile(KlaviyoProfile profile) async {
     _ensureInitialized();
 
     try {
-      _currentProfile = profile;
-      _profileController.add(_currentProfile);
-
-      await _persistProfile(profile);
       await _nativeWrapper.setProfile(profile);
-
       _logger.info('Profile updated: ${profile.email}');
     } catch (e) {
       throw KlaviyoException('Failed to set profile: $e');
@@ -95,52 +83,68 @@ class KlaviyoSDK {
   }
 
   /// Set profile email
+  /// Calls the native SDK directly - native SDK manages profile state
   Future<void> setEmail(String email) async {
     _ensureInitialized();
 
-    final profile =
-        _currentProfile?.copyWith(email: email) ?? KlaviyoProfile(email: email);
-    await setProfile(profile);
+    try {
+      await _nativeWrapper.setEmail(email);
+      _logger.info('Email set: $email');
+    } catch (e) {
+      throw KlaviyoException('Failed to set email: $e');
+    }
   }
 
   /// Set profile phone number
+  /// Calls the native SDK directly - native SDK manages profile state
   Future<void> setPhoneNumber(String phoneNumber) async {
     _ensureInitialized();
 
-    final profile = _currentProfile?.copyWith(phoneNumber: phoneNumber) ??
-        KlaviyoProfile(phoneNumber: phoneNumber);
-    await setProfile(profile);
+    try {
+      await _nativeWrapper.setPhoneNumber(phoneNumber);
+      _logger.info('Phone number set: $phoneNumber');
+    } catch (e) {
+      throw KlaviyoException('Failed to set phone number: $e');
+    }
   }
 
   /// Set external ID for the profile
+  /// Calls the native SDK directly - native SDK manages profile state
   Future<void> setExternalId(String externalId) async {
     _ensureInitialized();
 
-    final profile = _currentProfile?.copyWith(externalId: externalId) ??
-        KlaviyoProfile(externalId: externalId);
-    await setProfile(profile);
+    try {
+      await _nativeWrapper.setExternalId(externalId);
+      _logger.info('External ID set: $externalId');
+    } catch (e) {
+      throw KlaviyoException('Failed to set external ID: $e');
+    }
   }
 
   /// Set profile properties
+  /// Calls the native SDK directly - native SDK manages profile state
   Future<void> setProfileProperties(Map<String, dynamic> properties) async {
     _ensureInitialized();
 
-    final profile = _currentProfile?.copyWith(properties: {
-          ...(_currentProfile?.properties ?? {}),
-          ...properties,
-        }) ??
-        KlaviyoProfile(properties: properties);
-
-    await setProfile(profile);
+    try {
+      await _nativeWrapper.setProfileProperties(properties);
+      _logger.info('Profile properties set');
+    } catch (e) {
+      throw KlaviyoException('Failed to set profile properties: $e');
+    }
   }
 
   /// Set profile location
+  /// Calls the native SDK directly - native SDK manages profile state
   Future<void> setLocation(KlaviyoLocation location) async {
     _ensureInitialized();
 
-    final profile = _currentProfile?.copyWith(location: location) ??
-        KlaviyoProfile(location: location);
-    await setProfile(profile);
+    try {
+      await _nativeWrapper.setLocation(location);
+      _logger.info('Location set');
+    } catch (e) {
+      throw KlaviyoException('Failed to set location: $e');
+    }
   }
 
   /// Track an event
@@ -218,17 +222,16 @@ class KlaviyoSDK {
   }
 
   /// Reset the current profile (useful for logout)
+  /// Profile state is managed by the native SDK
   Future<void> resetProfile() async {
     _ensureInitialized();
 
-    _currentProfile = null;
-    _profileController.add(null);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('klaviyo_profile');
-
-    await _nativeWrapper.resetProfile();
-    _logger.info('Profile reset');
+    try {
+      await _nativeWrapper.resetProfile();
+      _logger.info('Profile reset');
+    } catch (e) {
+      throw KlaviyoException('Failed to reset profile: $e');
+    }
   }
 
   /// Set log level
@@ -272,33 +275,8 @@ class KlaviyoSDK {
     }
   }
 
-  Future<void> _loadPersistedProfile() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final profileJson = prefs.getString('klaviyo_profile');
-
-      if (profileJson != null) {
-        _currentProfile = KlaviyoProfile.fromJsonString(profileJson);
-        _profileController.add(_currentProfile);
-        _logger.debug('Loaded persisted profile');
-      }
-    } catch (e) {
-      _logger.warning('Failed to load persisted profile: $e');
-    }
-  }
-
-  Future<void> _persistProfile(KlaviyoProfile profile) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('klaviyo_profile', profile.toJsonString());
-    } catch (e) {
-      _logger.warning('Failed to persist profile: $e');
-    }
-  }
-
   /// Dispose resources
   void dispose() {
-    _profileController.close();
     _nativeWrapper.dispose();
   }
 }
