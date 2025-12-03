@@ -57,7 +57,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
     case "setEmail":
       guard let args = call.arguments as? [String: Any],
-        let email = args["email"] as? String
+        let _ = args["email"] as? String
       else {
         result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid email", details: nil))
         return
@@ -67,7 +67,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
     case "setPhoneNumber":
       guard let args = call.arguments as? [String: Any],
-        let phoneNumber = args["phoneNumber"] as? String
+        let _ = args["phoneNumber"] as? String
       else {
         result(
           FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid phone number", details: nil))
@@ -78,7 +78,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
     case "setExternalId":
       guard let args = call.arguments as? [String: Any],
-        let externalId = args["externalId"] as? String
+        let _ = args["externalId"] as? String
       else {
         result(
           FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid external ID", details: nil))
@@ -89,7 +89,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
     case "setProfileProperties":
       guard let args = call.arguments as? [String: Any],
-        let properties = args["properties"] as? [String: Any]
+        let _ = args["properties"] as? [String: Any]
       else {
         result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid properties", details: nil))
         return
