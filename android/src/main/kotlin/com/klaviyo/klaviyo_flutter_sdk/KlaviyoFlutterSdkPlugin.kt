@@ -17,8 +17,9 @@ import android.util.Log
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.Event
-import com.klaviyo.analytics.model.PushToken
-import com.klaviyo.analytics.model.InAppForm
+import com.klaviyo.analytics.model.ProfileKey
+import com.klaviyo.analytics.model.EventKey
+import com.klaviyo.analytics.model.EventMetric
 import org.json.JSONObject
 import org.json.JSONArray
 
@@ -81,17 +82,28 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       "setProfile" -> {
         val profileJson = call.argument<Map<String, Any>>("profile")
         try {
-          val profile = Profile.Builder()
-            .email(profileJson?.get("email") as? String)
-            .phoneNumber(profileJson?.get("phone_number") as? String)
-            .externalId(profileJson?.get("external_id") as? String)
-            .firstName(profileJson?.get("first_name") as? String)
-            .lastName(profileJson?.get("last_name") as? String)
-            .organization(profileJson?.get("organization") as? String)
-            .title(profileJson?.get("title") as? String)
-            .image(profileJson?.get("image") as? String)
-            .build()
-          
+          // Build properties map for custom fields
+          val properties = mutableMapOf<ProfileKey, java.io.Serializable>()
+          (profileJson?.get("first_name") as? String)?.let { properties[ProfileKey.FIRST_NAME] = it }
+          (profileJson?.get("last_name") as? String)?.let { properties[ProfileKey.LAST_NAME] = it }
+          (profileJson?.get("organization") as? String)?.let { properties[ProfileKey.ORGANIZATION] = it }
+          (profileJson?.get("title") as? String)?.let { properties[ProfileKey.TITLE] = it }
+          (profileJson?.get("image") as? String)?.let { properties[ProfileKey.IMAGE] = it }
+
+          // Add any custom properties from the properties field
+          (profileJson?.get("properties") as? Map<String, Any>)?.forEach { (key, value) ->
+            if (value is java.io.Serializable) {
+              properties[ProfileKey.CUSTOM(key)] = value
+            }
+          }
+
+          val profile = Profile(
+            externalId = profileJson?.get("external_id") as? String,
+            email = profileJson?.get("email") as? String,
+            phoneNumber = profileJson?.get("phone_number") as? String,
+            properties = properties.toMap()
+          )
+
           Klaviyo.setProfile(profile)
           result.success(null)
         } catch (e: Exception) {
@@ -132,7 +144,12 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       "setProfileProperties" -> {
         val properties = call.argument<Map<String, Any>>("properties")
         try {
-          Klaviyo.setProfileProperties(properties!!)
+          // Set each property individually using setProfileAttribute
+          properties?.forEach { (key, value) ->
+            if (value is java.io.Serializable) {
+              Klaviyo.setProfileAttribute(ProfileKey.CUSTOM(key), value)
+            }
+          }
           result.success(null)
         } catch (e: Exception) {
           result.error("PROPERTIES_ERROR", "Failed to set profile properties", e.message)
@@ -142,13 +159,22 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       "trackEvent" -> {
         val eventJson = call.argument<Map<String, Any>>("event")
         try {
-          val event = Event.Builder()
-            .name(eventJson?.get("name") as String)
-            .properties(eventJson?.get("properties") as? Map<String, Any>)
-            .timestamp(eventJson?.get("timestamp") as? String)
-            .build()
-          
-          Klaviyo.trackEvent(event)
+          val eventName = eventJson?.get("name") as String
+          var event = Event(EventMetric.CUSTOM(eventName))
+
+          // Add properties if provided
+          (eventJson?.get("properties") as? Map<String, Any>)?.forEach { (key, value) ->
+            if (value is java.io.Serializable) {
+              event = event.setProperty(EventKey.CUSTOM(key), value)
+            }
+          }
+
+          // Add value if provided
+          (eventJson?.get("value") as? Number)?.let { value ->
+            event = event.setValue(value.toDouble())
+          }
+
+          Klaviyo.createEvent(event)
           result.success(null)
         } catch (e: Exception) {
           result.error("TRACK_ERROR", "Failed to track event", e.message)
@@ -157,7 +183,9 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       
       "registerForPushNotifications" -> {
         try {
-          Klaviyo.registerForPushNotifications()
+          // On Android, push registration is handled by Firebase
+          // The app should handle FCM token via FirebaseMessaging.getInstance().token
+          // and then call setPushToken
           result.success(null)
         } catch (e: Exception) {
           result.error("PUSH_REGISTER_ERROR", "Failed to register for push notifications", e.message)
@@ -166,15 +194,10 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       
       "setPushToken" -> {
         val token = call.argument<String>("token")
-        val environment = call.argument<String>("environment")
-        
+
         try {
-          val pushToken = PushToken.Builder()
-            .token(token!!)
-            .environment(environment ?: "production")
-            .build()
-          
-          Klaviyo.setPushToken(pushToken)
+          // Klaviyo.setPushToken takes a String token directly
+          Klaviyo.setPushToken(token!!)
           result.success(null)
         } catch (e: Exception) {
           result.error("PUSH_TOKEN_ERROR", "Failed to set push token", e.message)

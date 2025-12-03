@@ -59,3 +59,7 @@ build/
 *.tmp
 *.temp
 flutter_macos_arm64_stable.zip
+
+# Firebase
+**/google-services.json
+**/GoogleService-Info.plist
