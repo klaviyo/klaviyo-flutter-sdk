@@ -263,7 +263,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _registerForForms() async {
     try {
-      final config = const InAppFormConfig(
+      const config = InAppFormConfig(
         enabled: true,
         autoShow: true,
         position: 'bottom',
