@@ -1,68 +1,44 @@
 class InAppFormConfig {
-  final bool? enabled;
-  final bool? autoShow;
-  final String? position;
-  final Map<String, dynamic>? theme;
+  final int? sessionTimeoutDuration;
 
   const InAppFormConfig({
-    this.enabled,
-    this.autoShow,
-    this.position,
-    this.theme,
+    this.sessionTimeoutDuration,
   });
 
   factory InAppFormConfig.fromJson(Map<String, dynamic> json) {
     return InAppFormConfig(
-      enabled: json['enabled'] as bool?,
-      autoShow: json['autoShow'] as bool?,
-      position: json['position'] as String?,
-      theme: json['theme'] as Map<String, dynamic>?,
+      sessionTimeoutDuration: json['sessionTimeoutDuration'] as int?
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'enabled': enabled,
-      'autoShow': autoShow,
-      'position': position,
-      'theme': theme,
+      'sessionTimeoutDuration': sessionTimeoutDuration
     };
   }
 
   InAppFormConfig copyWith({
-    bool? enabled,
-    bool? autoShow,
-    String? position,
-    Map<String, dynamic>? theme,
+    int? sessionTimeoutDuration
   }) {
     return InAppFormConfig(
-      enabled: enabled ?? this.enabled,
-      autoShow: autoShow ?? this.autoShow,
-      position: position ?? this.position,
-      theme: theme ?? this.theme,
+      sessionTimeoutDuration: sessionTimeoutDuration ?? this.sessionTimeoutDuration
     );
   }
 
   @override
   String toString() {
-    return 'InAppFormConfig(enabled: $enabled, autoShow: $autoShow, position: $position, theme: $theme)';
+    return 'InAppFormConfig(sessionTimeoutDuration: $sessionTimeoutDuration)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is InAppFormConfig &&
-        other.enabled == enabled &&
-        other.autoShow == autoShow &&
-        other.position == position &&
-        other.theme == theme;
+        other.sessionTimeoutDuration == sessionTimeoutDuration;
   }
 
   @override
   int get hashCode {
-    return enabled.hashCode ^
-        autoShow.hashCode ^
-        position.hashCode ^
-        theme.hashCode;
+    return sessionTimeoutDuration.hashCode;
   }
 }
