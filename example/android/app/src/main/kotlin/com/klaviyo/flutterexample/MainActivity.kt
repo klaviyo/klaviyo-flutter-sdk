@@ -1,4 +1,4 @@
-package com.example.example
+package com.klaviyo.flutterexample
 
 import android.content.Intent
 import android.os.Bundle
