@@ -10,6 +10,7 @@ import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
+import com.klaviyo.analytics.InAppFormsConfig
 import com.klaviyo.core.Registry
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -19,6 +20,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class KlaviyoFlutterSdkPlugin :
     FlutterPlugin,
@@ -38,11 +41,11 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
         applicationContext = flutterPluginBinding.applicationContext
-
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
 
         eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, "klaviyo_events")
+<<<<<<< HEAD
         eventChannel.setStreamHandler(
             object : EventChannel.StreamHandler {
                 override fun onListen(
@@ -224,7 +227,14 @@ class KlaviyoFlutterSdkPlugin :
                 val configuration = call.argument<Map<String, Any>>("configuration")
 
                 try {
-                    // In-app forms registration is handled automatically by the SDK
+                    val sessionTimeout: Duration =
+                        (configuration?.get("sessionTimeoutDuration") as? Int)?.seconds
+                            ?: InAppFormsConfig.DEFAULT_SESSION_TIMEOUT
+
+                    Klaviyo.registerForInAppForms(
+                        InAppFormsConfig(sessionTimeoutDuration = sessionTimeout)
+                    )
+
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
