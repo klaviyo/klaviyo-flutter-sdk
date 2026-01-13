@@ -402,38 +402,44 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _registerForForms() async {
     try {
-      final durationText = _durationController.text.trim();
-      final durationSeconds = int.tryParse(durationText);
+      final text = _durationController.text.trim();
 
-      if (durationSeconds == null) {
+      final InAppFormConfig? config = switch (text) {
+        '' => null, // default 1hr
+        '-1' => const InAppFormConfig.infinite(),
+        _ => _parseFiniteConfig(text),
+      };
+
+      if (config == null && text.isNotEmpty && text != '') {
         setState(() {
           _status = 'Invalid duration value. Please enter a number.';
         });
         return;
       }
 
-      final InAppFormConfig config;
-      if (durationSeconds == -1) {
-        // Use infinite timeout
-        config = const InAppFormConfig.infinite();
-      } else {
-        // Use custom duration
-        config = InAppFormConfig(
-          sessionTimeoutDuration: Duration(seconds: durationSeconds),
-        );
-      }
-
       await _klaviyo.registerForInAppForms(configuration: config);
+
       setState(() {
-        _status = durationSeconds == -1
+        _status = config == null
+            ? 'Registered for in-app forms (default timeout)'
+            : config.isInfinite
             ? 'Registered for in-app forms (infinite timeout)'
-            : 'Registered for in-app forms ($durationSeconds seconds)';
+            : 'Registered for in-app forms (${config.sessionTimeoutDuration!.inSeconds} seconds)';
       });
     } catch (e) {
       setState(() {
         _status = 'Failed to register for forms: $e';
       });
     }
+  }
+
+  InAppFormConfig? _parseFiniteConfig(String text) {
+    final seconds = int.tryParse(text);
+    if (seconds == null || seconds <= 0) return null;
+
+    return InAppFormConfig(
+      sessionTimeoutDuration: Duration(seconds: seconds),
+    );
   }
 
   Future<void> _setLogLevel() async {
