@@ -1,44 +1,77 @@
-class InAppFormConfig {
-  final int? sessionTimeoutDuration;
+const int _infiniteTimeoutSentinel = -1;
 
-  const InAppFormConfig({
+class InAppFormConfig {
+  final Duration? sessionTimeoutDuration;
+  final bool isInfinite;
+
+  const InAppFormConfig._({
     this.sessionTimeoutDuration,
+    required this.isInfinite,
   });
 
+  /// Platform default (1hr) or custom timeout
+  const InAppFormConfig({Duration? sessionTimeoutDuration})
+    : this._(sessionTimeoutDuration: sessionTimeoutDuration, isInfinite: false);
+
+  /// No timeout (infinite)
+  const InAppFormConfig.infinite()
+    : this._(sessionTimeoutDuration: null, isInfinite: true);
+
   factory InAppFormConfig.fromJson(Map<String, dynamic> json) {
-    return InAppFormConfig(
-      sessionTimeoutDuration: json['sessionTimeoutDuration'] as int?
-    );
+    final raw = json['sessionTimeoutDuration'];
+
+    if (raw == _infiniteTimeoutSentinel) {
+      return const InAppFormConfig.infinite();
+    }
+
+    if (raw is int) {
+      return InAppFormConfig(
+        sessionTimeoutDuration: Duration(seconds: raw),
+      );
+    }
+
+    return const InAppFormConfig();
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'sessionTimeoutDuration': sessionTimeoutDuration
+      'sessionTimeoutDuration': isInfinite
+          ? _infiniteTimeoutSentinel
+          : sessionTimeoutDuration?.inSeconds,
     };
   }
 
   InAppFormConfig copyWith({
-    int? sessionTimeoutDuration
+    Duration? sessionTimeoutDuration,
+    bool? isInfinite,
   }) {
+    if (isInfinite == true) {
+      return const InAppFormConfig.infinite();
+    }
+
     return InAppFormConfig(
-      sessionTimeoutDuration: sessionTimeoutDuration ?? this.sessionTimeoutDuration
+      sessionTimeoutDuration:
+      sessionTimeoutDuration ?? this.sessionTimeoutDuration,
     );
   }
 
   @override
   String toString() {
-    return 'InAppFormConfig(sessionTimeoutDuration: $sessionTimeoutDuration)';
+    return isInfinite
+        ? 'InAppFormConfig(sessionTimeoutDuration: infinite)'
+        : 'InAppFormConfig(sessionTimeoutDuration: $sessionTimeoutDuration)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
+
     return other is InAppFormConfig &&
+        other.isInfinite == isInfinite &&
         other.sessionTimeoutDuration == sessionTimeoutDuration;
   }
 
   @override
-  int get hashCode {
-    return sessionTimeoutDuration.hashCode;
-  }
+  int get hashCode =>
+      Object.hash(isInfinite, sessionTimeoutDuration);
 }

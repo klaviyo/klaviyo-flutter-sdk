@@ -10,8 +10,9 @@ import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
-import com.klaviyo.analytics.InAppFormsConfig
 import com.klaviyo.core.Registry
+import com.klaviyo.forms.InAppFormsConfig
+import com.klaviyo.forms.registerForInAppForms
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -21,6 +22,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.INFINITE
 import kotlin.time.Duration.Companion.seconds
 
 class KlaviyoFlutterSdkPlugin :
@@ -35,6 +37,7 @@ class KlaviyoFlutterSdkPlugin :
 
     companion object {
         private const val TAG = "KlaviyoFlutter"
+        private const val INFINITE_TIMEOUT_SENTINEL = -1
     }
 
     override fun onAttachedToEngine(
@@ -227,9 +230,11 @@ class KlaviyoFlutterSdkPlugin :
                 val configuration = call.argument<Map<String, Any>>("configuration")
 
                 try {
-                    val sessionTimeout: Duration =
-                        (configuration?.get("sessionTimeoutDuration") as? Int)?.seconds
-                            ?: InAppFormsConfig.DEFAULT_SESSION_TIMEOUT
+                    val sessionTimeout: Duration = when (val timeout = configuration?.get("sessionTimeoutDuration") as? Int) {
+                        null -> InAppFormsConfig.DEFAULT_SESSION_TIMEOUT
+                        INFINITE_TIMEOUT_SENTINEL -> INFINITE
+                        else -> timeout.seconds
+                    }
 
                     Klaviyo.registerForInAppForms(
                         InAppFormsConfig(sessionTimeoutDuration = sessionTimeout)
