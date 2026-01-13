@@ -31,6 +31,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
   final TextEditingController _apiKeyController = TextEditingController();
+  final TextEditingController _durationController = TextEditingController();
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
 
@@ -401,19 +402,32 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _registerForForms() async {
     try {
-      const config = InAppFormConfig(
-        enabled: true,
-        autoShow: true,
-        position: 'bottom',
-        theme: {
-          'primary_color': '#007bff',
-          'text_color': '#333333',
-        },
-      );
+      final durationText = _durationController.text.trim();
+      final durationSeconds = int.tryParse(durationText);
+
+      if (durationSeconds == null) {
+        setState(() {
+          _status = 'Invalid duration value. Please enter a number.';
+        });
+        return;
+      }
+
+      final InAppFormConfig config;
+      if (durationSeconds == -1) {
+        // Use infinite timeout
+        config = const InAppFormConfig.infinite();
+      } else {
+        // Use custom duration
+        config = InAppFormConfig(
+          sessionTimeoutDuration: Duration(seconds: durationSeconds),
+        );
+      }
 
       await _klaviyo.registerForInAppForms(configuration: config);
       setState(() {
-        _status = 'Registered for in-app forms';
+        _status = durationSeconds == -1
+            ? 'Registered for in-app forms (infinite timeout)'
+            : 'Registered for in-app forms ($durationSeconds seconds)';
       });
     } catch (e) {
       setState(() {
@@ -575,8 +589,22 @@ class _MyAppState extends State<MyApp> {
 
               // In-App Forms Section
               _buildSectionHeader('In-App Forms'),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: TextField(
+                  controller: _durationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Session Timeout Duration (seconds)',
+                    hintText: 'Enter seconds (default: 3600)',
+                    border: OutlineInputBorder(),
+                    helperText: 'Enter -1 for infinite timeout',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(signed: true),
+                  enabled: _isInitialized,
+                ),
+              ),
               _buildButton('Register for Forms', _registerForForms),
-
+              // unregister button here
               const SizedBox(height: 16),
 
               // Configuration Section
@@ -622,6 +650,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void dispose() {
     _apiKeyController.dispose();
+    _durationController.dispose();
     _klaviyo.dispose();
     super.dispose();
   }
