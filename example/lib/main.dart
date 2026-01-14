@@ -128,11 +128,15 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _setPhoneNumber() async {
     try {
-      await _klaviyo.setPhoneNumber('+1987654321');
+      const phoneNumber = '+12015557210';
+      print('📱 Setting phone number: $phoneNumber');
+      await _klaviyo.setPhoneNumber(phoneNumber);
+      print('✅ Phone number set successfully');
       setState(() {
-        _status = 'Phone number set successfully';
+        _status = 'Phone number set successfully: $phoneNumber';
       });
     } catch (e) {
+      print('❌ Failed to set phone number: $e');
       setState(() {
         _status = 'Failed to set phone number: $e';
       });
@@ -141,11 +145,15 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _setExternalId() async {
     try {
-      await _klaviyo.setExternalId('user_12345');
+      const externalId = 'user_12345';
+      print('🆔 Setting external ID: $externalId');
+      await _klaviyo.setExternalId(externalId);
+      print('✅ External ID set successfully');
       setState(() {
-        _status = 'External ID set successfully';
+        _status = 'External ID set successfully: $externalId';
       });
     } catch (e) {
+      print('❌ Failed to set external ID: $e');
       setState(() {
         _status = 'Failed to set external ID: $e';
       });
@@ -154,15 +162,19 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _setProfileProperties() async {
     try {
-      await _klaviyo.setProfileProperties({
+      final properties = {
         'preferences': {'notifications': true, 'marketing': false},
         'last_activity': DateTime.now().toIso8601String(),
         'app_version': '1.0.0',
-      });
+      };
+      print('⚙️ Setting profile properties: $properties');
+      await _klaviyo.setProfileProperties(properties);
+      print('✅ Profile properties set successfully');
       setState(() {
         _status = 'Profile properties set successfully';
       });
     } catch (e) {
+      print('❌ Failed to set profile properties: $e');
       setState(() {
         _status = 'Failed to set profile properties: $e';
       });
