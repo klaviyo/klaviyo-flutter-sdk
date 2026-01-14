@@ -423,8 +423,8 @@ class _MyAppState extends State<MyApp> {
         _status = config == null
             ? 'Registered for in-app forms (default timeout)'
             : config.isInfinite
-            ? 'Registered for in-app forms (infinite timeout)'
-            : 'Registered for in-app forms (${config.sessionTimeoutDuration!.inSeconds} seconds)';
+                ? 'Registered for in-app forms (infinite timeout)'
+                : 'Registered for in-app forms (${config.sessionTimeoutDuration!.inSeconds} seconds)';
       });
     } catch (e) {
       setState(() {
@@ -440,6 +440,19 @@ class _MyAppState extends State<MyApp> {
     return InAppFormConfig(
       sessionTimeoutDuration: Duration(seconds: seconds),
     );
+  }
+
+  Future<void> _unregisterFromInAppForms() async {
+    try {
+      await _klaviyo.unregisterFromInAppForms();
+      setState(() {
+        _status = 'Unregistered from in-app forms.';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to unregister from in-app forms: $e';
+      });
+    }
   }
 
   Future<void> _setLogLevel() async {
@@ -605,12 +618,13 @@ class _MyAppState extends State<MyApp> {
                     border: OutlineInputBorder(),
                     helperText: 'Enter -1 for infinite timeout',
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(signed: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(signed: true),
                   enabled: _isInitialized,
                 ),
               ),
               _buildButton('Register for Forms', _registerForForms),
-              // unregister button here
+              _buildButton('Unregister from Forms', _unregisterFromInAppForms),
               const SizedBox(height: 16),
 
               // Configuration Section
