@@ -89,13 +89,17 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             
         case "setProfileProperties":
             guard let args = call.arguments as? [String: Any],
-                  let _ = args["properties"] as? [String: Any]
+                  let properties = args["properties"] as? [String: Any]
             else {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid properties", details: nil))
                 return
             }
-            // Not directly supported: must use setProfile with new Profile
-            result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
+
+            properties.forEach { (key, value) in
+                let profileKey = Profile.ProfileKey.from(key)
+                KlaviyoSDK().set(profileAttribute: profileKey, value: value)
+            }
+            result(nil)
             
         case "trackEvent":
             guard let args = call.arguments as? [String: Any],
