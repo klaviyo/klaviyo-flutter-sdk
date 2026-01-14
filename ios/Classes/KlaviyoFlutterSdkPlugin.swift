@@ -57,13 +57,13 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             
         case "setEmail":
             guard let args = call.arguments as? [String: Any],
-                  let _ = args["email"] as? String
+                  let email = args["email"] as? String
             else {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid email", details: nil))
                 return
             }
-            // Not directly supported: must use setProfile with new Profile
-            result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
+            KlaviyoSDK().set(email: email)
+            result(nil)
             
         case "setPhoneNumber":
             guard let args = call.arguments as? [String: Any],
