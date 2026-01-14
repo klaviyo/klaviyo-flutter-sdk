@@ -435,7 +435,7 @@ class _MyAppState extends State<MyApp> {
 
   InAppFormConfig? _parseFiniteConfig(String text) {
     final seconds = int.tryParse(text);
-    if (seconds == null || seconds <= 0) return null;
+    if (seconds == null || seconds < 0) return null;
 
     return InAppFormConfig(
       sessionTimeoutDuration: Duration(seconds: seconds),
@@ -616,7 +616,8 @@ class _MyAppState extends State<MyApp> {
                     labelText: 'Session Timeout Duration (seconds)',
                     hintText: 'Enter seconds (default: 3600)',
                     border: OutlineInputBorder(),
-                    helperText: 'Enter -1 for infinite timeout',
+                    helperText: 'Enter -1 for infinite timeout, 0 for timeout '
+                        'on background',
                   ),
                   keyboardType:
                       const TextInputType.numberWithOptions(signed: true),

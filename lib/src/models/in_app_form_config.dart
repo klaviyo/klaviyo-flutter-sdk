@@ -1,6 +1,11 @@
 const int _infiniteTimeoutSentinel = -1;
 
 class InAppFormConfig {
+
+  /// - null → platform default (1 hour)
+  /// - 0 → timeout immediately when app backgrounds
+  /// - >0 → timeout after inactivity
+  /// - infinite() → no timeout
   final Duration? sessionTimeoutDuration;
   final bool isInfinite;
 
