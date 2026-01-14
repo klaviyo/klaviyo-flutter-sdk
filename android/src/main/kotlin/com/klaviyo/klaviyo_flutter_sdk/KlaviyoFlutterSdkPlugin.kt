@@ -48,7 +48,6 @@ class KlaviyoFlutterSdkPlugin :
         channel.setMethodCallHandler(this)
 
         eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, "klaviyo_events")
-<<<<<<< HEAD
         eventChannel.setStreamHandler(
             object : EventChannel.StreamHandler {
                 override fun onListen(
@@ -230,11 +229,12 @@ class KlaviyoFlutterSdkPlugin :
                 val configuration = call.argument<Map<String, Any>>("configuration")
 
                 try {
-                    val sessionTimeout: Duration = when (val timeout = configuration?.get("sessionTimeoutDuration") as? Int) {
-                        null -> InAppFormsConfig.DEFAULT_SESSION_TIMEOUT
-                        INFINITE_TIMEOUT_SENTINEL -> INFINITE
-                        else -> timeout.seconds
-                    }
+                    val sessionTimeout: Duration =
+                        when (val timeout = configuration?.get("sessionTimeoutDuration") as? Int) {
+                            null -> InAppFormsConfig.DEFAULT_SESSION_TIMEOUT
+                            INFINITE_TIMEOUT_SENTINEL -> INFINITE
+                            else -> timeout.seconds
+                        }
 
                     Klaviyo.registerForInAppForms(
                         InAppFormsConfig(sessionTimeoutDuration = sessionTimeout)
@@ -244,6 +244,16 @@ class KlaviyoFlutterSdkPlugin :
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
                 }
+            }
+
+            "unregisterFromInAppForms" -> {
+                try {
+                    Klaviyo.unregisterFromInAppForms()
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to unregister from in-app forms", e.message)
+                }
+
             }
 
             "showForm" -> {

@@ -219,12 +219,13 @@ class KlaviyoSDK {
     await _nativeWrapper.registerForInAppForms(
       configuration: configuration?.toJson(),
     );
+    _logger.info('Registered for in-app forms');
   }
 
   /// Unregister from in-app forms
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
-    // TODO: Implement unregistration in native wrapper
+    await _nativeWrapper.unregisterFromInAppForms();
     _logger.info('Unregistered from in-app forms');
   }
 

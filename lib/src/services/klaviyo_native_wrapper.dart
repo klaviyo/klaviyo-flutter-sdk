@@ -11,7 +11,9 @@ class KlaviyoNativeWrapper {
 
   static final KlaviyoNativeWrapper _instance =
       KlaviyoNativeWrapper._internal();
+
   factory KlaviyoNativeWrapper() => _instance;
+
   KlaviyoNativeWrapper._internal();
 
   bool _isInitialized = false;
@@ -26,6 +28,7 @@ class KlaviyoNativeWrapper {
   // Getters for streams
   Stream<Map<String, dynamic>> get onPushNotification =>
       _pushNotificationController.stream;
+
   Stream<Map<String, dynamic>> get onFormEvent => _formEventController.stream;
 
   /// Initialize the native SDK wrapper
@@ -60,9 +63,7 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setProfile', {
-        'profile': profile.toJson(),
-      });
+      await _channel.invokeMethod('setProfile', {'profile': profile.toJson()});
     } catch (e) {
       throw KlaviyoException('Failed to set profile: $e');
     }
@@ -73,9 +74,7 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setEmail', {
-        'email': email,
-      });
+      await _channel.invokeMethod('setEmail', {'email': email});
     } catch (e) {
       throw KlaviyoException('Failed to set email: $e');
     }
@@ -99,9 +98,7 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setExternalId', {
-        'externalId': externalId,
-      });
+      await _channel.invokeMethod('setExternalId', {'externalId': externalId});
     } catch (e) {
       throw KlaviyoException('Failed to set external ID: $e');
     }
@@ -138,17 +135,17 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('trackEvent', {
-        'event': event.toJson(),
-      });
+      await _channel.invokeMethod('trackEvent', {'event': event.toJson()});
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
     }
   }
 
   /// Track simple event using native SDK
-  Future<void> track(String eventName,
-      [Map<String, dynamic>? properties]) async {
+  Future<void> track(
+    String eventName, [
+    Map<String, dynamic>? properties,
+  ]) async {
     final event = KlaviyoEvent(
       name: eventName,
       properties: properties ?? {},
@@ -171,8 +168,10 @@ class KlaviyoNativeWrapper {
   }
 
   /// Set push token using native SDK
-  Future<void> setPushToken(String token,
-      {PushEnvironment? environment}) async {
+  Future<void> setPushToken(
+    String token, {
+    PushEnvironment? environment,
+  }) async {
     _ensureInitialized();
 
     try {
@@ -199,13 +198,26 @@ class KlaviyoNativeWrapper {
   }
 
   /// Register for in-app forms using native SDK
-  Future<void> registerForInAppForms(
-      {Map<String, dynamic>? configuration}) async {
+  Future<void> registerForInAppForms({
+    Map<String, dynamic>? configuration,
+  }) async {
     _ensureInitialized();
     try {
       await _channel.invokeMethod('registerForInAppForms', {
         'configuration': configuration,
       });
+    } catch (e) {
+      throw KlaviyoException('Failed to register for in-app forms: $e');
+    }
+  }
+
+  /// Unregister from in-app forms using native SDK
+  Future<void> unregisterFromInAppForms({
+    Map<String, dynamic>? configuration,
+  }) async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('unregisterFromInAppForms');
     } catch (e) {
       throw KlaviyoException('Failed to register for in-app forms: $e');
     }
@@ -227,9 +239,7 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setLogLevel', {
-        'logLevel': logLevel,
-      });
+      await _channel.invokeMethod('setLogLevel', {'logLevel': logLevel});
     } catch (e) {
       throw KlaviyoException('Failed to set log level: $e');
     }
