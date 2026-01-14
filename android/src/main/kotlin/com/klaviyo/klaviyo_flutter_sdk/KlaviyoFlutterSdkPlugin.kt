@@ -312,6 +312,11 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
+        try {
+            Klaviyo.unregisterFromInAppForms()
+        } catch (e: Exception) {
+            Log.d(TAG, "IAF cleanup on engine detach failed: ${e.message}")
+        }
     }
 
     // ActivityAware implementation
