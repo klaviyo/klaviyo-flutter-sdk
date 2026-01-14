@@ -78,14 +78,14 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             
         case "setExternalId":
             guard let args = call.arguments as? [String: Any],
-                  let _ = args["externalId"] as? String
+                  let externalId = args["externalId"] as? String
             else {
                 result(
                     FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid external ID", details: nil))
                 return
             }
-            // Not directly supported: must use setProfile with new Profile
-            result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
+            KlaviyoSDK().set(externalId: externalId)
+            result(nil)
             
         case "setProfileProperties":
             guard let args = call.arguments as? [String: Any],
