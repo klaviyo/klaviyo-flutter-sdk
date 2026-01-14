@@ -158,17 +158,6 @@ class KlaviyoNativeWrapper {
     await trackEvent(event);
   }
 
-  /// Register for push notifications using native SDK
-  Future<void> registerForPushNotifications() async {
-    _ensureInitialized();
-
-    try {
-      await _channel.invokeMethod('registerForPushNotifications');
-    } catch (e) {
-      throw KlaviyoException('Failed to register for push notifications: $e');
-    }
-  }
-
   /// Set push token using native SDK
   Future<void> setPushToken(String token,
       {PushEnvironment? environment}) async {
@@ -185,15 +174,13 @@ class KlaviyoNativeWrapper {
   }
 
   /// Get push token from native SDK
-  Future<PushTokenInfo?> getPushToken() async {
+  /// Returns the raw token string or null if no token is available
+  Future<String?> getPushToken() async {
     _ensureInitialized();
 
     try {
-      final result = await _channel.invokeMethod('getPushToken');
-      if (result != null) {
-        return PushTokenInfo.fromJson(Map<String, dynamic>.from(result));
-      }
-      return null;
+      final result = await _channel.invokeMethod<String>('getPushToken');
+      return result;
     } catch (e) {
       throw KlaviyoException('Failed to get push token: $e');
     }

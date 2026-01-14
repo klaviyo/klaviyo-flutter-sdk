@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    print('Firebase initialization failed: $e');
+  }
+
   runApp(const MyApp());
 }
 
@@ -23,8 +33,77 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     // Set default API key for demo purposes
-    _apiKeyController.text = 'Xr5bFG';
+    _apiKeyController.text = 'UHZ3zG';
+
+    // Set up FCM token listeners
+    _setupFCM();
+
+    // Set up foreground notification listener
+    _setupForegroundNotificationListener();
   }
+
+  /// Set up Firebase Cloud Messaging (FCM) token collection and listeners
+  /// NOTE: The native KlaviyoFirebaseMessagingService also registers tokens via onNewToken()
+  /// This Dart-side registration provides visibility and acts as a backup
+  Future<void> _setupFCM() async {
+    try {
+      // Get current FCM token
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        print('Current FCM token retrieved');
+        print('Token: $token');
+        await _handleFCMToken(token);
+      } else {
+        print('No FCM token available yet');
+      }
+
+      // Listen for token refreshes
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+        print('FCM token refresh: $newToken');
+        _handleFCMToken(newToken);
+      }, onError: (error) {
+        print('Error listening for token refresh: $error');
+      });
+    } catch (e) {
+      print('FCM setup failed: $e');
+    }
+  }
+
+  /// Set up listener for foreground notifications
+  /// This is for logging and updating UI when notifications arrive while app is in foreground
+  void _setupForegroundNotificationListener() {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      print('FOREGROUND NOTIFICATION RECEIVED');
+      print('Message ID: ${message.messageId}');
+      print('From: ${message.from}');
+      print('Notification payload: ${message.notification?.title}');
+      print('Data payload: ${message.data}');
+      setState(() {
+        _status = 'Received push: ${message.notification?.title ?? message.data['title'] ?? "No title"}';
+      });
+    });
+  }
+
+  /// Handle FCM token by forwarding to Klaviyo SDK
+  Future<void> _handleFCMToken(String token) async {
+    try {
+      if (_isInitialized) {
+        await _klaviyo.setPushToken(token);
+        print('Token registered with Klaviyo successfully');
+        setState(() {
+          _status = 'FCM token registered with Klaviyo';
+        });
+      } else {
+        print('Klaviyo SDK not initialized yet, token will be registered after initialization');
+      }
+    } catch (e) {
+      print('Failed to register token with Klaviyo: $e');
+      setState(() {
+        _status = 'Failed to register FCM token: $e';
+      });
+    }
+  }
+
 
   Future<void> _initializeKlaviyo() async {
     final apiKey = _apiKeyController.text.trim();
@@ -37,13 +116,12 @@ class _MyAppState extends State<MyApp> {
     }
 
     try {
-      print('🚀 Starting Klaviyo initialization with API key: $apiKey');
+      print('Starting Klaviyo initialization with API key: $apiKey');
       await _klaviyo.initialize(
         apiKey: apiKey,
         logLevel: KlaviyoLogLevel.debug,
         environment: PushEnvironment.development,
       );
-      print('✅ Klaviyo initialization completed');
 
       // Set up push notification listeners
       _setupPushNotificationListeners();
@@ -52,8 +130,16 @@ class _MyAppState extends State<MyApp> {
         _isInitialized = true;
         _status = 'Initialized successfully with API key: $apiKey';
       });
+
+      // Register FCM token with Klaviyo now that SDK is initialized
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await _handleFCMToken(token);
+      } else {
+        print('No FCM token available to register');
+      }
     } catch (e) {
-      print('❌ Klaviyo initialization failed: $e');
+      print('Klaviyo initialization failed: $e');
       setState(() {
         _status = 'Initialization failed: $e';
       });
@@ -64,11 +150,11 @@ class _MyAppState extends State<MyApp> {
     // Listen for push notification opens
     _klaviyo.onPushNotification.listen((eventData) {
       final eventType = eventData['type'] as String? ?? '';
-      print('📱 Received push notification event: $eventType');
+      print('Received push notification event: $eventType');
 
       if (eventType == 'push_notification_opened') {
         final userInfo = eventData['data'] as Map<String, dynamic>? ?? {};
-        print('🎯 Push notification opened: $userInfo');
+        print('Push notification opened: $userInfo');
 
         setState(() {
           _status = 'Push notification opened! Data: ${userInfo.toString()}';
@@ -87,9 +173,9 @@ class _MyAppState extends State<MyApp> {
   Future<void> _setProfile() async {
     try {
       final profile = KlaviyoProfile(
-        email: 'ajay.subra@klaviyo.com',
-        firstName: 'Ajay',
-        lastName: 'Subra',
+        email: 'michael@michaelsons.com',
+        firstName: 'Michael',
+        lastName: 'Michaelson',
         phoneNumber: '+1234567899',
         properties: {
           'plan': 'premium',
@@ -235,7 +321,6 @@ class _MyAppState extends State<MyApp> {
   Future<void> _registerForPush() async {
     try {
       await _requestNotificationPermission();
-      await _klaviyo.registerForPushNotifications();
       setState(() {
         _status = 'Registered for push notifications';
       });
@@ -246,26 +331,19 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  Future<void> _setPushToken() async {
-    try {
-      // Instead of setting a mock token, let's get the actual token info
-      final tokenInfo = await _klaviyo.getPushToken();
-      setState(() {
-        _status = 'Push Token Info: ${tokenInfo.toString()}';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to get push token info: ${e.toString()}';
-      });
-    }
-  }
-
   Future<void> _getPushToken() async {
     try {
       final token = await _klaviyo.getPushToken();
-      setState(() {
-        _status = 'Push token retrieved: ${token ?? 'null'}';
-      });
+      if (token != null) {
+        setState(() {
+          _status = 'Push token: $token...';
+        });
+        print('Full push token: $token');
+      } else {
+        setState(() {
+          _status = 'No push token available';
+        });
+      }
     } catch (e) {
       setState(() {
         _status = 'Failed to get push token: $e';
@@ -318,35 +396,6 @@ class _MyAppState extends State<MyApp> {
     } catch (e) {
       setState(() {
         _status = 'Failed to reset profile: $e';
-      });
-    }
-  }
-
-  Future<void> _registerForPushNative() async {
-    try {
-      // Use the native Klaviyo SDK push registration
-      await _requestNotificationPermission();
-      await _klaviyo.registerForPushNotifications();
-      setState(() {
-        _status = 'Registered for push notifications (native)';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to register for push: $e';
-      });
-    }
-  }
-
-  Future<void> _getPushTokenNative() async {
-    try {
-      // For now, this is a placeholder since getPushToken doesn't return real tokens
-      final tokenInfo = await _klaviyo.getPushToken();
-      setState(() {
-        _status = 'Push token info: $tokenInfo';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to get push token: $e';
       });
     }
   }
@@ -471,9 +520,8 @@ class _MyAppState extends State<MyApp> {
 
               // Push Notifications Section
               _buildSectionHeader('Push Notifications'),
-              _buildButton('Register for Push', _registerForPushNative),
-              _buildButton('Get Push Token Info', _setPushToken),
-              _buildButton('Get Push Token', _getPushTokenNative),
+              _buildButton('Register for Push', _registerForPush),
+              _buildButton('Get Push Token', _getPushToken),
 
               const SizedBox(height: 16),
 

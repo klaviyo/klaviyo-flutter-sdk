@@ -170,12 +170,6 @@ class KlaviyoSDK {
     await trackEvent(event);
   }
 
-  /// Register for push notifications
-  Future<void> registerForPushNotifications() async {
-    _ensureInitialized();
-    await _nativeWrapper.registerForPushNotifications();
-  }
-
   /// Set push token
   Future<void> setPushToken(String token,
       {PushEnvironment? environment}) async {
@@ -186,8 +180,7 @@ class KlaviyoSDK {
   /// Get push token
   Future<String?> getPushToken() async {
     _ensureInitialized();
-    final tokenInfo = await _nativeWrapper.getPushToken();
-    return tokenInfo?.token;
+    return await _nativeWrapper.getPushToken();
   }
 
   /// Handle push notification received
