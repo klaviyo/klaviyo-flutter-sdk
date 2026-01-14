@@ -12,3 +12,7 @@ trim_trailing_whitespace = true
 [*.swift]
 indent_style = space
 indent_size = 4
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
