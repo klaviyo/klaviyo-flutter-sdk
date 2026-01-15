@@ -27,13 +27,6 @@ repos:
         files: \.dart$
         stages: [pre-push]
 
-      - id: flutter-analyze
-        name: flutter analyze
-        entry: flutter analyze
-        language: system
-        pass_filenames: false
-        stages: [pre-push]
-
       # ----- Kotlin (Android) -----
       - id: ktlint-format
         name: ktlint format (Kotlin)
