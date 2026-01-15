@@ -9,10 +9,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    print('Firebase initialization failed: $e');
+  // Initialize Firebase for FCM (Android only)
+  if (Platform.isAndroid) {
+    try {
+      await Firebase.initializeApp();
+    } catch (e) {
+      print('Firebase initialization failed: $e');
+    }
   }
 
   runApp(const MyApp());
@@ -156,12 +159,14 @@ class _MyAppState extends State<MyApp> {
         _status = 'Initialized successfully with API key: $apiKey';
       });
 
-      // Register FCM token with Klaviyo now that SDK is initialized
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) {
-        await _handleFCMToken(token);
-      } else {
-        print('No FCM token available to register');
+      // Register FCM token with Klaviyo now that SDK is initialized (Android only)
+      if (Platform.isAndroid) {
+        final token = await FirebaseMessaging.instance.getToken();
+        if (token != null) {
+          await _handleFCMToken(token);
+        } else {
+          print('No FCM token available to register');
+        }
       }
     } catch (e) {
       print('Klaviyo initialization failed: $e');
