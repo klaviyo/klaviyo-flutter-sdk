@@ -18,14 +18,14 @@ repos:
         entry: dart format
         language: system
         files: \.dart$
-        stages: [ pre-commit ]
+        stages: [pre-commit]
 
       - id: dart-format-check
         name: dart format (check)
         entry: dart format --set-exit-if-changed
         language: system
         files: \.dart$
-        stages: [ pre-push, manual ]
+        stages: [pre-push]
 
       # ----- Kotlin (Android) -----
       - id: ktlint-format
@@ -33,16 +33,19 @@ repos:
         entry: ktlint -F
         language: system
         files: \.kt$
+        stages: [pre-commit]
 
       # ----- Swift (iOS) -----
-      - id: swiftlint
-        name: swiftlint
-        entry: swiftlint
-        language: system
-        files: \.swift$
-
       - id: swiftformat
         name: swiftformat
         entry: swiftformat
         language: system
         files: \.swift$
+        stages: [pre-commit]
+
+      - id: swiftlint
+        name: swiftlint
+        entry: swiftlint
+        language: system
+        files: \.swift$
+        stages: [ pre-push ]
