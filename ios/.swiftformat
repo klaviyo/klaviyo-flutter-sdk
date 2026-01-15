@@ -12,7 +12,8 @@
 # format options
 --indent 4
 --smarttabs enabled
---wrapindent indent
+--xcode-indentation enabled
+--trim-whitespace nonblank-lines
 --closingparen balanced
 --commas inline
 --comments indent
