@@ -13,11 +13,19 @@ repos:
   - repo: local
     hooks:
       # ----- Dart / Flutter -----
-      - id: dart-format
-        name: dart format
+      - id: dart-format-fix
+        name: dart format (fix)
         entry: dart format
         language: system
         files: \.dart$
+        stages: [ pre-commit ]
+
+      - id: dart-format-check
+        name: dart format (check)
+        entry: dart format --set-exit-if-changed
+        language: system
+        files: \.dart$
+        stages: [ pre-push, manual ]
 
       # ----- Kotlin (Android) -----
       - id: ktlint-format
