@@ -10,10 +10,10 @@ import KlaviyoSwift
 
 extension Profile.ProfileKey {
     /// Converts a string key to a Profile.ProfileKey enum case
-    /// - Parameter key: The string key to convert
+    /// - Parameter stringKey: The string key to convert
     /// - Returns: A ProfileKey enum case, using `.custom(customKey:)` for unrecognized keys
-    static func from(_ key: String) -> Profile.ProfileKey {
-        switch key.lowercased() {
+    static func from(_ stringKey: String) -> Profile.ProfileKey {
+        switch stringKey.lowercased() {
         case "firstname", "first_name":
             return .firstName
         case "lastname", "last_name":
@@ -41,7 +41,7 @@ extension Profile.ProfileKey {
         case "longitude":
             return .longitude
         default:
-            return .custom(customKey: key)
+            return .custom(customKey: stringKey)
         }
     }
 }

@@ -66,7 +66,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             KlaviyoSDK().set(email: email)
             result(nil)
-            
+
         case "setPhoneNumber":
             guard let args = call.arguments as? [String: Any],
                   let phoneNumber = args["phoneNumber"] as? String
@@ -77,7 +77,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             KlaviyoSDK().set(phoneNumber: phoneNumber)
             result(nil)
-            
+
         case "setExternalId":
             guard let args = call.arguments as? [String: Any],
                   let externalId = args["externalId"] as? String
@@ -88,7 +88,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             KlaviyoSDK().set(externalId: externalId)
             result(nil)
-            
+
         case "setProfileProperties":
             guard let args = call.arguments as? [String: Any],
                   let properties = args["properties"] as? [String: Any]
@@ -97,12 +97,13 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 return
             }
 
-            properties.forEach { (key, value) in
+            // swiftlint:disable:next identifier_name
+            for (key, value) in properties {
                 let profileKey = Profile.ProfileKey.from(key)
                 KlaviyoSDK().set(profileAttribute: profileKey, value: value)
             }
             result(nil)
-            
+
         case "trackEvent":
             guard let args = call.arguments as? [String: Any],
                   let eventData = args["event"] as? [String: Any],
@@ -232,13 +233,13 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 }
 
 extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
-    public func onListen(withArguments _: Any?, eventSink events: @escaping FlutterEventSink)
+    public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink)
         -> FlutterError? {
         eventSink = events
         return nil
     }
 
-    public func onCancel(withArguments _: Any?) -> FlutterError? {
+    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
         eventSink = nil
         return nil
     }

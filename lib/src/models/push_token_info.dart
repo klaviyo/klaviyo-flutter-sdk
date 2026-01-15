@@ -52,8 +52,7 @@ class PushTokenInfo {
         (e) => e.name == (json['environment'] as String? ?? ''),
         orElse: () => PushEnvironment.production,
       ),
-      createdAt:
-          DateTime.tryParse(json['enabled_datetime'] as String? ?? '') ??
+      createdAt: DateTime.tryParse(json['enabled_datetime'] as String? ?? '') ??
           DateTime.now(),
       isActive: json['is_active'] as bool? ?? true,
     );

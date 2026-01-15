@@ -44,11 +44,11 @@ class KlaviyoNetworkException extends KlaviyoException {
     dynamic originalError,
     StackTrace? stackTrace,
   }) : super(
-         message,
-         code: 'NETWORK_ERROR',
-         originalError: originalError,
-         stackTrace: stackTrace,
-       );
+          message,
+          code: 'NETWORK_ERROR',
+          originalError: originalError,
+          stackTrace: stackTrace,
+        );
 
   @override
   String toString() {
@@ -63,11 +63,11 @@ class KlaviyoProfileException extends KlaviyoException {
     dynamic originalError,
     StackTrace? stackTrace,
   }) : super(
-         message,
-         code: 'PROFILE_ERROR',
-         originalError: originalError,
-         stackTrace: stackTrace,
-       );
+          message,
+          code: 'PROFILE_ERROR',
+          originalError: originalError,
+          stackTrace: stackTrace,
+        );
 }
 
 /// Exception thrown when event tracking fails
@@ -77,11 +77,11 @@ class KlaviyoEventException extends KlaviyoException {
     dynamic originalError,
     StackTrace? stackTrace,
   }) : super(
-         message,
-         code: 'EVENT_ERROR',
-         originalError: originalError,
-         stackTrace: stackTrace,
-       );
+          message,
+          code: 'EVENT_ERROR',
+          originalError: originalError,
+          stackTrace: stackTrace,
+        );
 }
 
 /// Exception thrown when push notification operations fail
@@ -91,11 +91,11 @@ class KlaviyoPushException extends KlaviyoException {
     dynamic originalError,
     StackTrace? stackTrace,
   }) : super(
-         message,
-         code: 'PUSH_ERROR',
-         originalError: originalError,
-         stackTrace: stackTrace,
-       );
+          message,
+          code: 'PUSH_ERROR',
+          originalError: originalError,
+          stackTrace: stackTrace,
+        );
 }
 
 /// Exception thrown when form operations fail
@@ -105,11 +105,11 @@ class KlaviyoFormException extends KlaviyoException {
     dynamic originalError,
     StackTrace? stackTrace,
   }) : super(
-         message,
-         code: 'FORM_ERROR',
-         originalError: originalError,
-         stackTrace: stackTrace,
-       );
+          message,
+          code: 'FORM_ERROR',
+          originalError: originalError,
+          stackTrace: stackTrace,
+        );
 }
 
 /// Exception thrown when configuration is invalid
@@ -119,11 +119,11 @@ class KlaviyoConfigurationException extends KlaviyoException {
     dynamic originalError,
     StackTrace? stackTrace,
   }) : super(
-         message,
-         code: 'CONFIGURATION_ERROR',
-         originalError: originalError,
-         stackTrace: stackTrace,
-       );
+          message,
+          code: 'CONFIGURATION_ERROR',
+          originalError: originalError,
+          stackTrace: stackTrace,
+        );
 }
 
 /// Exception thrown when permissions are not granted
@@ -133,9 +133,9 @@ class KlaviyoPermissionException extends KlaviyoException {
     dynamic originalError,
     StackTrace? stackTrace,
   }) : super(
-         message,
-         code: 'PERMISSION_ERROR',
-         originalError: originalError,
-         stackTrace: stackTrace,
-       );
+          message,
+          code: 'PERMISSION_ERROR',
+          originalError: originalError,
+          stackTrace: stackTrace,
+        );
 }
