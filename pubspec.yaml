@@ -24,4 +24,4 @@ flutter:
         package: com.klaviyo.klaviyo_flutter_sdk
         pluginClass: KlaviyoFlutterSdkPlugin
       ios:
-        pluginClass: KlaviyoFlutterSdkPlugin 
+        pluginClass: KlaviyoFlutterSdkPlugin

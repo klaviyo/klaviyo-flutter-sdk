@@ -99,12 +99,6 @@ class KlaviyoEvent {
 
   @override
   int get hashCode {
-    return Object.hash(
-      name,
-      timestamp,
-      customerProperties,
-      value,
-      uniqueId,
-    );
+    return Object.hash(name, timestamp, customerProperties, value, uniqueId);
   }
 }

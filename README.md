@@ -34,7 +34,7 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  
+
   # Add Klaviyo Swift SDK
   pod 'KlaviyoSwiftSDK'
 end
@@ -80,14 +80,14 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   final klaviyo = KlaviyoSDK();
   await klaviyo.initialize(
     apiKey: 'YOUR_KLAVIYO_PUBLIC_API_KEY',
     logLevel: KlaviyoLogLevel.debug,
     environment: PushEnvironment.development,
   );
-  
+
   runApp(MyApp());
 }
 ```
@@ -170,7 +170,7 @@ final config = InAppFormConfig(
 await klaviyo.registerForInAppForms(configuration: config);
 
 // Show a specific form
-final success = await klaviyo.showForm('newsletter_signup', 
+final success = await klaviyo.showForm('newsletter_signup',
   customData: {'source': 'flutter_app'});
 
 // Hide a form
@@ -314,4 +314,4 @@ This Flutter SDK wraps the following native SDKs:
 - **iOS**: [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk)
 - **Android**: [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk)
 
-Make sure to refer to the native SDK documentation for platform-specific features and requirements. 
+Make sure to refer to the native SDK documentation for platform-specific features and requirements.

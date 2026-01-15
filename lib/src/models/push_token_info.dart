@@ -52,7 +52,8 @@ class PushTokenInfo {
         (e) => e.name == (json['environment'] as String? ?? ''),
         orElse: () => PushEnvironment.production,
       ),
-      createdAt: DateTime.tryParse(json['enabled_datetime'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['enabled_datetime'] as String? ?? '') ??
           DateTime.now(),
       isActive: json['is_active'] as bool? ?? true,
     );
@@ -77,12 +78,6 @@ class PushTokenInfo {
 
   @override
   int get hashCode {
-    return Object.hash(
-      token,
-      environment,
-      platform,
-      createdAt,
-      isActive,
-    );
+    return Object.hash(token, environment, platform, createdAt, isActive);
   }
 }

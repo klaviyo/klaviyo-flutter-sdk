@@ -50,7 +50,7 @@ class KlaviyoLocation {
   /// Convert to JSON
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {};
-    
+
     if (address1 != null) data['address1'] = address1;
     if (address2 != null) data['address2'] = address2;
     if (city != null) data['city'] = city;
@@ -60,7 +60,7 @@ class KlaviyoLocation {
     if (latitude != null) data['latitude'] = latitude;
     if (longitude != null) data['longitude'] = longitude;
     if (timezone != null) data['timezone'] = timezone;
-    
+
     return data;
   }
 
@@ -87,7 +87,7 @@ class KlaviyoLocation {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    
+
     return other is KlaviyoLocation &&
         other.address1 == address1 &&
         other.address2 == address2 &&
@@ -114,4 +114,4 @@ class KlaviyoLocation {
       timezone,
     );
   }
-} 
+}

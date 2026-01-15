@@ -46,13 +46,13 @@ import KlaviyoSwift
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
-    
+
     // Initialize Klaviyo (if not done from Flutter)
     // KlaviyoSDK().initialize(with: "YOUR_API_KEY")
-    
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
-  
+
   // Handle successful APNs token registration
   override func application(
     _ application: UIApplication,
@@ -61,7 +61,7 @@ import KlaviyoSwift
     // Set the token directly with Klaviyo
     KlaviyoSDK().set(pushToken: deviceToken)
   }
-  
+
   // Handle APNs registration failure
   override func application(
     _ application: UIApplication,
@@ -175,7 +175,7 @@ class PushNotificationHandler {
 
       // 2. Register for push notifications
       await _klaviyo.registerForPushNotifications();
-      
+
       print('Push notifications setup complete');
     } catch (e) {
       print('Failed to setup push notifications: $e');
@@ -229,4 +229,4 @@ If you're migrating from a Firebase-based implementation:
 3. **Check device logs** for any error messages
 4. **Verify token registration** in Klaviyo profile data
 
-This approach provides a cleaner, more maintainable solution for push notifications without Firebase dependencies. 
+This approach provides a cleaner, more maintainable solution for push notifications without Firebase dependencies.

@@ -93,4 +93,4 @@ class Logger {
 
   /// Check if logging is enabled
   bool get enabled => _enabled;
-} 
+}
