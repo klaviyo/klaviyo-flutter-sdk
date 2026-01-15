@@ -232,20 +232,6 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  Future<void> _registerForPush() async {
-    try {
-      await _requestNotificationPermission();
-      await _klaviyo.registerForPushNotifications();
-      setState(() {
-        _status = 'Registered for push notifications';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to register for push: $e';
-      });
-    }
-  }
-
   Future<void> _setPushToken() async {
     try {
       // Instead of setting a mock token, let's get the actual token info
@@ -256,19 +242,6 @@ class _MyAppState extends State<MyApp> {
     } catch (e) {
       setState(() {
         _status = 'Failed to get push token info: ${e.toString()}';
-      });
-    }
-  }
-
-  Future<void> _getPushToken() async {
-    try {
-      final token = await _klaviyo.getPushToken();
-      setState(() {
-        _status = 'Push token retrieved: ${token ?? 'null'}';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to get push token: $e';
       });
     }
   }
