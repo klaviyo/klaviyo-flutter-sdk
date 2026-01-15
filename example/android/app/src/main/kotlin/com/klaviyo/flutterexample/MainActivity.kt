@@ -10,6 +10,12 @@ import com.klaviyo.analytics.Klaviyo
 class MainActivity: FlutterActivity() {
   private val TAG = "MainActivity"
 
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+
+    // Handle notification intent on cold start
+    intent?.let { handleNotificationIntent(it) }
+  }
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)

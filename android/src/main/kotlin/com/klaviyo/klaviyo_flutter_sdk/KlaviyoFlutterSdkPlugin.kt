@@ -12,13 +12,13 @@ import io.flutter.plugin.common.EventChannel
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.Event
 import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
+import com.klaviyo.core.Registry
 
 class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var channel : MethodChannel
@@ -178,7 +178,7 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
         // Validate token is not null or blank
         if (token.isNullOrBlank()) {
-          Log.w(TAG, "Attempted to set null or empty push token")
+          Registry.log.warning("Attempted to set null or empty push token")
           result.error(
             "INVALID_TOKEN",
             "Push token cannot be null or empty",
@@ -189,7 +189,7 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
         // Forward token to Klaviyo SDK
         // setPushToken() uses safeApply which catches exceptions internally - it never throws
-        Log.d(TAG, "Setting push token: $token...")
+        Registry.log.verbose("Setting push token: $token...")
         Klaviyo.setPushToken(token)
         result.success(null)
       }
@@ -198,9 +198,9 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         val token = Klaviyo.getPushToken()
 
         if (token != null) {
-          Log.d(TAG, "Retrieved push token from SDK: $token...")
+          Registry.log.verbose("Retrieved push token from SDK: $token...")
         } else {
-          Log.d(TAG, "No push token available")
+          Registry.log.verbose("No push token available")
         }
 
         result.success(token)
@@ -330,7 +330,7 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           }
         }
 
-        Log.d(TAG, "Push notification opened: $notificationData")
+        Registry.log.verbose("Push notification opened: $notificationData")
 
         // Forward to Flutter via EventChannel
         if (::eventSink.isInitialized) {
@@ -341,7 +341,7 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         }
       }
     } catch (e: Exception) {
-      Log.e(TAG, "Error handling push: ${e.message}", e)
+      Registry.log.error("Error handling push: ${e.message}", e)
     }
   }
 } 

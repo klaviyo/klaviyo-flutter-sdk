@@ -1,8 +1,10 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,17 +31,36 @@ class _MyAppState extends State<MyApp> {
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
 
+  static const String _apiKeyPrefsKey = 'klaviyo_api_key';
+
   @override
   void initState() {
     super.initState();
-    // Set default API key for demo purposes
-    _apiKeyController.text = 'UHZ3zG';
 
-    // Set up FCM token listeners
-    _setupFCM();
+    // Load saved API key
+    _loadSavedApiKey();
 
-    // Set up foreground notification listener
-    _setupForegroundNotificationListener();
+    // Set up FCM token listeners and foreground notification listener (Android only)
+    if (Platform.isAndroid) {
+      _setupFCM();
+      _setupForegroundNotificationListener();
+    }
+  }
+
+  /// Load API key from local storage
+  Future<void> _loadSavedApiKey() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedApiKey = prefs.getString(_apiKeyPrefsKey);
+
+      if (savedApiKey != null && savedApiKey.isNotEmpty) {
+        setState(() {
+          _apiKeyController.text = savedApiKey;
+        });
+      }
+    } catch (e) {
+      print('Failed to load saved API key: $e');
+    }
   }
 
   /// Set up Firebase Cloud Messaging (FCM) token collection and listeners
@@ -123,6 +144,10 @@ class _MyAppState extends State<MyApp> {
         environment: PushEnvironment.development,
       );
 
+      // Save API key to local storage for next time
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_apiKeyPrefsKey, apiKey);
+
       // Set up push notification listeners
       _setupPushNotificationListeners();
 
@@ -163,7 +188,16 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  void _resetSdk() {
+  Future<void> _resetSdk() async {
+    // Clear saved API key from local storage
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_apiKeyPrefsKey);
+      _apiKeyController.clear();
+    } catch (e) {
+      print('Failed to clear saved API key: $e');
+    }
+
     setState(() {
       _isInitialized = false;
       _status = 'SDK reset. Enter a new API key to reinitialize.';

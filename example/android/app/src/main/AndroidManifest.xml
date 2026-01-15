@@ -39,6 +39,9 @@
             android:name="com.klaviyo.core.log_level"
             android:value="1" />
 
+        <!-- This service declaration overrides Flutter's default FirebaseMessagingService
+             to allow Klaviyo's SDK to handle push notifications. Without this, Flutter would
+             intercept all FCM messages before Klaviyo can process them. -->
         <service
             android:name="com.klaviyo.pushFcm.KlaviyoPushService"
             android:exported="false">
