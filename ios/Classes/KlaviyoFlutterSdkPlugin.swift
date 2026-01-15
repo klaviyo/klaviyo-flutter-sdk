@@ -57,45 +57,49 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             
         case "setEmail":
             guard let args = call.arguments as? [String: Any],
-                  let _ = args["email"] as? String
+                  let email = args["email"] as? String
             else {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid email", details: nil))
                 return
             }
-            // Not directly supported: must use setProfile with new Profile
-            result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
+            KlaviyoSDK().set(email: email)
+            result(nil)
             
         case "setPhoneNumber":
             guard let args = call.arguments as? [String: Any],
-                  let _ = args["phoneNumber"] as? String
+                  let phoneNumber = args["phoneNumber"] as? String
             else {
                 result(
                     FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid phone number", details: nil))
                 return
             }
-            // Not directly supported: must use setProfile with new Profile
-            result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
+            KlaviyoSDK().set(phoneNumber: phoneNumber)
+            result(nil)
             
         case "setExternalId":
             guard let args = call.arguments as? [String: Any],
-                  let _ = args["externalId"] as? String
+                  let externalId = args["externalId"] as? String
             else {
                 result(
                     FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid external ID", details: nil))
                 return
             }
-            // Not directly supported: must use setProfile with new Profile
-            result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
+            KlaviyoSDK().set(externalId: externalId)
+            result(nil)
             
         case "setProfileProperties":
             guard let args = call.arguments as? [String: Any],
-                  let _ = args["properties"] as? [String: Any]
+                  let properties = args["properties"] as? [String: Any]
             else {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid properties", details: nil))
                 return
             }
-            // Not directly supported: must use setProfile with new Profile
-            result(FlutterError(code: "NOT_SUPPORTED", message: "Use setProfile instead", details: nil))
+
+            properties.forEach { (key, value) in
+                let profileKey = Profile.ProfileKey.from(key)
+                KlaviyoSDK().set(profileAttribute: profileKey, value: value)
+            }
+            result(nil)
             
         case "trackEvent":
             guard let args = call.arguments as? [String: Any],
