@@ -20,6 +20,7 @@ indent_size = 4
 [*.{kt,kts}]
 indent_style = space
 indent_size = 4
+ktlint_standard_package-name = disabled
 
 [*.gradle]
 indent_style = space
