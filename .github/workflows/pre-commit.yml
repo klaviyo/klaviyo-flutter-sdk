@@ -1,0 +1,22 @@
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  lint:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.38.6
+
+      - name: Install native linters
+        run: |
+          brew install ktlint swiftformat swiftlint
+
+      - uses: pre-commit/action@v3.0.0
