@@ -12,16 +12,13 @@ import io.flutter.plugin.common.EventChannel
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
-import android.util.Log
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.Event
 import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
-import org.json.JSONObject
-import org.json.JSONArray
+import com.klaviyo.core.Registry
 
 class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var channel : MethodChannel
@@ -29,18 +26,13 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var eventSink: EventChannel.EventSink
   private lateinit var applicationContext: android.content.Context
   private var activity: Activity? = null
-  private lateinit var sharedPreferences: SharedPreferences
 
   companion object {
-    private const val PREFS_NAME = "KlaviyoFlutterSDKPrefs"
-    private const val KEY_PUSH_TOKEN = "push_token"
-    private const val KEY_TOKEN_TIMESTAMP = "token_timestamp"
     private const val TAG = "KlaviyoFlutter"
   }
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     applicationContext = flutterPluginBinding.applicationContext
-    sharedPreferences = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
     channel.setMethodCallHandler(this)
@@ -180,89 +172,40 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           result.error("TRACK_ERROR", "Failed to track event", e.message)
         }
       }
-      
-      "registerForPushNotifications" -> {
-        try {
-          // On Android, push registration is handled by Firebase
-          // The app should handle FCM token via FirebaseMessaging.getInstance().token
-          // and then call setPushToken
-          result.success(null)
-        } catch (e: Exception) {
-          result.error("PUSH_REGISTER_ERROR", "Failed to register for push notifications", e.message)
-        }
-      }
-      
+
       "setPushToken" -> {
         val token = call.argument<String>("token")
 
-        try {
-          // Klaviyo.setPushToken takes a String token directly
-          Klaviyo.setPushToken(token!!)
-          result.success(null)
-        } catch (e: Exception) {
-          result.error("PUSH_TOKEN_ERROR", "Failed to set push token", e.message)
+        // Validate token is not null or blank
+        if (token.isNullOrBlank()) {
+          Registry.log.warning("Attempted to set null or empty push token")
+          result.error(
+            "INVALID_TOKEN",
+            "Push token cannot be null or empty",
+            mapOf("token" to token)
+          )
+          return
         }
+
+        // Forward token to Klaviyo SDK
+        // setPushToken() uses safeApply which catches exceptions internally - it never throws
+        Registry.log.verbose("Setting push token: $token...")
+        Klaviyo.setPushToken(token)
+        result.success(null)
       }
-      
+
       "getPushToken" -> {
-        try {
-          val token = sharedPreferences.getString(KEY_PUSH_TOKEN, "") ?: ""
-          val timestamp = sharedPreferences.getLong(KEY_TOKEN_TIMESTAMP, 0L)
+        val token = Klaviyo.getPushToken()
 
-          result.success(mapOf(
-            "token" to token,
-            "environment" to "production",
-            "platform" to "android",
-            "createdAt" to timestamp.toString(),
-            "isActive" to token.isNotEmpty()
-          ))
-        } catch (e: Exception) {
-          result.error("PUSH_TOKEN_ERROR", "Failed to get push token", e.message)
+        if (token != null) {
+          Registry.log.verbose("Retrieved push token from SDK: $token...")
+        } else {
+          Registry.log.verbose("No push token available")
         }
+
+        result.success(token)
       }
 
-      "onPushTokenReceived" -> {
-        val token = call.argument<String>("token")
-
-        try {
-          if (token != null) {
-            // Store token in SharedPreferences
-            sharedPreferences.edit().apply {
-              putString(KEY_PUSH_TOKEN, token)
-              putLong(KEY_TOKEN_TIMESTAMP, System.currentTimeMillis())
-              apply()
-            }
-
-            Log.d(TAG, "FCM token stored: $token")
-            result.success(null)
-          } else {
-            result.error("TOKEN_ERROR", "Token cannot be null", null)
-          }
-        } catch (e: Exception) {
-          result.error("TOKEN_STORAGE_ERROR", "Failed to store token", e.message)
-        }
-      }
-
-      "onPushNotificationOpened" -> {
-        val userInfo = call.argument<Map<String, Any>>("userInfo")
-
-        try {
-          Log.d(TAG, "Push opened: $userInfo")
-
-          // Forward to Flutter via EventChannel
-          if (::eventSink.isInitialized) {
-            eventSink.success(mapOf(
-              "type" to "push_notification_opened",
-              "data" to userInfo
-            ))
-          }
-
-          result.success(null)
-        } catch (e: Exception) {
-          result.error("PUSH_OPEN_ERROR", "Failed to handle push open", e.message)
-        }
-      }
-      
       "registerForInAppForms" -> {
         val configuration = call.argument<Map<String, Any>>("configuration")
         
@@ -387,7 +330,7 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           }
         }
 
-        Log.d(TAG, "Push notification opened: $notificationData")
+        Registry.log.verbose("Push notification opened: $notificationData")
 
         // Forward to Flutter via EventChannel
         if (::eventSink.isInitialized) {
@@ -398,7 +341,7 @@ class KlaviyoFlutterSdkPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         }
       }
     } catch (e: Exception) {
-      Log.e(TAG, "Error handling push: ${e.message}", e)
+      Registry.log.error("Error handling push: ${e.message}", e)
     }
   }
 } 
