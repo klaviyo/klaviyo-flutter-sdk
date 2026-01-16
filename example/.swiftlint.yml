@@ -55,5 +55,4 @@ identifier_name:
     - GlobalAPIKey
 reporter: "xcode" # reporter type (xcode, json, csv, checkstyle, codeclimate, junit, html, emoji, sonarqube, markdown, github-actions-logging)
 trailing_whitespace:
-  severity: warning
   ignores_empty_lines: true
