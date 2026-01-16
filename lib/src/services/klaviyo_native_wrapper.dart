@@ -249,7 +249,7 @@ class KlaviyoNativeWrapper {
   /// Ensure SDK is initialized
   void _ensureInitialized() {
     if (!_isInitialized) {
-      throw KlaviyoNotInitializedException();
+      throw const KlaviyoNotInitializedException();
     }
   }
 
