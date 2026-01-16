@@ -41,7 +41,7 @@ extension Profile.ProfileKey {
         case "longitude":
             return .longitude
         default:
-            return .custom(customKey: key)
+            return .custom(customKey: stringKey)
         }
     }
 }
