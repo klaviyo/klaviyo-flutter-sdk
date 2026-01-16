@@ -29,20 +29,20 @@ import UserNotifications
   ) -> Bool {
     // Initialize Klaviyo SDK
     KlaviyoSDK().initialize(with: "YOUR_API_KEY")
-    
+
     // Set up notification center delegate for push open tracking
     UNUserNotificationCenter.current().delegate = self
-    
+
     // Request push notification permissions
     requestPushNotificationPermissions()
-    
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }
 
 // MARK: - UNUserNotificationCenterDelegate
 extension AppDelegate {
-  
+
   // Called when user taps on a notification (app in background/terminated)
   override func userNotificationCenter(
     _ center: UNUserNotificationCenter,
@@ -50,16 +50,16 @@ extension AppDelegate {
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
     let userInfo = response.notification.request.content.userInfo
-    
+
     // Notify the Flutter plugin about the push notification open
     if let controller = window?.rootViewController as? FlutterViewController {
       let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: controller.binaryMessenger)
       channel.invokeMethod("onPushNotificationOpened", arguments: ["userInfo": userInfo])
     }
-    
+
     // Let Klaviyo SDK handle the push open tracking
     let handled = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
-    
+
     if handled {
       print("✅ Klaviyo handled push notification open")
     } else {
@@ -67,7 +67,7 @@ extension AppDelegate {
       completionHandler()
     }
   }
-  
+
   // Called when a notification is received while app is in foreground
   override func userNotificationCenter(
     _ center: UNUserNotificationCenter,
@@ -97,7 +97,7 @@ case "onPushNotificationOpened":
     result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid notification data", details: nil))
     return
   }
-  
+
   // Notify Flutter side via event sink if available
   if let eventSink = self.eventSink {
     eventSink([
@@ -146,7 +146,7 @@ void _setupNativeEventListeners() {
   // Listen for push notification events from native SDK
   _nativeWrapper.onPushNotification.listen((eventData) {
     final eventType = eventData['type'] as String? ?? '';
-    
+
     if (eventType == 'push_notification_opened') {
       final userInfo = eventData['data'] as Map<String, dynamic>? ?? {};
       _logger.info('Push notification opened with data: $userInfo');
@@ -172,7 +172,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initializeKlaviyo() async {
     final apiKey = _apiKeyController.text.trim();
-    
+
     if (apiKey.isEmpty) {
       setState(() {
         _status = 'Please enter a valid API key';
@@ -194,11 +194,11 @@ class _MyAppState extends State<MyApp> {
     // Listen for push notification opens
     _klaviyo.onPushNotification.listen((eventData) {
       final eventType = eventData['type'] as String? ?? '';
-      
+
       if (eventType == 'push_notification_opened') {
         final userInfo = eventData['data'] as Map<String, dynamic>? ?? {};
         print('🎯 Push notification opened: $userInfo');
-        
+
         // Handle the push notification open
         _handlePushNotificationOpen(userInfo);
       }
@@ -209,13 +209,13 @@ class _MyAppState extends State<MyApp> {
     // Extract relevant data from the push notification
     final String? deepLink = userInfo['deep_link'] as String?;
     final String? campaignId = userInfo['campaign_id'] as String?;
-    
+
     // Navigate to specific screen or perform action based on push content
     if (deepLink != null) {
       // Navigate to deep link
       Navigator.pushNamed(context, deepLink);
     }
-    
+
     // Track custom event for analytics
     _klaviyo.track('Push Notification Opened', {
       'campaign_id': campaignId,
@@ -323,4 +323,4 @@ If you're upgrading from a previous version:
 3. **Set up event listeners** in your Flutter code
 4. **Test thoroughly** to ensure push notifications still work as expected
 
-This implementation provides a robust, native-first approach to push notification tracking that leverages the full power of the Klaviyo iOS SDK while providing a clean Flutter interface. 
+This implementation provides a robust, native-first approach to push notification tracking that leverages the full power of the Klaviyo iOS SDK while providing a clean Flutter interface.

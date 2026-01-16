@@ -57,7 +57,7 @@ class KlaviyoProfile {
   /// Convert to JSON for API requests
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {};
-    
+
     if (email != null) data['email'] = email;
     if (phoneNumber != null) data['phone_number'] = phoneNumber;
     if (externalId != null) data['external_id'] = externalId;
@@ -67,12 +67,12 @@ class KlaviyoProfile {
     if (title != null) data['title'] = title;
     if (image != null) data['image'] = image;
     if (location != null) data['location'] = location!.toJson();
-    
+
     // Merge custom properties
     if (properties != null) {
       data.addAll(properties!);
     }
-    
+
     return data;
   }
 
@@ -87,19 +87,26 @@ class KlaviyoProfile {
     final organization = json['organization'] as String?;
     final title = json['title'] as String?;
     final image = json['image'] as String?;
-    
+
     KlaviyoLocation? location;
     if (json['location'] != null) {
       location = KlaviyoLocation.fromJson(json['location']);
     }
-    
+
     // Extract custom properties (exclude known fields)
     final Map<String, dynamic> properties = Map.from(json);
     properties.removeWhere((key, value) => [
-      'email', 'phone_number', 'external_id', 'first_name', 'last_name',
-      'organization', 'title', 'image', 'location'
-    ].contains(key));
-    
+          'email',
+          'phone_number',
+          'external_id',
+          'first_name',
+          'last_name',
+          'organization',
+          'title',
+          'image',
+          'location'
+        ].contains(key));
+
     return KlaviyoProfile(
       email: email,
       phoneNumber: phoneNumber,
@@ -130,7 +137,7 @@ class KlaviyoProfile {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    
+
     return other is KlaviyoProfile &&
         other.email == email &&
         other.phoneNumber == phoneNumber &&
@@ -157,4 +164,4 @@ class KlaviyoProfile {
       location,
     );
   }
-} 
+}

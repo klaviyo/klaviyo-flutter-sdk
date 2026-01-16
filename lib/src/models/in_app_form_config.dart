@@ -65,4 +65,4 @@ class InAppFormConfig {
         position.hashCode ^
         theme.hashCode;
   }
-} 
+}

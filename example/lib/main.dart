@@ -103,7 +103,8 @@ class _MyAppState extends State<MyApp> {
       print('Notification payload: ${message.notification?.title}');
       print('Data payload: ${message.data}');
       setState(() {
-        _status = 'Received push: ${message.notification?.title ?? message.data['title'] ?? "No title"}';
+        _status =
+            'Received push: ${message.notification?.title ?? message.data['title'] ?? "No title"}';
       });
     });
   }
@@ -118,7 +119,8 @@ class _MyAppState extends State<MyApp> {
           _status = 'FCM token registered with Klaviyo';
         });
       } else {
-        print('Klaviyo SDK not initialized yet, token will be registered after initialization');
+        print(
+            'Klaviyo SDK not initialized yet, token will be registered after initialization');
       }
     } catch (e) {
       print('Failed to register token with Klaviyo: $e');
@@ -127,7 +129,6 @@ class _MyAppState extends State<MyApp> {
       });
     }
   }
-
 
   Future<void> _initializeKlaviyo() async {
     final apiKey = _apiKeyController.text.trim();
@@ -370,6 +371,24 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  // TODO: implement setPushToken()
+  // ignore: unused_element
+  Future<void> _setPushToken() async {
+    try {
+      // Instead of setting a mock token, let's get the actual token info
+      final tokenInfo = await _klaviyo.getPushToken();
+      setState(() {
+        _status = 'Push Token Info: ${tokenInfo.toString()}';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to get push token info: ${e.toString()}';
+      });
+    }
+  }
+
+  // TODO: implement _getPushToken()
+  // ignore: unused_element
   Future<void> _getPushToken() async {
     try {
       final token = await _klaviyo.getPushToken();

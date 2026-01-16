@@ -1,0 +1,46 @@
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  lint:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.38.7
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          flutter pub get
+          cd example && flutter pub get
+          cd ..
+
+      - name: Print versions
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Install native linters
+        run: |
+          brew install ktlint swiftlint
+
+      - name: Dart format check
+        run: dart format --set-exit-if-changed .
+
+      - name: Flutter analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Kotlin lint check
+        run: ktlint --reporter=plain "**/*.kt"
+        working-directory: android
+
+      - name: Swift lint check
+        run: swiftlint lint --strict
+        working-directory: ios

@@ -1,10 +1,11 @@
 import Flutter
-import UIKit
 import KlaviyoSwift
+import UIKit
 import UserNotifications
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc
+class AppDelegate: FlutterAppDelegate {
     override func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -45,7 +46,7 @@ import UserNotifications
     
     // Handle successful APNs token registration
     override func application(
-        _ application: UIApplication,
+        _: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         // Convert token to hex string for logging and storage
@@ -65,7 +66,7 @@ import UserNotifications
     
     // Handle APNs registration failure
     override func application(
-        _ application: UIApplication,
+        _: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         print("❌ Failed to register for remote notifications: \(error)")
@@ -79,11 +80,11 @@ import UserNotifications
 }
 
 // MARK: - UNUserNotificationCenterDelegate
+
 extension AppDelegate {
-    
     // Called when user taps on a notification (app in background/terminated)
     override func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
+        _: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
@@ -109,7 +110,7 @@ extension AppDelegate {
     
     // Called when a notification is received while app is in foreground
     override func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
+        _: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {

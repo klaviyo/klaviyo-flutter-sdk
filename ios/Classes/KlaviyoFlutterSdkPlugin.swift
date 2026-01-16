@@ -1,6 +1,6 @@
 import Flutter
-import KlaviyoSwift
 import KlaviyoForms
+import KlaviyoSwift
 import UIKit
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
@@ -14,7 +14,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: channel)
         
         let eventChannel = FlutterEventChannel(
-            name: "klaviyo_events", binaryMessenger: registrar.messenger())
+            name: "klaviyo_events", binaryMessenger: registrar.messenger()
+        )
         eventChannel.setStreamHandler(instance)
     }
     
@@ -26,7 +27,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             else {
                 result(
                     FlutterError(
-                        code: "INVALID_ARGUMENTS", message: "Invalid arguments for initialize", details: nil))
+                        code: "INVALID_ARGUMENTS", message: "Invalid arguments for initialize", details: nil
+                    ))
                 return
             }
             KlaviyoSDK().initialize(with: apiKey)
@@ -49,7 +51,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 organization: profileData["organization"] as? String,
                 title: profileData["title"] as? String,
                 image: profileData["image"] as? String,
-                location: nil, // TODO: handle location if needed
+                location: nil,
                 properties: profileData["properties"] as? [String: Any]
             )
             KlaviyoSDK().set(profile: profile)
@@ -94,8 +96,9 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid properties", details: nil))
                 return
             }
-
-            properties.forEach { (key, value) in
+            
+            // swiftlint:disable:next identifier_name
+            for (key, value) in properties {
                 let profileKey = Profile.ProfileKey.from(key)
                 KlaviyoSDK().set(profileAttribute: profileKey, value: value)
             }
@@ -154,7 +157,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 "environment": "production",
                 "platform": "ios",
                 "createdAt": tokenReceivedDate?.description ?? "Not received",
-                "isActive": lastPushToken != nil,
+                "isActive": lastPushToken != nil
             ])
             
         case "registerForInAppForms":
@@ -167,6 +170,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         case "showForm":
             // Not supported in v5.0.0; forms are shown automatically based on targeting
             result(FlutterError(code: "NOT_SUPPORTED", message: "Direct showForm is not supported in v5.0.0; forms are shown automatically.", details: nil))
+            
         case "hideForm":
             // Not supported in v5.0.0; forms are hidden automatically
             result(FlutterError(code: "NOT_SUPPORTED", message: "Direct hideForm is not supported in v5.0.0; forms are hidden automatically.", details: nil))
@@ -214,7 +218,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             print("📱 Push notification opened in plugin: \(userInfo)")
             
             // Notify Flutter side via event sink if available
-            if let eventSink = self.eventSink {
+            if let eventSink = eventSink {
                 eventSink([
                     "type": "push_notification_opened",
                     "data": userInfo
@@ -230,14 +234,13 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
 extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
     public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink)
-    -> FlutterError?
-    {
-        self.eventSink = events
+    -> FlutterError? {
+        eventSink = events
         return nil
     }
     
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        self.eventSink = nil
+        eventSink = nil
         return nil
     }
 }
