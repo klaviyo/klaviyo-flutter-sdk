@@ -13,6 +13,7 @@ import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.core.Registry
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
+import com.klaviyo.forms.unregisterFromInAppForms
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -237,7 +238,7 @@ class KlaviyoFlutterSdkPlugin :
                         }
 
                     Klaviyo.registerForInAppForms(
-                        InAppFormsConfig(sessionTimeoutDuration = sessionTimeout)
+                        InAppFormsConfig(sessionTimeoutDuration = sessionTimeout),
                     )
 
                     result.success(null)
@@ -253,7 +254,6 @@ class KlaviyoFlutterSdkPlugin :
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to unregister from in-app forms", e.message)
                 }
-
             }
 
             "showForm" -> {
@@ -312,11 +312,7 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
-        try {
-            Klaviyo.unregisterFromInAppForms()
-        } catch (e: Exception) {
-            Log.d(TAG, "IAF cleanup on engine detach failed: ${e.message}")
-        }
+        Klaviyo.unregisterFromInAppForms()
     }
 
     // ActivityAware implementation

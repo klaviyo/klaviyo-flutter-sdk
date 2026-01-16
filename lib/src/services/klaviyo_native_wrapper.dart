@@ -219,7 +219,7 @@ class KlaviyoNativeWrapper {
     try {
       await _channel.invokeMethod('unregisterFromInAppForms');
     } catch (e) {
-      throw KlaviyoException('Failed to register for in-app forms: $e');
+      throw KlaviyoException('Failed to unregister from in-app forms: $e');
     }
   }
 

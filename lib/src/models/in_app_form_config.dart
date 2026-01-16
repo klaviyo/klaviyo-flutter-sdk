@@ -1,7 +1,6 @@
 const int _infiniteTimeoutSentinel = -1;
 
 class InAppFormConfig {
-
   /// - null → platform default (1 hour)
   /// - 0 → timeout immediately when app backgrounds
   /// - >0 → timeout after inactivity
@@ -16,11 +15,12 @@ class InAppFormConfig {
 
   /// Platform default (1hr) or custom timeout
   const InAppFormConfig({Duration? sessionTimeoutDuration})
-    : this._(sessionTimeoutDuration: sessionTimeoutDuration, isInfinite: false);
+      : this._(
+            sessionTimeoutDuration: sessionTimeoutDuration, isInfinite: false);
 
   /// No timeout (infinite)
   const InAppFormConfig.infinite()
-    : this._(sessionTimeoutDuration: null, isInfinite: true);
+      : this._(sessionTimeoutDuration: null, isInfinite: true);
 
   factory InAppFormConfig.fromJson(Map<String, dynamic> json) {
     final raw = json['sessionTimeoutDuration'];
@@ -56,7 +56,7 @@ class InAppFormConfig {
 
     return InAppFormConfig(
       sessionTimeoutDuration:
-      sessionTimeoutDuration ?? this.sessionTimeoutDuration,
+          sessionTimeoutDuration ?? this.sessionTimeoutDuration,
     );
   }
 
@@ -77,6 +77,5 @@ class InAppFormConfig {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(isInfinite, sessionTimeoutDuration);
+  int get hashCode => Object.hash(isInfinite, sessionTimeoutDuration);
 }
