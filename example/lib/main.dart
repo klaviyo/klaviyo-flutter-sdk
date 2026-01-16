@@ -103,7 +103,8 @@ class _MyAppState extends State<MyApp> {
       print('Notification payload: ${message.notification?.title}');
       print('Data payload: ${message.data}');
       setState(() {
-        _status = 'Received push: ${message.notification?.title ?? message.data['title'] ?? "No title"}';
+        _status =
+            'Received push: ${message.notification?.title ?? message.data['title'] ?? "No title"}';
       });
     });
   }
@@ -118,7 +119,8 @@ class _MyAppState extends State<MyApp> {
           _status = 'FCM token registered with Klaviyo';
         });
       } else {
-        print('Klaviyo SDK not initialized yet, token will be registered after initialization');
+        print(
+            'Klaviyo SDK not initialized yet, token will be registered after initialization');
       }
     } catch (e) {
       print('Failed to register token with Klaviyo: $e');
@@ -127,7 +129,6 @@ class _MyAppState extends State<MyApp> {
       });
     }
   }
-
 
   Future<void> _initializeKlaviyo() async {
     final apiKey = _apiKeyController.text.trim();
@@ -369,7 +370,6 @@ class _MyAppState extends State<MyApp> {
       });
     }
   }
-
 
   // TODO: implement setPushToken()
   // ignore: unused_element

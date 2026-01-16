@@ -25,7 +25,7 @@ Native SDKs:
 ### 1. Main SDK (`lib/src/klaviyo_sdk.dart`)
 - **Before**: Pure Flutter implementation with HTTP calls, Firebase integration, and custom services
 - **After**: Native wrapper that delegates all operations to native SDKs via platform channels
-- **Benefits**: 
+- **Benefits**:
   - Leverages native SDK features and optimizations
   - Better performance and reliability
   - Automatic platform-specific handling
@@ -195,4 +195,4 @@ The conversion to a native wrapper approach provides significant benefits:
 - **Feature Completeness**: Access to all native SDK features
 - **Future-Proof**: Automatic updates from native SDK improvements
 
-The implementation maintains full API compatibility while providing a more robust and efficient solution for Flutter developers integrating with Klaviyo. 
+The implementation maintains full API compatibility while providing a more robust and efficient solution for Flutter developers integrating with Klaviyo.

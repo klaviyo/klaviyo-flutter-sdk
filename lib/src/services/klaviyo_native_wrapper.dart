@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
-import '../models/push_token_info.dart';
+// import '../models/push_token_info.dart';
 import '../enums/push_environment.dart';
 import '../exceptions/klaviyo_exception.dart';
 
