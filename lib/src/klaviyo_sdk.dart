@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
@@ -168,6 +169,19 @@ class KlaviyoSDK {
       timestamp: DateTime.now(),
     );
     await trackEvent(event);
+  }
+
+  /// Register for push notifications
+  /// This is only required on iOS to trigger APNs registration.
+  /// On Android, FCM handles registration automatically via KlaviyoPushService.
+  Future<void> registerForPushNotifications() async {
+    _ensureInitialized();
+
+    // Only call native method on iOS
+    if (Platform.isIOS) {
+      await _nativeWrapper.registerForPushNotifications();
+    }
+    // No-op on Android - FCM handles this automatically
   }
 
   /// Set push token
