@@ -402,7 +402,7 @@ class _MyAppState extends State<MyApp> {
       final token = await _klaviyo.getPushToken();
       if (token != null) {
         setState(() {
-          _status = 'Push token: $token...';
+          _status = 'Push token:\n$token';
         });
         print('Full push token: $token');
       } else {
