@@ -11,39 +11,15 @@ class AppDelegate: FlutterAppDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         GeneratedPluginRegistrant.register(with: self)
-        
+
         // Initialize Klaviyo SDK from Flutter with user-provided API key
         // KlaviyoSDK().initialize(with: "API_KEY") // Now handled from Flutter
-        
+
         // Set up notification center delegate for push open tracking
         UNUserNotificationCenter.current().delegate = self
-        
-        // Request push notification permissions
-        requestPushNotificationPermissions()
-        
+
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
-    
-    // Request push notification permissions
-    private func requestPushNotificationPermissions() {
-        let center = UNUserNotificationCenter.current()
-        let options: UNAuthorizationOptions = [.alert, .sound, .badge]
-        
-        center.requestAuthorization(options: options) { granted, error in
-            if let error = error {
-                print("❌ Push notification permission error: \(error)")
-                return
-            }
-            
-            print("📱 Push notification permission granted: \(granted)")
-            
-            // Register for remote notifications on the main thread
-            DispatchQueue.main.async {
-                UIApplication.shared.registerForRemoteNotifications()
-            }
-        }
-    }
-    
     // Handle successful APNs token registration
     override func application(
         _: UIApplication,
