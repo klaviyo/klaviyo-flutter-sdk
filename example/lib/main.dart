@@ -361,6 +361,14 @@ class _MyAppState extends State<MyApp> {
   Future<void> _registerForPush() async {
     try {
       await _requestNotificationPermission();
+
+      // Register for push notifications
+      // The SDK handles platform differences internally:
+      // - iOS: triggers APNs registration
+      // - Android: no-op (FCM handles this automatically)
+      await _klaviyo.registerForPushNotifications();
+      print('Push registration triggered');
+
       setState(() {
         _status = 'Registered for push notifications';
       });
