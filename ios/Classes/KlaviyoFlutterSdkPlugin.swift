@@ -162,7 +162,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             let token = KlaviyoSDK().pushToken
             
             if let token = token {
-                print("Retrieved push token from SDK\n:\(token")
+                print("Retrieved push token from SDK\n:\(token)")
             } else {
                 print("No push token available")
             }
