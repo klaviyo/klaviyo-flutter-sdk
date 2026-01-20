@@ -11,16 +11,15 @@ class AppDelegate: FlutterAppDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         GeneratedPluginRegistrant.register(with: self)
-        
+
         // Initialize Klaviyo SDK from Flutter with user-provided API key
         // KlaviyoSDK().initialize(with: "API_KEY") // Now handled from Flutter
-        
+
         // Set up notification center delegate for push open tracking
         UNUserNotificationCenter.current().delegate = self
         
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
-
     // Handle successful APNs token registration
     override func application(
         _: UIApplication,
