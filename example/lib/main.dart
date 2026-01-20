@@ -481,6 +481,61 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  /// Set badge count to a specific value
+  void _setBadgeCount(int count) {
+    try {
+      _klaviyo.setBadgeCount(count);
+      setState(() {
+        _status = 'Badge count set to $count';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to set badge count: $e';
+      });
+    }
+  }
+
+  /// Clear the badge (set to 0)
+  void _clearBadge() {
+    _setBadgeCount(0);
+  }
+
+  /// Show badge count dialog to set a custom value
+  void _showBadgeCountDialog() {
+    final TextEditingController badgeController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Set Badge Count'),
+          content: TextField(
+            controller: badgeController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              hintText: 'Enter badge count (e.g., 5)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final count = int.tryParse(badgeController.text) ?? 0;
+                _setBadgeCount(count);
+                Navigator.of(context).pop();
+              },
+              child: const Text('Set'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -606,6 +661,12 @@ class _MyAppState extends State<MyApp> {
 
               const SizedBox(height: 16),
 
+              // Badge Count Section (iOS only)
+              _buildSectionHeader('Badge Count (iOS)'),
+              _buildBadgeCountSection(),
+
+              const SizedBox(height: 16),
+
               // In-App Forms Section
               _buildSectionHeader('In-App Forms'),
               Padding(
@@ -665,6 +726,72 @@ class _MyAppState extends State<MyApp> {
         ),
         child: Text(text),
       ),
+    );
+  }
+
+  Widget _buildBadgeCountSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Set badge count on the app icon',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+            ),
+            const SizedBox(height: 12),
+            // Quick badge count buttons
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildBadgeButton('1', () => _setBadgeCount(1)),
+                _buildBadgeButton('5', () => _setBadgeCount(5)),
+                _buildBadgeButton('10', () => _setBadgeCount(10)),
+                _buildBadgeButton('99+', () => _setBadgeCount(100)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isInitialized ? _showBadgeCountDialog : null,
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Custom'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isInitialized ? _clearBadge : null,
+                    icon: const Icon(Icons.clear),
+                    label: const Text('Clear'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadgeButton(String label, VoidCallback onPressed) {
+    return ElevatedButton(
+      onPressed: _isInitialized ? onPressed : null,
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(60, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+      ),
+      child: Text(label),
     );
   }
 
