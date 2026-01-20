@@ -5,8 +5,6 @@ import UIKit
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var eventSink: FlutterEventSink?
-    private var lastPushToken: String?
-    private var tokenReceivedDate: Date?
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: registrar.messenger())
@@ -124,6 +122,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             
         case "registerForPushNotifications":
             // iOS requires manual APNs registration
+            // This triggers the system to request a new APNs token
             DispatchQueue.main.async {
                 UIApplication.shared.registerForRemoteNotifications()
             }
@@ -137,8 +136,16 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 return
             }
             
-            // Store the token for later retrieval
-            lastPushToken = token
+            // Validate token is not empty
+            guard !token.isEmpty else {
+                print("⚠️ Attempted to set empty push token")
+                result(FlutterError(
+                    code: "INVALID_TOKEN",
+                    message: "Push token cannot be empty",
+                    details: nil
+                ))
+                return
+            }
             
             // Convert hex string back to Data if needed, or handle string token directly
             if let tokenData = Data(hexString: token) {
@@ -151,14 +158,16 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             result(nil)
             
         case "getPushToken":
-            // Return stored push token info
-            result([
-                "token": lastPushToken ?? "",
-                "environment": "production",
-                "platform": "ios",
-                "createdAt": tokenReceivedDate?.description ?? "Not received",
-                "isActive": lastPushToken != nil
-            ])
+            // Return the push token directly from the Klaviyo SDK
+            let token = KlaviyoSDK().pushToken
+            
+            if let token = token {
+                print("Retrieved push token from SDK\n:\(token")
+            } else {
+                print("No push token available")
+            }
+            
+            result(token)
             
         case "registerForInAppForms":
             // Register for in-app forms
@@ -191,8 +200,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid token data", details: nil))
                 return
             }
-            lastPushToken = token
-            tokenReceivedDate = Date()
             print("✅ Push token stored in plugin: \(token)")
             result(nil)
             
