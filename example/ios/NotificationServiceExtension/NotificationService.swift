@@ -9,6 +9,7 @@ import KlaviyoSwiftExtension
 import UserNotifications
 
 class NotificationService: UNNotificationServiceExtension {
+    var request: UNNotificationRequest!
     var contentHandler: ((UNNotificationContent) -> Void)?
     var bestAttemptContent: UNMutableNotificationContent?
 
@@ -16,8 +17,12 @@ class NotificationService: UNNotificationServiceExtension {
         _ request: UNNotificationRequest,
         withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void
     ) {
+        // Track any custom key-value pairs sent in the push so the Test App can display them
+        storeCustomValues(from: request.content.userInfo)
+        
+        self.request = request
         self.contentHandler = contentHandler
-        bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
+        self.bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
         
         if let bestAttemptContent = bestAttemptContent {
             // Let Klaviyo handle the notification content modification
@@ -25,7 +30,7 @@ class NotificationService: UNNotificationServiceExtension {
             // - Rich media (images) attached to push notifications
             // - Badge count management (increment/set based on payload)
             KlaviyoExtensionSDK.handleNotificationServiceDidReceivedRequest(
-                request: request,
+                request: self.request,
                 bestAttemptContent: bestAttemptContent,
                 contentHandler: contentHandler
             )
@@ -40,14 +45,22 @@ class NotificationService: UNNotificationServiceExtension {
            let bestAttemptContent = bestAttemptContent
         {
             KlaviyoExtensionSDK.handleNotificationServiceExtensionTimeWillExpireRequest(
-                request: UNNotificationRequest(
-                    identifier: bestAttemptContent.threadIdentifier,
-                    content: bestAttemptContent,
-                    trigger: nil
-                ),
+                request: self.request,
                 bestAttemptContent: bestAttemptContent,
                 contentHandler: contentHandler
             )
+        }
+    }
+    
+    private func storeCustomValues(from userInfo: [AnyHashable: Any]) {
+        guard let appGroup = Bundle.main.object(forInfoDictionaryKey: "klaviyo_app_group") as? String,
+              let userDefaults = UserDefaults(suiteName: appGroup) else { return }
+        if let kvPairs = userInfo["key_value_pairs"] as? [String: Any] {
+            var result = ""
+            for (key, value) in kvPairs {
+                result += "Key: \(key), Value: \(value)\n"
+            }
+            userDefaults.set(result, forKey: "key_value_pairs")
         }
     }
 }
