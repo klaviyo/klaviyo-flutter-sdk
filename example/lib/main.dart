@@ -410,7 +410,7 @@ class _MyAppState extends State<MyApp> {
         _ => _parseFiniteConfig(text),
       };
 
-      if (config == null && text.isNotEmpty && text != '') {
+      if (config == null && text.isNotEmpty) {
         setState(() {
           _status = 'Invalid duration value. Please enter a number.';
         });
