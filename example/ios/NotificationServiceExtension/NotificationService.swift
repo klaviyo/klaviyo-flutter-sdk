@@ -53,9 +53,8 @@ class NotificationService: UNNotificationServiceExtension {
     }
     
     private func storeCustomValues(from userInfo: [AnyHashable: Any]) {
-        let appGroup = "group.com.klaviyo.FlutterExample"
-        
-        guard let userDefaults = UserDefaults(suiteName: appGroup) else { return }
+        guard let appGroup = Bundle.main.object(forInfoDictionaryKey: "klaviyo_app_group") as? String,
+              let userDefaults = UserDefaults(suiteName: appGroup) else { return }
         if let kvPairs = userInfo["key_value_pairs"] as? [String: Any] {
             var result = ""
             for (key, value) in kvPairs {
