@@ -264,7 +264,8 @@ class KlaviyoSDK {
   /// Private methods
   void _ensureInitialized() {
     if (!_isInitialized) {
-      throw const KlaviyoException('SDK not initialized. Call initialize() first.');
+      throw const KlaviyoException(
+          'SDK not initialized. Call initialize() first.');
     }
   }
 
