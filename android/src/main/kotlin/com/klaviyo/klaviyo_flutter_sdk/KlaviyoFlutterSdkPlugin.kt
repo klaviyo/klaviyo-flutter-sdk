@@ -11,6 +11,7 @@ import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.core.Registry
+import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.unregisterFromInAppForms
@@ -312,12 +313,14 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
-        Klaviyo.unregisterFromInAppForms()
     }
 
     // ActivityAware implementation
+    @OptIn(AdvancedAPI::class)
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+
+        Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
         // Handle the intent that launched this activity (cold start)
         binding.activity.intent?.let { intent ->
