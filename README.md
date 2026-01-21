@@ -7,6 +7,7 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
 - **Profile Management**: Set user profiles, emails, phone numbers, and custom properties
 - **Event Tracking**: Track custom events and user interactions
 - **Push Notifications**: Register for and handle push notifications
+- **Rich Push**: Display images within push notifications
 - **In-App Forms**: Display and manage in-app forms for lead capture
 - **Cross-Platform**: Works on both iOS and Android using native SDKs
 - **Real-time Updates**: Stream-based profile updates and event handling
@@ -154,7 +155,16 @@ klaviyo.profileStream.listen((profile) {
 });
 ```
 
-### 5. In-App Forms
+### 5. Rich Push
+
+[Rich Push](https://help.klaviyo.com/hc/en-us/articles/16917302437275) is the ability to add images to
+push notification messages. On iOS, you will need to implement an extension service to attach images to notifications.
+No additional setup is needed to support rich push on Android.
+
+- [Android](https://github.com/klaviyo/klaviyo-android-sdk#Rich-Push)
+- [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#Rich-Push)
+
+### 6. In-App Forms
 
 ```dart
 // Register for in-app forms
@@ -177,7 +187,7 @@ final success = await klaviyo.showForm('newsletter_signup',
 await klaviyo.hideForm('newsletter_signup');
 ```
 
-### 6. Profile Reset (Logout)
+### 7. Profile Reset (Logout)
 
 ```dart
 // Reset profile when user logs out
