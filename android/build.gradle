@@ -9,7 +9,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.7.3'
+        classpath 'com.android.tools.build:gradle:8.9.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -49,8 +49,8 @@ android {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation "com.github.klaviyo.klaviyo-android-sdk:core:4.1.0"
-    api "com.github.klaviyo.klaviyo-android-sdk:analytics:4.1.0"
-    api "com.github.klaviyo.klaviyo-android-sdk:push-fcm:4.1.0"
-    api "com.github.klaviyo.klaviyo-android-sdk:forms:4.1.0"
+    implementation "com.github.klaviyo.klaviyo-android-sdk:core:feat~flutter-support-SNAPSHOT"
+    api "com.github.klaviyo.klaviyo-android-sdk:analytics:feat~flutter-support-SNAPSHOT"
+    api "com.github.klaviyo.klaviyo-android-sdk:push-fcm:feat~flutter-support-SNAPSHOT"
+    api "com.github.klaviyo.klaviyo-android-sdk:forms:feat~flutter-support-SNAPSHOT"
 }
