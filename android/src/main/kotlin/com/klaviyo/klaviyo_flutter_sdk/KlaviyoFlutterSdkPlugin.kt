@@ -234,9 +234,9 @@ class KlaviyoFlutterSdkPlugin :
                     val sessionTimeout: Duration =
                         when (val timeout = configuration?.get("sessionTimeoutDuration") as? Int) {
                             null -> {
-                                InAppFormsConfig.DEFAULT_SESSION_TIMEOUT?.also {
+                                InAppFormsConfig.DEFAULT_SESSION_TIMEOUT.also {
                                     Registry.log.warning(
-                                        "No session duration included - defaulting to ${InAppFormsConfig.DEFAULT_SESSION_TIMEOUT}",
+                                        "No session timeout included - defaulting to ${InAppFormsConfig.DEFAULT_SESSION_TIMEOUT}",
                                     )
                                 }
                             }
@@ -350,8 +350,11 @@ class KlaviyoFlutterSdkPlugin :
         activity = null
     }
 
+    @OptIn(AdvancedAPI::class)
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
+
+        Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
         binding.addOnNewIntentListener { intent ->
             handleIntent(intent)
