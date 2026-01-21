@@ -29,6 +29,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _durationController = TextEditingController();
@@ -497,6 +498,8 @@ class _MyAppState extends State<MyApp> {
   /// Show badge count dialog to set a custom value
   void _showBadgeCountDialog() {
     final TextEditingController badgeController = TextEditingController();
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
 
     showDialog(
       context: context,
@@ -533,6 +536,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Klaviyo Flutter SDK Example',
       theme: ThemeData(
         primarySwatch: Colors.blue,
