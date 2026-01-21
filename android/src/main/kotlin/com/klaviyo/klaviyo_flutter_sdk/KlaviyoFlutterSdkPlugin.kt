@@ -233,9 +233,21 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     val sessionTimeout: Duration =
                         when (val timeout = configuration?.get("sessionTimeoutDuration") as? Int) {
-                            null -> InAppFormsConfig.DEFAULT_SESSION_TIMEOUT
-                            INFINITE_TIMEOUT_SENTINEL -> INFINITE
-                            else -> timeout.seconds
+                            null -> {
+                                InAppFormsConfig.DEFAULT_SESSION_TIMEOUT?.also {
+                                    Registry.log.warning(
+                                        "No session duration included - defaulting to ${InAppFormsConfig.DEFAULT_SESSION_TIMEOUT}",
+                                    )
+                                }
+                            }
+
+                            INFINITE_TIMEOUT_SENTINEL -> {
+                                INFINITE
+                            }
+
+                            else -> {
+                                timeout.seconds
+                            }
                         }
 
                     Klaviyo.registerForInAppForms(

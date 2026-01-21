@@ -212,9 +212,7 @@ class KlaviyoNativeWrapper {
   }
 
   /// Unregister from in-app forms using native SDK
-  Future<void> unregisterFromInAppForms({
-    Map<String, dynamic>? configuration,
-  }) async {
+  Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
     try {
       await _channel.invokeMethod('unregisterFromInAppForms');
