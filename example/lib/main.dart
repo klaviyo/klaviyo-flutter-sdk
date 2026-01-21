@@ -743,18 +743,6 @@ class _MyAppState extends State<MyApp> {
                   ),
             ),
             const SizedBox(height: 12),
-            // Quick badge count buttons
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildBadgeButton('1', () => _setBadgeCount(1)),
-                _buildBadgeButton('5', () => _setBadgeCount(5)),
-                _buildBadgeButton('10', () => _setBadgeCount(10)),
-                _buildBadgeButton('99+', () => _setBadgeCount(100)),
-              ],
-            ),
-            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -781,17 +769,6 @@ class _MyAppState extends State<MyApp> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildBadgeButton(String label, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: _isInitialized ? onPressed : null,
-      style: ElevatedButton.styleFrom(
-        minimumSize: const Size(60, 40),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-      ),
-      child: Text(label),
     );
   }
 
