@@ -1,4 +1,4 @@
-library klaviyo_flutter_sdk;
+library;
 
 export 'src/klaviyo_sdk.dart';
 export 'src/models/klaviyo_profile.dart';
