@@ -656,7 +656,7 @@ class _MyAppState extends State<MyApp> {
               const SizedBox(height: 16),
 
               // Badge Count Section (iOS only)
-              _buildSectionHeader('Badge Count (iOS)'),
+              _buildSectionHeader('Badge Count (iOS only)'),
               _buildBadgeCountSection(),
 
               const SizedBox(height: 16),
