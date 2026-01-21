@@ -242,6 +242,17 @@ class KlaviyoSDK {
     }
   }
 
+  /// Reset the current profile (useful for logout)
+  /// Profile state is managed by the native SDK
+  void setBadgeCount(int count) async {
+    if (Platform.isIOS) {
+      _ensureInitialized();
+      _nativeWrapper.setBadgeCount(count);
+      _logger.info('Set the badge count to $count');
+    }
+    // Android does not support badge count
+  }
+
   /// Set log level
   void setLogLevel(KlaviyoLogLevel logLevel) {
     _logger.setLogLevel(logLevel);
