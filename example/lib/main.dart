@@ -361,6 +361,14 @@ class _MyAppState extends State<MyApp> {
   Future<void> _registerForPush() async {
     try {
       await _requestNotificationPermission();
+
+      // Register for push notifications
+      // The SDK handles platform differences internally:
+      // - iOS: triggers APNs registration
+      // - Android: no-op (FCM handles this automatically)
+      await _klaviyo.registerForPushNotifications();
+      print('Push registration triggered');
+
       setState(() {
         _status = 'Registered for push notifications';
       });
@@ -371,30 +379,12 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  // TODO: implement setPushToken()
-  // ignore: unused_element
-  Future<void> _setPushToken() async {
-    try {
-      // Instead of setting a mock token, let's get the actual token info
-      final tokenInfo = await _klaviyo.getPushToken();
-      setState(() {
-        _status = 'Push Token Info: ${tokenInfo.toString()}';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to get push token info: ${e.toString()}';
-      });
-    }
-  }
-
-  // TODO: implement _getPushToken()
-  // ignore: unused_element
   Future<void> _getPushToken() async {
     try {
       final token = await _klaviyo.getPushToken();
       if (token != null) {
         setState(() {
-          _status = 'Push token: $token...';
+          _status = 'Push token:\n$token';
         });
         print('Full push token: $token');
       } else {

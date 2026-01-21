@@ -157,6 +157,19 @@ class KlaviyoNativeWrapper {
     await trackEvent(event);
   }
 
+  /// Register for push notifications using native SDK
+  /// This should only be called on iOS to trigger APNs registration.
+  /// Callers should check platform before calling this method.
+  Future<void> registerForPushNotifications() async {
+    _ensureInitialized();
+
+    try {
+      await _channel.invokeMethod('registerForPushNotifications');
+    } catch (e) {
+      throw KlaviyoException('Failed to register for push notifications: $e');
+    }
+  }
+
   /// Set push token using native SDK
   Future<void> setPushToken(String token,
       {PushEnvironment? environment}) async {
