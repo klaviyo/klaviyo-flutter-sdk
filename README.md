@@ -144,10 +144,13 @@ await klaviyo.trackEvent(event);
 
 ```dart
 // Register for push notifications
+// iOS: Triggers APNs registration
+// Android: No-op (FCM handles registration automatically)
 await klaviyo.registerForPushNotifications();
 
-// Set push token (usually handled automatically)
-await klaviyo.setPushToken('device_token_here');
+// Get the current push token
+final token = await klaviyo.getPushToken();
+print('Push token: $token');
 
 // Handle push notification events
 klaviyo.profileStream.listen((profile) {
@@ -210,8 +213,8 @@ The main SDK class that provides all functionality.
 - `setProfileProperties(properties)` - Set custom profile properties
 - `track(name, properties)` - Track a simple event
 - `trackEvent(event)` - Track a complex event
-- `registerForPushNotifications()` - Register for push notifications
-- `setPushToken(token, environment)` - Set push notification token
+- `registerForPushNotifications()` - Register for push notifications (iOS: triggers APNs registration, Android: no-op)
+- `setPushToken(token, environment)` - Set push notification token (usually handled automatically by native SDKs)
 - `getPushToken()` - Get current push token
 - `registerForInAppForms(configuration)` - Register for in-app forms
 - `showForm(formId, customData)` - Show a specific form
