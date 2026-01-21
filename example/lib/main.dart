@@ -483,16 +483,10 @@ class _MyAppState extends State<MyApp> {
 
   /// Set badge count to a specific value
   void _setBadgeCount(int count) {
-    try {
-      _klaviyo.setBadgeCount(count);
-      setState(() {
-        _status = 'Badge count set to $count';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to set badge count: $e';
-      });
-    }
+    _klaviyo.setBadgeCount(count);
+    setState(() {
+      _status = 'Badge count set to $count';
+    });
   }
 
   /// Clear the badge (set to 0)
