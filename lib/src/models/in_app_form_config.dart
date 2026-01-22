@@ -60,22 +60,11 @@ class InAppFormConfig {
     );
   }
 
+  // Returns IAF config in H:MM:SS.uuuuuu format
   @override
   String toString() {
     return isInfinite
         ? 'InAppFormConfig(sessionTimeoutDuration: infinite)'
         : 'InAppFormConfig(sessionTimeoutDuration: $sessionTimeoutDuration)';
   }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-
-    return other is InAppFormConfig &&
-        other.isInfinite == isInfinite &&
-        other.sessionTimeoutDuration == sessionTimeoutDuration;
-  }
-
-  @override
-  int get hashCode => Object.hash(isInfinite, sessionTimeoutDuration);
 }

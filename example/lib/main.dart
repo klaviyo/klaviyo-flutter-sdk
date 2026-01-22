@@ -421,7 +421,7 @@ class _MyAppState extends State<MyApp> {
 
       setState(() {
         _status = config == null
-            ? 'Registered for in-app forms (default)'
+            ? 'Registered for in-app forms (1 hour)'
             : config.isInfinite
                 ? 'Registered for in-app forms (infinite timeout)'
                 : 'Registered for in-app forms (${config.sessionTimeoutDuration!.inSeconds}s)';
