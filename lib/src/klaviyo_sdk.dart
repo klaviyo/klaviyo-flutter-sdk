@@ -251,7 +251,8 @@ class KlaviyoSDK {
       _logger.info('Set the badge count to $count');
     } else {
       // Android does not support badge count
-      _logger.warning('Setting badge count via the Klaviyo SDK is unsupported on Android.');
+      _logger.warning(
+          'Setting badge count via the Klaviyo SDK is unsupported on Android.');
     }
   }
 
