@@ -12,7 +12,7 @@ class NotificationService: UNNotificationServiceExtension {
     var request: UNNotificationRequest!
     var contentHandler: ((UNNotificationContent) -> Void)?
     var bestAttemptContent: UNMutableNotificationContent?
-
+    
     override func didReceive(
         _ request: UNNotificationRequest,
         withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void
@@ -24,7 +24,7 @@ class NotificationService: UNNotificationServiceExtension {
         self.contentHandler = contentHandler
         self.bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
         
-        if let bestAttemptContent = bestAttemptContent {
+        if let bestAttemptContent {
             // Let Klaviyo handle the notification content modification
             // This handles:
             // - Rich media (images) attached to push notifications
@@ -34,6 +34,9 @@ class NotificationService: UNNotificationServiceExtension {
                 bestAttemptContent: bestAttemptContent,
                 contentHandler: contentHandler
             )
+        } else {
+            // If we can't create mutable content, deliver the original notification immediately
+            contentHandler(request.content)
         }
     }
     
@@ -41,14 +44,15 @@ class NotificationService: UNNotificationServiceExtension {
         // Called just before the extension will be terminated by the system.
         // Use this as an opportunity to deliver your "best attempt" at modified content,
         // otherwise the original push payload will be used.
-        if let contentHandler = contentHandler,
-           let bestAttemptContent = bestAttemptContent
-        {
+        if let contentHandler, let bestAttemptContent {
             KlaviyoExtensionSDK.handleNotificationServiceExtensionTimeWillExpireRequest(
                 request: self.request,
                 bestAttemptContent: bestAttemptContent,
                 contentHandler: contentHandler
             )
+        } else if let contentHandler {
+            // If we don't have modified content, deliver the original notification
+            contentHandler(request.content)
         }
     }
     
