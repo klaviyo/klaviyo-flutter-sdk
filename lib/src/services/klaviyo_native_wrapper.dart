@@ -135,7 +135,9 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('trackEvent', {'event': event.toJson()});
+      await _channel.invokeMethod('trackEvent', {
+        'event': event.toJson(),
+      });
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
     }
