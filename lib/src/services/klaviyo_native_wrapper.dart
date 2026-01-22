@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
+import '../models/geofence.dart';
 import '../enums/push_environment.dart';
 import '../exceptions/klaviyo_exception.dart';
 
@@ -218,6 +219,40 @@ class KlaviyoNativeWrapper {
       await _channel.invokeMethod('unregisterFromInAppForms');
     } catch (e) {
       throw KlaviyoException('Failed to unregister from in-app forms: $e');
+    }
+  }
+
+  /// Register for geofencing using native SDK
+  Future<void> registerGeofencing() async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('registerGeofencing');
+    } catch (e) {
+      throw KlaviyoException('Failed to register for geofencing: $e');
+    }
+  }
+
+  /// Unregister from geofencing using native SDK
+  Future<void> unregisterGeofencing() async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('unregisterGeofencing');
+    } catch (e) {
+      throw KlaviyoException('Failed to unregister from geofencing: $e');
+    }
+  }
+
+  /// Get currently monitored geofences from native SDK
+  Future<List<Geofence>> getCurrentGeofences() async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod('getCurrentGeofences');
+      final List<dynamic> geofencesJson = result['geofences'];
+      return geofencesJson
+          .map((json) => Geofence.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } catch (e) {
+      throw KlaviyoException('Failed to get current geofences: $e');
     }
   }
 
