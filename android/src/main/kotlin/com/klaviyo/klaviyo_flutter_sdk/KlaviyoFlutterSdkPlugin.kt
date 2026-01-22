@@ -11,6 +11,10 @@ import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.core.Registry
+import com.klaviyo.core.utils.AdvancedAPI
+import com.klaviyo.forms.InAppFormsConfig
+import com.klaviyo.forms.registerForInAppForms
+import com.klaviyo.forms.unregisterFromInAppForms
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -19,6 +23,9 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.INFINITE
+import kotlin.time.Duration.Companion.seconds
 
 class KlaviyoFlutterSdkPlugin :
     FlutterPlugin,
@@ -32,13 +39,13 @@ class KlaviyoFlutterSdkPlugin :
 
     companion object {
         private const val TAG = "KlaviyoFlutter"
+        private const val INFINITE_TIMEOUT_SENTINEL = -1
     }
 
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
         applicationContext = flutterPluginBinding.applicationContext
-
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
 
@@ -224,10 +231,41 @@ class KlaviyoFlutterSdkPlugin :
                 val configuration = call.argument<Map<String, Any>>("configuration")
 
                 try {
-                    // In-app forms registration is handled automatically by the SDK
+                    val sessionTimeout: Duration =
+                        when (val timeout = configuration?.get("sessionTimeoutDuration") as? Int) {
+                            null -> {
+                                InAppFormsConfig.DEFAULT_SESSION_TIMEOUT.also {
+                                    Registry.log.warning(
+                                        "No session timeout included - defaulting to ${InAppFormsConfig.DEFAULT_SESSION_TIMEOUT}",
+                                    )
+                                }
+                            }
+
+                            INFINITE_TIMEOUT_SENTINEL -> {
+                                INFINITE
+                            }
+
+                            else -> {
+                                timeout.seconds
+                            }
+                        }
+
+                    Klaviyo.registerForInAppForms(
+                        InAppFormsConfig(sessionTimeoutDuration = sessionTimeout),
+                    )
+
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
+                }
+            }
+
+            "unregisterFromInAppForms" -> {
+                try {
+                    Klaviyo.unregisterFromInAppForms()
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to unregister from in-app forms", e.message)
                 }
             }
 
@@ -290,8 +328,11 @@ class KlaviyoFlutterSdkPlugin :
     }
 
     // ActivityAware implementation
+    @OptIn(AdvancedAPI::class)
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+
+        Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
         // Handle the intent that launched this activity (cold start)
         binding.activity.intent?.let { intent ->
@@ -309,8 +350,11 @@ class KlaviyoFlutterSdkPlugin :
         activity = null
     }
 
+    @OptIn(AdvancedAPI::class)
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
+
+        Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
         binding.addOnNewIntentListener { intent ->
             handleIntent(intent)

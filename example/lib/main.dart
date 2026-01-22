@@ -31,6 +31,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
   final TextEditingController _apiKeyController = TextEditingController();
+  final TextEditingController _durationController = TextEditingController();
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
 
@@ -401,23 +402,55 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _registerForForms() async {
     try {
-      const config = InAppFormConfig(
-        enabled: true,
-        autoShow: true,
-        position: 'bottom',
-        theme: {
-          'primary_color': '#007bff',
-          'text_color': '#333333',
-        },
-      );
+      final text = _durationController.text.trim();
+
+      final InAppFormConfig? config = switch (text) {
+        '' => null, // default 1hr
+        '-1' => const InAppFormConfig.infinite(),
+        _ => _parseFiniteConfig(text),
+      };
+
+      if (config == null && text.isNotEmpty) {
+        setState(() {
+          _status = 'Invalid duration value. Please enter a number.';
+        });
+        return;
+      }
 
       await _klaviyo.registerForInAppForms(configuration: config);
+
       setState(() {
-        _status = 'Registered for in-app forms';
+        _status = config == null
+            ? 'Registered for in-app forms (1 hour)'
+            : config.isInfinite
+                ? 'Registered for in-app forms (infinite timeout)'
+                : 'Registered for in-app forms (${config.sessionTimeoutDuration!.inSeconds}s)';
       });
     } catch (e) {
       setState(() {
         _status = 'Failed to register for forms: $e';
+      });
+    }
+  }
+
+  InAppFormConfig? _parseFiniteConfig(String text) {
+    final seconds = int.tryParse(text);
+    if (seconds == null || seconds < 0) return null;
+
+    return InAppFormConfig(
+      sessionTimeoutDuration: Duration(seconds: seconds),
+    );
+  }
+
+  Future<void> _unregisterFromInAppForms() async {
+    try {
+      await _klaviyo.unregisterFromInAppForms();
+      setState(() {
+        _status = 'Unregistered from in-app forms.';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to unregister from in-app forms: $e';
       });
     }
   }
@@ -575,8 +608,24 @@ class _MyAppState extends State<MyApp> {
 
               // In-App Forms Section
               _buildSectionHeader('In-App Forms'),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: TextField(
+                  controller: _durationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Session Timeout Duration (seconds)',
+                    hintText: 'Enter seconds (default: 3600)',
+                    border: OutlineInputBorder(),
+                    helperText: 'Enter -1 for infinite timeout, 0 for timeout '
+                        'on background',
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(signed: true),
+                  enabled: _isInitialized,
+                ),
+              ),
               _buildButton('Register for Forms', _registerForForms),
-
+              _buildButton('Unregister from Forms', _unregisterFromInAppForms),
               const SizedBox(height: 16),
 
               // Configuration Section
@@ -622,6 +671,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void dispose() {
     _apiKeyController.dispose();
+    _durationController.dispose();
     _klaviyo.dispose();
     super.dispose();
   }
