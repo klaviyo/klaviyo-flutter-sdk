@@ -21,7 +21,7 @@ class KlaviyoSDK {
 
   // Native wrapper service
   late KlaviyoNativeWrapper _nativeWrapper;
-  late Logger _logger;
+  final Logger _logger = Logger();
 
   // State
   bool _isInitialized = false;
@@ -46,8 +46,7 @@ class KlaviyoSDK {
     try {
       _apiKey = apiKey;
 
-      // Initialize logger
-      _logger = Logger();
+      // Set logger level
       _logger.setLogLevel(logLevel);
 
       // Initialize native wrapper
