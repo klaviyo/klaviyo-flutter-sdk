@@ -29,10 +29,10 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _durationController = TextEditingController();
+  final TextEditingController _badgeCountController = TextEditingController();
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
 
@@ -485,6 +485,8 @@ class _MyAppState extends State<MyApp> {
   /// Set badge count to a specific value
   void _setBadgeCount(int count) {
     _klaviyo.setBadgeCount(count);
+    _badgeCountController.clear();
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _status = 'Badge count set to $count';
     });
@@ -495,48 +497,9 @@ class _MyAppState extends State<MyApp> {
     _setBadgeCount(0);
   }
 
-  /// Show badge count dialog to set a custom value
-  void _showBadgeCountDialog() {
-    final TextEditingController badgeController = TextEditingController();
-    final context = _navigatorKey.currentContext;
-    if (context == null) return;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Set Badge Count'),
-          content: TextField(
-            controller: badgeController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              hintText: 'Enter badge count (e.g., 5)',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final count = int.tryParse(badgeController.text) ?? 0;
-                _setBadgeCount(count);
-                Navigator.of(context).pop();
-              },
-              child: const Text('Set'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: _navigatorKey,
       title: 'Klaviyo Flutter SDK Example',
       theme: ThemeData(
         primarySwatch: Colors.blue,
@@ -744,23 +707,40 @@ class _MyAppState extends State<MyApp> {
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isInitialized ? _showBadgeCountDialog : null,
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Custom'),
+                  flex: 2,
+                  child: TextField(
+                    controller: _badgeCountController,
+                    enabled: _isInitialized,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      hintText: 'New value',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isInitialized ? _clearBadge : null,
-                    icon: const Icon(Icons.clear),
-                    label: const Text('Clear'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                    ),
+                ElevatedButton(
+                  onPressed: _isInitialized
+                      ? () {
+                          final count =
+                              int.tryParse(_badgeCountController.text) ?? 0;
+                          _setBadgeCount(count);
+                        }
+                      : null,
+                  child: const Text('Set'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _isInitialized ? _clearBadge : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
                   ),
+                  child: const Text('Clear'),
                 ),
               ],
             ),
@@ -774,6 +754,7 @@ class _MyAppState extends State<MyApp> {
   void dispose() {
     _apiKeyController.dispose();
     _durationController.dispose();
+    _badgeCountController.dispose();
     _klaviyo.dispose();
     super.dispose();
   }
