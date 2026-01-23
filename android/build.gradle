@@ -2,7 +2,7 @@ group 'com.klaviyo.klaviyo_flutter_sdk'
 version '1.0'
 
 buildscript {
-    ext.kotlin_version = '2.1.0'
+    ext.kotlin_version = '1.9.25'
     repositories {
         google()
         mavenCentral()
