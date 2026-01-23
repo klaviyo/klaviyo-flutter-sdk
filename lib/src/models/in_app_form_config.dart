@@ -16,7 +16,9 @@ class InAppFormConfig {
   /// Platform default (1hr) or custom timeout
   const InAppFormConfig({Duration? sessionTimeoutDuration})
       : this._(
-            sessionTimeoutDuration: sessionTimeoutDuration, isInfinite: false);
+          sessionTimeoutDuration: sessionTimeoutDuration,
+          isInfinite: false,
+        );
 
   /// No timeout (infinite)
   const InAppFormConfig.infinite()

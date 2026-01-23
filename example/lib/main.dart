@@ -83,12 +83,15 @@ class _MyAppState extends State<MyApp> {
       }
 
       // Listen for token refreshes
-      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-        print('FCM token refresh: $newToken');
-        _handleFCMToken(newToken);
-      }, onError: (error) {
-        print('Error listening for token refresh: $error');
-      });
+      FirebaseMessaging.instance.onTokenRefresh.listen(
+        (newToken) {
+          print('FCM token refresh: $newToken');
+          _handleFCMToken(newToken);
+        },
+        onError: (error) {
+          print('Error listening for token refresh: $error');
+        },
+      );
     } catch (e) {
       print('FCM setup failed: $e');
     }
@@ -121,7 +124,8 @@ class _MyAppState extends State<MyApp> {
         });
       } else {
         print(
-            'Klaviyo SDK not initialized yet, token will be registered after initialization');
+          'Klaviyo SDK not initialized yet, token will be registered after initialization',
+        );
       }
     } catch (e) {
       print('Failed to register token with Klaviyo: $e');
@@ -535,9 +539,11 @@ class _MyAppState extends State<MyApp> {
                                 backgroundColor: Theme.of(context).primaryColor,
                                 foregroundColor: Colors.white,
                               ),
-                              child: Text(_isInitialized
-                                  ? 'Initialized'
-                                  : 'Initialize SDK'),
+                              child: Text(
+                                _isInitialized
+                                    ? 'Initialized'
+                                    : 'Initialize SDK',
+                              ),
                             ),
                           ),
                           if (_isInitialized) ...[
@@ -653,8 +659,11 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
-  Widget _buildButton(String text, VoidCallback? onPressed,
-      {bool isDestructive = false}) {
+  Widget _buildButton(
+    String text,
+    VoidCallback? onPressed, {
+    bool isDestructive = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: ElevatedButton(
