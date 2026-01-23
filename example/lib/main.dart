@@ -501,6 +501,109 @@ class _MyAppState extends State<MyApp> {
     _setBadgeCount(0);
   }
 
+  Future<void> _requestLocationPermission() async {
+    try {
+      // iOS requires requesting "When In Use" before "Always"
+      // Check current status
+      final whenInUseStatus = await Permission.locationWhenInUse.status;
+
+      // Step 1: Request "When In Use" if not granted
+      if (!whenInUseStatus.isGranted) {
+        final status = await Permission.locationWhenInUse.request();
+
+        if (!status.isGranted) {
+          setState(() {
+            _status = 'Location "When In Use" permission denied';
+          });
+          return;
+        }
+      }
+
+      // Step 2: Now request "Always" permission
+      final alwaysPermissionStatus = await Permission.locationAlways.request();
+
+      if (alwaysPermissionStatus.isGranted) {
+        setState(() {
+          _status = 'Location "Always" permission granted ✅';
+        });
+      } else if (alwaysPermissionStatus.isDenied) {
+        setState(() {
+          _status =
+              'Location "Always" denied - you can change this in Settings';
+        });
+      } else if (alwaysPermissionStatus.isPermanentlyDenied) {
+        setState(() {
+          _status = 'Location permission permanently denied - opening Settings';
+        });
+        await openAppSettings();
+      }
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to request location permission: $e';
+      });
+    }
+  }
+
+  Future<void> _registerGeofencing() async {
+    try {
+      // Check permission status first
+      final alwaysStatus = await Permission.locationAlways.status;
+
+      if (!alwaysStatus.isGranted) {
+        setState(() {
+          _status =
+              'Location "Always" permission required - tap "Request Location Permission" and choose "Change to Always Allow"';
+        });
+        return;
+      }
+
+      await _klaviyo.registerGeofencing();
+      setState(() {
+        _status = 'Geofencing registered successfully';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to register geofencing: $e';
+      });
+    }
+  }
+
+  Future<void> _unregisterGeofencing() async {
+    try {
+      await _klaviyo.unregisterGeofencing();
+      setState(() {
+        _status = 'Geofencing unregistered successfully';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to unregister geofencing: $e';
+      });
+    }
+  }
+
+  Future<void> _getCurrentGeofences() async {
+    try {
+      // ignore: invalid_use_of_internal_member
+      final geofences = await _klaviyo.getCurrentGeofences();
+
+      print('📍 Current Geofences (${geofences.length}):');
+      for (final geofence in geofences) {
+        print(
+          '  - ${geofence.identifier}: (${geofence.latitude}, ${geofence.longitude}) radius: ${geofence.radius}m',
+        );
+      }
+
+      setState(() {
+        _status =
+            'Found ${geofences.length} geofence(s) - check console for details';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to get geofences: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -654,6 +757,17 @@ class _MyAppState extends State<MyApp> {
               ),
               _buildButton('Register for Forms', _registerForForms),
               _buildButton('Unregister from Forms', _unregisterFromInAppForms),
+              const SizedBox(height: 16),
+
+              // Geofencing Section (Debug/Testing)
+              _buildSectionHeader('Geofencing (Debug)'),
+              _buildButton(
+                'Request Location Permission',
+                _requestLocationPermission,
+              ),
+              _buildButton('Register Geofencing', _registerGeofencing),
+              _buildButton('Unregister Geofencing', _unregisterGeofencing),
+              _buildButton('Get Current Geofences', _getCurrentGeofences),
               const SizedBox(height: 16),
 
               // Configuration Section
