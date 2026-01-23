@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
 import '../models/geofence.dart';
@@ -243,6 +244,11 @@ class KlaviyoNativeWrapper {
   }
 
   /// Get currently monitored geofences from native SDK
+  ///
+  /// **This is for internal use only and should not be used in production applications.**
+  ///
+  /// This method is provided for demonstration and debugging purposes only.
+  @internal
   Future<List<Geofence>> getCurrentGeofences() async {
     _ensureInitialized();
     try {
