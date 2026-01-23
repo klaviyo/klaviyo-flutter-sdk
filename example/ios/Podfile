@@ -37,6 +37,12 @@ target 'Runner' do
   end
 end
 
+# Notification Service Extension target for rich push and badge count support
+target 'NotificationServiceExtension' do
+  use_frameworks!
+  pod 'KlaviyoSwiftExtension', '~> 5.2.0'
+end
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)

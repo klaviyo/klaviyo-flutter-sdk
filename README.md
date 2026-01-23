@@ -7,6 +7,7 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
 - **Profile Management**: Set user profiles, emails, phone numbers, and custom properties
 - **Event Tracking**: Track custom events and user interactions
 - **Push Notifications**: Register for and handle push notifications
+- **Rich Push**: Display images within push notifications
 - **In-App Forms**: Display and manage in-app forms for lead capture
 - **Cross-Platform**: Works on both iOS and Android using native SDKs
 - **Real-time Updates**: Stream-based profile updates and event handling
@@ -143,10 +144,13 @@ await klaviyo.trackEvent(event);
 
 ```dart
 // Register for push notifications
+// iOS: Triggers APNs registration
+// Android: No-op (FCM handles registration automatically)
 await klaviyo.registerForPushNotifications();
 
-// Set push token (usually handled automatically)
-await klaviyo.setPushToken('device_token_here');
+// Get the current push token
+final token = await klaviyo.getPushToken();
+print('Push token: $token');
 
 // Handle push notification events
 klaviyo.profileStream.listen((profile) {
@@ -154,7 +158,16 @@ klaviyo.profileStream.listen((profile) {
 });
 ```
 
-### 5. In-App Forms
+### 5. Rich Push
+
+[Rich Push](https://help.klaviyo.com/hc/en-us/articles/16917302437275) is the ability to add images to
+push notification messages. On iOS, you will need to implement an extension service to attach images to notifications.
+No additional setup is needed to support rich push on Android.
+
+- [Android](https://github.com/klaviyo/klaviyo-android-sdk#Rich-Push)
+- [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#Rich-Push)
+
+### 6. In-App Forms
 
 ```dart
 // Register for in-app forms
@@ -177,7 +190,7 @@ final success = await klaviyo.showForm('newsletter_signup',
 await klaviyo.hideForm('newsletter_signup');
 ```
 
-### 6. Profile Reset (Logout)
+### 7. Profile Reset (Logout)
 
 ```dart
 // Reset profile when user logs out
@@ -200,8 +213,8 @@ The main SDK class that provides all functionality.
 - `setProfileProperties(properties)` - Set custom profile properties
 - `track(name, properties)` - Track a simple event
 - `trackEvent(event)` - Track a complex event
-- `registerForPushNotifications()` - Register for push notifications
-- `setPushToken(token, environment)` - Set push notification token
+- `registerForPushNotifications()` - Register for push notifications (iOS: triggers APNs registration, Android: no-op)
+- `setPushToken(token, environment)` - Set push notification token (usually handled automatically by native SDKs)
 - `getPushToken()` - Get current push token
 - `registerForInAppForms(configuration)` - Register for in-app forms
 - `showForm(formId, customData)` - Show a specific form

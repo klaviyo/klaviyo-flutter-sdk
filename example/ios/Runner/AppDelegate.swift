@@ -20,7 +20,6 @@ class AppDelegate: FlutterAppDelegate {
         
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
-
     // Handle successful APNs token registration
     override func application(
         _: UIApplication,
