@@ -21,7 +21,7 @@ class KlaviyoSDK {
 
   // Native wrapper service
   late KlaviyoNativeWrapper _nativeWrapper;
-  late Logger _logger;
+  final Logger _logger = Logger();
 
   // State
   bool _isInitialized = false;
@@ -46,8 +46,7 @@ class KlaviyoSDK {
     try {
       _apiKey = apiKey;
 
-      // Initialize logger
-      _logger = Logger();
+      // Set logger level
       _logger.setLogLevel(logLevel);
 
       // Initialize native wrapper
@@ -245,6 +244,20 @@ class KlaviyoSDK {
       _logger.info('Profile reset');
     } catch (e) {
       throw KlaviyoException('Failed to reset profile: $e');
+    }
+  }
+
+  /// Reset the current profile (useful for logout)
+  /// Profile state is managed by the native SDK
+  void setBadgeCount(int count) {
+    if (Platform.isIOS) {
+      _ensureInitialized();
+      _nativeWrapper.setBadgeCount(count);
+      _logger.info('Set the badge count to $count');
+    } else {
+      // Android does not support badge count
+      _logger.warning(
+          'Setting badge count via the Klaviyo SDK is unsupported on Android.');
     }
   }
 

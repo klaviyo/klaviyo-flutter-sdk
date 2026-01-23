@@ -32,6 +32,7 @@ class _MyAppState extends State<MyApp> {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _durationController = TextEditingController();
+  final TextEditingController _badgeCountController = TextEditingController();
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
 
@@ -485,6 +486,21 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  /// Set badge count to a specific value
+  void _setBadgeCount(int count) {
+    _klaviyo.setBadgeCount(count);
+    _badgeCountController.clear();
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _status = 'Badge count set to $count';
+    });
+  }
+
+  /// Clear the badge (set to 0)
+  void _clearBadge() {
+    _setBadgeCount(0);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -612,6 +628,12 @@ class _MyAppState extends State<MyApp> {
 
               const SizedBox(height: 16),
 
+              // Badge Count Section (iOS only)
+              _buildSectionHeader('Badge Count (iOS only)'),
+              _buildBadgeCountSection(),
+
+              const SizedBox(height: 16),
+
               // In-App Forms Section
               _buildSectionHeader('In-App Forms'),
               Padding(
@@ -677,10 +699,71 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
+  Widget _buildBadgeCountSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Set badge count on the app icon',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _badgeCountController,
+                    enabled: _isInitialized,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      hintText: 'New value',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _isInitialized
+                      ? () {
+                          final count =
+                              int.tryParse(_badgeCountController.text) ?? 0;
+                          _setBadgeCount(count);
+                        }
+                      : null,
+                  child: const Text('Set'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _isInitialized ? _clearBadge : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Clear'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _apiKeyController.dispose();
     _durationController.dispose();
+    _badgeCountController.dispose();
     _klaviyo.dispose();
     super.dispose();
   }

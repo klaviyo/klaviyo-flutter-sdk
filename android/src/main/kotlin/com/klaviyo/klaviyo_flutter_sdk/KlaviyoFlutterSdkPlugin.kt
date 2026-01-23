@@ -315,6 +315,12 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "setBadgeCount" -> {
+                // Badge count is not supported on Android in the same way as iOS
+                Registry.log.verbose("setBadgeCount called - not supported on Android")
+                result.success(null)
+            }
+
             else -> {
                 result.notImplemented()
             }

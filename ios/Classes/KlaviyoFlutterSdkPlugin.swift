@@ -191,7 +191,20 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         case "setLogLevel":
             // Not directly supported in v5.0.0
             result(nil)
-            
+
+        case "setBadgeCount":
+            guard let args = call.arguments as? [String: Any],
+                  let count = args["count"] as? Int
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARGUMENTS", message: "Invalid badge count argument", details: nil
+                    ))
+                return
+            }
+            KlaviyoSDK().setBadgeCount(count)
+            result(nil)
+
         case "onPushTokenReceived":
             // Called from AppDelegate when a push token is received
             guard let args = call.arguments as? [String: Any],

@@ -8,6 +8,7 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
 - **Event Tracking**: Track custom events and user interactions
 - **Push Notifications**: Register for and handle push notifications
 - **Rich Push**: Display images within push notifications
+- **Badge Count**: Set and manage app icon badge count (iOS only)
 - **In-App Forms**: Display and manage in-app forms for lead capture
 - **Cross-Platform**: Works on both iOS and Android using native SDKs
 - **Real-time Updates**: Stream-based profile updates and event handling
@@ -167,7 +168,15 @@ No additional setup is needed to support rich push on Android.
 - [Android](https://github.com/klaviyo/klaviyo-android-sdk#Rich-Push)
 - [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#Rich-Push)
 
-### 6. In-App Forms
+### 6. Badge Count (iOS Only)
+
+Klaviyo supports setting or incrementing the badge count on iOS when you send a push notification.
+To enable this functionality, you will need to implement a notification service extension and app group
+as detailed in the [Swift SDK installation instructions](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#installation).
+See the [badge count documentation](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#badge-count) for more details and the example app for reference.
+Android automatically handles badge counts, and no additional setup is needed.
+
+### 7. In-App Forms
 
 ```dart
 // Register for in-app forms
@@ -190,7 +199,7 @@ final success = await klaviyo.showForm('newsletter_signup',
 await klaviyo.hideForm('newsletter_signup');
 ```
 
-### 7. Profile Reset (Logout)
+### 8. Profile Reset (Logout)
 
 ```dart
 // Reset profile when user logs out
@@ -220,6 +229,7 @@ The main SDK class that provides all functionality.
 - `showForm(formId, customData)` - Show a specific form
 - `hideForm(formId)` - Hide a specific form
 - `resetProfile()` - Reset user profile
+- `setBadgeCount(count)` - Set the badge count on the app icon (iOS only)
 - `setLogLevel(logLevel)` - Set logging level
 - `dispose()` - Clean up resources
 

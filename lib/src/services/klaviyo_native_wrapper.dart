@@ -243,6 +243,18 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Set badge count on the app icon (iOS only)
+  /// This is a synchronous fire-and-forget operation
+  void setBadgeCount(int count) {
+    _ensureInitialized();
+
+    // Fire-and-forget - we don't await or handle errors
+    // since this is a synchronous operation from the caller's perspective
+    _channel.invokeMethod('setBadgeCount', {
+      'count': count,
+    });
+  }
+
   /// Handle native events from platform channels
   void _handleNativeEvent(dynamic event) {
     try {
