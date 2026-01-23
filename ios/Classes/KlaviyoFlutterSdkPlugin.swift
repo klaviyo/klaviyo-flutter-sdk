@@ -1,6 +1,7 @@
 import Flutter
 import KlaviyoForms
 import KlaviyoSwift
+@_spi(KlaviyoPrivate) import KlaviyoLocation
 import UIKit
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
@@ -185,29 +186,41 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
         case "registerGeofencing":
             DispatchQueue.main.async {
-                KlaviyoSDK().registerGeofencing()
+                Task { @MainActor in
+                    await KlaviyoSDK().registerGeofencing()
+                    result(nil)
+                }
             }
-            result(nil)
 
         case "unregisterGeofencing":
             DispatchQueue.main.async {
-                KlaviyoSDK().unregisterGeofencing()
+                Task { @MainActor in
+                    await KlaviyoSDK().unregisterGeofencing()
+                    result(nil)
+                }
             }
-            result(nil)
 
         case "getCurrentGeofences":
             DispatchQueue.main.async {
                 Task { @MainActor in
-                    let geofences = await KlaviyoSDK().getCurrentGeofences()
-                    let geofencesArray = geofences.map { region -> [String: Any] in
-                        [
-                            "identifier": region.identifier,
-                            "latitude": region.center.latitude,
-                            "longitude": region.center.longitude,
-                            "radius": region.radius
-                        ]
+                    do {
+                        let geofences = await KlaviyoSDK().getCurrentGeofences()
+                        let geofencesArray = geofences.map { region -> [String: Any] in
+                            [
+                                "identifier": region.identifier,
+                                "latitude": region.center.latitude,
+                                "longitude": region.center.longitude,
+                                "radius": region.radius
+                            ]
+                        }
+                        result(["geofences": geofencesArray])
+                    } catch {
+                        result(FlutterError(
+                            code: "GEOFENCING_ERROR",
+                            message: "Failed to get current geofences",
+                            details: error.localizedDescription
+                        ))
                     }
-                    result(["geofences": geofencesArray])
                 }
             }
 

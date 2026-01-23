@@ -26,9 +26,9 @@ class Geofence {
   factory Geofence.fromJson(Map<String, dynamic> json) {
     return Geofence(
       identifier: json['identifier'] as String,
-      latitude: json['latitude'] as double,
-      longitude: json['longitude'] as double,
-      radius: json['radius'] as double,
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
+      radius: (json['radius'] as num).toDouble(),
     );
   }
 
