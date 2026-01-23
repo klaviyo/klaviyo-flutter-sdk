@@ -14,6 +14,13 @@ repos:
   - repo: local
     hooks:
       # ----- Dart / Flutter -----
+      - id: dart-fix
+        name: dart fix
+        entry: dart fix --apply
+        language: system
+        files: \.dart$
+        pass_filenames: false
+
       - id: dart-format
         name: dart format
         entry: dart format

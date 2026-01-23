@@ -161,8 +161,10 @@ class KlaviyoSDK {
   }
 
   /// Track event with just name and properties
-  Future<void> track(String eventName,
-      [Map<String, dynamic>? properties]) async {
+  Future<void> track(
+    String eventName, [
+    Map<String, dynamic>? properties,
+  ]) async {
     final event = KlaviyoEvent(
       name: eventName,
       properties: properties ?? {},
@@ -185,8 +187,10 @@ class KlaviyoSDK {
   }
 
   /// Set push token
-  Future<void> setPushToken(String token,
-      {PushEnvironment? environment}) async {
+  Future<void> setPushToken(
+    String token, {
+    PushEnvironment? environment,
+  }) async {
     _ensureInitialized();
     await _nativeWrapper.setPushToken(token, environment: environment);
   }
@@ -199,7 +203,8 @@ class KlaviyoSDK {
 
   /// Handle push notification received
   Future<void> handlePushNotificationReceived(
-      Map<String, dynamic> userInfo) async {
+    Map<String, dynamic> userInfo,
+  ) async {
     _ensureInitialized();
     // Native SDK handles this automatically
     _logger.info('Push notification received');
@@ -207,7 +212,8 @@ class KlaviyoSDK {
 
   /// Handle push notification opened
   Future<void> handlePushNotificationOpened(
-      Map<String, dynamic> userInfo) async {
+    Map<String, dynamic> userInfo,
+  ) async {
     _ensureInitialized();
     // Native SDK handles this automatically
     _logger.info('Push notification opened');
@@ -280,7 +286,8 @@ class KlaviyoSDK {
   void _ensureInitialized() {
     if (!_isInitialized) {
       throw const KlaviyoException(
-          'SDK not initialized. Call initialize() first.');
+        'SDK not initialized. Call initialize() first.',
+      );
     }
   }
 

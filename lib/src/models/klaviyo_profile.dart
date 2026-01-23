@@ -95,17 +95,19 @@ class KlaviyoProfile {
 
     // Extract custom properties (exclude known fields)
     final Map<String, dynamic> properties = Map.from(json);
-    properties.removeWhere((key, value) => [
-          'email',
-          'phone_number',
-          'external_id',
-          'first_name',
-          'last_name',
-          'organization',
-          'title',
-          'image',
-          'location'
-        ].contains(key));
+    properties.removeWhere(
+      (key, value) => [
+        'email',
+        'phone_number',
+        'external_id',
+        'first_name',
+        'last_name',
+        'organization',
+        'title',
+        'image',
+        'location',
+      ].contains(key),
+    );
 
     return KlaviyoProfile(
       email: email,
