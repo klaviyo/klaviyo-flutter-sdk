@@ -178,50 +178,35 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             result(nil)
 
         case "unregisterFromInAppForms":
-            // Unregister from in-app forms
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 KlaviyoSDK().unregisterFromInAppForms()
             }
             result(nil)
 
         case "registerGeofencing":
-            DispatchQueue.main.async {
-                Task { @MainActor in
-                    await KlaviyoSDK().registerGeofencing()
-                    result(nil)
-                }
+            Task { @MainActor in
+                await KlaviyoSDK().registerGeofencing()
+                result(nil)
             }
 
         case "unregisterGeofencing":
-            DispatchQueue.main.async {
-                Task { @MainActor in
-                    await KlaviyoSDK().unregisterGeofencing()
-                    result(nil)
-                }
+            Task { @MainActor in
+                await KlaviyoSDK().unregisterGeofencing()
+                result(nil)
             }
 
         case "getCurrentGeofences":
-            DispatchQueue.main.async {
-                Task { @MainActor in
-                    do {
-                        let geofences = await KlaviyoSDK().getCurrentGeofences()
-                        let geofencesArray = geofences.map { region -> [String: Any] in
-                            [
-                                "identifier": region.identifier,
-                                "latitude": region.center.latitude,
-                                "longitude": region.center.longitude,
-                                "radius": region.radius
-                            ]
-                        }
-                        result(["geofences": geofencesArray])
-                    } catch {
-                        result(FlutterError(
-                            code: "GEOFENCING_ERROR",
-                            message: "Failed to get current geofences",
-                            details: error.localizedDescription
-                        ))
-                    }
+            Task { @MainActor in
+                let geofences = await KlaviyoSDK().getCurrentGeofences()
+                let geofencesArray = geofences.map { region -> [String: Any] in
+                    [
+                        "identifier": region.identifier,
+                        "latitude": region.center.latitude,
+                        "longitude": region.center.longitude,
+                        "radius": region.radius
+                    ]
                 }
+                result(["geofences": geofencesArray])
             }
 
         case "showForm":
