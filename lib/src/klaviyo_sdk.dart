@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:meta/meta.dart';
+
 import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
 import 'models/klaviyo_location.dart';
 import 'models/in_app_form_config.dart';
+import 'models/geofence.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'enums/push_environment.dart';
 import 'services/klaviyo_native_wrapper.dart';
@@ -232,6 +235,33 @@ class KlaviyoSDK {
     _ensureInitialized();
     await _nativeWrapper.unregisterFromInAppForms();
     _logger.info('Unregistered from in-app forms');
+  }
+
+  /// Begin monitoring geofences configured in your Klaviyo account
+  /// Requires location permissions to be granted by user
+  Future<void> registerGeofencing() async {
+    _ensureInitialized();
+    await _nativeWrapper.registerGeofencing();
+    _logger.info('Registered for geofencing');
+  }
+
+  /// Stop monitoring all geofences
+  Future<void> unregisterGeofencing() async {
+    _ensureInitialized();
+    await _nativeWrapper.unregisterGeofencing();
+    _logger.info('Unregistered from geofencing');
+  }
+
+  /// Get currently monitored geofences
+  ///
+  /// **This is for internal use only and should not be used in production applications.**
+  ///
+  /// This method is provided for demonstration and debugging purposes only.
+  /// It provides the same functionality as the native platform's geofence monitoring APIs.
+  @internal
+  Future<List<Geofence>> getCurrentGeofences() async {
+    _ensureInitialized();
+    return await _nativeWrapper.getCurrentGeofences();
   }
 
   /// Reset the current profile (useful for logout)

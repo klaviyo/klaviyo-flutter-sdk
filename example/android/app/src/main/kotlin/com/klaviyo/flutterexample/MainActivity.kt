@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.util.Log
 import com.klaviyo.analytics.Klaviyo
 import io.flutter.embedding.android.FlutterActivity
-import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     @Suppress("ktlint:standard:property-naming")

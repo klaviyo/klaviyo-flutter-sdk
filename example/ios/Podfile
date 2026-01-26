@@ -29,7 +29,7 @@ flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks!
-  # use_modular_headers!
+  use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
@@ -46,6 +46,13 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # Special handling for Firebase pods
+    if target.name == 'firebase_messaging'
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      end
+    end
 
     target.build_configurations.each do |config|
       # Comprehensive fix for Firebase modular header issues

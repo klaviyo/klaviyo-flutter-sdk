@@ -15,6 +15,9 @@ import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.unregisterFromInAppForms
+import com.klaviyo.location.LocationManager
+import com.klaviyo.location.registerGeofencing
+import com.klaviyo.location.unregisterGeofencing
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -266,6 +269,49 @@ class KlaviyoFlutterSdkPlugin :
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to unregister from in-app forms", e.message)
+                }
+            }
+
+            "registerGeofencing" -> {
+                try {
+                    Klaviyo.registerGeofencing()
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("GEOFENCING_ERROR", "Failed to register for geofencing", e.message)
+                }
+            }
+
+            "unregisterGeofencing" -> {
+                try {
+                    Klaviyo.unregisterGeofencing()
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("GEOFENCING_ERROR", "Failed to unregister from geofencing", e.message)
+                }
+            }
+
+            "getCurrentGeofences" -> {
+                try {
+                    // Follow the same pattern as React Native SDK
+                    // Note: in the future, we may be storing more fences than we are observing
+                    val geofencesArray = mutableListOf<Map<String, Any>>()
+
+                    Registry.getOrNull<LocationManager>()?.getStoredGeofences()?.forEach { geofence ->
+                        geofencesArray.add(
+                            mapOf(
+                                "identifier" to geofence.id,
+                                "latitude" to geofence.latitude,
+                                "longitude" to geofence.longitude,
+                                "radius" to geofence.radius.toDouble(),
+                            ),
+                        )
+                    } ?: run {
+                        Registry.log.warning("Geofencing is not yet registered")
+                    }
+
+                    result.success(mapOf("geofences" to geofencesArray))
+                } catch (e: Exception) {
+                    result.error("GEOFENCING_ERROR", "Failed to get current geofences", e.message)
                 }
             }
 

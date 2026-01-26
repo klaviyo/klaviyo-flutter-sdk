@@ -1,6 +1,7 @@
 import Flutter
 import KlaviyoForms
 import KlaviyoSwift
+@_spi(KlaviyoPrivate) import KlaviyoLocation
 import UIKit
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
@@ -175,7 +176,39 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 KlaviyoSDK().registerForInAppForms()
             }
             result(nil)
-            
+
+        case "unregisterFromInAppForms":
+            Task { @MainActor in
+                KlaviyoSDK().unregisterFromInAppForms()
+            }
+            result(nil)
+
+        case "registerGeofencing":
+            Task { @MainActor in
+                await KlaviyoSDK().registerGeofencing()
+                result(nil)
+            }
+
+        case "unregisterGeofencing":
+            Task { @MainActor in
+                await KlaviyoSDK().unregisterGeofencing()
+                result(nil)
+            }
+
+        case "getCurrentGeofences":
+            Task { @MainActor in
+                let geofences = await KlaviyoSDK().getCurrentGeofences()
+                let geofencesArray = geofences.map { region -> [String: Any] in
+                    [
+                        "identifier": region.identifier,
+                        "latitude": region.center.latitude,
+                        "longitude": region.center.longitude,
+                        "radius": region.radius
+                    ]
+                }
+                result(["geofences": geofencesArray])
+            }
+
         case "showForm":
             // Not supported in v5.0.0; forms are shown automatically based on targeting
             result(FlutterError(code: "NOT_SUPPORTED", message: "Direct showForm is not supported in v5.0.0; forms are shown automatically.", details: nil))
