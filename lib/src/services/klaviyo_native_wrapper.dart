@@ -299,12 +299,14 @@ class KlaviyoNativeWrapper {
   /// Handle native events from platform channels
   void _handleNativeEvent(dynamic event) {
     try {
-      final Map<String, dynamic> eventData = Map<String, dynamic>.from(event);
+      final Map<String, dynamic> eventData = _deepConvertMap(event);
       final String eventType = eventData['type'] as String? ?? '';
 
       switch (eventType) {
         case 'push_notification_received':
         case 'push_notification_opened':
+        case 'push_token_received':
+        case 'push_token_error':
           _pushNotificationController.add(eventData);
           break;
         case 'form_event':
@@ -318,6 +320,27 @@ class KlaviyoNativeWrapper {
       // Log error but don't crash
       print('Error handling native event: $e');
     }
+  }
+
+  /// Recursively convert platform channel maps to Map<String, dynamic>
+  Map<String, dynamic> _deepConvertMap(dynamic value) {
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(
+            key.toString(),
+            _deepConvertValue(val),
+          ));
+    }
+    return <String, dynamic>{};
+  }
+
+  /// Recursively convert values, handling nested maps and lists
+  dynamic _deepConvertValue(dynamic value) {
+    if (value is Map) {
+      return _deepConvertMap(value);
+    } else if (value is List) {
+      return value.map(_deepConvertValue).toList();
+    }
+    return value;
   }
 
   /// Ensure SDK is initialized
