@@ -3,19 +3,56 @@ import KlaviyoForms
 import KlaviyoSwift
 @_spi(KlaviyoPrivate) import KlaviyoLocation
 import UIKit
+import UserNotifications
 
-public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
+public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificationCenterDelegate {
     private var eventSink: FlutterEventSink?
+    private var channel: FlutterMethodChannel?
+    
+    // Cache for the token in case it arrives before Flutter is ready
+    private var cachedToken: [String: Any]?
+    
+    // Stores the previous UNUserNotificationCenter delegate so we can forward forward calls to it
+    private weak var previousNotificationDelegate: UNUserNotificationCenterDelegate?
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: registrar.messenger())
         let instance = KlaviyoFlutterSdkPlugin()
-        registrar.addMethodCallDelegate(instance, channel: channel)
+        instance.channel = channel
         
+        registrar.addMethodCallDelegate(instance, channel: channel)
+        registrar.addApplicationDelegate(instance)
+        
+        // Setup Event Channel
         let eventChannel = FlutterEventChannel(
             name: "klaviyo_events", binaryMessenger: registrar.messenger()
         )
         eventChannel.setStreamHandler(instance)
+        
+        // Delay the delegate takeover to the next run loop.
+        // This ensures we run AFTER the Host App's didFinishLaunching and other plugins.
+        // It drastically reduces the chance of overwriting Firebase or other SDKs.
+        DispatchQueue.main.async {
+            let center = UNUserNotificationCenter.current()
+            
+            // Prevent double registration if register() is called multiple times
+            if center.delegate === instance {
+                return
+            }
+            
+            // Capture the existing delegate (e.g., Firebase or Host App)
+            instance.previousNotificationDelegate = center.delegate
+            
+            // Set ourselves as the new delegate
+            center.delegate = instance
+            
+            // Debug log to help users verify integration
+            if let previous = instance.previousNotificationDelegate {
+                print("✅ Klaviyo Flutter SDK: Notification Delegate attached (wrapping \(type(of: previous)))")
+            } else {
+                print("✅ Klaviyo Flutter SDK: Notification Delegate attached (no previous delegate)")
+            }
+        }
     }
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -306,15 +343,120 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 }
 
 extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
-    public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink)
-    -> FlutterError? {
+    public func onListen(
+        withArguments arguments: Any?,
+        eventSink events: @escaping FlutterEventSink
+    ) -> FlutterError? {
         eventSink = events
+        
+        // If we have a cached token from early app launch, send it now.
+        // This solves the race condition where token arrives before Flutter is ready.
+        if let cachedToken = cachedToken {
+            events(cachedToken)
+        }
         return nil
     }
     
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
         eventSink = nil
         return nil
+    }
+}
+
+// MARK: - Flutter AppDelegate methods (APNs & Notification Callbacks)
+
+extension KlaviyoFlutterSdkPlugin {
+    // Handle successful APNs token registration
+    public func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
+        print("📱 APNs Token received: \(tokenString)")
+        
+        // Set the token with Klaviyo Swift SDK
+        KlaviyoSDK().set(pushToken: deviceToken)
+        print("✅ Token set with Klaviyo SDK")
+        
+        // Prepare event data
+        let eventData: [String: Any] = [
+            "type": "push_token_received",
+            "data": ["token": tokenString]
+        ]
+        
+        // Cache it (so future listeners get it)
+        self.cachedToken = eventData
+        
+        // Notify Flutter side via event sink
+        eventSink?(eventData)
+    }
+    
+    // Handle APNs registration failure
+    public func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("❌ Failed to register for remote notifications: \(error)")
+        
+        // Notify Flutter side via event sink
+        eventSink?([
+            "type": "push_token_error",
+            "data": ["error": error.localizedDescription]
+        ])
+    }
+    
+    // Called when user taps on a notification (app in background/terminated)
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        print("📱 Push notification opened with userInfo:\n\(userInfo)")
+        
+        // Notify Flutter side via event sink
+        eventSink?([
+            "type": "push_notification_opened",
+            "data": userInfo
+        ])
+        
+        // Let Klaviyo SDK handle the push open tracking
+        let handled = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
+        
+        if handled {
+            print("✅ Klaviyo handled push notification open")
+            // Klaviyo Swift SDK calls the completionHandler internally when it returns true
+        } else {
+            print("ℹ️ Non-Klaviyo push notification opened")
+            
+            // Forward to previous delegate if available
+            if let previousDelegate = previousNotificationDelegate,
+               previousDelegate.responds(to: #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:withCompletionHandler:))) {
+                previousDelegate.userNotificationCenter?(center, didReceive: response, withCompletionHandler: completionHandler)
+            } else {
+                // If no previous delegate, WE must call completion
+                completionHandler()
+            }
+        }
+    }
+    
+    // Called when a notification is received while app is in foreground
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        let userInfo = notification.request.content.userInfo
+        print("📱 Push notification received in foreground:\n\(userInfo)")
+        
+        // Forward to previous delegate if it wants to handle presentation
+        if let previousDelegate = previousNotificationDelegate,
+           previousDelegate.responds(to: #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:willPresent:withCompletionHandler:))) {
+            previousDelegate.userNotificationCenter?(center, willPresent: notification, withCompletionHandler: completionHandler)
+        } else {
+            // Default: show the notification even when app is in foreground
+            completionHandler([.banner, .sound, .badge])
+        }
     }
 }
 
