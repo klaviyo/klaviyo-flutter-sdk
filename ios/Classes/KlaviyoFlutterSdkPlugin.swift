@@ -61,10 +61,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificatio
             guard let args = call.arguments as? [String: Any],
                   let apiKey = args["apiKey"] as? String
             else {
-                result(
-                    FlutterError(
-                        code: "INVALID_ARGUMENTS", message: "Invalid arguments for initialize", details: nil
-                    ))
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments for initialize", details: nil))
                 return
             }
             KlaviyoSDK().initialize(with: apiKey)
@@ -74,8 +71,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificatio
             guard let args = call.arguments as? [String: Any],
                   let profileData = args["profile"] as? [String: Any]
             else {
-                result(
-                    FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid profile data", details: nil))
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid profile data", details: nil))
                 return
             }
             let profile = Profile(
@@ -107,8 +103,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificatio
             guard let args = call.arguments as? [String: Any],
                   let phoneNumber = args["phoneNumber"] as? String
             else {
-                result(
-                    FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid phone number", details: nil))
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid phone number", details: nil))
                 return
             }
             KlaviyoSDK().set(phoneNumber: phoneNumber)
@@ -118,8 +113,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificatio
             guard let args = call.arguments as? [String: Any],
                   let externalId = args["externalId"] as? String
             else {
-                result(
-                    FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid external ID", details: nil))
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid external ID", details: nil))
                 return
             }
             KlaviyoSDK().set(externalId: externalId)
@@ -133,7 +127,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificatio
                 return
             }
             
-            // swiftlint:disable:next identifier_name
             for (key, value) in properties {
                 let profileKey = Profile.ProfileKey.from(key)
                 KlaviyoSDK().set(profileAttribute: profileKey, value: value)
@@ -174,7 +167,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificatio
                 return
             }
             
-            // Validate token is not empty
             guard !token.isEmpty else {
                 print("⚠️ Attempted to set empty push token")
                 result(FlutterError(
@@ -213,7 +205,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificatio
             result(token)
             
         case "registerForInAppForms":
-            // Register for in-app forms
             DispatchQueue.main.async {
                 KlaviyoSDK().registerForInAppForms()
             }
@@ -391,7 +382,6 @@ extension KlaviyoFlutterSdkPlugin {
         eventSink?(eventData)
     }
     
-    // Handle APNs registration failure
     public func application(
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
