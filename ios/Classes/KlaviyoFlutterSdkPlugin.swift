@@ -181,25 +181,25 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 KlaviyoSDK().registerForInAppForms()
             }
             result(nil)
-
+            
         case "unregisterFromInAppForms":
             Task { @MainActor in
                 KlaviyoSDK().unregisterFromInAppForms()
             }
             result(nil)
-
+            
         case "registerGeofencing":
             Task { @MainActor in
                 await KlaviyoSDK().registerGeofencing()
                 result(nil)
             }
-
+            
         case "unregisterGeofencing":
             Task { @MainActor in
                 await KlaviyoSDK().unregisterGeofencing()
                 result(nil)
             }
-
+            
         case "getCurrentGeofences":
             Task { @MainActor in
                 let geofences = await KlaviyoSDK().getCurrentGeofences()
@@ -213,7 +213,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 }
                 result(["geofences": geofencesArray])
             }
-
+            
         case "showForm":
             // Not supported in v5.0.0; forms are shown automatically based on targeting
             let error = FlutterError(
@@ -239,7 +239,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         case "setLogLevel":
             // Not directly supported in v5.0.0
             result(nil)
-
+            
         case "setBadgeCount":
             guard let args = call.arguments as? [String: Any],
                   let count = args["count"] as? Int
@@ -252,7 +252,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             KlaviyoSDK().setBadgeCount(count)
             result(nil)
-
+            
         case "onPushTokenReceived":
             // Called from AppDelegate when a push token is received
             guard let args = call.arguments as? [String: Any],
