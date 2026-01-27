@@ -35,6 +35,7 @@ class _MyAppState extends State<MyApp> {
   final TextEditingController _badgeCountController = TextEditingController();
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
+  String? _locationPermissionState; // null = none, 'whenInUse', 'always'
 
   static const String _apiKeyPrefsKey = 'klaviyo_api_key';
 
@@ -44,6 +45,9 @@ class _MyAppState extends State<MyApp> {
 
     // Load saved API key
     _loadSavedApiKey();
+
+    // Check location permission state
+    _updateLocationPermissionState();
 
     // Set up FCM token listeners and foreground notification listener (Android only)
     if (Platform.isAndroid) {
@@ -65,6 +69,26 @@ class _MyAppState extends State<MyApp> {
       }
     } catch (e) {
       print('Failed to load saved API key: $e');
+    }
+  }
+
+  /// Check and update location permission state
+  Future<void> _updateLocationPermissionState() async {
+    try {
+      final alwaysStatus = await Permission.locationAlways.status;
+      final whenInUseStatus = await Permission.locationWhenInUse.status;
+
+      setState(() {
+        if (alwaysStatus.isGranted) {
+          _locationPermissionState = 'always';
+        } else if (whenInUseStatus.isGranted) {
+          _locationPermissionState = 'whenInUse';
+        } else {
+          _locationPermissionState = null;
+        }
+      });
+    } catch (e) {
+      print('Failed to check location permission state: $e');
     }
   }
 
@@ -515,6 +539,7 @@ class _MyAppState extends State<MyApp> {
           setState(() {
             _status = 'Location "When In Use" permission denied';
           });
+          await _updateLocationPermissionState();
           return;
         }
       }
@@ -537,10 +562,14 @@ class _MyAppState extends State<MyApp> {
         });
         await openAppSettings();
       }
+
+      // Update permission state after request
+      await _updateLocationPermissionState();
     } catch (e) {
       setState(() {
         _status = 'Failed to request location permission: $e';
       });
+      await _updateLocationPermissionState();
     }
   }
 
@@ -761,10 +790,7 @@ class _MyAppState extends State<MyApp> {
 
               // Geofencing Section (Debug/Testing)
               _buildSectionHeader('Geofencing (Debug)'),
-              _buildButton(
-                'Request Location Permission',
-                _requestLocationPermission,
-              ),
+              _buildLocationPermissionButton(),
               _buildButton('Register Geofencing', _registerGeofencing),
               _buildButton('Unregister Geofencing', _unregisterGeofencing),
               _buildButton('Get Current Geofences', _getCurrentGeofences),
@@ -811,6 +837,48 @@ class _MyAppState extends State<MyApp> {
         child: Text(text),
       ),
     );
+  }
+
+  Widget _buildLocationPermissionButton() {
+    if (_locationPermissionState == 'always') {
+      // Permission granted - show status text instead of button
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Container(
+          padding: const EdgeInsets.all(12.0),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(8.0),
+            border: Border.all(color: Colors.green.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green.shade700),
+              const SizedBox(width: 8),
+              Text(
+                'Location Permission Granted',
+                style: TextStyle(
+                  color: Colors.green.shade900,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (_locationPermissionState == 'whenInUse') {
+      // Only "When In Use" granted - need to upgrade to "Always"
+      return _buildButton(
+        'Request Background Permission',
+        _requestLocationPermission,
+      );
+    } else {
+      // No permission granted - initial request
+      return _buildButton(
+        'Request Location Permission',
+        _requestLocationPermission,
+      );
+    }
   }
 
   Widget _buildBadgeCountSection() {
