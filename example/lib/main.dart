@@ -35,6 +35,7 @@ class _MyAppState extends State<MyApp> {
   final TextEditingController _badgeCountController = TextEditingController();
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
+  String? _locationPermissionState; // null = none, 'whenInUse', 'always'
 
   static const String _apiKeyPrefsKey = 'klaviyo_api_key';
 
@@ -44,6 +45,9 @@ class _MyAppState extends State<MyApp> {
 
     // Load saved API key
     _loadSavedApiKey();
+
+    // Check location permission state
+    _updateLocationPermissionState();
 
     // Set up FCM token listeners and foreground notification listener (Android only)
     if (Platform.isAndroid) {
@@ -65,6 +69,26 @@ class _MyAppState extends State<MyApp> {
       }
     } catch (e) {
       print('Failed to load saved API key: $e');
+    }
+  }
+
+  /// Check and update location permission state
+  Future<void> _updateLocationPermissionState() async {
+    try {
+      final alwaysStatus = await Permission.locationAlways.status;
+      final whenInUseStatus = await Permission.locationWhenInUse.status;
+
+      setState(() {
+        if (alwaysStatus.isGranted) {
+          _locationPermissionState = 'always';
+        } else if (whenInUseStatus.isGranted) {
+          _locationPermissionState = 'whenInUse';
+        } else {
+          _locationPermissionState = null;
+        }
+      });
+    } catch (e) {
+      print('Failed to check location permission state: $e');
     }
   }
 
@@ -501,6 +525,114 @@ class _MyAppState extends State<MyApp> {
     _setBadgeCount(0);
   }
 
+  Future<void> _requestLocationPermission() async {
+    try {
+      // iOS requires requesting "When In Use" before "Always"
+      // Check current status
+      final whenInUseStatus = await Permission.locationWhenInUse.status;
+
+      // Step 1: Request "When In Use" if not granted
+      if (!whenInUseStatus.isGranted) {
+        final status = await Permission.locationWhenInUse.request();
+
+        if (!status.isGranted) {
+          setState(() {
+            _status = 'Location "When In Use" permission denied';
+          });
+          await _updateLocationPermissionState();
+          return;
+        }
+      }
+
+      // Step 2: Now request "Always" permission
+      final alwaysPermissionStatus = await Permission.locationAlways.request();
+
+      if (alwaysPermissionStatus.isGranted) {
+        setState(() {
+          _status = 'Location "Always" permission granted ✅';
+        });
+      } else if (alwaysPermissionStatus.isDenied) {
+        setState(() {
+          _status =
+              'Location "Always" denied - you can change this in Settings';
+        });
+      } else if (alwaysPermissionStatus.isPermanentlyDenied) {
+        setState(() {
+          _status = 'Location permission permanently denied - opening Settings';
+        });
+        await openAppSettings();
+      }
+
+      // Update permission state after request
+      await _updateLocationPermissionState();
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to request location permission: $e';
+      });
+      await _updateLocationPermissionState();
+    }
+  }
+
+  Future<void> _registerGeofencing() async {
+    try {
+      // Check permission status first
+      final alwaysStatus = await Permission.locationAlways.status;
+
+      if (!alwaysStatus.isGranted) {
+        setState(() {
+          _status =
+              'Location "Always" permission required - tap "Request Location Permission" and choose "Change to Always Allow"';
+        });
+        return;
+      }
+
+      await _klaviyo.registerGeofencing();
+      setState(() {
+        _status = 'Geofencing registered successfully';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to register geofencing: $e';
+      });
+    }
+  }
+
+  Future<void> _unregisterGeofencing() async {
+    try {
+      await _klaviyo.unregisterGeofencing();
+      setState(() {
+        _status = 'Geofencing unregistered successfully';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to unregister geofencing: $e';
+      });
+    }
+  }
+
+  Future<void> _getCurrentGeofences() async {
+    try {
+      // ignore: invalid_use_of_internal_member
+      final geofences = await _klaviyo.getCurrentGeofences();
+
+      print('📍 Current Geofences (${geofences.length}):');
+      for (final geofence in geofences) {
+        print(
+          '  - ${geofence.identifier}: (${geofence.latitude}, ${geofence.longitude}) radius: ${geofence.radius}m',
+        );
+      }
+
+      setState(() {
+        _status =
+            'Found ${geofences.length} geofence(s) - check console for details';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to get geofences: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -656,6 +788,14 @@ class _MyAppState extends State<MyApp> {
               _buildButton('Unregister from Forms', _unregisterFromInAppForms),
               const SizedBox(height: 16),
 
+              // Geofencing Section (Debug/Testing)
+              _buildSectionHeader('Geofencing (Debug)'),
+              _buildLocationPermissionButton(),
+              _buildButton('Register Geofencing', _registerGeofencing),
+              _buildButton('Unregister Geofencing', _unregisterGeofencing),
+              _buildButton('Get Current Geofences', _getCurrentGeofences),
+              const SizedBox(height: 16),
+
               // Configuration Section
               _buildSectionHeader('Configuration'),
               _buildButton('Set Log Level', _setLogLevel),
@@ -697,6 +837,48 @@ class _MyAppState extends State<MyApp> {
         child: Text(text),
       ),
     );
+  }
+
+  Widget _buildLocationPermissionButton() {
+    if (_locationPermissionState == 'always') {
+      // Permission granted - show status text instead of button
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Container(
+          padding: const EdgeInsets.all(12.0),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(8.0),
+            border: Border.all(color: Colors.green.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green.shade700),
+              const SizedBox(width: 8),
+              Text(
+                'Location Permission Granted',
+                style: TextStyle(
+                  color: Colors.green.shade900,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (_locationPermissionState == 'whenInUse') {
+      // Only "When In Use" granted - need to upgrade to "Always"
+      return _buildButton(
+        'Request Background Permission',
+        _requestLocationPermission,
+      );
+    } else {
+      // No permission granted - initial request
+      return _buildButton(
+        'Request Location Permission',
+        _requestLocationPermission,
+      );
+    }
   }
 
   Widget _buildBadgeCountSection() {
