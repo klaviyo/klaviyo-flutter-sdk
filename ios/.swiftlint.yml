@@ -20,6 +20,7 @@ analyzer_rules: # Rules run by `swiftlint analyze` (experimental)
 
 # --- Rule Configurations ---
 
+todo: warning
 
 line_length: 110
 
