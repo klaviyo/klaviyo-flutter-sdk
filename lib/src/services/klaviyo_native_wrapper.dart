@@ -324,6 +324,11 @@ class KlaviyoNativeWrapper {
 
   /// Recursively convert platform channel maps to Map<String, dynamic>
   Map<String, dynamic> _deepConvertMap(dynamic value) {
+    assert(
+      value == null || value is Map,
+      '_deepConvertMap expected Map but got ${value.runtimeType}',
+    );
+
     if (value is Map) {
       return value.map((key, val) => MapEntry(
         key.toString(),
