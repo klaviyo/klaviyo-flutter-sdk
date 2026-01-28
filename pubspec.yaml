@@ -6,17 +6,17 @@ homepage: https://github.com/klaviyo/klaviyo-flutter-sdk
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
-  flutter: ">=3.0.0"
+  flutter: ">=3.24.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  permission_handler: ^12.0.0+1
 
+  meta: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^5.0.0
 
 flutter:
   plugin:
@@ -25,4 +25,4 @@ flutter:
         package: com.klaviyo.klaviyo_flutter_sdk
         pluginClass: KlaviyoFlutterSdkPlugin
       ios:
-        pluginClass: KlaviyoFlutterSdkPlugin 
+        pluginClass: KlaviyoFlutterSdkPlugin

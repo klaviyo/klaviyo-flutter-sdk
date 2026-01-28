@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:io';
+
+import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
 import 'models/klaviyo_location.dart';
 import 'models/in_app_form_config.dart';
+import 'models/geofence.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'enums/push_environment.dart';
 import 'services/klaviyo_native_wrapper.dart';
@@ -20,7 +24,7 @@ class KlaviyoSDK {
 
   // Native wrapper service
   late KlaviyoNativeWrapper _nativeWrapper;
-  late Logger _logger;
+  final Logger _logger = Logger();
 
   // State
   bool _isInitialized = false;
@@ -45,8 +49,7 @@ class KlaviyoSDK {
     try {
       _apiKey = apiKey;
 
-      // Initialize logger
-      _logger = Logger();
+      // Set logger level
       _logger.setLogLevel(logLevel);
 
       // Initialize native wrapper
@@ -160,8 +163,10 @@ class KlaviyoSDK {
   }
 
   /// Track event with just name and properties
-  Future<void> track(String eventName,
-      [Map<String, dynamic>? properties]) async {
+  Future<void> track(
+    String eventName, [
+    Map<String, dynamic>? properties,
+  ]) async {
     final event = KlaviyoEvent(
       name: eventName,
       properties: properties ?? {},
@@ -171,14 +176,23 @@ class KlaviyoSDK {
   }
 
   /// Register for push notifications
+  /// This is only required on iOS to trigger APNs registration.
+  /// On Android, FCM handles registration automatically via KlaviyoPushService.
   Future<void> registerForPushNotifications() async {
     _ensureInitialized();
-    await _nativeWrapper.registerForPushNotifications();
+
+    // Only call native method on iOS
+    if (Platform.isIOS) {
+      await _nativeWrapper.registerForPushNotifications();
+    }
+    // No-op on Android - FCM handles this automatically
   }
 
   /// Set push token
-  Future<void> setPushToken(String token,
-      {PushEnvironment? environment}) async {
+  Future<void> setPushToken(
+    String token, {
+    PushEnvironment? environment,
+  }) async {
     _ensureInitialized();
     await _nativeWrapper.setPushToken(token, environment: environment);
   }
@@ -186,13 +200,13 @@ class KlaviyoSDK {
   /// Get push token
   Future<String?> getPushToken() async {
     _ensureInitialized();
-    final tokenInfo = await _nativeWrapper.getPushToken();
-    return tokenInfo?.token;
+    return await _nativeWrapper.getPushToken();
   }
 
   /// Handle push notification received
   Future<void> handlePushNotificationReceived(
-      Map<String, dynamic> userInfo) async {
+    Map<String, dynamic> userInfo,
+  ) async {
     _ensureInitialized();
     // Native SDK handles this automatically
     _logger.info('Push notification received');
@@ -200,7 +214,8 @@ class KlaviyoSDK {
 
   /// Handle push notification opened
   Future<void> handlePushNotificationOpened(
-      Map<String, dynamic> userInfo) async {
+    Map<String, dynamic> userInfo,
+  ) async {
     _ensureInitialized();
     // Native SDK handles this automatically
     _logger.info('Push notification opened');
@@ -212,13 +227,41 @@ class KlaviyoSDK {
     await _nativeWrapper.registerForInAppForms(
       configuration: configuration?.toJson(),
     );
+    _logger.info('Registered for in-app forms');
   }
 
   /// Unregister from in-app forms
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
-    // TODO: Implement unregistration in native wrapper
+    await _nativeWrapper.unregisterFromInAppForms();
     _logger.info('Unregistered from in-app forms');
+  }
+
+  /// Begin monitoring geofences configured in your Klaviyo account
+  /// Requires location permissions to be granted by user
+  Future<void> registerGeofencing() async {
+    _ensureInitialized();
+    await _nativeWrapper.registerGeofencing();
+    _logger.info('Registered for geofencing');
+  }
+
+  /// Stop monitoring all geofences
+  Future<void> unregisterGeofencing() async {
+    _ensureInitialized();
+    await _nativeWrapper.unregisterGeofencing();
+    _logger.info('Unregistered from geofencing');
+  }
+
+  /// Get currently monitored geofences
+  ///
+  /// **This is for internal use only and should not be used in production applications.**
+  ///
+  /// This method is provided for demonstration and debugging purposes only.
+  /// It provides the same functionality as the native platform's geofence monitoring APIs.
+  @internal
+  Future<List<Geofence>> getCurrentGeofences() async {
+    _ensureInitialized();
+    return await _nativeWrapper.getCurrentGeofences();
   }
 
   /// Reset the current profile (useful for logout)
@@ -231,6 +274,21 @@ class KlaviyoSDK {
       _logger.info('Profile reset');
     } catch (e) {
       throw KlaviyoException('Failed to reset profile: $e');
+    }
+  }
+
+  /// Reset the current profile (useful for logout)
+  /// Profile state is managed by the native SDK
+  void setBadgeCount(int count) {
+    if (Platform.isIOS) {
+      _ensureInitialized();
+      _nativeWrapper.setBadgeCount(count);
+      _logger.info('Set the badge count to $count');
+    } else {
+      // Android does not support badge count
+      _logger.warning(
+        'Setting badge count via the Klaviyo SDK is unsupported on Android.',
+      );
     }
   }
 
@@ -271,7 +329,9 @@ class KlaviyoSDK {
   /// Private methods
   void _ensureInitialized() {
     if (!_isInitialized) {
-      throw KlaviyoException('SDK not initialized. Call initialize() first.');
+      throw const KlaviyoException(
+        'SDK not initialized. Call initialize() first.',
+      );
     }
   }
 

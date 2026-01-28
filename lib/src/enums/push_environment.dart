@@ -24,4 +24,4 @@ enum PushEnvironment {
         return 'production';
     }
   }
-} 
+}

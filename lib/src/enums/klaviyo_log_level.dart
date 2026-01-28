@@ -42,4 +42,4 @@ enum KlaviyoLogLevel {
         return 'verbose';
     }
   }
-} 
+}

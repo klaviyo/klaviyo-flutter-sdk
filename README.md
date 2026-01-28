@@ -7,6 +7,8 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
 - **Profile Management**: Set user profiles, emails, phone numbers, and custom properties
 - **Event Tracking**: Track custom events and user interactions
 - **Push Notifications**: Register for and handle push notifications
+- **Rich Push**: Display images within push notifications
+- **Badge Count**: Set and manage app icon badge count (iOS only)
 - **In-App Forms**: Display and manage in-app forms for lead capture
 - **Cross-Platform**: Works on both iOS and Android using native SDKs
 - **Real-time Updates**: Stream-based profile updates and event handling
@@ -34,7 +36,7 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  
+
   # Add Klaviyo Swift SDK
   pod 'KlaviyoSwiftSDK'
 end
@@ -80,14 +82,14 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   final klaviyo = KlaviyoSDK();
   await klaviyo.initialize(
     apiKey: 'YOUR_KLAVIYO_PUBLIC_API_KEY',
     logLevel: KlaviyoLogLevel.debug,
     environment: PushEnvironment.development,
   );
-  
+
   runApp(MyApp());
 }
 ```
@@ -143,10 +145,13 @@ await klaviyo.trackEvent(event);
 
 ```dart
 // Register for push notifications
+// iOS: Triggers APNs registration
+// Android: No-op (FCM handles registration automatically)
 await klaviyo.registerForPushNotifications();
 
-// Set push token (usually handled automatically)
-await klaviyo.setPushToken('device_token_here');
+// Get the current push token
+final token = await klaviyo.getPushToken();
+print('Push token: $token');
 
 // Handle push notification events
 klaviyo.profileStream.listen((profile) {
@@ -154,7 +159,24 @@ klaviyo.profileStream.listen((profile) {
 });
 ```
 
-### 5. In-App Forms
+### 5. Rich Push
+
+[Rich Push](https://help.klaviyo.com/hc/en-us/articles/16917302437275) is the ability to add images to
+push notification messages. On iOS, you will need to implement an extension service to attach images to notifications.
+No additional setup is needed to support rich push on Android.
+
+- [Android](https://github.com/klaviyo/klaviyo-android-sdk#Rich-Push)
+- [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#Rich-Push)
+
+### 6. Badge Count (iOS Only)
+
+Klaviyo supports setting or incrementing the badge count on iOS when you send a push notification.
+To enable this functionality, you will need to implement a notification service extension and app group
+as detailed in the [Swift SDK installation instructions](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#installation).
+See the [badge count documentation](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#badge-count) for more details and the example app for reference.
+Android automatically handles badge counts, and no additional setup is needed.
+
+### 7. In-App Forms
 
 ```dart
 // Register for in-app forms
@@ -170,14 +192,14 @@ final config = InAppFormConfig(
 await klaviyo.registerForInAppForms(configuration: config);
 
 // Show a specific form
-final success = await klaviyo.showForm('newsletter_signup', 
+final success = await klaviyo.showForm('newsletter_signup',
   customData: {'source': 'flutter_app'});
 
 // Hide a form
 await klaviyo.hideForm('newsletter_signup');
 ```
 
-### 6. Profile Reset (Logout)
+### 8. Profile Reset (Logout)
 
 ```dart
 // Reset profile when user logs out
@@ -200,13 +222,14 @@ The main SDK class that provides all functionality.
 - `setProfileProperties(properties)` - Set custom profile properties
 - `track(name, properties)` - Track a simple event
 - `trackEvent(event)` - Track a complex event
-- `registerForPushNotifications()` - Register for push notifications
-- `setPushToken(token, environment)` - Set push notification token
+- `registerForPushNotifications()` - Register for push notifications (iOS: triggers APNs registration, Android: no-op)
+- `setPushToken(token, environment)` - Set push notification token (usually handled automatically by native SDKs)
 - `getPushToken()` - Get current push token
 - `registerForInAppForms(configuration)` - Register for in-app forms
 - `showForm(formId, customData)` - Show a specific form
 - `hideForm(formId)` - Hide a specific form
 - `resetProfile()` - Reset user profile
+- `setBadgeCount(count)` - Set the badge count on the app icon (iOS only)
 - `setLogLevel(logLevel)` - Set logging level
 - `dispose()` - Clean up resources
 
@@ -314,4 +337,4 @@ This Flutter SDK wraps the following native SDKs:
 - **iOS**: [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk)
 - **Android**: [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk)
 
-Make sure to refer to the native SDK documentation for platform-specific features and requirements. 
+Make sure to refer to the native SDK documentation for platform-specific features and requirements.

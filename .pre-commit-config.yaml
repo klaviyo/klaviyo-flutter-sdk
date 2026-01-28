@@ -1,0 +1,54 @@
+default_language_version:
+  python: python3
+
+repos:
+  # Generic hygiene hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        exclude: '\.swift$' # keep xcode indents
+
+  # Language-specific formatters/linters
+  - repo: local
+    hooks:
+      # ----- Dart / Flutter -----
+      - id: dart-fix
+        name: dart fix
+        entry: dart fix --apply
+        language: system
+        files: \.dart$
+        pass_filenames: false
+
+      - id: dart-format
+        name: dart format
+        entry: dart format
+        language: system
+        files: \.dart$
+
+      - id: flutter-analyze
+        name: flutter analyze
+        entry: flutter analyze --no-fatal-infos
+        language: system
+        pass_filenames: false
+
+      # ----- Kotlin (Android) -----
+      - id: ktlint-format
+        name: ktlint format (Kotlin)
+        entry: ktlint -F
+        language: system
+        files: \.kt$
+
+      # ----- Swift (iOS) -----
+      - id: swiftformat
+        name: swiftformat
+        entry: swiftformat
+        language: system
+        files: \.swift$
+
+      - id: swiftlint
+        name: swiftlint
+        entry: swiftlint
+        language: system
+        files: \.swift$
