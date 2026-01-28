@@ -18,10 +18,13 @@ excluded: # paths to ignore during linting. Takes precedence over `included`.
 analyzer_rules: # Rules run by `swiftlint analyze` (experimental)
   - explicit_self
 
-force_cast: warning
-force_try: warning
+# --- Rule Configurations ---
+
 
 line_length: 110
+
+force_cast: warning
+force_try: warning
 
 type_body_length:
   - 300 # warning
