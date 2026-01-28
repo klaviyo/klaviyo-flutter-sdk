@@ -3,7 +3,6 @@ disabled_rules: # rule identifiers turned on by default to exclude from running
   - colon
   - comma
   - control_statement
-  - line_length # SDK ONLY
   - cyclomatic_complexity # SDK ONLY
   - function_body_length # SDK ONLY
 
