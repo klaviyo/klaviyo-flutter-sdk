@@ -326,9 +326,9 @@ class KlaviyoNativeWrapper {
   Map<String, dynamic> _deepConvertMap(dynamic value) {
     if (value is Map) {
       return value.map((key, val) => MapEntry(
-            key.toString(),
-            _deepConvertValue(val),
-          ));
+        key.toString(),
+        _deepConvertValue(val),
+      ));
     }
     return <String, dynamic>{};
   }
