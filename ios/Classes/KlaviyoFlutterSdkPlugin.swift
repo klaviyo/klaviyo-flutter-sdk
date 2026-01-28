@@ -17,6 +17,10 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificatio
     /// Cache for the token event to handle the race condition where the token arrives
     /// before Flutter has finished initializing the EventChannel.
     private var cachedToken: [String: Any]?
+
+    /// Cache for the error event to handle the race condition where registration fails
+    /// before Flutter has finished initializing the EventChannel.
+    private var cachedError: [String: Any]?
     
     // MARK: - Flutter Plugin Registration
     
@@ -316,10 +320,13 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
     ) -> FlutterError? {
         self.eventSink = events
         
-        // If we have a cached token from early app launch, send it now.
-        // This solves the race condition where token arrives before Flutter is ready.
+        // If we have a cached token or error from early app launch, send it now.
+        // This solves the race condition where token/error arrives before Flutter is ready.
         if let cachedToken = cachedToken {
             events(cachedToken)
+        }
+        if let cachedError = cachedError {
+            events(cachedError)
         }
         return nil
     }
@@ -364,12 +371,18 @@ extension KlaviyoFlutterSdkPlugin {
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         print("❌ Failed to register for remote notifications: \(error)")
-        
-        // Notify Flutter side via event sink
-        eventSink?([
+
+        // Create error payload
+        let errorData: [String: Any] = [
             "type": "push_token_error",
             "data": ["error": error.localizedDescription]
-        ])
+        ]
+
+        // Cache it for late subscribers
+        self.cachedError = errorData
+
+        // Notify Flutter side via event sink
+        eventSink?(errorData)
     }
     
     // Manual Forwarding Helper - "Open" Event
