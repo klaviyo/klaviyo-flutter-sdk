@@ -65,6 +65,20 @@ Please ensure you make the following changes to your existing AppDelegate:
 2.  **Set the Notification Delegate:** Assign `UNUserNotificationCenter.current().delegate = self` in `didFinishLaunching`.
 3.  **Forward Notification Events:** Implement (or update) the `userNotificationCenter` methods to forward events to the Klaviyo SDK.
 
+**Note on Push Token Handling:** The plugin automatically intercepts `didRegisterForRemoteNotificationsWithDeviceToken` to capture the APNs token. If you need to override this method in your AppDelegate (e.g., to also send the token to another push service), make sure to call `super`:
+
+```swift
+override func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+) {
+    // Call super to ensure the Klaviyo plugin receives the token
+    super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+
+    // Your custom token handling here
+}
+```
+
 Here is an example of what the integration looks like:
 
 ```swift
@@ -207,21 +221,56 @@ await klaviyo.trackEvent(event);
 
 ### 4. Push Notifications
 
+#### Option A: Using Firebase Messaging (Recommended)
+
+If your app already uses Firebase Messaging, pass the token directly to Klaviyo:
+
+```dart
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+// Get token from Firebase and pass to Klaviyo
+final token = await FirebaseMessaging.instance.getToken();
+if (token != null) {
+  await klaviyo.setPushToken(token);
+}
+
+// Listen for token refreshes
+FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+  klaviyo.setPushToken(token);
+});
+```
+
+#### Option B: Without Firebase
+
+If you're not using Firebase, use the SDK's built-in registration:
+
 ```dart
 // Register for push notifications
-// iOS: Triggers APNs registration (handled automatically)
-// Android: No-op (FCM handles registration automatically)
+// iOS: Triggers APNs registration and automatically captures the token
+// Android: No-op (requires FCM setup)
 await klaviyo.registerForPushNotifications();
 
 // Get the current push token (if needed)
 final token = await klaviyo.getPushToken();
 print('Push token: $token');
 
-// Handle push notification events
-klaviyo.profileStream.listen((event) {
-    if (event['type'] == 'push_notification_opened') {
-        print('Notification Opened: ${event['data']}');
-    }
+// Or listen for the token event
+klaviyo.onPushNotification.listen((event) {
+  if (event['type'] == 'push_token_received') {
+    final token = event['data']['token'];
+    print('Token received: $token');
+  }
+});
+```
+
+#### Handling Push Notification Opens
+
+```dart
+// Listen for notification open events
+klaviyo.onPushNotification.listen((event) {
+  if (event['type'] == 'push_notification_opened') {
+    print('Notification opened: ${event['data']}');
+  }
 });
 ```
 
@@ -303,8 +352,8 @@ The main SDK class that provides all functionality.
 
 - `isInitialized` - Whether the SDK is initialized
 - `apiKey` - Current API key
-- `currentProfile` - Current user profile
-- `profileStream` - Stream of profile updates
+- `onPushNotification` - Stream of push notification events (token received, notification opened, errors)
+- `onFormEvent` - Stream of in-app form events
 
 ### Models
 
