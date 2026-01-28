@@ -20,6 +20,8 @@ analyzer_rules: # Rules run by `swiftlint analyze` (experimental)
 
 # --- Rule Configurations ---
 
+todo: warning
+
 force_cast: warning
 force_try: warning
 
