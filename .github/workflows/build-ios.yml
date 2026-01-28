@@ -1,0 +1,40 @@
+name: build-ios
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.38.7
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          flutter pub get
+          cd example && flutter pub get
+
+      - name: Install CocoaPods dependencies
+        run: |
+          cd example/ios
+          pod install
+
+      - name: Build iOS (no codesigning)
+        run: |
+          cd example
+          flutter build ios --no-codesign --debug
+
+      - name: Verify build completion
+        run: |
+          if [ ! -d example/build/ios/iphoneos/Runner.app ]; then
+            echo "iOS build failed"
+            exit 1
+          fi
+          echo "iOS build successful"
