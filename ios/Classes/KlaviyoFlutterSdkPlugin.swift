@@ -336,7 +336,7 @@ extension KlaviyoFlutterSdkPlugin {
     
     // Automatic Token Interception
     // This is called automatically by Flutter because we used `registrar.addApplicationDelegate`.
-    public func application(
+    @objc public func application(
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
@@ -359,7 +359,7 @@ extension KlaviyoFlutterSdkPlugin {
         eventSink?(eventData)
     }
     
-    public func application(
+    @objc public func application(
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
