@@ -153,7 +153,12 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 KlaviyoSDK().set(pushToken: tokenData)
             } else {
                 // Handle as string token (for cross-platform compatibility)
-                result(FlutterError(code: "INVALID_TOKEN_FORMAT", message: "Invalid token format", details: nil))
+                let error = FlutterError(
+                    code: "INVALID_TOKEN_FORMAT",
+                    message: "Invalid token format",
+                    details: nil
+                )
+                result(error)
                 return
             }
             result(nil)
@@ -211,11 +216,21 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
         case "showForm":
             // Not supported in v5.0.0; forms are shown automatically based on targeting
-            result(FlutterError(code: "NOT_SUPPORTED", message: "Direct showForm is not supported in v5.0.0; forms are shown automatically.", details: nil))
+            let error = FlutterError(
+                code: "NOT_SUPPORTED",
+                message: "Direct showForm is not supported in v5.0.0; forms are shown automatically.",
+                details: nil
+            )
+            result(error)
             
         case "hideForm":
             // Not supported in v5.0.0; forms are hidden automatically
-            result(FlutterError(code: "NOT_SUPPORTED", message: "Direct hideForm is not supported in v5.0.0; forms are hidden automatically.", details: nil))
+            let error = FlutterError(
+                code: "NOT_SUPPORTED",
+                message: "Direct hideForm is not supported in v5.0.0; forms are hidden automatically.",
+                details: nil
+            )
+            result(error)
             
         case "resetProfile":
             KlaviyoSDK().resetProfile()
@@ -265,7 +280,12 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             guard let args = call.arguments as? [String: Any],
                   let userInfo = args["userInfo"] as? [String: Any]
             else {
-                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid notification data", details: nil))
+                let error = FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Invalid notification data",
+                    details: nil
+                )
+                result(error)
                 return
             }
             print("📱 Push notification opened in plugin: \(userInfo)")
