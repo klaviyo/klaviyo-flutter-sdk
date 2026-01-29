@@ -144,7 +144,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
             label: 'Profile',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.event),
+            icon: Icon(Icons.send),
             label: 'Events',
           ),
           BottomNavigationBarItem(

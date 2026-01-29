@@ -17,6 +17,34 @@ class _EventsTabState extends State<EventsTab> {
 
   String _status = 'Track events here';
 
+  Future<void> _trackQuickEvent(String eventName, IconData icon) async {
+    if (!_klaviyo.isInitialized) {
+      setState(() {
+        _status =
+            'SDK not initialized. Please initialize in Profile tab first.';
+      });
+      return;
+    }
+
+    try {
+      await _klaviyo.trackEvent(
+        KlaviyoEvent(
+          name: eventName,
+          properties: {},
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      setState(() {
+        _status = 'Event "$eventName" tracked successfully!';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to track event: $e';
+      });
+    }
+  }
+
   Future<void> _trackEvent() async {
     if (!_klaviyo.isInitialized) {
       setState(() {
@@ -133,23 +161,44 @@ class _EventsTabState extends State<EventsTab> {
             ),
             const SizedBox(height: 10),
 
-            ElevatedButton(
-              onPressed: () {
-                _eventNameController.text = 'App Opened';
-                _trackEvent();
-              },
-              child: const Text('Track "App Opened"'),
+            ElevatedButton.icon(
+              onPressed: () =>
+                  _trackQuickEvent('Opened App', Icons.rocket_launch),
+              icon: const Icon(Icons.rocket_launch),
+              label: const Text('Opened App'),
             ),
             const SizedBox(height: 8),
 
-            ElevatedButton(
-              onPressed: () {
-                _eventNameController.text = 'Button Clicked';
-                _propertyKeyController.text = 'button_name';
-                _propertyValueController.text = 'quick_event_button';
-                _trackEvent();
-              },
-              child: const Text('Track "Button Clicked"'),
+            ElevatedButton.icon(
+              onPressed: () =>
+                  _trackQuickEvent('Viewed Product', Icons.remove_red_eye),
+              icon: const Icon(Icons.remove_red_eye),
+              label: const Text('Viewed Product'),
+            ),
+            const SizedBox(height: 8),
+
+            ElevatedButton.icon(
+              onPressed: () =>
+                  _trackQuickEvent('Added to Cart', Icons.add_shopping_cart),
+              icon: const Icon(Icons.add_shopping_cart),
+              label: const Text('Added to Cart'),
+            ),
+            const SizedBox(height: 8),
+
+            ElevatedButton.icon(
+              onPressed: () => _trackQuickEvent(
+                'Started Checkout',
+                Icons.shopping_cart_checkout,
+              ),
+              icon: const Icon(Icons.shopping_cart_checkout),
+              label: const Text('Started Checkout'),
+            ),
+            const SizedBox(height: 8),
+
+            ElevatedButton.icon(
+              onPressed: () => _trackQuickEvent('Test Event', Icons.science),
+              icon: const Icon(Icons.science),
+              label: const Text('Test Event'),
             ),
           ],
         ),

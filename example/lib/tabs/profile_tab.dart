@@ -1,6 +1,8 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -65,6 +67,19 @@ class _ProfileTabState extends State<ProfileTab> {
       // Save API key
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_apiKeyPrefsKey, apiKey);
+
+      // Register FCM token with Klaviyo (Android only)
+      if (Platform.isAndroid) {
+        try {
+          final messaging = FirebaseMessaging.instance;
+          final token = await messaging.getToken();
+          if (token != null) {
+            await _klaviyo.setPushToken(token);
+          }
+        } catch (e) {
+          print('Failed to register FCM token: $e');
+        }
+      }
 
       setState(() {
         _isInitialized = true;
@@ -169,6 +184,36 @@ class _ProfileTabState extends State<ProfileTab> {
     } catch (e) {
       setState(() {
         _status = 'Failed to reset profile: $e';
+      });
+    }
+  }
+
+  Future<void> _resetSDK() async {
+    try {
+      // Reset profile first if initialized
+      if (_isInitialized) {
+        await _klaviyo.resetProfile();
+      }
+
+      // Clear saved API key
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_apiKeyPrefsKey);
+
+      // Clear all controllers
+      _apiKeyController.clear();
+      _emailController.clear();
+      _phoneController.clear();
+      _externalIdController.clear();
+      _firstNameController.clear();
+      _lastNameController.clear();
+
+      setState(() {
+        _isInitialized = false;
+        _status = 'SDK reset. Enter API key to initialize';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to reset SDK: $e';
       });
     }
   }
@@ -291,6 +336,17 @@ class _ProfileTabState extends State<ProfileTab> {
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('Reset Profile'),
+              ),
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _resetSDK,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade700,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Reset SDK & Change API Key'),
               ),
             ],
           ],

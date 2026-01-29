@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -41,6 +42,17 @@ class _GeofencingTabState extends State<GeofencingTab> {
     try {
       PermissionStatus status;
       if (always) {
+        // On iOS, must have "When In Use" before requesting "Always"
+        if (Platform.isIOS) {
+          final whenInUseStatus = await Permission.locationWhenInUse.status;
+          if (!whenInUseStatus.isGranted) {
+            setState(() {
+              _status =
+                  'Please grant "When In Use" permission first (iOS requirement)';
+            });
+            return;
+          }
+        }
         status = await Permission.locationAlways.request();
       } else {
         status = await Permission.locationWhenInUse.request();

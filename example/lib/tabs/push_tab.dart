@@ -56,12 +56,20 @@ class _PushTabState extends State<PushTab> {
 
     try {
       await _klaviyo.registerForPushNotifications();
-      setState(() {
-        _notificationsEnabled = true;
-        _status = 'Push notifications registered';
-      });
+
+      // Check if permission was actually granted
+      await _checkPermissions();
+
       // Get the token after registration
       await _getPushToken();
+
+      setState(() {
+        if (_notificationsEnabled) {
+          _status = 'Push notifications registered';
+        } else {
+          _status = 'Push notification permission denied';
+        }
+      });
     } catch (e) {
       setState(() {
         _status = 'Failed to register for push: $e';
