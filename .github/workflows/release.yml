@@ -8,6 +8,8 @@ on:
 jobs:
   release:
     runs-on: macos-15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -27,15 +29,13 @@ jobs:
 
       - name: Publish to pub.dev
         env:
-          PUB_CREDENTIALS: ${{ secrets.PUB_CREDENTIALS }}
-        run: |
-          mkdir -p ~/.pub-cache
-          echo "$PUB_CREDENTIALS" > ~/.pub-cache/credentials.json
-          flutter pub publish --force
+          PUB_TOKEN: ${{ secrets.PUB_CREDENTIALS }}
+        run: flutter pub publish --force
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             CHANGELOG.md
