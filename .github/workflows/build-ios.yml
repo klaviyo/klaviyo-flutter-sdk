@@ -3,7 +3,10 @@ name: build-ios
 on:
   pull_request:
   push:
-    branches: [master]
+    branches:
+      - master
+      - 'feat/**'
+      - 'rel/**'
 
 jobs:
   build-ios:
@@ -20,6 +23,45 @@ jobs:
         run: |
           flutter pub get
           cd example && flutter pub get
+
+      - name: Create dummy Firebase config for CI
+        run: |
+          cat > example/ios/Runner/GoogleService-Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CLIENT_ID</key>
+            <string>123456789000-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com</string>
+            <key>REVERSED_CLIENT_ID</key>
+            <string>com.googleusercontent.apps.123456789000-abcdefghijklmnopqrstuvwxyz123456</string>
+            <key>API_KEY</key>
+            <string>AIzaSyDummyKeyForCIBuildOnly1234567890123</string>
+            <key>GCM_SENDER_ID</key>
+            <string>123456789000</string>
+            <key>PLIST_VERSION</key>
+            <string>1</string>
+            <key>BUNDLE_ID</key>
+            <string>com.klaviyo.flutterexample</string>
+            <key>PROJECT_ID</key>
+            <string>klaviyo-flutter-sdk-example-ci</string>
+            <key>STORAGE_BUCKET</key>
+            <string>klaviyo-flutter-sdk-example-ci.appspot.com</string>
+            <key>IS_ADS_ENABLED</key>
+            <false/>
+            <key>IS_ANALYTICS_ENABLED</key>
+            <false/>
+            <key>IS_APPINVITE_ENABLED</key>
+            <false/>
+            <key>IS_GCM_ENABLED</key>
+            <true/>
+            <key>IS_SIGNIN_ENABLED</key>
+            <true/>
+            <key>GOOGLE_APP_ID</key>
+            <string>1:123456789000:ios:abc123def456ci</string>
+          </dict>
+          </plist>
+          EOF
 
       - name: Install CocoaPods dependencies
         run: |

@@ -3,7 +3,10 @@ name: build-android
 on:
   pull_request:
   push:
-    branches: [master]
+    branches:
+      - master
+      - 'feat/**'
+      - 'rel/**'
 
 jobs:
   build-android:
@@ -25,6 +28,40 @@ jobs:
         run: |
           flutter pub get
           cd example && flutter pub get
+
+      - name: Create dummy Firebase config for CI
+        run: |
+          cat > example/android/app/google-services.json << 'EOF'
+          {
+            "project_info": {
+              "project_number": "123456789000",
+              "project_id": "klaviyo-flutter-sdk-example-ci",
+              "storage_bucket": "klaviyo-flutter-sdk-example-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:123456789000:android:abc123def456ci",
+                  "android_client_info": {
+                    "package_name": "com.klaviyo.flutterexample"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyDummyKeyForCIBuildOnly1234567890123"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
 
       - name: Build Android APK
         run: |
