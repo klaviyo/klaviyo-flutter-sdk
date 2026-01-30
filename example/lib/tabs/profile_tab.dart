@@ -40,7 +40,15 @@ class _ProfileTabState extends State<ProfileTab> {
         setState(() {
           _apiKeyController.text = savedApiKey;
         });
-        await _initializeSDK();
+        // Only initialize if not already initialized
+        if (!_klaviyo.isInitialized) {
+          await _initializeSDK();
+        } else {
+          setState(() {
+            _isInitialized = true;
+            _status = 'SDK already initialized';
+          });
+        }
       }
     } catch (e) {
       print('Failed to load saved API key: $e');

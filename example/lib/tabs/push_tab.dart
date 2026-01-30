@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
@@ -16,12 +17,29 @@ class _PushTabState extends State<PushTab> {
   String _status = 'Push notification settings';
   String? _pushToken;
   bool _notificationsEnabled = false;
+  StreamSubscription<Map<String, dynamic>>? _pushNotificationSubscription;
 
   @override
   void initState() {
     super.initState();
     _checkPermissions();
     _getPushToken();
+    _setupPushNotificationListener();
+  }
+
+  void _setupPushNotificationListener() {
+    if (!_klaviyo.isInitialized) return;
+
+    // Listen for push notification open events
+    _pushNotificationSubscription = _klaviyo.onPushNotification.listen((event) {
+      final eventType = event['type'] as String?;
+      if (eventType == 'push_notification_opened') {
+        final data = event['data'] as Map<String, dynamic>?;
+        setState(() {
+          _status = 'Push notification opened: ${data?['title'] ?? 'Unknown'}';
+        });
+      }
+    });
   }
 
   Future<void> _checkPermissions() async {
@@ -199,6 +217,7 @@ class _PushTabState extends State<PushTab> {
 
   @override
   void dispose() {
+    _pushNotificationSubscription?.cancel();
     _badgeCountController.dispose();
     super.dispose();
   }
