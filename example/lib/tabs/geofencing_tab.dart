@@ -83,6 +83,16 @@ class _GeofencingTabState extends State<GeofencingTab> {
       return;
     }
 
+    // Check that "Always" location permission is granted before registering
+    final alwaysStatus = await Permission.locationAlways.status;
+    if (!alwaysStatus.isGranted) {
+      setState(() {
+        _status =
+            'Location "Always" permission required for geofencing. Please grant permission first.';
+      });
+      return;
+    }
+
     try {
       await _klaviyo.registerGeofencing();
       setState(() {
