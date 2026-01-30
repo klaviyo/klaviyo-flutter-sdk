@@ -12,7 +12,18 @@ class _FormsTabState extends State<FormsTab> {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
   final TextEditingController _durationController = TextEditingController();
   String _status = 'Manage in-app forms here';
-  bool _isRegistered = false;
+
+  // Use a static variable to persist state across widget rebuilds
+  static bool _isRegistered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Update status based on current registration state
+    if (_isRegistered) {
+      _status = 'In-app forms are registered';
+    }
+  }
 
   Future<void> _registerForForms() async {
     if (!_klaviyo.isInitialized) {

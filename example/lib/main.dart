@@ -37,13 +37,20 @@ Future<void> _setupFCM() async {
 
     // Listen for token refresh
     // Note: Initial token registration happens in ProfileTab after SDK initialization
-    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-      print('FCM Token refreshed: $newToken');
-      final klaviyo = KlaviyoSDK();
-      if (klaviyo.isInitialized) {
-        klaviyo.setPushToken(newToken);
-      }
-    });
+    FirebaseMessaging.instance.onTokenRefresh.listen(
+      (newToken) {
+        print('FCM Token refreshed: $newToken');
+        final klaviyo = KlaviyoSDK();
+        if (klaviyo.isInitialized) {
+          klaviyo.setPushToken(newToken).catchError((error) {
+            print('Failed to register refreshed FCM token: $error');
+          });
+        }
+      },
+      onError: (error) {
+        print('Error listening for token refresh: $error');
+      },
+    );
 
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {

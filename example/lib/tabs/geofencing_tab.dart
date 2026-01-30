@@ -14,15 +14,22 @@ class _GeofencingTabState extends State<GeofencingTab>
     with WidgetsBindingObserver {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
   String _status = 'Geofencing management';
-  bool _isRegistered = false;
-  List<Geofence> _currentGeofences = [];
   String? _locationPermissionState;
+
+  // Use static variables to persist state across widget rebuilds
+  static bool _isRegistered = false;
+  static List<Geofence> _currentGeofences = [];
 
   @override
   void initState() {
     super.initState();
     _checkLocationPermissions();
     WidgetsBinding.instance.addObserver(this);
+
+    // Update status based on current registration state
+    if (_isRegistered) {
+      _status = 'Geofencing is registered';
+    }
   }
 
   @override
