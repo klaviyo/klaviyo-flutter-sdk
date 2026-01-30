@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'forms_tab.dart';
+import 'geofencing_tab.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -214,6 +216,10 @@ class _ProfileTabState extends State<ProfileTab> {
       _externalIdController.clear();
       _firstNameController.clear();
       _lastNameController.clear();
+
+      // Reset static state in other tabs
+      FormsTab.resetState();
+      GeofencingTab.resetState();
 
       setState(() {
         _isInitialized = false;

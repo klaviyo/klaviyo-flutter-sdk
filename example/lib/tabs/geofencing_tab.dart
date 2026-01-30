@@ -6,6 +6,11 @@ import 'package:permission_handler/permission_handler.dart';
 class GeofencingTab extends StatefulWidget {
   const GeofencingTab({super.key});
 
+  /// Reset the registration state (called when SDK is reset)
+  static void resetState() {
+    _GeofencingTabState.resetState();
+  }
+
   @override
   State<GeofencingTab> createState() => _GeofencingTabState();
 }
@@ -19,6 +24,12 @@ class _GeofencingTabState extends State<GeofencingTab>
   // Use static variables to persist state across widget rebuilds
   static bool _isRegistered = false;
   static List<Geofence> _currentGeofences = [];
+
+  /// Reset the static state (called when SDK is reset)
+  static void resetState() {
+    _isRegistered = false;
+    _currentGeofences = [];
+  }
 
   @override
   void initState() {

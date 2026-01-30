@@ -4,6 +4,11 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 class FormsTab extends StatefulWidget {
   const FormsTab({super.key});
 
+  /// Reset the registration state (called when SDK is reset)
+  static void resetState() {
+    _FormsTabState.resetState();
+  }
+
   @override
   State<FormsTab> createState() => _FormsTabState();
 }
@@ -15,6 +20,11 @@ class _FormsTabState extends State<FormsTab> {
 
   // Use a static variable to persist state across widget rebuilds
   static bool _isRegistered = false;
+
+  /// Reset the static state (called when SDK is reset)
+  static void resetState() {
+    _isRegistered = false;
+  }
 
   @override
   void initState() {
