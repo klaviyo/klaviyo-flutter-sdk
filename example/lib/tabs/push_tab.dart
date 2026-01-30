@@ -73,9 +73,21 @@ class _PushTabState extends State<PushTab> {
     }
 
     try {
+      // Request notification permission first
+      final permissionStatus = await Permission.notification.request();
+
+      if (!permissionStatus.isGranted) {
+        setState(() {
+          _status = 'Notification permission denied';
+          _notificationsEnabled = false;
+        });
+        return;
+      }
+
+      // Register for push notifications after permission is granted
       await _klaviyo.registerForPushNotifications();
 
-      // Check if permission was actually granted
+      // Update permission state
       await _checkPermissions();
 
       // Get the token after registration

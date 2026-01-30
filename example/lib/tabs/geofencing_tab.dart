@@ -10,7 +10,8 @@ class GeofencingTab extends StatefulWidget {
   State<GeofencingTab> createState() => _GeofencingTabState();
 }
 
-class _GeofencingTabState extends State<GeofencingTab> {
+class _GeofencingTabState extends State<GeofencingTab>
+    with WidgetsBindingObserver {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
   String _status = 'Geofencing management';
   bool _isRegistered = false;
@@ -21,6 +22,21 @@ class _GeofencingTabState extends State<GeofencingTab> {
   void initState() {
     super.initState();
     _checkLocationPermissions();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When app returns to foreground, refresh permission state
+    if (state == AppLifecycleState.resumed) {
+      _checkLocationPermissions();
+    }
   }
 
   Future<void> _checkLocationPermissions() async {
@@ -54,6 +70,18 @@ class _GeofencingTabState extends State<GeofencingTab> {
           }
         }
         status = await Permission.locationAlways.request();
+
+        // On iOS, if "Always" is not granted after request, guide user to Settings
+        if (Platform.isIOS && !status.isGranted) {
+          setState(() {
+            _status =
+                'To enable "Always" permission, tap below to open Settings, then tap Location → Always';
+          });
+          // Open Settings after a brief delay
+          await Future.delayed(const Duration(milliseconds: 500));
+          await openAppSettings();
+          return;
+        }
       } else {
         status = await Permission.locationWhenInUse.request();
       }
