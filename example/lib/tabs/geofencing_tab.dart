@@ -31,6 +31,8 @@ class _GeofencingTabState extends State<GeofencingTab>
     _currentGeofences = [];
   }
 
+  //#region Lifecycle
+
   @override
   void initState() {
     super.initState();
@@ -44,18 +46,16 @@ class _GeofencingTabState extends State<GeofencingTab>
   }
 
   @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // When app returns to foreground, refresh permission state
     if (state == AppLifecycleState.resumed) {
       _checkLocationPermissions();
     }
   }
+
+  //#endregion
+
+  //#region Business Logic
 
   Future<void> _checkLocationPermissions() async {
     final alwaysStatus = await Permission.locationAlways.status;
@@ -195,6 +195,10 @@ class _GeofencingTabState extends State<GeofencingTab>
     }
   }
 
+  //#endregion
+
+  //#region View
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -316,5 +320,13 @@ class _GeofencingTabState extends State<GeofencingTab>
         ),
       ),
     );
+  }
+
+  //#endregion
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 }

@@ -17,7 +17,13 @@ class _EventsTabState extends State<EventsTab> {
 
   String _status = 'Track events here';
 
-  Future<void> _trackQuickEvent(String eventName) async {
+  //#region Business Logic
+
+  Future<void> _trackEvent({
+    String? eventName,
+    Map<String, dynamic>? properties,
+    bool clearFields = false,
+  }) async {
     if (!_klaviyo.isInitialized) {
       setState(() {
         _status =
@@ -26,36 +32,9 @@ class _EventsTabState extends State<EventsTab> {
       return;
     }
 
-    try {
-      await _klaviyo.trackEvent(
-        KlaviyoEvent(
-          name: eventName,
-          properties: {},
-          timestamp: DateTime.now(),
-        ),
-      );
-
-      setState(() {
-        _status = 'Event "$eventName" tracked successfully!';
-      });
-    } catch (e) {
-      setState(() {
-        _status = 'Failed to track event: $e';
-      });
-    }
-  }
-
-  Future<void> _trackEvent() async {
-    if (!_klaviyo.isInitialized) {
-      setState(() {
-        _status =
-            'SDK not initialized. Please initialize in Profile tab first.';
-      });
-      return;
-    }
-
-    final eventName = _eventNameController.text.trim();
-    if (eventName.isEmpty) {
+    // Get event name from parameter or text field
+    final name = eventName ?? _eventNameController.text.trim();
+    if (name.isEmpty) {
       setState(() {
         _status = 'Please enter an event name';
       });
@@ -63,25 +42,30 @@ class _EventsTabState extends State<EventsTab> {
     }
 
     try {
-      final properties = <String, dynamic>{};
-      if (_propertyKeyController.text.isNotEmpty &&
+      // Build properties from parameter or text fields
+      final eventProperties = properties ?? <String, dynamic>{};
+      if (properties == null &&
+          _propertyKeyController.text.isNotEmpty &&
           _propertyValueController.text.isNotEmpty) {
-        properties[_propertyKeyController.text] = _propertyValueController.text;
+        eventProperties[_propertyKeyController.text] =
+            _propertyValueController.text;
       }
 
       await _klaviyo.trackEvent(
         KlaviyoEvent(
-          name: eventName,
-          properties: properties,
+          name: name,
+          properties: eventProperties,
           timestamp: DateTime.now(),
         ),
       );
 
       setState(() {
-        _status = 'Event "$eventName" tracked successfully!';
-        _eventNameController.clear();
-        _propertyKeyController.clear();
-        _propertyValueController.clear();
+        _status = 'Event "$name" tracked successfully!';
+        if (clearFields) {
+          _eventNameController.clear();
+          _propertyKeyController.clear();
+          _propertyValueController.clear();
+        }
       });
     } catch (e) {
       setState(() {
@@ -89,6 +73,10 @@ class _EventsTabState extends State<EventsTab> {
       });
     }
   }
+
+  //#endregion
+
+  //#region View
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +137,7 @@ class _EventsTabState extends State<EventsTab> {
             const SizedBox(height: 20),
 
             ElevatedButton(
-              onPressed: _trackEvent,
+              onPressed: () => _trackEvent(clearFields: true),
               child: const Text('Track Event'),
             ),
             const SizedBox(height: 20),
@@ -162,35 +150,35 @@ class _EventsTabState extends State<EventsTab> {
             const SizedBox(height: 10),
 
             ElevatedButton.icon(
-              onPressed: () => _trackQuickEvent('Opened App'),
+              onPressed: () => _trackEvent(eventName: 'Opened App'),
               icon: const Icon(Icons.rocket_launch),
               label: const Text('Opened App'),
             ),
             const SizedBox(height: 8),
 
             ElevatedButton.icon(
-              onPressed: () => _trackQuickEvent('Viewed Product'),
+              onPressed: () => _trackEvent(eventName: 'Viewed Product'),
               icon: const Icon(Icons.remove_red_eye),
               label: const Text('Viewed Product'),
             ),
             const SizedBox(height: 8),
 
             ElevatedButton.icon(
-              onPressed: () => _trackQuickEvent('Added to Cart'),
+              onPressed: () => _trackEvent(eventName: 'Added to Cart'),
               icon: const Icon(Icons.add_shopping_cart),
               label: const Text('Added to Cart'),
             ),
             const SizedBox(height: 8),
 
             ElevatedButton.icon(
-              onPressed: () => _trackQuickEvent('Started Checkout'),
+              onPressed: () => _trackEvent(eventName: 'Started Checkout'),
               icon: const Icon(Icons.shopping_cart_checkout),
               label: const Text('Started Checkout'),
             ),
             const SizedBox(height: 8),
 
             ElevatedButton.icon(
-              onPressed: () => _trackQuickEvent('Test Event'),
+              onPressed: () => _trackEvent(eventName: 'Test Event'),
               icon: const Icon(Icons.science),
               label: const Text('Test Event'),
             ),
@@ -199,6 +187,8 @@ class _EventsTabState extends State<EventsTab> {
       ),
     );
   }
+
+  //#endregion
 
   @override
   void dispose() {

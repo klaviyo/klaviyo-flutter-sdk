@@ -19,6 +19,8 @@ class _PushTabState extends State<PushTab> {
   bool _notificationsEnabled = false;
   StreamSubscription<Map<String, dynamic>>? _pushNotificationSubscription;
 
+  //#region Lifecycle
+
   @override
   void initState() {
     super.initState();
@@ -26,6 +28,10 @@ class _PushTabState extends State<PushTab> {
     _getPushToken();
     _setupPushNotificationListener();
   }
+
+  //#endregion
+
+  //#region Business Logic
 
   void _setupPushNotificationListener() {
     if (!_klaviyo.isInitialized) return;
@@ -151,6 +157,10 @@ class _PushTabState extends State<PushTab> {
     });
   }
 
+  //#endregion
+
+  //#region View
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -251,6 +261,8 @@ class _PushTabState extends State<PushTab> {
       ),
     );
   }
+
+  //#endregion
 
   @override
   void dispose() {

@@ -26,6 +26,8 @@ class _FormsTabState extends State<FormsTab> {
     _isRegistered = false;
   }
 
+  //#region Lifecycle
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +36,10 @@ class _FormsTabState extends State<FormsTab> {
       _status = 'In-app forms are registered';
     }
   }
+
+  //#endregion
+
+  //#region Business Logic
 
   Future<void> _registerForForms() async {
     if (!_klaviyo.isInitialized) {
@@ -107,11 +113,9 @@ class _FormsTabState extends State<FormsTab> {
     }
   }
 
-  @override
-  void dispose() {
-    _durationController.dispose();
-    super.dispose();
-  }
+  //#endregion
+
+  //#region View
 
   @override
   Widget build(BuildContext context) {
@@ -182,5 +186,13 @@ class _FormsTabState extends State<FormsTab> {
         ),
       ),
     );
+  }
+
+  //#endregion
+
+  @override
+  void dispose() {
+    _durationController.dispose();
+    super.dispose();
   }
 }

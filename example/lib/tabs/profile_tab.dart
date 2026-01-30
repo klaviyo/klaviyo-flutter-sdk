@@ -27,6 +27,8 @@ class _ProfileTabState extends State<ProfileTab> {
 
   static const String _apiKeyPrefsKey = 'klaviyo_api_key';
 
+  //#region Lifecycle
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +58,10 @@ class _ProfileTabState extends State<ProfileTab> {
       print('Failed to load saved API key: $e');
     }
   }
+
+  //#endregion
+
+  //#region Business Logic
 
   Future<void> _initializeSDK() async {
     final apiKey = _apiKeyController.text.trim();
@@ -232,6 +238,10 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
+  //#endregion
+
+  //#region View
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -368,6 +378,8 @@ class _ProfileTabState extends State<ProfileTab> {
       ),
     );
   }
+
+  //#endregion
 
   @override
   void dispose() {
