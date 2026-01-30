@@ -125,6 +125,7 @@ class _PushTabState extends State<PushTab> {
 
     try {
       _klaviyo.setBadgeCount(count);
+      _badgeCountController.clear();
       setState(() {
         _status = 'Badge count set to $count (iOS only)';
       });
@@ -133,6 +134,21 @@ class _PushTabState extends State<PushTab> {
         _status = 'Failed to set badge count: $e';
       });
     }
+  }
+
+  void _clearBadge() {
+    if (!_klaviyo.isInitialized) {
+      setState(() {
+        _status = 'SDK not initialized.';
+      });
+      return;
+    }
+
+    _klaviyo.setBadgeCount(0);
+    _badgeCountController.clear();
+    setState(() {
+      _status = 'Badge cleared (set to 0)';
+    });
   }
 
   @override
@@ -216,6 +232,15 @@ class _PushTabState extends State<PushTab> {
                   ElevatedButton(
                     onPressed: _setBadgeCount,
                     child: const Text('Set'),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _clearBadge,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Clear'),
                   ),
                 ],
               ),

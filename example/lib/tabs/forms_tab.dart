@@ -10,6 +10,7 @@ class FormsTab extends StatefulWidget {
 
 class _FormsTabState extends State<FormsTab> {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
+  final TextEditingController _durationController = TextEditingController();
   String _status = 'Manage in-app forms here';
   bool _isRegistered = false;
 
@@ -23,16 +24,45 @@ class _FormsTabState extends State<FormsTab> {
     }
 
     try {
-      await _klaviyo.registerForInAppForms();
+      final text = _durationController.text.trim();
+
+      final InAppFormConfig? config = switch (text) {
+        '' => null, // default 1hr
+        '-1' => const InAppFormConfig.infinite(),
+        _ => _parseFiniteConfig(text),
+      };
+
+      if (config == null && text.isNotEmpty) {
+        setState(() {
+          _status = 'Invalid duration value. Please enter a number.';
+        });
+        return;
+      }
+
+      await _klaviyo.registerForInAppForms(configuration: config);
+
       setState(() {
         _isRegistered = true;
-        _status = 'Registered for in-app forms successfully!';
+        _status = config == null
+            ? 'Registered for in-app forms (1 hour timeout)'
+            : config.isInfinite
+                ? 'Registered for in-app forms (infinite timeout)'
+                : 'Registered for in-app forms (${config.sessionTimeoutDuration!.inSeconds}s timeout)';
       });
     } catch (e) {
       setState(() {
         _status = 'Failed to register for forms: $e';
       });
     }
+  }
+
+  InAppFormConfig? _parseFiniteConfig(String text) {
+    final seconds = int.tryParse(text);
+    if (seconds == null || seconds < 0) return null;
+
+    return InAppFormConfig(
+      sessionTimeoutDuration: Duration(seconds: seconds),
+    );
   }
 
   Future<void> _unregisterFromForms() async {
@@ -54,6 +84,12 @@ class _FormsTabState extends State<FormsTab> {
         _status = 'Failed to unregister from forms: $e';
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _durationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -88,6 +124,19 @@ class _FormsTabState extends State<FormsTab> {
             const SizedBox(height: 20),
 
             if (!_isRegistered) ...[
+              TextField(
+                controller: _durationController,
+                decoration: const InputDecoration(
+                  labelText: 'Session Timeout (seconds)',
+                  hintText: 'Leave empty for default (3600s)',
+                  border: OutlineInputBorder(),
+                  helperText:
+                      'Enter -1 for infinite timeout, or number of seconds',
+                ),
+                keyboardType:
+                    const TextInputType.numberWithOptions(signed: true),
+              ),
+              const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: _registerForForms,
                 child: const Text('Register for In-App Forms'),
