@@ -3,57 +3,55 @@ disabled_rules: # rule identifiers turned on by default to exclude from running
   - colon
   - comma
   - control_statement
-  - line_length # SDK ONLY
   - cyclomatic_complexity # SDK ONLY
   - function_body_length # SDK ONLY
-opt_in_rules: # some rules are turned off by default, so you need to opt-in
-  - empty_count # Find all the available rules by running: `swiftlint rules`
 
-# Alternatively, specify all rules explicitly by uncommenting this option:
-# only_rules: # delete `disabled_rules` & `opt_in_rules` if using this
-#   - empty_parameters
-#   - vertical_whitespace
+opt_in_rules: # some rules are turned off by default, so you need to opt-in
+  - empty_count
 
 included: # paths to include during linting. `--path` is ignored if present.
   - Classes
 excluded: # paths to ignore during linting. Takes precedence over `included`.
   - Pods
+
 analyzer_rules: # Rules run by `swiftlint analyze` (experimental)
   - explicit_self
 
-# configurable rules can be customized from this configuration file
-# binary rules can set their severity level
-force_cast: warning # implicitly
-force_try:
-  severity: warning # explicitly
-# rules that have both warning and error levels, can set just the warning level
-# implicitly
+# --- Rule Configurations ---
+
+todo: warning
+
 line_length: 110
-# they can set both implicitly with an array
+
+force_cast: warning
+force_try: warning
+
 type_body_length:
   - 300 # warning
   - 400 # error
-# or they can set both explicitly
+
 file_length:
   warning: 500
   error: 1200
-# naming rules can set warnings/errors for min_length and max_length
-# additionally they can set excluded names
+
 type_name:
   min_length: 4 # only warning
   max_length: # warning and error
     warning: 40
     error: 50
-  excluded: iPhone # excluded via string
-  allowed_symbols: ["_"] # these are allowed in type names
+  excluded: iPhone
+  allowed_symbols: ["_"]
+
 identifier_name:
-  min_length: # only min_length
-    error: 4 # only error
-  excluded: # excluded via string array
+  min_length:
+    error: 4
+  excluded:
     - id
     - URL
     - GlobalAPIKey
-reporter: "xcode" # reporter type (xcode, json, csv, checkstyle, codeclimate, junit, html, emoji, sonarqube, markdown, github-actions-logging)
+
+reporter: "xcode"
+
 trailing_whitespace:
   severity: warning
   ignores_empty_lines: true
