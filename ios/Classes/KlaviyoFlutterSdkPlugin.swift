@@ -14,13 +14,11 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificatio
     
     private var eventSink: FlutterEventSink?
     
-    /// Cache for the token event to handle the race condition where the token arrives
-    /// before Flutter has finished initializing the EventChannel.
+    // Cache values to handle the race condition where the value arrives
+    // before Flutter has finished initializing the EventChannel.
     private var cachedToken: [String: Any]?
-
-    /// Cache for the error event to handle the race condition where registration fails
-    /// before Flutter has finished initializing the EventChannel.
     private var cachedError: [String: Any]?
+    private var cachedOpenedNotification: [String: Any]?
     
     // MARK: - Flutter Plugin Registration
     
@@ -296,13 +294,19 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
     ) -> FlutterError? {
         self.eventSink = events
         
-        // If we have a cached token or error from early app launch, send it now.
-        // This solves the race condition where token/error arrives before Flutter is ready.
+        // If we have cached values from early app launch, send them now.
+        // This solves the race condition where values arrive before Flutter is ready.
         if let cachedToken = cachedToken {
             events(cachedToken)
+            self.cachedToken = nil
         }
         if let cachedError = cachedError {
             events(cachedError)
+            self.cachedError = nil
+        }
+        if let cachedOpenedNotification = cachedOpenedNotification {
+            events(cachedOpenedNotification)
+            self.cachedOpenedNotification = nil
         }
         return nil
     }
@@ -347,43 +351,42 @@ extension KlaviyoFlutterSdkPlugin {
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         print("❌ Failed to register for remote notifications: \(error)")
-
+        
         // Create error payload
         let errorData: [String: Any] = [
             "type": "push_token_error",
             "data": ["error": error.localizedDescription]
         ]
-
+        
         // Cache it for late subscribers
         self.cachedError = errorData
-
+        
         // Notify Flutter side via event sink
         eventSink?(errorData)
     }
     
-    // Manual Forwarding Helper - "Open" Event
-    // This should be called from the Host App's AppDelegate in `didReceive response`.
-    public func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping () -> Void
-    ) {
+    public func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
         print("📱 Push notification opened: \(userInfo)")
         
-        // Notify Flutter
-        eventSink?([
+        // 1. Prepare Payload
+        let eventPayload: [String: Any] = [
             "type": "push_notification_opened",
             "data": userInfo
-        ])
+        ]
         
-        // Pass to Klaviyo Native SDK for tracking
-        let handled = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
-        
-        // If Klaviyo didn't handle the completion, we assume the host app will.
-        if !handled {
-            completionHandler()
+        // 2. Send to Flutter (or Cache if Flutter is asleep)
+        if let eventSink = eventSink {
+            eventSink(eventPayload)
+        } else {
+            print("⚠️ [Plugin] Flutter not ready. Caching notification open event.")
+            self.cachedOpenedNotification = eventPayload
         }
+        
+        // 3. Pass to Native Klaviyo SDK
+        // We pass a dummy completion handler because the Host App owns the real one.
+        // No-op: We let the host app finish the system callback
+        _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
     }
 }
 

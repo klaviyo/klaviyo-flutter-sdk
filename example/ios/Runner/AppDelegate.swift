@@ -28,16 +28,10 @@ import UIKit
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let controller = window?.rootViewController as! FlutterViewController
-        let channel = FlutterMethodChannel(name: "klaviyo_events", binaryMessenger: controller.binaryMessenger)
-        channel.invokeMethod("push_notification_opened", arguments: response.notification.request.content.userInfo)
+        // 1. Tell the SDK to track the open
+        KlaviyoFlutterSdkPlugin.shared.handleNotificationResponse(response)
+
+        // 2. Complete the system callback
         completionHandler()
-        
-        // Forward to Klaviyo for tracking
-        KlaviyoFlutterSdkPlugin.shared.userNotificationCenter(
-            center,
-            didReceive: response,
-            withCompletionHandler: completionHandler
-        )
     }
 }

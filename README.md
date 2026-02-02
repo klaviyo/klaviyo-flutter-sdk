@@ -122,13 +122,12 @@ import klaviyo_flutter_sdk // <--- Add this import
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         // Forward the "Open" event to the Klaviyo SDK
-        KlaviyoFlutterSdkPlugin.shared.userNotificationCenter(
-            center,
-            didReceive: response,
-            withCompletionHandler: completionHandler
-        )
+        KlaviyoFlutterSdkPlugin.shared.handleNotificationResponse(response)
 
         // ... Your custom logic (if any) ...
+
+        // Complete the system callback
+        completionHandler()
     }
 }
 ```
