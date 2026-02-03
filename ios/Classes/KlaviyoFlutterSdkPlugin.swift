@@ -222,7 +222,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             
         case "showForm":
-            // FIXME: [CHNL-29888] implement IAF support
+            // TODO: [CHNL-29888] implement IAF support
             let error = FlutterError(
                 code: "NOT_SUPPORTED",
                 message: "Direct showForm is not supported in v5.0.0; forms are shown automatically.",
@@ -231,7 +231,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             result(error)
             
         case "hideForm":
-            // FIXME: [CHNL-29888] implement IAF support
+            // TODO: [CHNL-29888] implement IAF support
             let error = FlutterError(
                 code: "NOT_SUPPORTED",
                 message: "Direct hideForm is not supported in v5.0.0; forms are hidden automatically.",
