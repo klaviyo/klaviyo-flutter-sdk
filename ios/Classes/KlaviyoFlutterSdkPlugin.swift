@@ -5,7 +5,7 @@ import KlaviyoSwift
 import UIKit
 import UserNotifications
 
-public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificationCenterDelegate {
+public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     // MARK: - Properties
     
     /// Singleton instance to allow the Host App's AppDelegate to forward events manually.
