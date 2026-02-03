@@ -6,7 +6,6 @@ import UIKit
 import UserNotifications
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin, UNUserNotificationCenterDelegate {
-    
     // MARK: - Properties
     
     /// Singleton instance to allow the Host App's AppDelegate to forward events manually.
@@ -292,7 +291,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         withArguments arguments: Any?,
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
-        self.eventSink = events
+        eventSink = events
         
         // If we have cached values from early app launch, send them now.
         // This solves the race condition where values arrive before Flutter is ready.
@@ -320,10 +319,10 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
 // MARK: - AppDelegate Lifecycle & Notification Forwarding
 
 extension KlaviyoFlutterSdkPlugin {
-    
-    // Automatic Token Interception
-    // This is called automatically by Flutter because we used `registrar.addApplicationDelegate`.
-    @objc public func application(
+    /// Automatic Token Interception
+    /// This is called automatically by Flutter because we used `registrar.addApplicationDelegate`.
+    @objc
+    public func application(
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
@@ -339,14 +338,17 @@ extension KlaviyoFlutterSdkPlugin {
             "data": ["token": tokenString]
         ]
         
-        // Cache it for late subscribers
-        self.cachedToken = eventData
-        
-        // Notify Flutter side via event sink
-        eventSink?(eventData)
+        // Send to Flutter (or cache if Flutter is not ready)
+        if let eventSink {
+            eventSink(eventData)
+        } else {
+            print("⚠️ [Plugin] Flutter not ready. Caching push token event.")
+            cachedToken = eventData
+        }
     }
     
-    @objc public func application(
+    @objc
+    public func application(
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
@@ -358,11 +360,13 @@ extension KlaviyoFlutterSdkPlugin {
             "data": ["error": error.localizedDescription]
         ]
         
-        // Cache it for late subscribers
-        self.cachedError = errorData
-        
-        // Notify Flutter side via event sink
-        eventSink?(errorData)
+        // Send to Flutter (or cache if Flutter is not ready)
+        if let eventSink {
+            eventSink(errorData)
+        } else {
+            print("⚠️ [Plugin] Flutter not ready. Caching push token error event.")
+            cachedError = errorData
+        }
     }
     
     public func handleNotificationResponse(_ response: UNNotificationResponse) {
@@ -380,7 +384,7 @@ extension KlaviyoFlutterSdkPlugin {
             eventSink(eventPayload)
         } else {
             print("⚠️ [Plugin] Flutter not ready. Caching notification open event.")
-            self.cachedOpenedNotification = eventPayload
+            cachedOpenedNotification = eventPayload
         }
         
         // 3. Pass to Native Klaviyo SDK
