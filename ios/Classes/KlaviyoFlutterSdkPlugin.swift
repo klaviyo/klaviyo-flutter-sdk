@@ -255,29 +255,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             KlaviyoSDK().setBadgeCount(count)
             result(nil)
-            
-        case "onPushTokenReceived":
-            // Called from AppDelegate when a push token is received
-            guard let args = call.arguments as? [String: Any],
-                  let token = args["token"] as? String
-            else {
-                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid token data", details: nil))
-                return
-            }
-            print("✅ Push token stored in plugin: \(token)")
-            result(nil)
-            
-        case "onPushTokenError":
-            // Called from AppDelegate when push token registration fails
-            guard let args = call.arguments as? [String: Any],
-                  let error = args["error"] as? String
-            else {
-                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid error data", details: nil))
-                return
-            }
-            print("❌ Push token error received in plugin: \(error)")
-            result(nil)
-            
+
         default:
             result(FlutterMethodNotImplemented)
         }
