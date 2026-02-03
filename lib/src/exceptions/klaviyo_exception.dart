@@ -43,9 +43,7 @@ class KlaviyoNetworkException extends KlaviyoException {
     this.responseBody,
     super.originalError,
     super.stackTrace,
-  }) : super(
-          code: 'NETWORK_ERROR',
-        );
+  }) : super(code: 'NETWORK_ERROR');
 
   @override
   String toString() {

@@ -4,7 +4,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 void main() {
   group('KlaviyoProfile', () {
     test('creates profile with basic properties', () {
-      final profile = KlaviyoProfile(
+      final profile = const KlaviyoProfile(
         email: 'test@example.com',
         firstName: 'John',
         lastName: 'Doe',
@@ -16,7 +16,7 @@ void main() {
     });
 
     test('toJson converts profile to map', () {
-      final profile = KlaviyoProfile(
+      final profile = const KlaviyoProfile(
         email: 'test@example.com',
         firstName: 'John',
         phoneNumber: '+1234567890',
@@ -44,15 +44,12 @@ void main() {
     });
 
     test('copyWith creates new profile with updated values', () {
-      final original = KlaviyoProfile(
+      final original = const KlaviyoProfile(
         email: 'test@example.com',
         firstName: 'John',
       );
 
-      final updated = original.copyWith(
-        firstName: 'Jane',
-        lastName: 'Doe',
-      );
+      final updated = original.copyWith(firstName: 'Jane', lastName: 'Doe');
 
       expect(updated.email, 'test@example.com');
       expect(updated.firstName, 'Jane');
@@ -61,12 +58,9 @@ void main() {
     });
 
     test('toJson includes custom properties', () {
-      final profile = KlaviyoProfile(
+      final profile = const KlaviyoProfile(
         email: 'test@example.com',
-        properties: {
-          'custom_field': 'custom_value',
-          'age': 25,
-        },
+        properties: {'custom_field': 'custom_value', 'age': 25},
       );
 
       final json = profile.toJson();

@@ -291,9 +291,7 @@ class KlaviyoNativeWrapper {
 
     // Fire-and-forget - we don't await or handle errors
     // since this is a synchronous operation from the caller's perspective
-    _channel.invokeMethod('setBadgeCount', {
-      'count': count,
-    });
+    _channel.invokeMethod('setBadgeCount', {'count': count});
   }
 
   /// Handle native events from platform channels
@@ -330,10 +328,9 @@ class KlaviyoNativeWrapper {
     );
 
     if (value is Map) {
-      return value.map((key, val) => MapEntry(
-        key.toString(),
-        _deepConvertValue(val),
-      ));
+      return value.map(
+        (key, val) => MapEntry(key.toString(), _deepConvertValue(val)),
+      );
     }
     return <String, dynamic>{};
   }
