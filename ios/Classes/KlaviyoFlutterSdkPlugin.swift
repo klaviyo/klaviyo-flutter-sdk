@@ -47,7 +47,12 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             guard let args = call.arguments as? [String: Any],
                   let apiKey = args["apiKey"] as? String
             else {
-                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments for initialize", details: nil))
+                let error = FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Invalid arguments for initialize",
+                    details: nil
+                )
+                result(error)
                 return
             }
             KlaviyoSDK().initialize(with: apiKey)
@@ -250,7 +255,12 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             guard let args = call.arguments as? [String: Any],
                   let count = args["count"] as? Int
             else {
-                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid badge count argument", details: nil))
+                let error = FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Invalid badge count argument",
+                    details: nil
+                )
+                result(error)
                 return
             }
             KlaviyoSDK().setBadgeCount(count)
