@@ -173,16 +173,24 @@ class KlaviyoSDK {
   }
 
   /// Register for push notifications
-  /// This is only required on iOS to trigger APNs registration.
-  /// On Android, FCM handles registration automatically via KlaviyoPushService.
+  ///
+  /// This method triggers push notification registration on both platforms:
+  /// - **iOS**: Triggers APNs registration. The token is automatically captured
+  ///   and forwarded to the Klaviyo SDK.
+  /// - **Android**: Fetches the FCM token and registers it with the Klaviyo SDK.
+  ///
+  /// After calling this method, you can listen for the token via [onPushNotification]:
+  /// ```dart
+  /// klaviyo.onPushNotification.listen((event) {
+  ///   if (event['type'] == 'push_token_received') {
+  ///     final token = event['data']['token'];
+  ///     print('Token received: $token');
+  ///   }
+  /// });
+  /// ```
   Future<void> registerForPushNotifications() async {
     _ensureInitialized();
-
-    // Only call native method on iOS
-    if (Platform.isIOS) {
-      await _nativeWrapper.registerForPushNotifications();
-    }
-    // No-op on Android - FCM handles this automatically
+    await _nativeWrapper.registerForPushNotifications();
   }
 
   /// Set push token

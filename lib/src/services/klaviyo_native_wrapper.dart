@@ -160,8 +160,12 @@ class KlaviyoNativeWrapper {
   }
 
   /// Register for push notifications using native SDK
-  /// This should only be called on iOS to trigger APNs registration.
-  /// Callers should check platform before calling this method.
+  ///
+  /// On iOS, this triggers APNs registration.
+  /// On Android, this fetches the FCM token and registers it with Klaviyo.
+  ///
+  /// Both platforms emit the token via the event channel as a
+  /// `push_token_received` event.
   Future<void> registerForPushNotifications() async {
     _ensureInitialized();
 

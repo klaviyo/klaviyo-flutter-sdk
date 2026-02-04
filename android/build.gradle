@@ -54,4 +54,5 @@ dependencies {
     api "com.github.klaviyo.klaviyo-android-sdk:push-fcm:feat~flutter-support-SNAPSHOT"
     api "com.github.klaviyo.klaviyo-android-sdk:forms:feat~flutter-support-SNAPSHOT"
     api "com.github.klaviyo.klaviyo-android-sdk:location:feat~flutter-support-SNAPSHOT"
+    implementation "com.google.firebase:firebase-messaging:24.1.0"
 }

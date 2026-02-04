@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.NonNull
+import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.model.Event
 import com.klaviyo.analytics.model.EventKey
@@ -222,12 +223,65 @@ class KlaviyoFlutterSdkPlugin :
                 val token = Klaviyo.getPushToken()
 
                 if (token != null) {
-                    Registry.log.verbose("Retrieved push token from SDK: $token...")
+                    Registry.log.verbose("Retrieved push token from SDK: $token")
                 } else {
                     Registry.log.verbose("No push token available")
                 }
 
                 result.success(token)
+            }
+
+            "registerForPushNotifications" -> {
+                // Fetch the FCM token and register it with Klaviyo
+                // This provides parity with iOS's registerForPushNotifications
+                try {
+                    FirebaseMessaging
+                        .getInstance()
+                        .token
+                        .addOnSuccessListener { token ->
+                            Registry.log.verbose("FCM token received: $token")
+
+                            // Set the token in Klaviyo SDK
+                            Klaviyo.setPushToken(token)
+
+                            // Emit the token via EventChannel (matching iOS behavior)
+                            if (::eventSink.isInitialized) {
+                                eventSink.success(
+                                    mapOf(
+                                        "type" to "push_token_received",
+                                        "data" to mapOf("token" to token),
+                                    ),
+                                )
+                            }
+
+                            result.success(null)
+                        }.addOnFailureListener { exception ->
+                            Registry.log.error("Failed to get FCM token: ${exception.message}", exception)
+
+                            // Emit error via EventChannel (matching iOS behavior)
+                            if (::eventSink.isInitialized) {
+                                eventSink.success(
+                                    mapOf(
+                                        "type" to "push_token_error",
+                                        "data" to mapOf("error" to (exception.message ?: "Unknown error")),
+                                    ),
+                                )
+                            }
+
+                            result.error(
+                                "FCM_TOKEN_ERROR",
+                                "Failed to get FCM token",
+                                exception.message,
+                            )
+                        }
+                } catch (e: Exception) {
+                    Registry.log.error("Error registering for push notifications: ${e.message}", e)
+                    result.error(
+                        "PUSH_REGISTRATION_ERROR",
+                        "Failed to register for push notifications",
+                        e.message,
+                    )
+                }
             }
 
             "registerForInAppForms" -> {
