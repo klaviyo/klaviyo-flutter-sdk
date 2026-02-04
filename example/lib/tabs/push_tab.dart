@@ -36,14 +36,36 @@ class _PushTabState extends State<PushTab> {
   void _setupPushNotificationListener() {
     if (!_klaviyo.isInitialized) return;
 
-    // Listen for push notification open events
+    // Listen for push notification events (token received, opened, errors)
     _pushNotificationSubscription = _klaviyo.onPushNotification.listen((event) {
       final eventType = event['type'] as String?;
-      if (eventType == 'push_notification_opened') {
-        final data = event['data'] as Map<String, dynamic>?;
-        setState(() {
-          _status = 'Push notification opened: ${data?['title'] ?? 'Unknown'}';
-        });
+
+      switch (eventType) {
+        case 'push_token_received':
+          // Update token from stream (reactive approach)
+          final data = event['data'] as Map<String, dynamic>?;
+          final token = data?['token'] as String?;
+          setState(() {
+            _pushToken = token;
+            _status = 'Push token received';
+          });
+          break;
+
+        case 'push_token_error':
+          final data = event['data'] as Map<String, dynamic>?;
+          final error = data?['error'] as String? ?? 'Unknown error';
+          setState(() {
+            _status = 'Push token error: $error';
+          });
+          break;
+
+        case 'push_notification_opened':
+          final data = event['data'] as Map<String, dynamic>?;
+          setState(() {
+            _status =
+                'Push notification opened: ${data?['title'] ?? 'Unknown'}';
+          });
+          break;
       }
     });
   }
@@ -91,17 +113,15 @@ class _PushTabState extends State<PushTab> {
       }
 
       // Register for push notifications after permission is granted
+      // The token will arrive via onPushNotification stream
       await _klaviyo.registerForPushNotifications();
 
       // Update permission state
       await _checkPermissions();
 
-      // Get the token after registration
-      await _getPushToken();
-
       setState(() {
         if (_notificationsEnabled) {
-          _status = 'Push notifications registered';
+          _status = 'Registering for push notifications...';
         } else {
           _status = 'Push notification permission denied';
         }

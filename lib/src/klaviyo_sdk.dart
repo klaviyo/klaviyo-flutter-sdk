@@ -198,6 +198,10 @@ class KlaviyoSDK {
   }
 
   /// Get push token
+  ///
+  /// Note: On iOS, the token may not be immediately available after calling
+  /// [registerForPushNotifications]. For immediate access to the token,
+  /// listen to [onPushNotification] for `push_token_received` events instead.
   Future<String?> getPushToken() async {
     _ensureInitialized();
     return await _nativeWrapper.getPushToken();
