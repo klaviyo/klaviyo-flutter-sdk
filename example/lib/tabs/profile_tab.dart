@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import '../main.dart' show setupSilentPushListener;
 import 'forms_tab.dart';
 import 'geofencing_tab.dart';
 
@@ -96,6 +97,9 @@ class _ProfileTabState extends State<ProfileTab> {
           print('Failed to register FCM token: $e');
         }
       }
+
+      // Set up silent push listener now that SDK is initialized
+      setupSilentPushListener();
 
       setState(() {
         _isInitialized = true;
