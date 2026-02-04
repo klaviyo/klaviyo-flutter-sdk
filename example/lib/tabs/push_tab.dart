@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -218,12 +219,23 @@ class _PushTabState extends State<PushTab> {
 
             if (_pushToken != null) ...[
               const Text(
-                'Push Token:',
+                'Push Token (tap to copy):',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              SelectableText(
-                _pushToken!,
-                style: const TextStyle(fontSize: 10),
+              InkWell(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: _pushToken!));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Push token copied to clipboard'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                child: Text(
+                  _pushToken!,
+                  style: const TextStyle(fontSize: 10),
+                ),
               ),
               const SizedBox(height: 10),
             ],
