@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
@@ -62,6 +63,10 @@ Future<void> _setupFCM() async {
   }
 }
 
+/// Subscription for silent push notifications.
+/// Tracked to prevent duplicate subscriptions on SDK re-initialization.
+StreamSubscription<Map<String, dynamic>>? _silentPushSubscription;
+
 /// Set up listener for silent push notifications.
 /// Called from ProfileTab after SDK initialization.
 void setupSilentPushListener() {
@@ -71,7 +76,10 @@ void setupSilentPushListener() {
     return;
   }
 
-  klaviyo.onPushNotification.listen((eventData) {
+  // Cancel any existing subscription to prevent duplicates
+  _silentPushSubscription?.cancel();
+
+  _silentPushSubscription = klaviyo.onPushNotification.listen((eventData) {
     final eventType = eventData['type'] as String? ?? '';
 
     if (eventType == 'silent_push_received') {
