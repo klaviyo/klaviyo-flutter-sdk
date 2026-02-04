@@ -249,10 +249,6 @@ If you're not using Firebase, use the SDK's built-in registration:
 // Android: No-op (requires FCM setup)
 await klaviyo.registerForPushNotifications();
 
-// Get the current push token (if needed)
-final token = await klaviyo.getPushToken();
-print('Push token: $token');
-
 // Or listen for the token event
 klaviyo.onPushNotification.listen((event) {
   if (event['type'] == 'push_token_received') {
