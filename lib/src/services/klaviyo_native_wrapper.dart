@@ -337,6 +337,21 @@ class KlaviyoNativeWrapper {
     _channel.invokeMethod('setBadgeCount', {'count': count});
   }
 
+  /// Handle a Klaviyo universal tracking link URL
+  /// Returns true if the URL is a valid Klaviyo tracking link, false otherwise
+  void handleUniversalTrackingLink(String url) async {
+    _ensureInitialized();
+
+    try {
+      await _channel.invokeMethod<bool>(
+        'handleUniversalTrackingLink',
+        {'url': url},
+      );
+    } catch (e) {
+      throw KlaviyoException('Failed to handle universal tracking link: $e');
+    }
+  }
+
   /// Handle native events from platform channels
   void _handleNativeEvent(dynamic event) {
     try {

@@ -10,11 +10,40 @@ class AppDelegate: FlutterAppDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
-        
+
         GeneratedPluginRegistrant.register(with: self)
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
-    
+
+    // Handle custom URL scheme deep links (e.g., com.klaviyo.flutterexample://push)
+    override func application(
+    _ application: UIApplication,
+    open deepLink: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+    ) -> Bool {
+        // Let Flutter handle the navigation via go_router
+        super.application(application, open: deepLink, options: options)
+    }
+
+    // Handle universal links (e.g., https://yourdomain.com/path)
+    override func application(
+    _ application: UIApplication,
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+    ) -> Bool {
+        // Let Flutter handle navigation via go_router
+        // Flutter's redirect handler will call handleUniversalTrackingLink if needed
+        // IMPORTANT: Call super first to let Flutter receive the URL
+        _ = super.application(
+            application,
+            continue: userActivity,
+            restorationHandler: restorationHandler
+        )
+
+        // Return true to indicate we handled it (prevents SDK from falling back to UIApplication.open)
+        return true
+    }
+
     override func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -23,7 +52,7 @@ class AppDelegate: FlutterAppDelegate {
         // Show banner, sound, badge even in foreground
         completionHandler([.banner, .sound, .badge])
     }
-    
+
     override func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,

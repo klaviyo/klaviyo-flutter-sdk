@@ -306,6 +306,61 @@ class KlaviyoSDK {
     return await _nativeWrapper.getCurrentGeofences();
   }
 
+  // ============================================================================
+  // Deep Linking
+  // ============================================================================
+
+  /// Handle a Klaviyo universal tracking link
+  ///
+  /// Checks if the provided URL is a Klaviyo tracking link (format: `https://domain/u/...`).
+  /// If it is, the native SDK will track the click event and resolve the destination URL.
+  /// Our native SDK will then broadcast the deeplink to Flutter for navigation
+  ///
+  /// **Integration Pattern:**
+  /// ```dart
+  /// // Using go_router
+  /// final router = GoRouter(
+  ///   routes: [...],
+  ///   redirect: (context, state) {
+  ///     // Fire-and-forget - Klaviyo tracks in background
+  ///     Klaviyo.handleUniversalTrackingLink(state.uri.toString());
+  ///     return null; // Continue with normal navigation
+  ///   },
+  /// );
+  /// ```
+  ///
+  /// Returns `true` if the URL is a Klaviyo tracking link, `false` otherwise.
+  /// Note: This is an async method but can be called without awaiting in go_router's redirect.
+  Future<bool> handleUniversalTrackingLink(String url) async {
+    _ensureInitialized();
+
+    // Validate empty/null URL
+    if (url.trim().isEmpty) {
+      _logger.error('[DeepLink SDK] Error: Empty tracking link provided');
+      return false;
+    }
+
+    // Validate that the URL is a Klaviyo universal tracking link using regex
+    // Pattern: https://domain/u/path
+    final klaviyoTrackingLinkPattern = RegExp(r'^https:\/\/[^/]+\/u\/.*$');
+
+    if (!klaviyoTrackingLinkPattern.hasMatch(url)) {
+      _logger.warning(
+        '[DeepLink SDK] URL does not match Klaviyo tracking link pattern, returning false',
+      );
+      return false;
+    }
+
+    try {
+      _nativeWrapper.handleUniversalTrackingLink(url);
+      _logger.info('Link $url sent to native layer');
+      return true;
+    } catch (e) {
+      _logger.error('Failed to handle universal tracking link $url: $e');
+      return false;
+    }
+  }
+
   /// Reset the current profile (useful for logout)
   /// Profile state is managed by the native SDK
   Future<void> resetProfile() async {

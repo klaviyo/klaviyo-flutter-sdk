@@ -7,41 +7,41 @@ import UserNotifications
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     // MARK: - Properties
-    
+
     /// Singleton instance to allow the Host App's AppDelegate to forward events manually.
     public static let shared = KlaviyoFlutterSdkPlugin()
-    
+
     private var eventSink: FlutterEventSink?
-    
+
     // Cache values to handle the race condition where the value arrives
     // before Flutter has finished initializing the EventChannel.
     private var cachedToken: [String: Any]?
     private var cachedError: [String: Any]?
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
-    
+
     // MARK: - Flutter Plugin Registration
-    
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         // Use the SHARED instance to ensure the AppDelegate accesses the same object
         let instance = KlaviyoFlutterSdkPlugin.shared
-        
+
         // 1. Setup Method Channel (For Commands: initialize, setProfile, etc.)
         let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: registrar.messenger())
         registrar.addMethodCallDelegate(instance, channel: channel)
-        
+
         // 2. Setup Event Channel (For Data Streams: tokens, opened notifications)
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
         eventChannel.setStreamHandler(instance)
-        
+
         // 3. Register as Application Delegate
         // This allows us to automatically intercept 'didRegisterForRemoteNotifications'
         // without requiring code in the Host App's AppDelegate.
         registrar.addApplicationDelegate(instance)
     }
-    
+
     // MARK: - Method Channel Handling
-    
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "initialize":
@@ -58,7 +58,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             KlaviyoSDK().initialize(with: apiKey)
             result(nil)
-            
+
         case "setProfile":
             guard let args = call.arguments as? [String: Any],
                   let profileData = args["profile"] as? [String: Any]
@@ -80,7 +80,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             )
             KlaviyoSDK().set(profile: profile)
             result(nil)
-            
+
         case "setEmail":
             guard let args = call.arguments as? [String: Any],
                   let email = args["email"] as? String
@@ -90,7 +90,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             KlaviyoSDK().set(email: email)
             result(nil)
-            
+
         case "setPhoneNumber":
             guard let args = call.arguments as? [String: Any],
                   let phoneNumber = args["phoneNumber"] as? String
@@ -100,7 +100,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             KlaviyoSDK().set(phoneNumber: phoneNumber)
             result(nil)
-            
+
         case "setExternalId":
             guard let args = call.arguments as? [String: Any],
                   let externalId = args["externalId"] as? String
@@ -130,14 +130,14 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid properties", details: nil))
                 return
             }
-            
+
             // swiftlint:disable:next identifier_name
             for (key, value) in properties {
                 let profileKey = Profile.ProfileKey.from(key)
                 KlaviyoSDK().set(profileAttribute: profileKey, value: value)
             }
             result(nil)
-            
+
         case "trackEvent":
             guard let args = call.arguments as? [String: Any],
                   let eventData = args["event"] as? [String: Any],
@@ -155,14 +155,14 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             )
             KlaviyoSDK().create(event: event)
             result(nil)
-            
+
         case "registerForPushNotifications":
             // iOS requires manual APNs registration trigger
             DispatchQueue.main.async {
                 UIApplication.shared.registerForRemoteNotifications()
             }
             result(nil)
-            
+
         case "setPushToken":
             guard let args = call.arguments as? [String: Any],
                   let token = args["token"] as? String
@@ -170,7 +170,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid push token", details: nil))
                 return
             }
-            
+
             guard !token.isEmpty else {
                 print("⚠️ Attempted to set empty push token")
                 result(FlutterError(
@@ -180,7 +180,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 ))
                 return
             }
-            
+
             if let tokenData = Data(hexString: token) {
                 KlaviyoSDK().set(pushToken: tokenData)
             } else {
@@ -193,38 +193,38 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 return
             }
             result(nil)
-            
+
         case "getPushToken":
             let token = KlaviyoSDK().pushToken
             if let token {
                 print("Retrieved push token from SDK: \(token)")
             }
             result(token)
-            
+
         case "registerForInAppForms":
             DispatchQueue.main.async {
                 KlaviyoSDK().registerForInAppForms()
             }
             result(nil)
-            
+
         case "unregisterFromInAppForms":
             Task { @MainActor in
                 KlaviyoSDK().unregisterFromInAppForms()
             }
             result(nil)
-            
+
         case "registerGeofencing":
             Task { @MainActor in
                 await KlaviyoSDK().registerGeofencing()
                 result(nil)
             }
-            
+
         case "unregisterGeofencing":
             Task { @MainActor in
                 await KlaviyoSDK().unregisterGeofencing()
                 result(nil)
             }
-            
+
         case "getCurrentGeofences":
             Task { @MainActor in
                 let geofences = await KlaviyoSDK().getCurrentGeofences()
@@ -238,17 +238,73 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 }
                 result(["geofences": geofencesArray])
             }
-            
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
             result(nil)
-            
+
         case "setLogLevel":
             result(nil)
-            
+
         case "setBadgeCount":
             guard let args = call.arguments as? [String: Any],
                   let count = args["count"] as? Int
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARGUMENTS",
+                        message: "Invalid badge count argument",
+                        details: nil
+                    ))
+                return
+            }
+            KlaviyoSDK().setBadgeCount(count)
+            result(nil)
+
+        case "handleUniversalTrackingLink":
+            guard let args = call.arguments as? [String: Any],
+                  let urlString = args["url"] as? String,
+                  let trackingUrl = URL(string: urlString)
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_URL",
+                        message: "URL cannot be null or invalid",
+                        details: nil
+                    )
+                )
+                return
+            }
+
+            let isKlaviyoLink = KlaviyoSDK().handleUniversalTrackingLink(trackingUrl)
+            result(isKlaviyoLink)
+
+        case "onPushTokenReceived":
+            // Called from AppDelegate when a push token is received
+            guard let args = call.arguments as? [String: Any],
+                  let token = args["token"] as? String
+            else {
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid token data", details: nil))
+                return
+            }
+            print("✅ Push token stored in plugin: \(token)")
+            result(nil)
+
+        case "onPushTokenError":
+            // Called from AppDelegate when push token registration fails
+            guard let args = call.arguments as? [String: Any],
+                  let error = args["error"] as? String
+            else {
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid error data", details: nil))
+                return
+            }
+            print("❌ Push token error received in plugin: \(error)")
+            result(nil)
+
+        case "onPushNotificationOpened":
+            // Called from AppDelegate when a push notification is opened
+            guard let args = call.arguments as? [String: Any],
+                  let userInfo = args["userInfo"] as? [String: Any]
             else {
                 let error = FlutterError(
                     code: "INVALID_ARGUMENTS",
@@ -258,7 +314,15 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(error)
                 return
             }
-            KlaviyoSDK().setBadgeCount(count)
+            print("📱 Push notification opened in plugin: \(userInfo)")
+
+            // Notify Flutter side via event sink if available
+            if let eventSink = eventSink {
+                eventSink([
+                    "type": "push_notification_opened",
+                    "data": userInfo
+                ])
+            }
             result(nil)
 
         default:
@@ -275,7 +339,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
         eventSink = events
-        
+
         // If we have cached values from early app launch, send them now.
         // This solves the race condition where values arrive before Flutter is ready.
         if let cachedToken = cachedToken {
@@ -296,7 +360,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         }
         return nil
     }
-    
+
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
         eventSink = nil
         return nil
@@ -315,16 +379,16 @@ extension KlaviyoFlutterSdkPlugin {
     ) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
         print("📱 APNs Token received: \(tokenString)")
-        
+
         // Pass to Klaviyo Swift SDK
         KlaviyoSDK().set(pushToken: deviceToken)
-        
+
         // Create event payload
         let eventData: [String: Any] = [
             "type": "push_token_received",
             "data": ["token": tokenString]
         ]
-        
+
         // Send to Flutter (or cache if Flutter is not ready)
         if let eventSink {
             eventSink(eventData)
@@ -333,20 +397,20 @@ extension KlaviyoFlutterSdkPlugin {
             cachedToken = eventData
         }
     }
-    
+
     @objc
     public func application(
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         print("❌ Failed to register for remote notifications: \(error)")
-        
+
         // Create error payload
         let errorData: [String: Any] = [
             "type": "push_token_error",
             "data": ["error": error.localizedDescription]
         ]
-        
+
         // Send to Flutter (or cache if Flutter is not ready)
         if let eventSink {
             eventSink(errorData)
@@ -355,17 +419,17 @@ extension KlaviyoFlutterSdkPlugin {
             cachedError = errorData
         }
     }
-    
+
     public func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
         print("📱 Push notification opened: \(userInfo)")
-        
+
         // 1. Prepare Payload
         let eventPayload: [String: Any] = [
             "type": "push_notification_opened",
             "data": userInfo
         ]
-        
+
         // 2. Send to Flutter (or Cache if Flutter is asleep)
         if let eventSink = eventSink {
             eventSink(eventPayload)
@@ -373,7 +437,7 @@ extension KlaviyoFlutterSdkPlugin {
             print("⚠️ [Plugin] Flutter not ready. Caching notification open event.")
             cachedOpenedNotification = eventPayload
         }
-        
+
         // 3. Pass to Native Klaviyo SDK
         // We pass a dummy completion handler because the Host App owns the real one.
         // No-op: We let the host app finish the system callback
@@ -410,10 +474,10 @@ extension Data {
         let cleanString = hexString.replacingOccurrences(of: " ", with: "")
         let length = cleanString.count
         guard length % 2 == 0 else { return nil }
-        
+
         var data = Data(capacity: length / 2)
         var index = cleanString.startIndex
-        
+
         for _ in 0..<(length / 2) {
             let nextIndex = cleanString.index(index, offsetBy: 2)
             let byteString = cleanString[index..<nextIndex]
@@ -421,7 +485,7 @@ extension Data {
             data.append(byte)
             index = nextIndex
         }
-        
+
         self = data
     }
 }
