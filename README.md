@@ -239,7 +239,8 @@ await klaviyo.trackEvent(event);
 
 #### Option A: Using Firebase Messaging (Recommended)
 
-If your app already uses Firebase Messaging, pass the token directly to Klaviyo:
+If your app uses Firebase Messaging, obtain the token from Firebase and pass it
+to Klaviyo:
 
 ```dart
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -275,9 +276,10 @@ if (Platform.isAndroid) {
 });
 ```
 
-#### Option B: Without Firebase
+#### Option B: Using the SDK's Built-in Registration
 
-If you're not using Firebase, use the SDK's built-in registration:
+If you don't want to add `firebase_messaging` as a dependency, the Klaviyo Flutter
+SDK provides a built-in method to register for push notifications:
 
 ```dart
 // Register for push notifications
@@ -288,9 +290,15 @@ await klaviyo.registerForPushNotifications();
 // If you need to access token updates, you may subscribe to
 // the push event stream and listen for token events
 klaviyo.onPushNotification.listen((event) {
-  if (event['type'] == 'push_token_received') {
-    final token = event['data']['token'];
-    print('Token received: $token');
+  switch (event['type']) {
+    case 'push_token_received':
+      final token = event['data']['token'];
+      print('Token received: $token');
+      break;
+    case 'push_token_error':
+      final error = event['data']['error'];
+      print('Token error: $error');
+      break;
   }
 });
 ```
@@ -369,7 +377,7 @@ The main SDK class that provides all functionality.
 - `setProfileProperties(properties)` - Set custom profile properties
 - `track(name, properties)` - Track a simple event
 - `trackEvent(event)` - Track a complex event
-- `registerForPushNotifications()` - Register for push notifications (iOS: triggers APNs registration, Android: no-op)
+- `registerForPushNotifications()` - Register for push notifications (iOS: triggers APNs registration, Android: fetches FCM token)
 - `setPushToken(token, environment)` - Set push notification token (usually handled automatically by native SDKs)
 - `getPushToken()` - Get current push token
 - `registerForInAppForms(configuration)` - Register for in-app forms
