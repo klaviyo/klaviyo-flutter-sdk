@@ -27,10 +27,20 @@ jobs:
       - name: Verify package
         run: flutter pub publish --dry-run
 
+      - name: Validate release files exist
+        run: |
+          if [ ! -f "CHANGELOG.md" ]; then
+            echo "Error: CHANGELOG.md not found"
+            exit 1
+          fi
+
       - name: Publish to pub.dev
         env:
-          PUB_TOKEN: ${{ secrets.PUB_CREDENTIALS }}
-        run: flutter pub publish --force
+          PUB_CREDENTIALS: ${{ secrets.PUB_CREDENTIALS }}
+        run: |
+          mkdir -p ~/.pub-cache
+          echo "$PUB_CREDENTIALS" > ~/.pub-cache/credentials.json
+          flutter pub publish --force
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
