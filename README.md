@@ -228,14 +228,33 @@ If your app already uses Firebase Messaging, pass the token directly to Klaviyo:
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 // Get token from Firebase and pass to Klaviyo
-final token = await FirebaseMessaging.instance.getToken();
-if (token != null) {
-  await klaviyo.setPushToken(token);
+if (Platform.isIOS) {
+  String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+
+  if (apnsToken != null) {
+    await klaviyo.setPushToken(apnsToken);
+    print("Sent APNs token to Klaviyo");
+  } else {
+    print("APNs token was null. Waiting for refresh...");
+  }
+} else if (Platform.isAndroid) {
+  String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+  if (fcmToken != null) {
+    await klaviyo.setPushToken(fcmToken);
+    print("Sent FCM token to Klaviyo");
+  }
 }
 
-// Listen for token refreshes
-FirebaseMessaging.instance.onTokenRefresh.listen((token) {
-  klaviyo.setPushToken(token);
+// Listen for Token Refreshes (Important for long-running apps)
+// Note: On iOS, this stream returns the FCM token, not APNs.
+// Native APNs token changes are rare, but for Android this is crucial.
+FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+  if (Platform.isAndroid) {
+    klaviyo.setPushToken(newToken);
+  }
+  // On iOS, if the APNs token changes, the OS usually relaunches the app
+  // or triggers distinct native callbacks.
 });
 ```
 
@@ -245,11 +264,12 @@ If you're not using Firebase, use the SDK's built-in registration:
 
 ```dart
 // Register for push notifications
-// iOS: Triggers APNs registration and automatically captures the token
+// iOS: Triggers APNs registration, captures the token, then sets it on the Klaviyo account
 // Android: No-op (requires FCM setup)
 await klaviyo.registerForPushNotifications();
 
-// Or listen for the token event
+// If you need to access token updates, you may subscribe to
+// the push event stream and listen for token events
 klaviyo.onPushNotification.listen((event) {
   if (event['type'] == 'push_token_received') {
     final token = event['data']['token'];
