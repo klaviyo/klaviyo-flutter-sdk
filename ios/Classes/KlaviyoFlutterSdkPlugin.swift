@@ -369,7 +369,8 @@ extension KlaviyoFlutterSdkPlugin {
     }
 
     /// Manual Forwarding Helper - Silent Push
-    /// This should be called from the Host App's AppDelegate in `didReceiveRemoteNotification:fetchCompletionHandler:`.
+    /// This should be called from the Host App's AppDelegate
+    /// in `didReceiveRemoteNotification:fetchCompletionHandler:`.
     /// Note: The host app is responsible for calling the completion handler after this method returns.
     public func handleSilentPush(userInfo: [AnyHashable: Any]) {
         print("📱 Silent push received: \(userInfo)")

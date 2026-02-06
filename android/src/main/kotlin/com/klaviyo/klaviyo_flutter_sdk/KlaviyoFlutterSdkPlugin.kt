@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.NonNull
+import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.model.Event
 import com.klaviyo.analytics.model.EventKey
@@ -36,7 +37,7 @@ class KlaviyoFlutterSdkPlugin :
     ActivityAware {
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
-    private lateinit var eventSink: EventChannel.EventSink
+    private var eventSink: EventChannel.EventSink? = null
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
@@ -59,11 +60,11 @@ class KlaviyoFlutterSdkPlugin :
                     arguments: Any?,
                     events: EventChannel.EventSink?,
                 ) {
-                    eventSink = events!!
+                    eventSink = events
                 }
 
                 override fun onCancel(arguments: Any?) {
-                    // Handle cancellation
+                    eventSink = null
                 }
             },
         )
@@ -222,12 +223,59 @@ class KlaviyoFlutterSdkPlugin :
                 val token = Klaviyo.getPushToken()
 
                 if (token != null) {
-                    Registry.log.verbose("Retrieved push token from SDK: $token...")
+                    Registry.log.verbose("Retrieved push token from SDK: $token")
                 } else {
                     Registry.log.verbose("No push token available")
                 }
 
                 result.success(token)
+            }
+
+            "registerForPushNotifications" -> {
+                // Fetch the FCM token and register it with Klaviyo.
+                // Return result immediately to match iOS behavior, where
+                // registerForRemoteNotifications() is fire-and-forget and
+                // the outcome arrives asynchronously via the event channel.
+                try {
+                    FirebaseMessaging
+                        .getInstance()
+                        .token
+                        .addOnSuccessListener { token ->
+                            Registry.log.verbose("FCM token received: $token")
+
+                            // Set the token in Klaviyo SDK
+                            Klaviyo.setPushToken(token)
+
+                            // Emit the token via EventChannel
+                            eventSink?.success(
+                                mapOf(
+                                    "type" to "push_token_received",
+                                    "data" to mapOf("token" to token),
+                                ),
+                            )
+                        }.addOnFailureListener { exception ->
+                            Registry.log.error("Failed to get FCM token: ${exception.message}", exception)
+
+                            // Emit error via EventChannel
+                            eventSink?.success(
+                                mapOf(
+                                    "type" to "push_token_error",
+                                    "data" to mapOf("error" to (exception.message ?: "Unknown error")),
+                                ),
+                            )
+                        }
+                } catch (e: Exception) {
+                    Registry.log.error("Error registering for push notifications: ${e.message}", e)
+
+                    eventSink?.success(
+                        mapOf(
+                            "type" to "push_token_error",
+                            "data" to mapOf("error" to (e.message ?: "Unknown error")),
+                        ),
+                    )
+                }
+
+                result.success(null)
             }
 
             "registerForInAppForms" -> {
@@ -421,14 +469,12 @@ class KlaviyoFlutterSdkPlugin :
                 Registry.log.verbose("Push notification opened: $notificationData")
 
                 // Forward to Flutter via EventChannel
-                if (::eventSink.isInitialized) {
-                    eventSink.success(
-                        mapOf(
-                            "type" to "push_notification_opened",
-                            "data" to notificationData,
-                        ),
-                    )
-                }
+                eventSink?.success(
+                    mapOf(
+                        "type" to "push_notification_opened",
+                        "data" to notificationData,
+                    ),
+                )
             }
         } catch (e: Exception) {
             Registry.log.error("Error handling push: ${e.message}", e)
