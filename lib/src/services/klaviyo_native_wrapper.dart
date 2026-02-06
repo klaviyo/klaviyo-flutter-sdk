@@ -6,6 +6,7 @@ import '../models/geofence.dart';
 import '../enums/push_environment.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
+import '../utils/logger.dart';
 
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
@@ -18,6 +19,7 @@ class KlaviyoNativeWrapper {
 
   KlaviyoNativeWrapper._internal();
 
+  final Logger _logger = Logger();
   bool _isInitialized = false;
   String? _apiKey;
 
@@ -306,9 +308,11 @@ class KlaviyoNativeWrapper {
         case 'push_notification_opened':
         case 'push_token_received':
         case 'push_token_error':
+          _logger.info('Native push notification event: $eventData');
           _pushNotificationController.add(eventData);
           break;
         case 'form_event':
+          _logger.info('Native form event: $eventData');
           _formEventController.add(eventData);
           break;
         default:
@@ -316,8 +320,7 @@ class KlaviyoNativeWrapper {
           break;
       }
     } catch (e) {
-      // Log error but don't crash
-      print('Error handling native event: $e');
+      _logger.error('Error handling native event: $e');
     }
   }
 

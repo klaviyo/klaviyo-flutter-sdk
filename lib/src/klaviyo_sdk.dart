@@ -60,9 +60,6 @@ class KlaviyoSDK {
         configuration: configuration,
       );
 
-      // Set up native event listeners
-      _setupNativeEventListeners();
-
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
 
@@ -308,27 +305,6 @@ class KlaviyoSDK {
 
   /// Get form events stream
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
-
-  /// Set up native event listeners
-  void _setupNativeEventListeners() {
-    // Listen for push notification events from native SDK
-    _nativeWrapper.onPushNotification.listen((eventData) {
-      _logger.info('Native push notification event: $eventData');
-      final eventType = eventData['type'] as String? ?? '';
-
-      if (eventType == 'push_notification_opened') {
-        final userInfo = eventData['data'] as Map<String, dynamic>? ?? {};
-        _logger.info('Push notification opened with data: $userInfo');
-        // The event is automatically forwarded via the stream
-      }
-    });
-
-    // Listen for form events from native SDK
-    _nativeWrapper.onFormEvent.listen((eventData) {
-      _logger.info('Native form event: $eventData');
-      // Handle form events
-    });
-  }
 
   /// Private methods
   void _ensureInitialized() {
