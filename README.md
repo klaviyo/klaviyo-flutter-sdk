@@ -249,8 +249,8 @@ if (Platform.isIOS) {
 // Listen for Token Refreshes (Important for long-running apps)
 // Note: On iOS, this stream returns the FCM token, not APNs.
 // Native APNs token changes are rare, but for Android this is crucial.
-FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-  if (Platform.isAndroid) {
+if (Platform.isAndroid) {
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
     klaviyo.setPushToken(newToken);
   }
   // On iOS, if the APNs token changes, the OS usually relaunches the app
