@@ -32,9 +32,7 @@ class InAppFormConfig {
     }
 
     if (raw is int) {
-      return InAppFormConfig(
-        sessionTimeoutDuration: Duration(seconds: raw),
-      );
+      return InAppFormConfig(sessionTimeoutDuration: Duration(seconds: raw));
     }
 
     return const InAppFormConfig();

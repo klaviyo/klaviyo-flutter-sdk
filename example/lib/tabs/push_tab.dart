@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -36,14 +37,36 @@ class _PushTabState extends State<PushTab> {
   void _setupPushNotificationListener() {
     if (!_klaviyo.isInitialized) return;
 
-    // Listen for push notification open events
+    // Listen for push notification events (token received, opened, errors)
     _pushNotificationSubscription = _klaviyo.onPushNotification.listen((event) {
       final eventType = event['type'] as String?;
-      if (eventType == 'push_notification_opened') {
-        final data = event['data'] as Map<String, dynamic>?;
-        setState(() {
-          _status = 'Push notification opened: ${data?['title'] ?? 'Unknown'}';
-        });
+
+      switch (eventType) {
+        case 'push_token_received':
+          // Update token from stream (reactive approach)
+          final data = event['data'] as Map<String, dynamic>?;
+          final token = data?['token'] as String?;
+          setState(() {
+            _pushToken = token;
+            _status = 'Push token received';
+          });
+          break;
+
+        case 'push_token_error':
+          final data = event['data'] as Map<String, dynamic>?;
+          final error = data?['error'] as String? ?? 'Unknown error';
+          setState(() {
+            _status = 'Push token error: $error';
+          });
+          break;
+
+        case 'push_notification_opened':
+          final data = event['data'] as Map<String, dynamic>?;
+          setState(() {
+            _status =
+                'Push notification opened: ${data?['title'] ?? 'Unknown'}';
+          });
+          break;
       }
     });
   }
@@ -91,17 +114,15 @@ class _PushTabState extends State<PushTab> {
       }
 
       // Register for push notifications after permission is granted
+      // The token will arrive via onPushNotification stream
       await _klaviyo.registerForPushNotifications();
 
       // Update permission state
       await _checkPermissions();
 
-      // Get the token after registration
-      await _getPushToken();
-
       setState(() {
         if (_notificationsEnabled) {
-          _status = 'Push notifications registered';
+          _status = 'Registering for push notifications...';
         } else {
           _status = 'Push notification permission denied';
         }
@@ -198,12 +219,23 @@ class _PushTabState extends State<PushTab> {
 
             if (_pushToken != null) ...[
               const Text(
-                'Push Token:',
+                'Push Token (tap to copy):',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              SelectableText(
-                _pushToken!,
-                style: const TextStyle(fontSize: 10),
+              InkWell(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: _pushToken!));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Push token copied to clipboard'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                child: Text(
+                  _pushToken!,
+                  style: const TextStyle(fontSize: 10),
+                ),
               ),
               const SizedBox(height: 10),
             ],

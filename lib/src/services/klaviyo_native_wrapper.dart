@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
@@ -6,6 +5,8 @@ import '../models/klaviyo_event.dart';
 import '../models/geofence.dart';
 import '../enums/push_environment.dart';
 import '../exceptions/klaviyo_exception.dart';
+import '../utils/buffered_broadcast_stream_controller.dart';
+import '../utils/logger.dart';
 
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
@@ -18,14 +19,16 @@ class KlaviyoNativeWrapper {
 
   KlaviyoNativeWrapper._internal();
 
+  final Logger _logger = Logger();
   bool _isInitialized = false;
   String? _apiKey;
 
-  // Stream controllers for native events
-  final StreamController<Map<String, dynamic>> _pushNotificationController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final StreamController<Map<String, dynamic>> _formEventController =
-      StreamController<Map<String, dynamic>>.broadcast();
+  // Stream controllers for native events – buffer events that arrive
+  // before any listener subscribes, then flush on first subscription.
+  final _pushNotificationController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>();
+  final _formEventController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>();
 
   // Getters for streams
   Stream<Map<String, dynamic>> get onPushNotification =>
@@ -291,23 +294,25 @@ class KlaviyoNativeWrapper {
 
     // Fire-and-forget - we don't await or handle errors
     // since this is a synchronous operation from the caller's perspective
-    _channel.invokeMethod('setBadgeCount', {
-      'count': count,
-    });
+    _channel.invokeMethod('setBadgeCount', {'count': count});
   }
 
   /// Handle native events from platform channels
   void _handleNativeEvent(dynamic event) {
     try {
-      final Map<String, dynamic> eventData = Map<String, dynamic>.from(event);
+      final Map<String, dynamic> eventData = _deepConvertMap(event);
       final String eventType = eventData['type'] as String? ?? '';
 
       switch (eventType) {
         case 'push_notification_received':
         case 'push_notification_opened':
+        case 'push_token_received':
+        case 'push_token_error':
+          _logger.info('Native push notification event: $eventData');
           _pushNotificationController.add(eventData);
           break;
         case 'form_event':
+          _logger.info('Native form event: $eventData');
           _formEventController.add(eventData);
           break;
         default:
@@ -315,9 +320,33 @@ class KlaviyoNativeWrapper {
           break;
       }
     } catch (e) {
-      // Log error but don't crash
-      print('Error handling native event: $e');
+      _logger.error('Error handling native event: $e');
     }
+  }
+
+  /// Recursively convert platform channel maps to Map<String, dynamic>
+  Map<String, dynamic> _deepConvertMap(dynamic value) {
+    assert(
+      value == null || value is Map,
+      '_deepConvertMap expected Map but got ${value.runtimeType}',
+    );
+
+    if (value is Map) {
+      return value.map(
+        (key, val) => MapEntry(key.toString(), _deepConvertValue(val)),
+      );
+    }
+    return <String, dynamic>{};
+  }
+
+  /// Recursively convert values, handling nested maps and lists
+  dynamic _deepConvertValue(dynamic value) {
+    if (value is Map) {
+      return _deepConvertMap(value);
+    } else if (value is List) {
+      return value.map(_deepConvertValue).toList();
+    }
+    return value;
   }
 
   /// Ensure SDK is initialized

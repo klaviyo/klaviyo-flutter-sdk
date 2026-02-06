@@ -6,7 +6,7 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
 
 - **Profile Management**: Set user profiles, emails, phone numbers, and custom properties
 - **Event Tracking**: Track custom events and user interactions
-- **Push Notifications**: Register for and handle push notifications
+- **Push Notifications**: Register for and handle push notifications (Automatic Token handling)
 - **Rich Push**: Display images within push notifications
 - **Badge Count**: Set and manage app icon badge count (iOS only)
 - **In-App Forms**: Display and manage in-app forms for lead capture
@@ -28,7 +28,9 @@ dependencies:
 
 #### iOS Setup
 
-1. Add the Klaviyo Swift SDK to your `ios/Podfile`:
+**1. Install Pods**
+
+Add the Klaviyo Swift SDK to your `ios/Podfile`:
 
 ```ruby
 target 'Runner' do
@@ -42,17 +44,92 @@ target 'Runner' do
 end
 ```
 
-2. Run `pod install` in the `ios` directory:
-
+Run `pod install` in the `ios` directory:
 ```bash
 cd ios && pod install
 ```
 
-3. Add required permissions to `ios/Runner/Info.plist`:
+**2. Enable Capabilities (Required)**
 
-```xml
-<key>NSUserNotificationUsageDescription</key>
-<string>We use notifications to keep you updated with important information.</string>
+Open your project in Xcode (`ios/Runner.xcworkspace`), select the **Runner** target, go to the **Signing & Capabilities** tab, and add the following capabilities:
+* **Push Notifications** (Required for APNs)
+* **Background Modes** -> Check **Remote notifications** (Required for silent push updates)
+
+**3. AppDelegate Setup (Required)**
+
+To ensure push notifications display correctly while the app is in the foreground and to track "Open" events reliably, you need to implement the notification delegate methods in your `ios/Runner/AppDelegate.swift`.
+
+Please ensure you make the following changes to your existing AppDelegate:
+
+1.  **Import the plugin module:** `import klaviyo_flutter_sdk`
+2.  **Set the Notification Delegate:** Assign `UNUserNotificationCenter.current().delegate = self` in `didFinishLaunching`.
+3.  **Forward Notification Events:** Implement (or update) the `userNotificationCenter` methods to forward events to the Klaviyo SDK.
+
+**Note on Push Token Handling:** The plugin automatically intercepts `didRegisterForRemoteNotificationsWithDeviceToken` to capture the APNs token. If you need to override this method in your AppDelegate (e.g., to also send the token to another push service), make sure to call `super`:
+
+```swift
+override func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+) {
+    // Call super to ensure the Klaviyo plugin receives the token
+    super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+
+    // Your custom token handling here
+}
+```
+
+Here is an example of what the integration looks like:
+
+```swift
+import UIKit
+import Flutter
+import klaviyo_flutter_sdk // <--- Add this import
+
+@main
+@objc class AppDelegate: FlutterAppDelegate {
+
+    override func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+
+        // <--- Add this line to handle foreground notifications and taps
+        UNUserNotificationCenter.current().delegate = self
+
+        // ... Your existing setup code ...
+
+        GeneratedPluginRegistrant.register(with: self)
+        return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+
+    // <--- Add or update this method to handle Foreground Notifications
+    override func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Show banner, sound, and badge even when the app is open
+        completionHandler([.banner, .sound, .badge])
+
+        // ... Your custom logic (if any) ...
+    }
+
+    // <--- Add or update this method to forward Tap Events
+    override func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        // Forward the "Open" event to the Klaviyo SDK
+        KlaviyoFlutterSdkPlugin.shared.handleNotificationResponse(response)
+
+        // ... Your custom logic (if any) ...
+
+        // Complete the system callback
+        completionHandler()
+    }
+}
 ```
 
 #### Android Setup
@@ -143,19 +220,72 @@ await klaviyo.trackEvent(event);
 
 ### 4. Push Notifications
 
+#### Option A: Using Firebase Messaging (Recommended)
+
+If your app already uses Firebase Messaging, pass the token directly to Klaviyo:
+
+```dart
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+// Get token from Firebase and pass to Klaviyo
+if (Platform.isIOS) {
+  String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+
+  if (apnsToken != null) {
+    await klaviyo.setPushToken(apnsToken);
+    print("Sent APNs token to Klaviyo");
+  } else {
+    print("APNs token was null. Waiting for refresh...");
+  }
+} else if (Platform.isAndroid) {
+  String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+  if (fcmToken != null) {
+    await klaviyo.setPushToken(fcmToken);
+    print("Sent FCM token to Klaviyo");
+  }
+}
+
+// Listen for Token Refreshes (Important for long-running apps)
+// Note: On iOS, this stream returns the FCM token, not APNs.
+// Native APNs token changes are rare, but for Android this is crucial.
+if (Platform.isAndroid) {
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+    klaviyo.setPushToken(newToken);
+  }
+  // On iOS, if the APNs token changes, the OS usually relaunches the app
+  // or triggers distinct native callbacks.
+});
+```
+
+#### Option B: Without Firebase
+
+If you're not using Firebase, use the SDK's built-in registration:
+
 ```dart
 // Register for push notifications
-// iOS: Triggers APNs registration
-// Android: No-op (FCM handles registration automatically)
+// iOS: Triggers APNs registration, captures the token, then sets it on the Klaviyo account
+// Android: No-op (requires FCM setup)
 await klaviyo.registerForPushNotifications();
 
-// Get the current push token
-final token = await klaviyo.getPushToken();
-print('Push token: $token');
+// If you need to access token updates, you may subscribe to
+// the push event stream and listen for token events
+klaviyo.onPushNotification.listen((event) {
+  if (event['type'] == 'push_token_received') {
+    final token = event['data']['token'];
+    print('Token received: $token');
+  }
+});
+```
 
-// Handle push notification events
-klaviyo.profileStream.listen((profile) {
-  print('Profile updated: ${profile?.email}');
+#### Handling Push Notification Opens
+
+```dart
+// Listen for notification open events
+klaviyo.onPushNotification.listen((event) {
+  if (event['type'] == 'push_notification_opened') {
+    print('Notification opened: ${event['data']}');
+  }
 });
 ```
 
@@ -237,8 +367,8 @@ The main SDK class that provides all functionality.
 
 - `isInitialized` - Whether the SDK is initialized
 - `apiKey` - Current API key
-- `currentProfile` - Current user profile
-- `profileStream` - Stream of profile updates
+- `onPushNotification` - Stream of push notification events (token received, notification opened, errors)
+- `onFormEvent` - Stream of in-app form events
 
 ### Models
 

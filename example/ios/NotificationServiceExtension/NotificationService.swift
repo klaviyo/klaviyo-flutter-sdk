@@ -22,7 +22,7 @@ class NotificationService: UNNotificationServiceExtension {
         
         self.request = request
         self.contentHandler = contentHandler
-        self.bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
+        bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
         
         if let bestAttemptContent {
             // Let Klaviyo handle the notification content modification
@@ -46,7 +46,7 @@ class NotificationService: UNNotificationServiceExtension {
         // otherwise the original push payload will be used.
         if let contentHandler, let bestAttemptContent {
             KlaviyoExtensionSDK.handleNotificationServiceExtensionTimeWillExpireRequest(
-                request: self.request,
+                request: request,
                 bestAttemptContent: bestAttemptContent,
                 contentHandler: contentHandler
             )

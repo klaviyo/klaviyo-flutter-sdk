@@ -77,12 +77,6 @@ class PushTokenInfo {
 
   @override
   int get hashCode {
-    return Object.hash(
-      token,
-      environment,
-      platform,
-      createdAt,
-      isActive,
-    );
+    return Object.hash(token, environment, platform, createdAt, isActive);
   }
 }
