@@ -315,31 +315,6 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
-            "showForm" -> {
-                val formId = call.argument<String>("formId")
-                val customData = call.argument<Map<String, Any>>("customData")
-
-                try {
-                    // In-app forms are handled automatically by the SDK
-                    // This method is not directly available in the Android SDK
-                    result.success(true)
-                } catch (e: Exception) {
-                    result.error("FORM_ERROR", "Failed to show form", e.message)
-                }
-            }
-
-            "hideForm" -> {
-                val formId = call.argument<String>("formId")
-
-                try {
-                    // In-app forms are handled automatically by the SDK
-                    // This method is not directly available in the Android SDK
-                    result.success(true)
-                } catch (e: Exception) {
-                    result.error("FORM_ERROR", "Failed to hide form", e.message)
-                }
-            }
-
             "resetProfile" -> {
                 try {
                     Klaviyo.resetProfile()
