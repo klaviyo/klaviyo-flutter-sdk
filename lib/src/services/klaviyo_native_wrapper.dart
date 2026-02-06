@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
@@ -6,6 +5,7 @@ import '../models/klaviyo_event.dart';
 import '../models/geofence.dart';
 import '../enums/push_environment.dart';
 import '../exceptions/klaviyo_exception.dart';
+import '../utils/buffered_broadcast_stream_controller.dart';
 
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
@@ -21,11 +21,12 @@ class KlaviyoNativeWrapper {
   bool _isInitialized = false;
   String? _apiKey;
 
-  // Stream controllers for native events
-  final StreamController<Map<String, dynamic>> _pushNotificationController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final StreamController<Map<String, dynamic>> _formEventController =
-      StreamController<Map<String, dynamic>>.broadcast();
+  // Stream controllers for native events – buffer events that arrive
+  // before any listener subscribes, then flush on first subscription.
+  final _pushNotificationController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>();
+  final _formEventController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>();
 
   // Getters for streams
   Stream<Map<String, dynamic>> get onPushNotification =>
