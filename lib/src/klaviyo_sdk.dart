@@ -54,14 +54,16 @@ class KlaviyoSDK {
 
       // Initialize native wrapper
       _nativeWrapper = KlaviyoNativeWrapper();
+
+      // Subscribe to broadcast streams before native init so cached events
+      // delivered during onListen aren't dropped by the broadcast controller.
+      _setupNativeEventListeners();
+
       await _nativeWrapper.initialize(
         apiKey: apiKey,
         environment: environment,
         configuration: configuration,
       );
-
-      // Set up native event listeners
-      _setupNativeEventListeners();
 
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
