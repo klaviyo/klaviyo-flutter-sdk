@@ -227,24 +227,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(["geofences": geofencesArray])
             }
             
-        case "showForm":
-            // TODO: [CHNL-29888] implement IAF support
-            let error = FlutterError(
-                code: "NOT_SUPPORTED",
-                message: "Direct showForm is not supported in v5.0.0; forms are shown automatically.",
-                details: nil
-            )
-            result(error)
-            
-        case "hideForm":
-            // TODO: [CHNL-29888] implement IAF support
-            let error = FlutterError(
-                code: "NOT_SUPPORTED",
-                message: "Direct hideForm is not supported in v5.0.0; forms are hidden automatically.",
-                details: nil
-            )
-            result(error)
-            
         case "resetProfile":
             KlaviyoSDK().resetProfile()
             result(nil)
