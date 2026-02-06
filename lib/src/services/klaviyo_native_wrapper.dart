@@ -306,6 +306,7 @@ class KlaviyoNativeWrapper {
       switch (eventType) {
         case 'push_notification_received':
         case 'push_notification_opened':
+        case 'silent_push_received':
         case 'push_token_received':
         case 'push_token_error':
           _logger.info('Native push notification event: $eventData');

@@ -35,4 +35,18 @@ class AppDelegate: FlutterAppDelegate {
         // 2. Complete the system callback
         completionHandler()
     }
+
+    override func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        // 1. Forward silent push to Klaviyo plugin
+        KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo: userInfo)
+
+        // 2. You MUST call the completion handler within ~30 seconds.
+        //    Failing to do so will cause iOS to throttle or stop delivering
+        //    silent push notifications to your app.
+        completionHandler(.newData)
+    }
 }

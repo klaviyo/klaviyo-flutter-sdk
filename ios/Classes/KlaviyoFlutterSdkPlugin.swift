@@ -18,6 +18,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedToken: [String: Any]?
     private var cachedError: [String: Any]?
     private var cachedOpenedNotification: [String: Any]?
+    private var cachedSilentPush: [String: Any]?
     
     // MARK: - Flutter Plugin Registration
     
@@ -277,6 +278,10 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedOpenedNotification)
             self.cachedOpenedNotification = nil
         }
+        if let cachedSilentPush = cachedSilentPush {
+            events(cachedSilentPush)
+            self.cachedSilentPush = nil
+        }
         return nil
     }
     
@@ -361,6 +366,27 @@ extension KlaviyoFlutterSdkPlugin {
         // We pass a dummy completion handler because the Host App owns the real one.
         // No-op: We let the host app finish the system callback
         _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
+    }
+
+    /// Manual Forwarding Helper - Silent Push
+    /// This should be called from the Host App's AppDelegate in `didReceiveRemoteNotification:fetchCompletionHandler:`.
+    /// Note: The host app is responsible for calling the completion handler after this method returns.
+    public func handleSilentPush(userInfo: [AnyHashable: Any]) {
+        print("📱 Silent push received: \(userInfo)")
+
+        // Prepare payload
+        let eventPayload: [String: Any] = [
+            "type": "silent_push_received",
+            "data": userInfo
+        ]
+
+        // Send to Flutter (or cache if Flutter is not ready)
+        if let eventSink = eventSink {
+            eventSink(eventPayload)
+        } else {
+            print("⚠️ [Plugin] Flutter not ready. Caching silent push event.")
+            cachedSilentPush = eventPayload
+        }
     }
 }
 

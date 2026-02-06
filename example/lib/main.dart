@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -59,6 +61,74 @@ Future<void> _setupFCM() async {
   } catch (e) {
     print('FCM setup failed: $e');
   }
+}
+
+/// Subscription for silent push notifications.
+/// Tracked to prevent duplicate subscriptions on SDK re-initialization.
+StreamSubscription<Map<String, dynamic>>? _silentPushSubscription;
+
+/// Set up listener for silent push notifications.
+/// Called from ProfileTab after SDK initialization.
+void setupSilentPushListener() {
+  final klaviyo = KlaviyoSDK();
+  if (!klaviyo.isInitialized) {
+    print('Cannot set up silent push listener: SDK not initialized');
+    return;
+  }
+
+  // Cancel any existing subscription to prevent duplicates
+  _silentPushSubscription?.cancel();
+
+  _silentPushSubscription = klaviyo.onPushNotification.listen((eventData) {
+    final eventType = eventData['type'] as String? ?? '';
+
+    if (eventType == 'silent_push_received') {
+      final data = eventData['data'];
+      final userInfo =
+          data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+
+      print('Silent push received: $userInfo');
+      _showSilentPushAlert(userInfo);
+    }
+  });
+}
+
+void _showSilentPushAlert(Map<String, dynamic> userInfo) {
+  final context = _router.routerDelegate.navigatorKey.currentContext;
+  if (context == null) {
+    print('Cannot show alert: context not available');
+    return;
+  }
+
+  showAdaptiveDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog.adaptive(
+        title: const Text('Silent Push Received'),
+        content: SingleChildScrollView(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _formatUserInfo(userInfo),
+              style: const TextStyle(fontFamily: 'Courier', fontSize: 12),
+              textAlign: TextAlign.left,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+String _formatUserInfo(Map<String, dynamic> userInfo) {
+  const encoder = JsonEncoder.withIndent('  ');
+  return encoder.convert(userInfo);
 }
 
 class MyApp extends StatelessWidget {
