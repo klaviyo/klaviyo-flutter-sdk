@@ -240,11 +240,19 @@ final GoRouter _router = GoRouter(
 
 /// Parse deep link path from custom scheme or universal link URL
 String _parseDeepLinkPath(Uri uri) {
-  // For custom scheme URLs (e.g., com.klaviyo.flutterexample://push),
+  // For custom scheme URLs (e.g., com.klaviyo.flutterexample://product/123),
   // the URI parser treats the first segment as authority/host, not path
   if (uri.scheme.isNotEmpty && uri.scheme != 'http' && uri.scheme != 'https') {
-    // Custom scheme: use authority as the path
+    // Custom scheme: combine authority and path
+    // For com.klaviyo.flutterexample://product/123:
+    //   uri.authority = "product"
+    //   uri.path = "/123"
     String path = uri.authority;
+
+    // Append the path component if it exists and is not just "/"
+    if (uri.path.isNotEmpty && uri.path != '/') {
+      path = '$path${uri.path}';
+    }
 
     // Remove trailing slash if present
     if (path.endsWith('/') && path.length > 1) {

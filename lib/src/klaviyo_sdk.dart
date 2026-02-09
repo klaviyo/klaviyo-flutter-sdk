@@ -352,7 +352,7 @@ class KlaviyoSDK {
     }
 
     try {
-      _nativeWrapper.handleUniversalTrackingLink(url);
+      await _nativeWrapper.handleUniversalTrackingLink(url);
       _logger.info('Link $url sent to native layer');
       return true;
     } catch (e) {

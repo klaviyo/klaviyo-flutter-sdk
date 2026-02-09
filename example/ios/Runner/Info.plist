@@ -68,16 +68,16 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.klaviyo.flutterexample</string>
+			<string>com.klaviyo.FlutterExample</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.klaviyo.flutterexample</string>
+				<string>com.klaviyo.FlutterExample</string>
 			</array>
 		</dict>
 	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>com.klaviyo.flutterexample</string>
+		<string>com.klaviyo.FlutterExample</string>
 	</array>
 </dict>
 </plist>
