@@ -158,6 +158,33 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "getEmail" -> {
+                try {
+                    val email = Klaviyo.getEmail()
+                    result.success(email)
+                } catch (e: Exception) {
+                    result.error("EMAIL_ERROR", "Failed to get email", e.message)
+                }
+            }
+
+            "getPhoneNumber" -> {
+                try {
+                    val phoneNumber = Klaviyo.getPhoneNumber()
+                    result.success(phoneNumber)
+                } catch (e: Exception) {
+                    result.error("PHONE_ERROR", "Failed to get phone number", e.message)
+                }
+            }
+
+            "getExternalId" -> {
+                try {
+                    val externalId = Klaviyo.getExternalId()
+                    result.success(externalId)
+                } catch (e: Exception) {
+                    result.error("EXTERNAL_ID_ERROR", "Failed to get external ID", e.message)
+                }
+            }
+
             "setProfileProperties" -> {
                 val properties = call.argument<Map<String, Any>>("properties")
                 try {

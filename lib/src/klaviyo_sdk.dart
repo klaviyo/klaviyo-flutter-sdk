@@ -121,6 +121,39 @@ class KlaviyoSDK {
     }
   }
 
+  /// Get the email of the currently tracked profile, if set
+  Future<String?> getEmail() async {
+    _ensureInitialized();
+
+    try {
+      return await _nativeWrapper.getEmail();
+    } catch (e) {
+      throw KlaviyoException('Failed to get email: $e');
+    }
+  }
+
+  /// Get the phone number of the currently tracked profile, if set
+  Future<String?> getPhoneNumber() async {
+    _ensureInitialized();
+
+    try {
+      return await _nativeWrapper.getPhoneNumber();
+    } catch (e) {
+      throw KlaviyoException('Failed to get phone number: $e');
+    }
+  }
+
+  /// Get the external ID of the currently tracked profile, if set
+  Future<String?> getExternalId() async {
+    _ensureInitialized();
+
+    try {
+      return await _nativeWrapper.getExternalId();
+    } catch (e) {
+      throw KlaviyoException('Failed to get external ID: $e');
+    }
+  }
+
   /// Set profile properties
   /// Calls the native SDK directly - native SDK manages profile state
   Future<void> setProfileProperties(Map<String, dynamic> properties) async {

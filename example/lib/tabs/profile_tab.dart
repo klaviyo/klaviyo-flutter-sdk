@@ -25,6 +25,9 @@ class _ProfileTabState extends State<ProfileTab> {
 
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
+  String? _currentEmail;
+  String? _currentPhoneNumber;
+  String? _currentExternalId;
 
   static const String _apiKeyPrefsKey = 'klaviyo_api_key';
 
@@ -101,6 +104,9 @@ class _ProfileTabState extends State<ProfileTab> {
       // Set up silent push listener now that SDK is initialized
       setupSilentPushListener();
 
+      // Fetch current profile values
+      await _fetchCurrentProfile();
+
       setState(() {
         _isInitialized = true;
         _status = 'SDK initialized successfully!';
@@ -112,11 +118,32 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
+  Future<void> _fetchCurrentProfile() async {
+    if (!_isInitialized) return;
+
+    try {
+      final email = await _klaviyo.getEmail();
+      final phoneNumber = await _klaviyo.getPhoneNumber();
+      final externalId = await _klaviyo.getExternalId();
+
+      setState(() {
+        _currentEmail = email;
+        _currentPhoneNumber = phoneNumber;
+        _currentExternalId = externalId;
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to fetch profile: $e';
+      });
+    }
+  }
+
   Future<void> _setEmail() async {
     if (!_isInitialized) return;
 
     try {
       await _klaviyo.setEmail(_emailController.text);
+      await _fetchCurrentProfile();
       setState(() {
         _status = 'Email set successfully';
       });
@@ -132,6 +159,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     try {
       await _klaviyo.setPhoneNumber(_phoneController.text);
+      await _fetchCurrentProfile();
       setState(() {
         _status = 'Phone number set successfully';
       });
@@ -147,6 +175,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     try {
       await _klaviyo.setExternalId(_externalIdController.text);
+      await _fetchCurrentProfile();
       setState(() {
         _status = 'External ID set successfully';
       });
@@ -178,6 +207,7 @@ class _ProfileTabState extends State<ProfileTab> {
               : null,
         ),
       );
+      await _fetchCurrentProfile();
       setState(() {
         _status = 'Full profile set successfully';
       });
@@ -193,6 +223,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     try {
       await _klaviyo.resetProfile();
+      await _fetchCurrentProfile();
       setState(() {
         _emailController.clear();
         _phoneController.clear();
@@ -246,6 +277,35 @@ class _ProfileTabState extends State<ProfileTab> {
 
   //#region View
 
+  Widget _buildProfileValueRow(String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value ?? '(not set)',
+              style: TextStyle(
+                color: value != null ? Colors.black : Colors.grey.shade600,
+                fontStyle: value != null ? FontStyle.normal : FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -276,6 +336,46 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // Current Profile Values Section
+            if (_isInitialized) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Current Profile Values',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh, size: 20),
+                          onPressed: _fetchCurrentProfile,
+                          tooltip: 'Refresh',
+                        ),
+                      ],
+                    ),
+                    const Divider(),
+                    _buildProfileValueRow('Email', _currentEmail),
+                    _buildProfileValueRow('Phone Number', _currentPhoneNumber),
+                    _buildProfileValueRow('External ID', _currentExternalId),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // API Key Section
             if (!_isInitialized) ...[
