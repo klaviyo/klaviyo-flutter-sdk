@@ -71,13 +71,13 @@
 			<string>com.klaviyo.flutterexample</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.klaviyo.FlutterExample</string>
+				<string>com.klaviyo.flutterexample</string>
 			</array>
 		</dict>
 	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>com.klaviyo.FlutterExample</string>
+		<string>com.klaviyo.flutterexample</string>
 	</array>
 </dict>
 </plist>
