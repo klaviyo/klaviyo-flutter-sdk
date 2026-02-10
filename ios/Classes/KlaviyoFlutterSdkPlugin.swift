@@ -279,52 +279,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             let isKlaviyoLink = KlaviyoSDK().handleUniversalTrackingLink(trackingUrl)
             result(isKlaviyoLink)
 
-        case "onPushTokenReceived":
-            // Called from AppDelegate when a push token is received
-            guard let args = call.arguments as? [String: Any],
-                  let token = args["token"] as? String
-            else {
-                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid token data", details: nil))
-                return
-            }
-            print("✅ Push token stored in plugin: \(token)")
-            result(nil)
-
-        case "onPushTokenError":
-            // Called from AppDelegate when push token registration fails
-            guard let args = call.arguments as? [String: Any],
-                  let error = args["error"] as? String
-            else {
-                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid error data", details: nil))
-                return
-            }
-            print("❌ Push token error received in plugin: \(error)")
-            result(nil)
-
-        case "onPushNotificationOpened":
-            // Called from AppDelegate when a push notification is opened
-            guard let args = call.arguments as? [String: Any],
-                  let userInfo = args["userInfo"] as? [String: Any]
-            else {
-                let error = FlutterError(
-                    code: "INVALID_ARGUMENTS",
-                    message: "Invalid badge count argument",
-                    details: nil
-                )
-                result(error)
-                return
-            }
-            print("📱 Push notification opened in plugin: \(userInfo)")
-
-            // Notify Flutter side via event sink if available
-            if let eventSink = eventSink {
-                eventSink([
-                    "type": "push_notification_opened",
-                    "data": userInfo
-                ])
-            }
-            result(nil)
-
         default:
             result(FlutterMethodNotImplemented)
         }
