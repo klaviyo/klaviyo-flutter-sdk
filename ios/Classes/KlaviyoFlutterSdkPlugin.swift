@@ -110,7 +110,19 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             KlaviyoSDK().set(externalId: externalId)
             result(nil)
-            
+
+        case "getEmail":
+            let email = KlaviyoSDK().email
+            result(email)
+
+        case "getPhoneNumber":
+            let phoneNumber = KlaviyoSDK().phoneNumber
+            result(phoneNumber)
+
+        case "getExternalId":
+            let externalId = KlaviyoSDK().externalId
+            result(externalId)
+
         case "setProfileProperties":
             guard let args = call.arguments as? [String: Any],
                   let properties = args["properties"] as? [String: Any]
