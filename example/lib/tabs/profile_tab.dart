@@ -262,6 +262,9 @@ class _ProfileTabState extends State<ProfileTab> {
 
       setState(() {
         _isInitialized = false;
+        _currentEmail = null;
+        _currentPhoneNumber = null;
+        _currentExternalId = null;
         _status = 'SDK reset. Enter API key to initialize';
       });
     } catch (e) {
