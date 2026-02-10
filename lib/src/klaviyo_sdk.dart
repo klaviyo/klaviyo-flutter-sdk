@@ -329,7 +329,7 @@ class KlaviyoSDK {
   /// );
   /// ```
   ///
-  /// Returns `true` if the URL is a Klaviyo tracking link, `false` otherwise.
+  /// Returns `true` if the URL is a valid Klaviyo tracking link, `false` otherwise.
   /// Note: This is an async method but can be called without awaiting in go_router's redirect.
   Future<bool> handleUniversalTrackingLink(String url) async {
     _ensureInitialized();
@@ -352,9 +352,14 @@ class KlaviyoSDK {
     }
 
     try {
-      await _nativeWrapper.handleUniversalTrackingLink(url);
-      _logger.info('Link $url sent to native layer');
-      return true;
+      final isKlaviyoLink =
+          await _nativeWrapper.handleUniversalTrackingLink(url);
+      if (isKlaviyoLink) {
+        _logger.info('Link $url handled by native layer');
+      } else {
+        _logger.warning('Link $url rejected by native SDK');
+      }
+      return isKlaviyoLink;
     } catch (e) {
       _logger.error('Failed to handle universal tracking link $url: $e');
       return false;

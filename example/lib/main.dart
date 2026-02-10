@@ -204,12 +204,14 @@ final GoRouter _router = GoRouter(
         final isTrackingLink = await klaviyo.handleUniversalTrackingLink(url);
         print('🔀 [Redirect] Is tracking link: $isTrackingLink');
 
-        // If this is a tracking link, don't navigate - let SDK resolve and rebroadcast
+        // If this is a tracking link, stay on current page (no navigation)
+        // The SDK will resolve and broadcast the destination, triggering another redirect
         if (isTrackingLink) {
           print(
-            '🔀 [Redirect] ✅ Tracking link - returning null (stay on current page)',
+            '🔀 [Redirect] ✅ Tracking link - staying on current location: ${state.matchedLocation}',
           );
-          return null; // Stay on current page while SDK resolves the link
+          return state
+              .matchedLocation; // Stay on current page while SDK resolves
         }
       } catch (error) {
         print('🔀 [Redirect] Error handling tracking link: $error');

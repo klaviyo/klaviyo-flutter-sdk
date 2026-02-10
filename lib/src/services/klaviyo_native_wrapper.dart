@@ -339,14 +339,15 @@ class KlaviyoNativeWrapper {
 
   /// Handle a Klaviyo universal tracking link URL
   /// Returns true if the URL is a valid Klaviyo tracking link, false otherwise
-  Future<void> handleUniversalTrackingLink(String url) async {
+  Future<bool> handleUniversalTrackingLink(String url) async {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod<bool>(
+      final result = await _channel.invokeMethod<bool>(
         'handleUniversalTrackingLink',
         {'url': url},
       );
+      return result ?? false;
     } catch (e) {
       throw KlaviyoException('Failed to handle universal tracking link: $e');
     }
