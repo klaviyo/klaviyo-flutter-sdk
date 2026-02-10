@@ -104,8 +104,8 @@ class _ProfileTabState extends State<ProfileTab> {
       // Set up silent push listener now that SDK is initialized
       setupSilentPushListener();
 
-      // Fetch current profile values
-      await _fetchCurrentProfile();
+      // Sync current profile values
+      await _syncCurrentProfile();
 
       setState(() {
         _isInitialized = true;
@@ -118,9 +118,7 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
-  Future<void> _fetchCurrentProfile() async {
-    if (!_isInitialized) return;
-
+  Future<void> _syncCurrentProfile() async {
     try {
       final email = await _klaviyo.getEmail();
       final phoneNumber = await _klaviyo.getPhoneNumber();
@@ -133,7 +131,7 @@ class _ProfileTabState extends State<ProfileTab> {
       });
     } catch (e) {
       setState(() {
-        _status = 'Failed to fetch profile: $e';
+        _status = 'Failed to sync profile: $e';
       });
     }
   }
@@ -143,7 +141,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     try {
       await _klaviyo.setEmail(_emailController.text);
-      await _fetchCurrentProfile();
+      await _syncCurrentProfile();
       setState(() {
         _status = 'Email set successfully';
       });
@@ -159,7 +157,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     try {
       await _klaviyo.setPhoneNumber(_phoneController.text);
-      await _fetchCurrentProfile();
+      await _syncCurrentProfile();
       setState(() {
         _status = 'Phone number set successfully';
       });
@@ -175,7 +173,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     try {
       await _klaviyo.setExternalId(_externalIdController.text);
-      await _fetchCurrentProfile();
+      await _syncCurrentProfile();
       setState(() {
         _status = 'External ID set successfully';
       });
@@ -207,7 +205,7 @@ class _ProfileTabState extends State<ProfileTab> {
               : null,
         ),
       );
-      await _fetchCurrentProfile();
+      await _syncCurrentProfile();
       setState(() {
         _status = 'Full profile set successfully';
       });
@@ -223,7 +221,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     try {
       await _klaviyo.resetProfile();
-      await _fetchCurrentProfile();
+      await _syncCurrentProfile();
       setState(() {
         _emailController.clear();
         _phoneController.clear();
@@ -362,7 +360,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.refresh, size: 20),
-                          onPressed: _fetchCurrentProfile,
+                          onPressed: _syncCurrentProfile,
                           tooltip: 'Refresh',
                         ),
                       ],
