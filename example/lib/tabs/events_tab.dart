@@ -20,8 +20,9 @@ class _EventsTabState extends State<EventsTab> {
   //#region Business Logic
 
   Future<void> _trackEvent({
-    String? eventName,
+    EventMetric? eventName,
     Map<String, dynamic>? properties,
+    double? value,
     bool clearFields = false,
   }) async {
     if (!_klaviyo.isInitialized) {
@@ -33,12 +34,18 @@ class _EventsTabState extends State<EventsTab> {
     }
 
     // Get event name from parameter or text field
-    final name = eventName ?? _eventNameController.text.trim();
-    if (name.isEmpty) {
-      setState(() {
-        _status = 'Please enter an event name';
-      });
-      return;
+    EventMetric name;
+    if (eventName != null) {
+      name = eventName;
+    } else {
+      final textName = _eventNameController.text.trim();
+      if (textName.isEmpty) {
+        setState(() {
+          _status = 'Please enter an event name';
+        });
+        return;
+      }
+      name = EventMetric.custom(textName);
     }
 
     try {
@@ -55,12 +62,12 @@ class _EventsTabState extends State<EventsTab> {
         KlaviyoEvent(
           name: name,
           properties: eventProperties,
-          timestamp: DateTime.now(),
+          value: value,
         ),
       );
 
       setState(() {
-        _status = 'Event "$name" tracked successfully!';
+        _status = 'Event "${name.name}" tracked successfully!';
         if (clearFields) {
           _eventNameController.clear();
           _propertyKeyController.clear();
@@ -142,43 +149,71 @@ class _EventsTabState extends State<EventsTab> {
             ),
             const SizedBox(height: 20),
 
-            // Quick Event Buttons
+            // Quick Event Buttons - Using EventMetric enum
             const Text(
-              'Quick Events:',
+              'Quick Events (Predefined Metrics):',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
 
             ElevatedButton.icon(
-              onPressed: () => _trackEvent(eventName: 'Opened App'),
+              onPressed: () => _trackEvent(eventName: EventMetric.openedApp),
               icon: const Icon(Icons.rocket_launch),
               label: const Text('Opened App'),
             ),
             const SizedBox(height: 8),
 
             ElevatedButton.icon(
-              onPressed: () => _trackEvent(eventName: 'Viewed Product'),
+              onPressed: () => _trackEvent(
+                eventName: EventMetric.viewedProduct,
+                properties: {
+                  'product_id': '12345',
+                  'product_name': 'Cool Widget',
+                  'price': 29.99,
+                },
+              ),
               icon: const Icon(Icons.remove_red_eye),
               label: const Text('Viewed Product'),
             ),
             const SizedBox(height: 8),
 
             ElevatedButton.icon(
-              onPressed: () => _trackEvent(eventName: 'Added to Cart'),
+              onPressed: () => _trackEvent(
+                eventName: EventMetric.addedToCart,
+                properties: {
+                  'product_id': '12345',
+                  'quantity': 2,
+                },
+                value: 59.98,
+              ),
               icon: const Icon(Icons.add_shopping_cart),
               label: const Text('Added to Cart'),
             ),
             const SizedBox(height: 8),
 
             ElevatedButton.icon(
-              onPressed: () => _trackEvent(eventName: 'Started Checkout'),
+              onPressed: () => _trackEvent(
+                eventName: EventMetric.startedCheckout,
+                properties: {'cart_items': 3},
+                value: 99.99,
+              ),
               icon: const Icon(Icons.shopping_cart_checkout),
               label: const Text('Started Checkout'),
             ),
             const SizedBox(height: 8),
 
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              'Custom Events:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+
             ElevatedButton.icon(
-              onPressed: () => _trackEvent(eventName: 'Test Event'),
+              onPressed: () => _trackEvent(
+                eventName: const EventMetric.custom('Test Event'),
+              ),
               icon: const Icon(Icons.science),
               label: const Text('Test Event'),
             ),

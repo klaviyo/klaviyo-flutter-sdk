@@ -186,23 +186,10 @@ class KlaviyoSDK {
 
     try {
       await _nativeWrapper.trackEvent(event);
-      _logger.info('Event tracked: ${event.name}');
+      _logger.info('Event tracked: ${event.name.name}');
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
     }
-  }
-
-  /// Track event with just name and properties
-  Future<void> track(
-    String eventName, [
-    Map<String, dynamic>? properties,
-  ]) async {
-    final event = KlaviyoEvent(
-      name: eventName,
-      properties: properties ?? {},
-      timestamp: DateTime.now(),
-    );
-    await trackEvent(event);
   }
 
   /// Register for push notifications

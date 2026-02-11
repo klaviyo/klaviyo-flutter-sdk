@@ -187,10 +187,9 @@ class KlaviyoNativeWrapper {
     String eventName, [
     Map<String, dynamic>? properties,
   ]) async {
-    final event = KlaviyoEvent(
-      name: eventName,
-      properties: properties ?? {},
-      timestamp: DateTime.now(),
+    final event = KlaviyoEvent.custom(
+      metric: eventName,
+      properties: properties,
     );
     await trackEvent(event);
   }
