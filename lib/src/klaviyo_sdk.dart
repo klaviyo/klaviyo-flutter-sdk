@@ -329,9 +329,11 @@ class KlaviyoSDK {
   /// );
   /// ```
   ///
-  /// Returns `true` if the URL is a valid Klaviyo tracking link, `false` otherwise.
-  /// Note: This is an async method but can be called without awaiting in go_router's redirect.
-  Future<bool> handleUniversalTrackingLink(String url) async {
+  /// This is a synchronous operation that validates the URL and returns immediately.
+  /// The native SDK handles tracking and link resolution in the background (fire-and-forget).
+  ///
+  /// Returns `true` if the URL matches the Klaviyo tracking link pattern, `false` otherwise.
+  bool handleUniversalTrackingLink(String url) {
     _ensureInitialized();
 
     // Validate empty/null URL
@@ -346,24 +348,24 @@ class KlaviyoSDK {
 
     if (!klaviyoTrackingLinkPattern.hasMatch(url)) {
       _logger.warning(
-        '[DeepLink SDK] URL does not match Klaviyo tracking link pattern, returning false',
+        '[DeepLink SDK] URL does not match Klaviyo tracking link pattern',
       );
       return false;
     }
 
-    try {
-      final isKlaviyoLink =
-          await _nativeWrapper.handleUniversalTrackingLink(url);
+    // Fire-and-forget the native call - we don't await or handle errors
+    // since this is a synchronous operation from the caller's perspective
+    _nativeWrapper.handleUniversalTrackingLink(url).then((isKlaviyoLink) {
       if (isKlaviyoLink) {
         _logger.info('Link $url handled by native layer');
       } else {
         _logger.warning('Link $url rejected by native SDK');
       }
-      return isKlaviyoLink;
-    } catch (e) {
+    }).catchError((e) {
       _logger.error('Failed to handle universal tracking link $url: $e');
-      return false;
-    }
+    });
+
+    return true;
   }
 
   /// Reset the current profile (useful for logout)

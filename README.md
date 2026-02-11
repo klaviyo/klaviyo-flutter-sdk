@@ -416,12 +416,12 @@ void main() async {
 
 1. **URL arrives** via go_router's routing system
 2. **`redirect` callback fires** with the URL
-3. **Call `handleUniversalTrackingLink()`** (fire-and-forget)
-4. **Returns `true`** if it's a Klaviyo tracking link (format: `https://domain/u/...`)
-5. **Native SDK tracks** the click event in the background
-6. **Native SDK broadcasts** resolved link to Flutter SDK
+3. **Call `handleUniversalTrackingLink()`** - validates and returns immediately
+4. **Returns `true`** if it's a Klaviyo tracking link (format: `https://domain/u/...`), `false` otherwise
+5. **Native SDK tracks** the click event in the background (fire-and-forget)
+6. **Native SDK resolves** the link and your Flutter routing library handles the final destination
 
-**Note**: `handleUniversalTrackingLink()` is async but can be called without awaiting in go_router's `redirect` callback.
+**Note**: `handleUniversalTrackingLink()` is synchronous - it validates the URL and returns a bool immediately, while the native tracking happens asynchronously in the background.
 
 ### 9. Profile Reset (Logout)
 
@@ -452,7 +452,7 @@ The main SDK class that provides all functionality.
 - `registerForInAppForms(configuration)` - Register for in-app forms
 - `showForm(formId, customData)` - Show a specific form
 - `hideForm(formId)` - Hide a specific form
-- `handleUniversalTrackingLink(url)` - Check if URL is a Klaviyo tracking link and track it, returns true/false
+- `handleUniversalTrackingLink(url)` - Validates and handles Klaviyo universal tracking links, returns `bool`
 - `resetProfile()` - Reset user profile
 - `setBadgeCount(count)` - Set the badge count on the app icon (iOS only)
 - `setLogLevel(logLevel)` - Set logging level

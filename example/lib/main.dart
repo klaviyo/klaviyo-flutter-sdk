@@ -199,22 +199,17 @@ final GoRouter _router = GoRouter(
     // Handle Klaviyo universal tracking links
     final klaviyo = KlaviyoSDK();
     if (klaviyo.isInitialized) {
-      try {
-        print('🔀 [Redirect] Checking if tracking link...');
-        final isTrackingLink = await klaviyo.handleUniversalTrackingLink(url);
-        print('🔀 [Redirect] Is tracking link: $isTrackingLink');
+      print('🔀 [Redirect] Checking if tracking link...');
+      final isTrackingLink = klaviyo.handleUniversalTrackingLink(url);
+      print('🔀 [Redirect] Is tracking link: $isTrackingLink');
 
-        // If this is a tracking link, stay on current page (no navigation)
-        // The SDK will resolve and broadcast the destination, triggering another redirect
-        if (isTrackingLink) {
-          print(
-            '🔀 [Redirect] ✅ Tracking link - staying on current location: ${state.matchedLocation}',
-          );
-          return state
-              .matchedLocation; // Stay on current page while SDK resolves
-        }
-      } catch (error) {
-        print('🔀 [Redirect] Error handling tracking link: $error');
+      // If this is a tracking link, stay on current page (no navigation)
+      // The SDK will resolve and broadcast the destination, triggering another redirect
+      if (isTrackingLink) {
+        print(
+          '🔀 [Redirect] ✅ Tracking link - staying on current location: ${state.matchedLocation}',
+        );
+        return state.matchedLocation; // Stay on current page while SDK resolves
       }
     }
 
