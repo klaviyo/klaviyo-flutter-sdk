@@ -10,7 +10,7 @@ sealed class EventMetric {
   const EventMetric._(this.name);
 
   /// Creates a custom event metric with the given name
-  const factory EventMetric.custom(String name) = CustomEventMetric;
+  const factory EventMetric.custom(String name) = _CustomEventMetric;
 
   /// The 'Opened App' event is used to track when a user opens the app.
   static const EventMetric openedApp = _PredefinedEventMetric('Opened App');
@@ -46,7 +46,7 @@ final class _PredefinedEventMetric extends EventMetric {
 }
 
 /// Custom event metric with a user-defined name
-final class CustomEventMetric extends EventMetric {
+final class _CustomEventMetric extends EventMetric {
   /// Creates a custom event metric with the given [name]
-  const CustomEventMetric(super.name) : super._();
+  const _CustomEventMetric(super.name) : super._();
 }
