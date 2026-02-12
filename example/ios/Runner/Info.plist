@@ -62,5 +62,22 @@
 	<string>We need access to your location even when the app is in the background to monitor geofences and send you location-based notifications.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>We need access to your location even when the app is in the background to monitor geofences.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.klaviyo.FlutterExample</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.klaviyo.FlutterExample</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>com.klaviyo.FlutterExample</string>
+	</array>
 </dict>
 </plist>

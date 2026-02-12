@@ -306,6 +306,68 @@ class KlaviyoSDK {
     return await _nativeWrapper.getCurrentGeofences();
   }
 
+  // ============================================================================
+  // Deep Linking
+  // ============================================================================
+
+  /// Handle a Klaviyo universal tracking link
+  ///
+  /// Checks if the provided URL is a Klaviyo tracking link (format: `https://domain/u/...`).
+  /// If it is, the native SDK will track the click event and resolve the destination URL.
+  /// Our native SDK will then broadcast the deeplink to Flutter for navigation
+  ///
+  /// **Integration Pattern:**
+  /// ```dart
+  /// // Using go_router
+  /// final router = GoRouter(
+  ///   routes: [...],
+  ///   redirect: (context, state) {
+  ///     // Fire-and-forget - Klaviyo tracks in background
+  ///     Klaviyo.handleUniversalTrackingLink(state.uri.toString());
+  ///     return null; // Continue with normal navigation
+  ///   },
+  /// );
+  /// ```
+  ///
+  /// This is a synchronous operation that validates the URL and returns immediately.
+  /// The native SDK handles tracking and link resolution in the background (fire-and-forget).
+  ///
+  /// Returns `true` if the URL matches the Klaviyo tracking link pattern, `false` otherwise.
+  bool handleUniversalTrackingLink(String url) {
+    _ensureInitialized();
+
+    // Validate empty/null URL
+    if (url.trim().isEmpty) {
+      _logger.error('[DeepLink SDK] Error: Empty tracking link provided');
+      return false;
+    }
+
+    // Validate that the URL is a Klaviyo universal tracking link using regex
+    // Pattern: https://domain/u/path
+    final klaviyoTrackingLinkPattern = RegExp(r'^https:\/\/[^/]+\/u\/.*$');
+
+    if (!klaviyoTrackingLinkPattern.hasMatch(url)) {
+      _logger.warning(
+        '[DeepLink SDK] URL does not match Klaviyo tracking link pattern',
+      );
+      return false;
+    }
+
+    // Fire-and-forget the native call - we don't await or handle errors
+    // since this is a synchronous operation from the caller's perspective
+    _nativeWrapper.handleUniversalTrackingLink(url).then((isKlaviyoLink) {
+      if (isKlaviyoLink) {
+        _logger.info('Link $url handled by native layer');
+      } else {
+        _logger.warning('Link $url rejected by native SDK');
+      }
+    }).catchError((e) {
+      _logger.error('Failed to handle universal tracking link $url: $e');
+    });
+
+    return true;
+  }
+
   /// Reset the current profile (useful for logout)
   /// Profile state is managed by the native SDK
   Future<void> resetProfile() async {

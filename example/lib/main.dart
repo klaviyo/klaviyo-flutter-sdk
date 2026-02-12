@@ -189,7 +189,85 @@ final GoRouter _router = GoRouter(
       ],
     ),
   ],
+  redirect: (context, state) async {
+    final url = state.uri.toString();
+    print('🔀 [Redirect] Called with URL: $url');
+    print(
+      '🔀 [Redirect] URI scheme: ${state.uri.scheme}, path: ${state.uri.path}',
+    );
+
+    // Handle Klaviyo universal tracking links
+    final klaviyo = KlaviyoSDK();
+    if (klaviyo.isInitialized) {
+      print('🔀 [Redirect] Checking if tracking link...');
+      final isTrackingLink = klaviyo.handleUniversalTrackingLink(url);
+      print('🔀 [Redirect] Is tracking link: $isTrackingLink');
+
+      // If this is a tracking link, stay on current page (no navigation)
+      // The SDK will resolve and broadcast the destination, triggering another redirect
+      if (isTrackingLink) {
+        print(
+          '🔀 [Redirect] ✅ Tracking link - staying on current location: ${state.matchedLocation}',
+        );
+        return state.matchedLocation; // Stay on current page while SDK resolves
+      }
+    }
+
+    // Parse the path from custom scheme or universal link
+    print('🔀 [Redirect] URI authority: ${state.uri.authority}');
+    final path = _parseDeepLinkPath(state.uri);
+    print('🔀 [Redirect] Parsed path: $path');
+
+    // Redirect root to profile
+    if (path == '/' || path.isEmpty) {
+      print('🔀 [Redirect] Root path detected, redirecting to /profile');
+      return '/profile';
+    }
+
+    // Navigate to valid paths
+    if (path != state.uri.path) {
+      print('🔀 [Redirect] Path differs from state.uri.path, returning: $path');
+      return path;
+    }
+
+    print('🔀 [Redirect] No redirect needed, returning null');
+    return null;
+  },
 );
+
+/// Parse deep link path from custom scheme or universal link URL
+String _parseDeepLinkPath(Uri uri) {
+  // For custom scheme URLs (e.g., com.klaviyo.flutterexample://product/123),
+  // the URI parser treats the first segment as authority/host, not path
+  if (uri.scheme.isNotEmpty && uri.scheme != 'http' && uri.scheme != 'https') {
+    // Custom scheme: combine authority and path
+    // For com.klaviyo.flutterexample://product/123:
+    //   uri.authority = "product"
+    //   uri.path = "/123"
+    String path = uri.authority;
+
+    // Append the path component if it exists and is not just "/"
+    if (uri.path.isNotEmpty && uri.path != '/') {
+      path = '$path${uri.path}';
+    }
+
+    // Remove trailing slash if present
+    if (path.endsWith('/') && path.length > 1) {
+      path = path.substring(0, path.length - 1);
+    }
+
+    // Ensure path starts with /
+    if (path.isNotEmpty && !path.startsWith('/')) {
+      path = '/$path';
+    }
+
+    return path.isEmpty ? '/' : path;
+  }
+
+  // For universal links (http/https) or internal navigation (empty scheme),
+  // go_router already parsed the path correctly
+  return uri.path;
+}
 
 /// Scaffold with bottom navigation bar
 class ScaffoldWithNavBar extends StatelessWidget {

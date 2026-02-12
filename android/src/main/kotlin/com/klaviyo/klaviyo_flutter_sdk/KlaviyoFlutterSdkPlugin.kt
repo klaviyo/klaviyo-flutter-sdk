@@ -417,6 +417,22 @@ class KlaviyoFlutterSdkPlugin :
                 result.success(null)
             }
 
+            "handleUniversalTrackingLink" -> {
+                val url = call.argument<String>("url")
+
+                try {
+                    if (url == null) {
+                        result.error("INVALID_URL", "URL cannot be null", null)
+                        return
+                    }
+
+                    val isKlaviyoLink = Klaviyo.handleUniversalTrackingLink(url)
+                    result.success(isKlaviyoLink)
+                } catch (e: Exception) {
+                    result.error("DEEP_LINK_ERROR", "Failed to handle universal tracking link", e.message)
+                }
+            }
+
             else -> {
                 result.notImplemented()
             }

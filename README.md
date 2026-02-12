@@ -354,7 +354,76 @@ final success = await klaviyo.showForm('newsletter_signup',
 await klaviyo.hideForm('newsletter_signup');
 ```
 
-### 8. Profile Reset (Logout)
+### 8. Deep Linking
+
+Klaviyo supports [Deep Links](https://help.klaviyo.com/hc/en-us/articles/14750403974043) for tracking link clicks and navigating to specific content within your app. This works with push notifications, in-app messages, and Klaviyo tracking links.
+
+#### Prerequisites
+
+1. Set up deep linking in your Flutter app using one of these approaches:
+   - [go_router](https://pub.dev/packages/go_router) (recommended by Flutter team)
+   - [app_links](https://pub.dev/packages/app_links) or [uni_links](https://pub.dev/packages/uni_links)
+   - Flutter's built-in `WidgetsBindingObserver`
+
+2. Configure platform-specific deep linking:
+   - [iOS Universal Links Setup](https://github.com/klaviyo/klaviyo-swift-sdk#deep-linking)
+   - [Android App Links Setup](https://github.com/klaviyo/klaviyo-android-sdk#deep-linking)
+
+#### Integration with go_router
+
+Use go_router's `redirect` callback to pass URLs to Klaviyo:
+
+```dart
+import 'package:go_router/go_router.dart';
+import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+
+final router = GoRouter(
+  routes: [
+    GoRoute(
+      path: '/',
+      builder: (context, state) => HomeScreen(),
+      routes: [
+        GoRoute(
+          path: 'product/:id',
+          builder: (context, state) => ProductScreen(
+            productId: state.pathParameters['id']!,
+          ),
+        ),
+      ],
+    ),
+  ],
+  redirect: (context, state) {
+    // Fire-and-forget - Klaviyo tracks the link in the background
+    final klaviyo = KlaviyoSDK();
+    klaviyo.handleUniversalTrackingLink(state.uri.toString());
+
+    // Continue with normal navigation
+    return null;
+  },
+);
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final klaviyo = KlaviyoSDK();
+  await klaviyo.initialize(apiKey: 'YOUR_API_KEY');
+
+  runApp(MaterialApp.router(routerConfig: router));
+}
+```
+
+#### How It Works
+
+1. **URL arrives** via go_router's routing system
+2. **`redirect` callback fires** with the URL
+3. **Call `handleUniversalTrackingLink()`** - validates and returns immediately
+4. **Returns `true`** if it's a Klaviyo tracking link (format: `https://domain/u/...`), `false` otherwise
+5. **Native SDK tracks** the click event in the background (fire-and-forget)
+6. **Native SDK resolves** the link and your Flutter routing library handles the final destination
+
+**Note**: `handleUniversalTrackingLink()` is synchronous - it validates the URL and returns a bool immediately, while the native tracking happens asynchronously in the background.
+
+### 9. Profile Reset (Logout)
 
 ```dart
 // Reset profile when user logs out
@@ -383,6 +452,7 @@ The main SDK class that provides all functionality.
 - `registerForInAppForms(configuration)` - Register for in-app forms
 - `showForm(formId, customData)` - Show a specific form
 - `hideForm(formId)` - Hide a specific form
+- `handleUniversalTrackingLink(url)` - Validates and handles Klaviyo universal tracking links, returns `bool`
 - `resetProfile()` - Reset user profile
 - `setBadgeCount(count)` - Set the badge count on the app icon (iOS only)
 - `setLogLevel(logLevel)` - Set logging level
