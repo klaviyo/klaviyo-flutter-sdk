@@ -106,10 +106,7 @@ class KlaviyoEvent {
     }
 
     if (value != null) {
-      if (data['properties'] == null) {
-        data['properties'] = {};
-      }
-      data['properties']['value'] = value;
+      data['value'] = value;
     }
 
     if (uniqueId != null) {
@@ -126,7 +123,7 @@ class KlaviyoEvent {
       properties: json['properties'] != null
           ? Map<String, dynamic>.from(json['properties'] as Map)
           : null,
-      value: (json['properties']?['value'] as num?)?.toDouble(),
+      value: (json['value'] as num?)?.toDouble(),
       uniqueId: json['unique_id'] as String?,
     );
   }
