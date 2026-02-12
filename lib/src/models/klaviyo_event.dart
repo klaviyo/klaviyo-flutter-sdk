@@ -119,7 +119,7 @@ class KlaviyoEvent {
   /// Create from JSON
   factory KlaviyoEvent.fromJson(Map<String, dynamic> json) {
     return KlaviyoEvent(
-      name: EventMetric.custom(json['event'] as String),
+      name: EventMetric.custom(json['name'] as String),
       properties: json['properties'] != null
           ? Map<String, dynamic>.from(json['properties'] as Map)
           : null,
