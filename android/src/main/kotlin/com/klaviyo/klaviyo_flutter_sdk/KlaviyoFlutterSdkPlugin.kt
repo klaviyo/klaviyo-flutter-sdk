@@ -218,6 +218,11 @@ class KlaviyoFlutterSdkPlugin :
                         event = event.setValue(value.toDouble())
                     }
 
+                    // Add uniqueId if provided
+                    (eventJson?.get("unique_id") as? String)?.let { uniqueId ->
+                        event = event.setUniqueId(uniqueId)
+                    }
+
                     Klaviyo.createEvent(event)
                     result.success(null)
                 } catch (e: Exception) {

@@ -148,10 +148,12 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             let properties = eventData["properties"] as? [String: Any] ?? [:]
             let value = eventData["value"] as? Double
+            let uniqueId = eventData["unique_id"] as? String
             let event = Event(
                 name: .customEvent(name),
                 properties: properties,
-                value: value
+                value: value,
+                uniqueId: uniqueId
             )
             KlaviyoSDK().create(event: event)
             result(nil)
