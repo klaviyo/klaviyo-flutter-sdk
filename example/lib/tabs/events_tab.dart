@@ -58,7 +58,7 @@ class _EventsTabState extends State<EventsTab> {
             _propertyValueController.text;
       }
 
-      await _klaviyo.trackEvent(
+      await _klaviyo.createEvent(
         KlaviyoEvent(
           name: name,
           properties: eventProperties,
