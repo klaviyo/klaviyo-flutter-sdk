@@ -167,6 +167,53 @@ dependencies {
 <uses-permission android:name="android.permission.VIBRATE" />
 ```
 
+### Enabling Geofencing (Optional)
+
+The Klaviyo Flutter SDK supports geofencing, but location permissions are **not included by default**. To use geofencing features, you must explicitly enable location permissions.
+
+#### Android
+
+Add to `android/gradle.properties`:
+
+```properties
+klaviyoIncludeLocationPermissions=true
+```
+
+This includes these permissions in your merged manifest:
+- `android.permission.ACCESS_FINE_LOCATION`
+- `android.permission.ACCESS_COARSE_LOCATION`
+- `android.permission.ACCESS_BACKGROUND_LOCATION`
+
+#### iOS
+
+Add to `ios/Podfile` before `flutter_install_all_ios_pods`:
+
+```ruby
+ENV['KLAVIYO_INCLUDE_LOCATION_PERMISSIONS'] = 'true'
+```
+
+This includes the `KlaviyoLocation` pod. You'll also need location permission descriptions in `Info.plist`:
+
+```xml
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>We use your location for geofencing features.</string>
+
+<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>We need background location for geofence monitoring.</string>
+```
+
+#### Impact
+
+**Without location permissions (default):**
+- Geofencing methods (`registerGeofencing()`, `unregisterGeofencing()`, `getCurrentGeofences()`) will throw errors
+- No location permissions requested from users
+- No location justification needed for app store submissions
+
+**With location permissions enabled:**
+- Full geofencing functionality available
+- Location permissions will be requested at runtime
+- App store submissions require location usage justification
+
 ## Usage
 
 ### 1. Initialize the SDK
