@@ -232,7 +232,7 @@ final event = KlaviyoEvent(
   },
   timestamp: DateTime.now(),
 );
-await klaviyo.trackEvent(event);
+await klaviyo.createEvent(event);
 ```
 
 ### 4. Push Notifications
@@ -444,8 +444,8 @@ The main SDK class that provides all functionality.
 - `setPhoneNumber(phoneNumber)` - Set user phone number
 - `setExternalId(externalId)` - Set external user ID
 - `setProfileProperties(properties)` - Set custom profile properties
-- `track(name, properties)` - Track a simple event
-- `trackEvent(event)` - Track a complex event
+- `createEvent(event)` - Create a new event to track a profile's activity
+- `setProfileAttribute(propertyKey, value)` - Set a single profile attribute
 - `registerForPushNotifications()` - Register for push notifications (iOS: triggers APNs registration, Android: fetches FCM token)
 - `setPushToken(token, environment)` - Set push notification token (usually handled automatically by native SDKs)
 - `getPushToken()` - Get current push token

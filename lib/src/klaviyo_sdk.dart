@@ -167,6 +167,19 @@ class KlaviyoSDK {
     }
   }
 
+  /// Set a single profile attribute
+  ///
+  /// This is a convenience method to set a single profile property.
+  /// To match the React Native SDK API.
+  ///
+  /// Example:
+  /// ```dart
+  /// await klaviyo.setProfileAttribute('first_name', 'John');
+  /// ```
+  Future<void> setProfileAttribute(String propertyKey, dynamic value) async {
+    await setProfileProperties({propertyKey: value});
+  }
+
   /// Set profile location
   /// Calls the native SDK directly - native SDK manages profile state
   Future<void> setLocation(KlaviyoLocation location) async {
@@ -180,8 +193,8 @@ class KlaviyoSDK {
     }
   }
 
-  /// Track an event
-  Future<void> trackEvent(KlaviyoEvent event) async {
+  /// Create a new event to track a profile's activity.
+  Future<void> createEvent(KlaviyoEvent event) async {
     _ensureInitialized();
 
     try {
