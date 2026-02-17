@@ -226,7 +226,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             #else
             result(FlutterError(
                 code: "UNAVAILABLE",
-                message: "Geofencing requires KlaviyoLocation dependency. Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true in Podfile.",
+                message: "Geofencing unavailable. Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true.",
                 details: nil
             ))
             #endif
@@ -240,7 +240,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             #else
             result(FlutterError(
                 code: "UNAVAILABLE",
-                message: "Geofencing requires KlaviyoLocation dependency. Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true in Podfile.",
+                message: "Geofencing unavailable. Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true.",
                 details: nil
             ))
             #endif
@@ -262,7 +262,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             #else
             result(FlutterError(
                 code: "UNAVAILABLE",
-                message: "Geofencing requires KlaviyoLocation dependency. Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true in Podfile.",
+                message: "Geofencing unavailable. Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true.",
                 details: nil
             ))
             #endif
