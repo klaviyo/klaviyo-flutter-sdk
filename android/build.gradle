@@ -65,13 +65,7 @@ dependencies {
     if (includeLocationPermissions) {
         api "com.github.klaviyo.klaviyo-android-sdk:location:feat~flutter-support-SNAPSHOT"
     } else {
-        api("com.github.klaviyo.klaviyo-android-sdk:location:feat~flutter-support-SNAPSHOT") {
-            artifact {
-                name = 'location'
-                type = 'aar'
-                classifier = 'noPermissions'
-            }
-        }
+        api "com.github.klaviyo.klaviyo-android-sdk:location:feat~flutter-support-SNAPSHOT:noPermissions@aar"
     }
 
     implementation "com.google.firebase:firebase-messaging:24.1.0"

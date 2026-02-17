@@ -59,7 +59,7 @@ The SDK supports geofencing, but location permissions are **not included by defa
 flutter run
 ```
 
-Geofencing methods will throw "UNAVAILABLE" errors.
+Geofencing methods will return "UNAVAILABLE" errors.
 
 ### With Location Permissions (For Geofencing)
 
@@ -99,7 +99,7 @@ Geofencing methods will throw "UNAVAILABLE" errors.
 ### Expected Behavior
 
 **Without location permissions (default):**
-- Geofencing methods (`registerGeofencing()`, `unregisterGeofencing()`, `getCurrentGeofences()`) throw errors
+- Geofencing methods (`registerGeofencing()`, `unregisterGeofencing()`, `getCurrentGeofences()`) return errors
 - Location permissions do NOT appear in manifest/Info.plist
 - No location permissions requested from users
 

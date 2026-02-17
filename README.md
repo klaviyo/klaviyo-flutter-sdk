@@ -205,7 +205,7 @@ This includes the `KlaviyoLocation` pod. You'll also need location permission de
 #### Impact
 
 **Without location permissions (default):**
-- Geofencing methods (`registerGeofencing()`, `unregisterGeofencing()`, `getCurrentGeofences()`) will throw errors
+- Geofencing methods (`registerGeofencing()`, `unregisterGeofencing()`, `getCurrentGeofences()`) will return an error
 - No location permissions requested from users
 - No location justification needed for app store submissions
 
