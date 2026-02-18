@@ -29,7 +29,7 @@ repos:
 
       - id: flutter-analyze
         name: flutter analyze
-        entry: bash -c 'timeout 60 flutter analyze --no-fatal-infos || (code=$?; if [ $code -eq 124 ]; then echo "Flutter analyze timed out after 60s - skipping (CI will catch issues)"; exit 0; else exit $code; fi)'
+        entry: flutter analyze --no-fatal-infos
         language: system
         pass_filenames: false
 
