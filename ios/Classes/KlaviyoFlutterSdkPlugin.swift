@@ -224,9 +224,10 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(nil)
             }
             #else
+            KlaviyoSDK().log(level: .error, message: "Geofencing not available: location module not included")
             result(FlutterError(
-                code: "UNAVAILABLE",
-                message: "Geofencing unavailable. Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true.",
+                code: "GEOFENCING_NOT_AVAILABLE",
+                message: "Geofencing requires the full location module. Add 'KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true' to your podfile or environment.",
                 details: nil
             ))
             #endif
@@ -238,9 +239,10 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(nil)
             }
             #else
+            KlaviyoSDK().log(level: .error, message: "Geofencing not available: location module not included")
             result(FlutterError(
-                code: "UNAVAILABLE",
-                message: "Geofencing unavailable. Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true.",
+                code: "GEOFENCING_NOT_AVAILABLE",
+                message: "Geofencing requires the full location module. Add 'KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true' to your podfile or environment.",
                 details: nil
             ))
             #endif
@@ -260,9 +262,10 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(["geofences": geofencesArray])
             }
             #else
+            KlaviyoSDK().log(level: .error, message: "Geofencing not available: location module not included")
             result(FlutterError(
-                code: "UNAVAILABLE",
-                message: "Geofencing unavailable. Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true.",
+                code: "GEOFENCING_NOT_AVAILABLE",
+                message: "Geofencing requires the full location module. Add 'KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true' to your podfile or environment.",
                 details: nil
             ))
             #endif

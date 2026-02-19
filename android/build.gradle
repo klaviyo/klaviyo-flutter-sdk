@@ -53,19 +53,17 @@ dependencies {
     api "com.github.klaviyo.klaviyo-android-sdk:analytics:feat~flutter-support-SNAPSHOT"
     api "com.github.klaviyo.klaviyo-android-sdk:push-fcm:feat~flutter-support-SNAPSHOT"
     api "com.github.klaviyo.klaviyo-android-sdk:forms:feat~flutter-support-SNAPSHOT"
+    // Always include location for geofencing interfaces (no Play Services dependencies)
+    api "com.github.klaviyo.klaviyo-android-sdk:location-core:feat~flutter-support-SNAPSHOT"
 
-    // Read location permissions configuration from host app
-    // Default to FALSE (first release - opt-in for geofencing)
     def includeLocationPermissions = false
     if (rootProject.hasProperty('klaviyoIncludeLocationPermissions')) {
         includeLocationPermissions = rootProject.getProperty('klaviyoIncludeLocationPermissions').toBoolean()
     }
 
-    // Conditionally include location module
+    // Conditionally include full location module with Play Services implementation
     if (includeLocationPermissions) {
         api "com.github.klaviyo.klaviyo-android-sdk:location:feat~flutter-support-SNAPSHOT"
-    } else {
-        api "com.github.klaviyo.klaviyo-android-sdk:location:feat~flutter-support-SNAPSHOT:noPermissions@aar"
     }
 
     implementation "com.google.firebase:firebase-messaging:24.1.0"
