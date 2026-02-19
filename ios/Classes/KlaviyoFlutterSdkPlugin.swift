@@ -227,7 +227,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             KlaviyoSDK().log(level: .error, message: "Geofencing not available: location module not included")
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
-                message: "Geofencing requires the full location module. Add 'KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true' to your podfile or environment.",
+                message: "Geofencing requires the location module. " +
+                    "Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true in your podfile.",
                 details: nil
             ))
             #endif
@@ -242,7 +243,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             KlaviyoSDK().log(level: .error, message: "Geofencing not available: location module not included")
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
-                message: "Geofencing requires the full location module. Add 'KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true' to your podfile or environment.",
+                message: "Geofencing requires the location module. " +
+                    "Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true in your podfile.",
                 details: nil
             ))
             #endif
@@ -265,7 +267,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             KlaviyoSDK().log(level: .error, message: "Geofencing not available: location module not included")
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
-                message: "Geofencing requires the full location module. Add 'KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true' to your podfile or environment.",
+                message: "Geofencing requires the location module. " +
+                    "Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true in your podfile.",
                 details: nil
             ))
             #endif

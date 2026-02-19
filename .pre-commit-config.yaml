@@ -49,6 +49,6 @@ repos:
 
       - id: swiftlint
         name: swiftlint
-        entry: swiftlint
+        entry: swiftlint lint --strict
         language: system
         files: \.swift$
