@@ -224,7 +224,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(nil)
             }
             #else
-            KlaviyoSDK().log(level: .error, message: "Geofencing not available: location module not included")
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
@@ -240,7 +239,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(nil)
             }
             #else
-            KlaviyoSDK().log(level: .error, message: "Geofencing not available: location module not included")
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
@@ -264,7 +262,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(["geofences": geofencesArray])
             }
             #else
-            KlaviyoSDK().log(level: .error, message: "Geofencing not available: location module not included")
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
