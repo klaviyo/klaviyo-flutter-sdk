@@ -361,7 +361,7 @@ class KlaviyoFlutterSdkPlugin :
                     Registry.log.error("Geofencing not available: location module not included", e)
                     result.error(
                         "GEOFENCING_NOT_AVAILABLE",
-                        "Geofencing requires the full location module. Add 'klaviyoIncludeLocationPermissions=true' to gradle.properties",
+                        "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties",
                         e.message,
                     )
                 } catch (e: Exception) {
@@ -378,7 +378,7 @@ class KlaviyoFlutterSdkPlugin :
                     Registry.log.error("Geofencing not available: location module not included", e)
                     result.error(
                         "GEOFENCING_NOT_AVAILABLE",
-                        "Geofencing requires the full location module. Add 'klaviyoIncludeLocationPermissions=true' to gradle.properties",
+                        "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties",
                         e.message,
                     )
                 } catch (e: Exception) {
@@ -395,7 +395,7 @@ class KlaviyoFlutterSdkPlugin :
                         Registry.log.error("Geofencing not available: location module not included")
                         result.error(
                             "GEOFENCING_NOT_AVAILABLE",
-                            "Geofencing requires the full location module. Add 'klaviyoIncludeLocationPermissions=true' to gradle.properties",
+                            "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties",
                             null,
                         )
                         return

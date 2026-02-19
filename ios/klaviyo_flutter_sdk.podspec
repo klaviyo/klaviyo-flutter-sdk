@@ -15,8 +15,8 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
   s.dependency 'KlaviyoForms', '~> 5.2.0'
 
   # Conditional location dependency based on environment variable
-  # Default is FALSE (first release - opt-in for geofencing)
-  include_location = ENV['KLAVIYO_INCLUDE_LOCATION_PERMISSIONS'] == 'true'
+  # Default is FALSE (opt-in for geofencing)
+  include_location = ENV['KLAVIYO_INCLUDE_LOCATION'] == 'true'
   if include_location
     s.dependency 'KlaviyoLocation', '~> 5.2.0'
   end

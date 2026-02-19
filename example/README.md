@@ -51,7 +51,7 @@ When you first launch the app, you'll see an **API Key input field** at the top:
 
 ## Testing Location Permission Configurations
 
-The SDK supports geofencing, but location permissions are **not included by default**. To test geofencing features, you must explicitly enable location permissions.
+The SDK supports geofencing, but location functionality is **not included by default**. To test geofencing features, you must explicitly enable location.
 
 ### Default (Without Permissions)
 
@@ -61,13 +61,13 @@ flutter run
 
 Geofencing methods will return "UNAVAILABLE" errors.
 
-### With Location Permissions (For Geofencing)
+### With Location Enabled (For Geofencing)
 
 #### Android
 
 1. Add to `android/gradle.properties`:
    ```properties
-   klaviyoIncludeLocationPermissions=true
+   klaviyoIncludeLocation=true
    ```
 
 2. Rebuild:
@@ -79,7 +79,7 @@ Geofencing methods will return "UNAVAILABLE" errors.
 
 1. Add to `ios/Podfile` (before `flutter_install_all_ios_pods`):
    ```ruby
-   ENV['KLAVIYO_INCLUDE_LOCATION_PERMISSIONS'] = 'true'
+   ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
    ```
 
 2. Add location permission descriptions to `ios/Runner/Info.plist`:
@@ -118,8 +118,8 @@ cd android && ./gradlew :app:processDebugManifest
 cat app/build/intermediates/merged_manifests/debug/AndroidManifest.xml | grep ACCESS_FINE_LOCATION
 # Expected: No output (permission not found)
 
-# With klaviyoIncludeLocationPermissions=true
-echo "klaviyoIncludeLocationPermissions=true" >> android/gradle.properties
+# With klaviyoIncludeLocation=true
+echo "klaviyoIncludeLocation=true" >> android/gradle.properties
 cd android && ./gradlew clean && ./gradlew :app:processDebugManifest
 cat app/build/intermediates/merged_manifests/debug/AndroidManifest.xml | grep ACCESS_FINE_LOCATION
 # Expected: Shows the permission line
@@ -133,7 +133,7 @@ cd ios && pod install
 pod list | grep KlaviyoLocation
 # Expected: No output (pod not installed)
 
-# With ENV['KLAVIYO_INCLUDE_LOCATION_PERMISSIONS'] = 'true'
+# With ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
 # (Add ENV line to Podfile first)
 cd ios && rm -rf Pods Podfile.lock && pod install
 pod list | grep KlaviyoLocation

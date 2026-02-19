@@ -169,30 +169,32 @@ dependencies {
 
 ### Enabling Geofencing (Optional)
 
-The Klaviyo Flutter SDK supports geofencing, but location permissions are **not included by default**. To use geofencing features, you must explicitly enable location permissions.
+The Klaviyo Flutter SDK supports geofencing, but the **full location module with Play Services is not included by default**. The SDK includes lightweight location interfaces (`location-core` on Android, compile-time checks on iOS) that allow you to call geofencing methods, but they will return errors unless you explicitly enable the full location module.
 
 #### Android
 
 Add to `android/gradle.properties`:
 
 ```properties
-klaviyoIncludeLocationPermissions=true
+klaviyoIncludeLocation=true
 ```
 
-This includes these permissions in your merged manifest:
-- `android.permission.ACCESS_FINE_LOCATION`
-- `android.permission.ACCESS_COARSE_LOCATION`
-- `android.permission.ACCESS_BACKGROUND_LOCATION`
+This:
+- Includes the full `location` module with Google Play Services implementation
+- Adds these permissions to your merged manifest:
+  - `android.permission.ACCESS_FINE_LOCATION`
+  - `android.permission.ACCESS_COARSE_LOCATION`
+  - `android.permission.ACCESS_BACKGROUND_LOCATION`
 
 #### iOS
 
 Add to `ios/Podfile` before `flutter_install_all_ios_pods`:
 
 ```ruby
-ENV['KLAVIYO_INCLUDE_LOCATION_PERMISSIONS'] = 'true'
+ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
 ```
 
-This includes the `KlaviyoLocation` pod. You'll also need location permission descriptions in `Info.plist`:
+This includes the `KlaviyoLocation` pod with full geofencing support. You'll also need location permission descriptions in `Info.plist`:
 
 ```xml
 <key>NSLocationWhenInUseUsageDescription</key>
@@ -202,17 +204,15 @@ This includes the `KlaviyoLocation` pod. You'll also need location permission de
 <string>We need background location for geofence monitoring.</string>
 ```
 
-#### Impact
+#### Error Behavior
 
-**Without location permissions (default):**
-- Geofencing methods (`registerGeofencing()`, `unregisterGeofencing()`, `getCurrentGeofences()`) will return an error
-- No location permissions requested from users
-- No location justification needed for app store submissions
+**Without the full location module (default):**
+- Geofencing methods (`registerGeofencing()`, `unregisterGeofencing()`, `getCurrentGeofences()`) will return:
+  - **Error code**: `GEOFENCING_NOT_AVAILABLE`
+  - **Message**: "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties" (Android) or "...to your podfile" (iOS)
 
-**With location permissions enabled:**
+**With the full location module enabled:**
 - Full geofencing functionality available
-- Location permissions will be requested at runtime
-- App store submissions require location usage justification
 
 ## Usage
 

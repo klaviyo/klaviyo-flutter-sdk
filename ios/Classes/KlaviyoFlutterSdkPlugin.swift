@@ -227,7 +227,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
-                    "Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true in your podfile.",
+                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
                 details: nil
             ))
             #endif
@@ -242,7 +242,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
-                    "Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true in your podfile.",
+                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
                 details: nil
             ))
             #endif
@@ -265,7 +265,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
-                    "Set KLAVIYO_INCLUDE_LOCATION_PERMISSIONS=true in your podfile.",
+                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
                 details: nil
             ))
             #endif
