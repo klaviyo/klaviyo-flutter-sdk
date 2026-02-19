@@ -340,7 +340,7 @@ class KlaviyoFlutterSdkPlugin :
 
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
-                    result.error("MISSING_MODULE", e.message, null)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
                 }
@@ -351,7 +351,7 @@ class KlaviyoFlutterSdkPlugin :
                     Klaviyo.unregisterFromInAppForms()
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
-                    result.error("MISSING_MODULE", e.message, null)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to unregister from in-app forms", e.message)
                 }
