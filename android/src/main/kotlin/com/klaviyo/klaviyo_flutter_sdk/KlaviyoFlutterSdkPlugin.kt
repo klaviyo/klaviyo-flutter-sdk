@@ -389,11 +389,23 @@ class KlaviyoFlutterSdkPlugin :
 
             "getCurrentGeofences" -> {
                 try {
+                    val locationManager = Registry.getOrNull<LocationManager>()
+
+                    if (locationManager == null) {
+                        Registry.log.error("Geofencing not available: location module not included")
+                        result.error(
+                            "GEOFENCING_NOT_AVAILABLE",
+                            "Geofencing requires the full location module. Add 'klaviyoIncludeLocationPermissions=true' to gradle.properties",
+                            null,
+                        )
+                        return
+                    }
+
                     // Follow the same pattern as React Native SDK
                     // Note: in the future, we may be storing more fences than we are observing
                     val geofencesArray = mutableListOf<Map<String, Any>>()
 
-                    Registry.getOrNull<LocationManager>()?.getStoredGeofences()?.forEach { geofence ->
+                    locationManager.getStoredGeofences()?.forEach { geofence ->
                         geofencesArray.add(
                             mapOf(
                                 "identifier" to geofence.id,
@@ -402,18 +414,9 @@ class KlaviyoFlutterSdkPlugin :
                                 "radius" to geofence.radius.toDouble(),
                             ),
                         )
-                    } ?: run {
-                        Registry.log.warning("Geofencing is not yet registered")
                     }
 
                     result.success(mapOf("geofences" to geofencesArray))
-                } catch (e: MissingKlaviyoModule) {
-                    Registry.log.error("Geofencing not available: location module not included", e)
-                    result.error(
-                        "GEOFENCING_NOT_AVAILABLE",
-                        "Geofencing requires the full location module. Add 'klaviyoIncludeLocationPermissions=true' to gradle.properties",
-                        e.message,
-                    )
                 } catch (e: Exception) {
                     Registry.log.error("Failed to get current geofences: ${e.message}", e)
                     result.error("GEOFENCING_ERROR", "Failed to get current geofences", e.message)
