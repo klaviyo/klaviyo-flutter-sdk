@@ -3,7 +3,6 @@ import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
 import '../models/geofence.dart';
-import '../enums/push_environment.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
 import '../utils/logger.dart';
@@ -39,8 +38,6 @@ class KlaviyoNativeWrapper {
   /// Initialize the native SDK wrapper
   Future<void> initialize({
     required String apiKey,
-    PushEnvironment environment = PushEnvironment.development,
-    Map<String, dynamic>? configuration,
   }) async {
     if (_isInitialized) return;
 
@@ -53,8 +50,6 @@ class KlaviyoNativeWrapper {
       // Initialize native SDK
       await _channel.invokeMethod('initialize', {
         'apiKey': apiKey,
-        'environment': environment.toString(),
-        'configuration': configuration,
       });
 
       _isInitialized = true;
@@ -212,16 +207,12 @@ class KlaviyoNativeWrapper {
   }
 
   /// Set push token using native SDK
-  Future<void> setPushToken(
-    String token, {
-    PushEnvironment? environment,
-  }) async {
+  Future<void> setPushToken(String token) async {
     _ensureInitialized();
 
     try {
       await _channel.invokeMethod('setPushToken', {
         'token': token,
-        'environment': environment?.toString(),
       });
     } catch (e) {
       throw KlaviyoException('Failed to set push token: $e');
@@ -312,17 +303,6 @@ class KlaviyoNativeWrapper {
       await _channel.invokeMethod('resetProfile');
     } catch (e) {
       throw KlaviyoException('Failed to reset profile: $e');
-    }
-  }
-
-  /// Set log level using native SDK
-  Future<void> setLogLevel(String logLevel) async {
-    _ensureInitialized();
-
-    try {
-      await _channel.invokeMethod('setLogLevel', {'logLevel': logLevel});
-    } catch (e) {
-      throw KlaviyoException('Failed to set log level: $e');
     }
   }
 

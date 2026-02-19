@@ -294,9 +294,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             KlaviyoSDK().resetProfile()
             result(nil)
 
-        case "setLogLevel":
-            result(nil)
-
         case "setBadgeCount":
             guard let args = call.arguments as? [String: Any],
                   let count = args["count"] as? Int

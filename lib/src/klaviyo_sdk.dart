@@ -9,7 +9,6 @@ import 'models/klaviyo_location.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'enums/klaviyo_log_level.dart';
-import 'enums/push_environment.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'utils/logger.dart';
 import 'exceptions/klaviyo_exception.dart';
@@ -37,9 +36,6 @@ class KlaviyoSDK {
   /// Initialize the Klaviyo SDK with your public API key
   Future<KlaviyoSDK> initialize({
     required String apiKey,
-    KlaviyoLogLevel logLevel = KlaviyoLogLevel.error,
-    PushEnvironment environment = PushEnvironment.development,
-    Map<String, dynamic>? configuration,
   }) async {
     if (_isInitialized) {
       _logger.warning('SDK already initialized');
@@ -49,16 +45,9 @@ class KlaviyoSDK {
     try {
       _apiKey = apiKey;
 
-      // Set logger level
-      _logger.setLogLevel(logLevel);
-
       // Initialize native wrapper
       _nativeWrapper = KlaviyoNativeWrapper();
-      await _nativeWrapper.initialize(
-        apiKey: apiKey,
-        environment: environment,
-        configuration: configuration,
-      );
+      await _nativeWrapper.initialize(apiKey: apiKey);
 
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
@@ -227,12 +216,9 @@ class KlaviyoSDK {
   }
 
   /// Set push token
-  Future<void> setPushToken(
-    String token, {
-    PushEnvironment? environment,
-  }) async {
+  Future<void> setPushToken(String token) async {
     _ensureInitialized();
-    await _nativeWrapper.setPushToken(token, environment: environment);
+    await _nativeWrapper.setPushToken(token);
   }
 
   /// Get push token
@@ -417,10 +403,10 @@ class KlaviyoSDK {
     }
   }
 
-  /// Set log level
+  /// Set log level for Flutter-side logging only
+  /// Note: This only affects Flutter console logs, not native SDK logs
   void setLogLevel(KlaviyoLogLevel logLevel) {
     _logger.setLogLevel(logLevel);
-    _nativeWrapper.setLogLevel(logLevel.toString());
   }
 
   /// Get push notification events stream
