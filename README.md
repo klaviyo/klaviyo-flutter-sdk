@@ -214,6 +214,22 @@ This includes the `KlaviyoLocation` pod with full geofencing support. You'll als
 **With the full location module enabled:**
 - Full geofencing functionality available
 
+### Disabling In-App Forms (Optional)
+
+In-app forms are **enabled by default**. To opt out:
+
+#### Android
+
+Add to `android/gradle.properties`:
+
+```properties
+klaviyoIncludeForms=false
+```
+
+**Forms opt-out**
+- Forms calls will log a warning and no-op gracefully
+- Smaller SDK code footprint
+
 ## Usage
 
 ### 1. Initialize the SDK

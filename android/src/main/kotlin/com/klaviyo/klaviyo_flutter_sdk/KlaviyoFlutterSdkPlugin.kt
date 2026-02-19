@@ -312,9 +312,9 @@ class KlaviyoFlutterSdkPlugin :
             }
 
             "registerForInAppForms" -> {
-                val configuration = call.argument<Map<String, Any>>("configuration")
-
                 try {
+                    val configuration = call.argument<Map<String, Any>>("configuration")
+
                     val sessionTimeout: Duration =
                         when (val timeout = configuration?.get("sessionTimeoutDuration") as? Int) {
                             null -> {
@@ -339,6 +339,8 @@ class KlaviyoFlutterSdkPlugin :
                     )
 
                     result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    result.error("MISSING_MODULE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
                 }
@@ -348,6 +350,8 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.unregisterFromInAppForms()
                     result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    result.error("MISSING_MODULE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to unregister from in-app forms", e.message)
                 }

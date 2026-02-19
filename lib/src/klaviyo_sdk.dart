@@ -266,17 +266,25 @@ class KlaviyoSDK {
   /// Register for in-app forms
   Future<void> registerForInAppForms({InAppFormConfig? configuration}) async {
     _ensureInitialized();
-    await _nativeWrapper.registerForInAppForms(
-      configuration: configuration?.toJson(),
-    );
-    _logger.info('Registered for in-app forms');
+    try {
+      await _nativeWrapper.registerForInAppForms(
+        configuration: configuration?.toJson(),
+      );
+      _logger.info('Registered for in-app forms');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to register for in-app forms: ${e.message}');
+    }
   }
 
   /// Unregister from in-app forms
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
-    await _nativeWrapper.unregisterFromInAppForms();
-    _logger.info('Unregistered from in-app forms');
+    try {
+      await _nativeWrapper.unregisterFromInAppForms();
+      _logger.info('Unregistered from in-app forms');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to unregister from in-app forms: ${e.message}');
+    }
   }
 
   /// Begin monitoring geofences configured in your Klaviyo account
