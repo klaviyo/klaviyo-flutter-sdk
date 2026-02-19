@@ -49,6 +49,97 @@ When you first launch the app, you'll see an **API Key input field** at the top:
 ### ⚙️ Configuration
 - **Set Log Level**: Change the verbosity of SDK logging
 
+## Testing Location Permission Configurations
+
+The SDK supports geofencing, but location functionality is **not included by default**. To test geofencing features, you must explicitly enable location.
+
+### Default (Without Permissions)
+
+```bash
+flutter run
+```
+
+Geofencing methods will return "UNAVAILABLE" errors.
+
+### With Location Enabled (For Geofencing)
+
+#### Android
+
+1. Add to `android/gradle.properties`:
+   ```properties
+   klaviyoIncludeLocation=true
+   ```
+
+2. Rebuild:
+   ```bash
+   cd android && ./gradlew clean && cd .. && flutter clean && flutter run
+   ```
+
+#### iOS
+
+1. Add to `ios/Podfile` (before `flutter_install_all_ios_pods`):
+   ```ruby
+   ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
+   ```
+
+2. Add location permission descriptions to `ios/Runner/Info.plist`:
+   ```xml
+   <key>NSLocationWhenInUseUsageDescription</key>
+   <string>We use your location for geofencing features.</string>
+
+   <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+   <string>We need background location for geofence monitoring.</string>
+   ```
+
+3. Rebuild:
+   ```bash
+   cd ios && rm -rf Pods Podfile.lock && pod install && cd .. && flutter clean && flutter run
+   ```
+
+### Expected Behavior
+
+**Without location permissions (default):**
+- Geofencing methods (`registerGeofencing()`, `unregisterGeofencing()`, `getCurrentGeofences()`) return errors
+- Location permissions do NOT appear in manifest/Info.plist
+- No location permissions requested from users
+
+**With location permissions enabled:**
+- Geofencing methods work correctly
+- Location permissions appear in manifest/Info.plist
+- Location permissions requested at runtime
+
+### Verification Steps
+
+#### Android Manifest Verification
+
+```bash
+# Default (should NOT include permissions)
+cd android && ./gradlew :app:processDebugManifest
+cat app/build/intermediates/merged_manifests/debug/AndroidManifest.xml | grep ACCESS_FINE_LOCATION
+# Expected: No output (permission not found)
+
+# With klaviyoIncludeLocation=true
+echo "klaviyoIncludeLocation=true" >> android/gradle.properties
+cd android && ./gradlew clean && ./gradlew :app:processDebugManifest
+cat app/build/intermediates/merged_manifests/debug/AndroidManifest.xml | grep ACCESS_FINE_LOCATION
+# Expected: Shows the permission line
+```
+
+#### iOS Pod Verification
+
+```bash
+# Default (should NOT include location pod)
+cd ios && pod install
+pod list | grep KlaviyoLocation
+# Expected: No output (pod not installed)
+
+# With ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
+# (Add ENV line to Podfile first)
+cd ios && rm -rf Pods Podfile.lock && pod install
+pod list | grep KlaviyoLocation
+# Expected: Shows KlaviyoLocation with version number
+```
+
 ## Push Notification Testing
 
 To test push notifications:

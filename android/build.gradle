@@ -53,6 +53,18 @@ dependencies {
     api "com.github.klaviyo.klaviyo-android-sdk:analytics:feat~flutter-support-SNAPSHOT"
     api "com.github.klaviyo.klaviyo-android-sdk:push-fcm:feat~flutter-support-SNAPSHOT"
     api "com.github.klaviyo.klaviyo-android-sdk:forms:feat~flutter-support-SNAPSHOT"
-    api "com.github.klaviyo.klaviyo-android-sdk:location:feat~flutter-support-SNAPSHOT"
+
+    // Location: full module (includes -core transitively), or just -core for lightweight
+    def includeLocation = false
+    if (rootProject.hasProperty('klaviyoIncludeLocation')) {
+        includeLocation = rootProject.getProperty('klaviyoIncludeLocation').toBoolean()
+    }
+
+    if (includeLocation) {
+        api "com.github.klaviyo.klaviyo-android-sdk:location:feat~flutter-support-SNAPSHOT"
+    } else {
+        implementation "com.github.klaviyo.klaviyo-android-sdk:location-core:feat~flutter-support-SNAPSHOT"
+    }
+
     implementation "com.google.firebase:firebase-messaging:24.1.0"
 }

@@ -1,7 +1,9 @@
 import Flutter
 import KlaviyoForms
 import KlaviyoSwift
+#if canImport(KlaviyoLocation)
 @_spi(KlaviyoPrivate) import KlaviyoLocation
+#endif
 import UIKit
 import UserNotifications
 
@@ -216,18 +218,37 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             result(nil)
 
         case "registerGeofencing":
+            #if canImport(KlaviyoLocation)
             Task { @MainActor in
                 await KlaviyoSDK().registerGeofencing()
                 result(nil)
             }
+            #else
+            result(FlutterError(
+                code: "GEOFENCING_NOT_AVAILABLE",
+                message: "Geofencing requires the location module. " +
+                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                details: nil
+            ))
+            #endif
 
         case "unregisterGeofencing":
+            #if canImport(KlaviyoLocation)
             Task { @MainActor in
                 await KlaviyoSDK().unregisterGeofencing()
                 result(nil)
             }
+            #else
+            result(FlutterError(
+                code: "GEOFENCING_NOT_AVAILABLE",
+                message: "Geofencing requires the location module. " +
+                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                details: nil
+            ))
+            #endif
 
         case "getCurrentGeofences":
+            #if canImport(KlaviyoLocation)
             Task { @MainActor in
                 let geofences = await KlaviyoSDK().getCurrentGeofences()
                 let geofencesArray = geofences.map { region -> [String: Any] in
@@ -240,6 +261,14 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 }
                 result(["geofences": geofencesArray])
             }
+            #else
+            result(FlutterError(
+                code: "GEOFENCING_NOT_AVAILABLE",
+                message: "Geofencing requires the location module. " +
+                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                details: nil
+            ))
+            #endif
 
         case "resetProfile":
             KlaviyoSDK().resetProfile()

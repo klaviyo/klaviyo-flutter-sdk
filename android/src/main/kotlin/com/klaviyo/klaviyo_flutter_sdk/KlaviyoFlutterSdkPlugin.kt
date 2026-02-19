@@ -11,6 +11,7 @@ import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
+import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.InAppFormsConfig
@@ -356,7 +357,15 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.registerGeofencing()
                     result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Geofencing not available: location module not included", e)
+                    result.error(
+                        "GEOFENCING_NOT_AVAILABLE",
+                        "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties",
+                        e.message,
+                    )
                 } catch (e: Exception) {
+                    Registry.log.error("Failed to register for geofencing: ${e.message}", e)
                     result.error("GEOFENCING_ERROR", "Failed to register for geofencing", e.message)
                 }
             }
@@ -365,18 +374,38 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.unregisterGeofencing()
                     result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Geofencing not available: location module not included", e)
+                    result.error(
+                        "GEOFENCING_NOT_AVAILABLE",
+                        "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties",
+                        e.message,
+                    )
                 } catch (e: Exception) {
+                    Registry.log.error("Failed to unregister from geofencing: ${e.message}", e)
                     result.error("GEOFENCING_ERROR", "Failed to unregister from geofencing", e.message)
                 }
             }
 
             "getCurrentGeofences" -> {
                 try {
+                    val locationManager = Registry.getOrNull<LocationManager>()
+
+                    if (locationManager == null) {
+                        Registry.log.error("Geofencing not available: location module not included")
+                        result.error(
+                            "GEOFENCING_NOT_AVAILABLE",
+                            "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties",
+                            null,
+                        )
+                        return
+                    }
+
                     // Follow the same pattern as React Native SDK
                     // Note: in the future, we may be storing more fences than we are observing
                     val geofencesArray = mutableListOf<Map<String, Any>>()
 
-                    Registry.getOrNull<LocationManager>()?.getStoredGeofences()?.forEach { geofence ->
+                    locationManager.getStoredGeofences()?.forEach { geofence ->
                         geofencesArray.add(
                             mapOf(
                                 "identifier" to geofence.id,
@@ -385,12 +414,11 @@ class KlaviyoFlutterSdkPlugin :
                                 "radius" to geofence.radius.toDouble(),
                             ),
                         )
-                    } ?: run {
-                        Registry.log.warning("Geofencing is not yet registered")
                     }
 
                     result.success(mapOf("geofences" to geofencesArray))
                 } catch (e: Exception) {
+                    Registry.log.error("Failed to get current geofences: ${e.message}", e)
                     result.error("GEOFENCING_ERROR", "Failed to get current geofences", e.message)
                 }
             }
