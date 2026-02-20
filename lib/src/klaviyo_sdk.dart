@@ -37,7 +37,7 @@ class KlaviyoSDK {
   /// Initialize the Klaviyo SDK with your public API key
   Future<KlaviyoSDK> initialize({
     required String apiKey,
-    KlaviyoLogLevel logLevel = KlaviyoLogLevel.none,
+    KlaviyoLogLevel logLevel = KlaviyoLogLevel.error,
     PushEnvironment environment = PushEnvironment.development,
     Map<String, dynamic>? configuration,
   }) async {
