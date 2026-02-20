@@ -272,7 +272,7 @@ class KlaviyoSDK {
       );
       _logger.info('Registered for in-app forms');
     } on KlaviyoException catch (e) {
-      _logger.warning('Failed to register for in-app forms: ${e.message}');
+      _logger.error('Failed to register for in-app forms: ${e.message}');
     }
   }
 
@@ -283,7 +283,7 @@ class KlaviyoSDK {
       await _nativeWrapper.unregisterFromInAppForms();
       _logger.info('Unregistered from in-app forms');
     } on KlaviyoException catch (e) {
-      _logger.warning('Failed to unregister from in-app forms: ${e.message}');
+      _logger.error('Failed to unregister from in-app forms: ${e.message}');
     }
   }
 
@@ -291,15 +291,23 @@ class KlaviyoSDK {
   /// Requires location permissions to be granted by user
   Future<void> registerGeofencing() async {
     _ensureInitialized();
-    await _nativeWrapper.registerGeofencing();
-    _logger.info('Registered for geofencing');
+    try {
+      await _nativeWrapper.registerGeofencing();
+      _logger.info('Registered for geofencing');
+    } on KlaviyoException catch (e) {
+      _logger.error('Failed to register for geofencing: ${e.message}');
+    }
   }
 
   /// Stop monitoring all geofences
   Future<void> unregisterGeofencing() async {
     _ensureInitialized();
-    await _nativeWrapper.unregisterGeofencing();
-    _logger.info('Unregistered from geofencing');
+    try {
+      await _nativeWrapper.unregisterGeofencing();
+      _logger.info('Unregistered from geofencing');
+    } on KlaviyoException catch (e) {
+      _logger.error('Failed to unregister from geofencing: ${e.message}');
+    }
   }
 
   /// Get currently monitored geofences
@@ -311,7 +319,12 @@ class KlaviyoSDK {
   @internal
   Future<List<Geofence>> getCurrentGeofences() async {
     _ensureInitialized();
-    return await _nativeWrapper.getCurrentGeofences();
+    try {
+      return await _nativeWrapper.getCurrentGeofences();
+    } on KlaviyoException catch (e) {
+      _logger.error('Failed to get current geofences: ${e.message}');
+      return [];
+    }
   }
 
   // ============================================================================

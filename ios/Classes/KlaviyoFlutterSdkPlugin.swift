@@ -1,5 +1,7 @@
 import Flutter
+#if canImport(KlaviyoForms)
 import KlaviyoForms
+#endif
 import KlaviyoSwift
 #if canImport(KlaviyoLocation)
 @_spi(KlaviyoPrivate) import KlaviyoLocation
@@ -206,16 +208,34 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             result(token)
 
         case "registerForInAppForms":
+            #if canImport(KlaviyoForms)
             DispatchQueue.main.async {
                 KlaviyoSDK().registerForInAppForms()
             }
             result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
 
         case "unregisterFromInAppForms":
+            #if canImport(KlaviyoForms)
             Task { @MainActor in
                 KlaviyoSDK().unregisterFromInAppForms()
             }
             result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
 
         case "registerGeofencing":
             #if canImport(KlaviyoLocation)

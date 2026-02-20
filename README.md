@@ -226,9 +226,20 @@ Add to `android/gradle.properties`:
 klaviyoIncludeForms=false
 ```
 
-**Forms opt-out**
-- Forms calls will log a warning and no-op gracefully
-- Smaller SDK code footprint
+#### iOS
+
+Add to `ios/Podfile` before `flutter_install_all_ios_pods`:
+
+```ruby
+ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'
+```
+
+#### Error Behavior
+
+**Without the forms module:**
+- Forms methods (`registerForInAppForms()`, `unregisterFromInAppForms()`) will log an error and no-op gracefully
+- Error code: `FORMS_NOT_AVAILABLE`
+- Smaller SDK footprint
 
 ## Usage
 
