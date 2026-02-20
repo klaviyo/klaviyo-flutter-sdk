@@ -47,12 +47,20 @@ android {
     }
 }
 
+def klaviyoSdkVersion = "feat~flutter-support-SNAPSHOT"
+
+// Whether to include the full forms module (in-app forms rendering).
+// Set klaviyoIncludeForms=false in your host app's gradle.properties to exclude forms.
+def includeForms = true
+if (rootProject.hasProperty('klaviyoIncludeForms')) {
+    includeForms = rootProject.getProperty('klaviyoIncludeForms').toBoolean()
+}
+
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation "com.github.klaviyo.klaviyo-android-sdk:core:feat~flutter-support-SNAPSHOT"
-    api "com.github.klaviyo.klaviyo-android-sdk:analytics:feat~flutter-support-SNAPSHOT"
-    api "com.github.klaviyo.klaviyo-android-sdk:push-fcm:feat~flutter-support-SNAPSHOT"
-    api "com.github.klaviyo.klaviyo-android-sdk:forms:feat~flutter-support-SNAPSHOT"
+    implementation "com.github.klaviyo.klaviyo-android-sdk:core:$klaviyoSdkVersion"
+    api "com.github.klaviyo.klaviyo-android-sdk:analytics:$klaviyoSdkVersion"
+    api "com.github.klaviyo.klaviyo-android-sdk:push-fcm:$klaviyoSdkVersion"
 
     // Location: full module (includes -core transitively), or just -core for lightweight
     def includeLocation = false
@@ -61,9 +69,16 @@ dependencies {
     }
 
     if (includeLocation) {
-        api "com.github.klaviyo.klaviyo-android-sdk:location:feat~flutter-support-SNAPSHOT"
+        api "com.github.klaviyo.klaviyo-android-sdk:location:$klaviyoSdkVersion"
     } else {
-        implementation "com.github.klaviyo.klaviyo-android-sdk:location-core:feat~flutter-support-SNAPSHOT"
+        implementation "com.github.klaviyo.klaviyo-android-sdk:location-core:$klaviyoSdkVersion"
+    }
+
+    // Forms: full module (includes -core transitively), or just -core for lightweight
+    if (includeForms) {
+        api "com.github.klaviyo.klaviyo-android-sdk:forms:$klaviyoSdkVersion"
+    } else {
+        implementation "com.github.klaviyo.klaviyo-android-sdk:forms-core:$klaviyoSdkVersion"
     }
 
     implementation "com.google.firebase:firebase-messaging:24.1.0"

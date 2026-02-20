@@ -214,6 +214,33 @@ This includes the `KlaviyoLocation` pod with full geofencing support. You'll als
 **With the full location module enabled:**
 - Full geofencing functionality available
 
+### Disabling In-App Forms (Optional)
+
+In-app forms are **enabled by default**. To opt out:
+
+#### Android
+
+Add to `android/gradle.properties`:
+
+```properties
+klaviyoIncludeForms=false
+```
+
+#### iOS
+
+Add to `ios/Podfile` before `flutter_install_all_ios_pods`:
+
+```ruby
+ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'
+```
+
+#### Error Behavior
+
+**Without the forms module:**
+- Forms methods (`registerForInAppForms()`, `unregisterFromInAppForms()`) will log an error and no-op gracefully
+- Error code: `FORMS_NOT_AVAILABLE`
+- Smaller SDK footprint
+
 ## Usage
 
 ### 1. Initialize the SDK
