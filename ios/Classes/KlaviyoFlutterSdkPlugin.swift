@@ -19,6 +19,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedError: [String: Any]?
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
+    private var cachedFormLifecycleEvents: [[String: Any]] = []
 
     // MARK: - Flutter Plugin Registration
 
@@ -204,13 +205,15 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             result(token)
 
         case "registerForInAppForms":
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 KlaviyoSDK().registerForInAppForms()
+                self.subscribeToFormLifecycleEvents()
             }
             result(nil)
 
         case "unregisterFromInAppForms":
             Task { @MainActor in
+                KlaviyoSDK().unregisterFormLifecycleHandler()
                 KlaviyoSDK().unregisterFromInAppForms()
             }
             result(nil)
@@ -314,6 +317,10 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedSilentPush)
             self.cachedSilentPush = nil
         }
+        for cachedFormEvent in cachedFormLifecycleEvents {
+            events(cachedFormEvent)
+        }
+        cachedFormLifecycleEvents.removeAll()
         return nil
     }
 
@@ -443,5 +450,32 @@ extension Data {
         }
 
         self = data
+    }
+}
+
+// MARK: - Form Lifecycle Events
+
+@MainActor
+extension KlaviyoFlutterSdkPlugin {
+    /// Subscribe to form lifecycle events from the iOS SDK
+    func subscribeToFormLifecycleEvents() {
+        KlaviyoSDK().registerFormLifecycleHandler { [weak self] event in
+            guard let self = self else { return }
+
+            let eventPayload: [String: Any] = [
+                "type": "form_lifecycle_event",
+                "data": [
+                    "event": event.rawValue
+                ]
+            ]
+
+            // Send to Flutter (or cache if Flutter is not ready)
+            if let eventSink = self.eventSink {
+                eventSink(eventPayload)
+            } else {
+                print("⚠️ [Plugin] Flutter not ready. Caching form lifecycle event.")
+                self.cachedFormLifecycleEvents.append(eventPayload)
+            }
+        }
     }
 }

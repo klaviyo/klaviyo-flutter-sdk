@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
@@ -21,6 +22,10 @@ class _FormsTabState extends State<FormsTab> {
   // Use a static variable to persist state across widget rebuilds
   static bool _isRegistered = false;
 
+  // Lifecycle event tracking
+  StreamSubscription<FormLifecycleEvent>? _lifecycleSubscription;
+  final List<String> _lifecycleEvents = [];
+
   /// Reset the static state (called when SDK is reset)
   static void resetState() {
     _isRegistered = false;
@@ -35,6 +40,16 @@ class _FormsTabState extends State<FormsTab> {
     if (_isRegistered) {
       _status = 'In-app forms are registered';
     }
+
+    // Listen to form lifecycle events
+    _lifecycleSubscription = _klaviyo.onFormLifecycleEvent.listen((event) {
+      setState(() {
+        final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+        final formIdInfo = event.formId != null ? ' (${event.formId})' : '';
+        _lifecycleEvents
+            .add('[$timestamp] ${event.eventType.name}$formIdInfo');
+      });
+    });
   }
 
   //#endregion
@@ -182,6 +197,56 @@ class _FormsTabState extends State<FormsTab> {
               'Note: In-app forms will be displayed automatically based on your Klaviyo account configuration.',
               style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
             ),
+
+            // Lifecycle Events Section
+            if (_lifecycleEvents.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Lifecycle Events',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.clear_all),
+                    onPressed: () {
+                      setState(() {
+                        _lifecycleEvents.clear();
+                      });
+                    },
+                    tooltip: 'Clear events',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: ListView.builder(
+                  itemCount: _lifecycleEvents.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        _lifecycleEvents[index],
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -192,6 +257,7 @@ class _FormsTabState extends State<FormsTab> {
 
   @override
   void dispose() {
+    _lifecycleSubscription?.cancel();
     _durationController.dispose();
     super.dispose();
   }
