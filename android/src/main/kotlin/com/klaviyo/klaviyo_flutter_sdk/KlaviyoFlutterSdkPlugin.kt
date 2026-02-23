@@ -17,6 +17,8 @@ import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.unregisterFromInAppForms
+import com.klaviyo.forms.registerFormLifecycleCallback
+import com.klaviyo.forms.unregisterFormLifecycleCallback
 import com.klaviyo.location.LocationManager
 import com.klaviyo.location.registerGeofencing
 import com.klaviyo.location.unregisterGeofencing
@@ -343,6 +345,27 @@ class KlaviyoFlutterSdkPlugin :
                         InAppFormsConfig(sessionTimeoutDuration = sessionTimeout),
                     )
 
+                    // Register form lifecycle callback
+                    Klaviyo.registerFormLifecycleCallback { event, formId ->
+                        val eventName =
+                            when (event) {
+                                com.klaviyo.forms.FormLifecycleEvent.FORM_SHOWN -> "form_shown"
+                                com.klaviyo.forms.FormLifecycleEvent.FORM_DISMISSED -> "form_dismissed"
+                                com.klaviyo.forms.FormLifecycleEvent.FORM_CTA_CLICKED -> "form_cta_clicked"
+                            }
+
+                        eventSink?.success(
+                            mapOf(
+                                "type" to "form_lifecycle_event",
+                                "data" to
+                                    mapOf(
+                                        "event" to eventName,
+                                        "formId" to formId,
+                                    ),
+                            ),
+                        )
+                    }
+
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
@@ -353,6 +376,7 @@ class KlaviyoFlutterSdkPlugin :
 
             "unregisterFromInAppForms" -> {
                 try {
+                    Klaviyo.unregisterFormLifecycleCallback()
                     Klaviyo.unregisterFromInAppForms()
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {

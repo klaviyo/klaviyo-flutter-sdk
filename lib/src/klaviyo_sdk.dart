@@ -7,6 +7,7 @@ import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
+import 'models/form_lifecycle_event.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
@@ -409,6 +410,13 @@ class KlaviyoSDK {
 
   /// Get form events stream
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
+
+  /// Get typed form lifecycle events stream
+  /// This is a convenience method that filters and maps lifecycle events
+  Stream<FormLifecycleEvent> get onFormLifecycleEvent =>
+      _nativeWrapper.onFormEvent
+          .where((event) => event['type'] == 'form_lifecycle_event')
+          .map((event) => FormLifecycleEvent.fromMap(event));
 
   /// Private methods
   void _ensureInitialized() {
