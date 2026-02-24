@@ -30,21 +30,7 @@ dependencies:
 
 **1. Install Pods**
 
-Add the Klaviyo Swift SDK to your `ios/Podfile`:
-
-```ruby
-target 'Runner' do
-  use_frameworks!
-  use_modular_headers!
-
-  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-
-  # Add Klaviyo Swift SDK
-  pod 'KlaviyoSwiftSDK'
-end
-```
-
-Run `pod install` in the `ios` directory:
+The required native iOS dependencies are automatically included via the plugin's podspec. Run `pod install` in the `ios` directory to install them:
 ```bash
 cd ios && pod install
 ```
