@@ -78,11 +78,7 @@ class _ProfileTabState extends State<ProfileTab> {
     }
 
     try {
-      await _klaviyo.initialize(
-        apiKey: apiKey,
-        logLevel: KlaviyoLogLevel.debug,
-        environment: PushEnvironment.development,
-      );
+      await _klaviyo.initialize(apiKey: apiKey);
 
       // Save API key
       final prefs = await SharedPreferences.getInstance();

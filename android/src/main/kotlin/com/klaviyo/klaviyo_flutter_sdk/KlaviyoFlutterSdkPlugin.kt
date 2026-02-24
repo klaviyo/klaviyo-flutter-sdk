@@ -78,18 +78,10 @@ class KlaviyoFlutterSdkPlugin :
         when (call.method) {
             "initialize" -> {
                 val apiKey = call.argument<String>("apiKey")
-                val environment = call.argument<String>("environment")
-                val configuration = call.argument<Map<String, Any>>("configuration")
 
                 try {
                     // Initialize Klaviyo SDK
                     Klaviyo.initialize(apiKey!!, applicationContext)
-
-                    // Apply configuration if provided
-                    configuration?.let { config ->
-                        // Handle configuration options
-                    }
-
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("INIT_ERROR", "Failed to initialize Klaviyo", e.message)
@@ -433,18 +425,6 @@ class KlaviyoFlutterSdkPlugin :
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("RESET_ERROR", "Failed to reset profile", e.message)
-                }
-            }
-
-            "setLogLevel" -> {
-                val logLevel = call.argument<String>("logLevel")
-
-                try {
-                    // Log level is typically set during initialization
-                    // This method is not directly available in the Android SDK
-                    result.success(null)
-                } catch (e: Exception) {
-                    result.error("LOG_LEVEL_ERROR", "Failed to set log level", e.message)
                 }
             }
 
