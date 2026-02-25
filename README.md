@@ -306,12 +306,15 @@ final profile = KlaviyoProfile(
     'signup_date': DateTime.now().toIso8601String(),
   },
 );
-await klaviyo.setProfile(profile);
 
+await KlaviyoSDK().setProfile(profile);
 // Set individual properties
-await klaviyo.setEmail('user@example.com');
-await klaviyo.setPhoneNumber('+1234567890');
-await klaviyo.setExternalId('user123');
+await KlaviyoSDK().setEmail('user@example.com');
+await KlaviyoSDK().setPhoneNumber('+1234567890');
+await KlaviyoSDK().setExternalId('user123');
+await KlaviyoSDK().setProfileProperties({
+  'preferences': {'notifications': true},
+});
 ```
 
 ### 3. Event Tracking
