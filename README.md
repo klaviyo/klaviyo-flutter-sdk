@@ -308,6 +308,9 @@ final profile = KlaviyoProfile(
 );
 
 await KlaviyoSDK().setProfile(profile);
+```
+
+```dart
 // Set individual properties
 await KlaviyoSDK().setEmail('user@example.com');
 await KlaviyoSDK().setPhoneNumber('+1234567890');
