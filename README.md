@@ -297,10 +297,10 @@ void main() async {
 ```dart
 // Set a complete profile
 final profile = KlaviyoProfile(
-  email: 'user@example.com',
+  email: 'user@test.com',
   firstName: 'John',
   lastName: 'Doe',
-  phoneNumber: '+1234567890',
+  phoneNumber: '+2125557890',
   properties: {
     'plan': 'premium',
     'signup_date': DateTime.now().toIso8601String(),
