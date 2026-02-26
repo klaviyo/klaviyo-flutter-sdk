@@ -474,7 +474,10 @@ extension service to attach images to notifications. No additional setup is need
 push on Android.
 
 - [Android](https://github.com/klaviyo/klaviyo-android-sdk#Rich-Push)
-- [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#Rich-Push)
+- [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#rich-push-images--videos)
+
+For iOS: Flutter currently only supports CocoaPods for dependency management, so you'll need to
+follow the CocoaPods setup steps in the [installation section](https://github.com/klaviyo/klaviyo-swift-sdk/blob/master/README.md#installation).
 
 ### 6. Badge Count (iOS Only)
 
