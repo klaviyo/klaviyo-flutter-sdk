@@ -459,7 +459,7 @@ klaviyo.onPushNotification.listen((event) {
 
 ```dart
 // Listen for notification open events
-klaviyo.onPushNotification.listen((event) {
+KlaviyoSDK().onPushNotification.listen((event) {
   if (event['type'] == 'push_notification_opened') {
     print('Notification opened: ${event['data']}');
   }
