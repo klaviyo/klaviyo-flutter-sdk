@@ -370,7 +370,12 @@ await klaviyo.createEvent(purchaseEvent);
 
 #### Requesting Notification Permissions
 
-TODO()
+Requesting user permission to display notifications can be managed from the Flutter code,
+or from platform-specific native code. Note that either of these approaches is sufficient
+to inform the Klaviyo SDK of the permission change. If managing permissions from Flutter code,
+you may use a third-party package (such as
+[firebase_messaging](https://pub.dev/packages/firebase_messaging) or
+[permission_handler](https://pub.dev/packages/permission_handler)) to handle permissions requests.
 
 #### Token Collection
 
