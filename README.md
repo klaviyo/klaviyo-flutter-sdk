@@ -468,9 +468,10 @@ KlaviyoSDK().onPushNotification.listen((event) {
 
 ### 5. Rich Push
 
-[Rich Push](https://help.klaviyo.com/hc/en-us/articles/16917302437275) is the ability to add images to
-push notification messages. On iOS, you will need to implement an extension service to attach images to notifications.
-No additional setup is needed to support rich push on Android.
+With [Rich Push](https://help.klaviyo.com/hc/en-us/articles/16917302437275) configured, you can add
+images and videos (on iOS only) to push notification messages. On iOS, you will need to implement an
+extension service to attach images to notifications. No additional setup is needed to support rich
+push on Android.
 
 - [Android](https://github.com/klaviyo/klaviyo-android-sdk#Rich-Push)
 - [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#Rich-Push)
