@@ -18,7 +18,7 @@ Add `klaviyo_flutter_sdk` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  klaviyo_flutter_sdk: ^1.0.0
+  klaviyo_flutter_sdk: ^0.1.0-alpha.1
 ```
 
 ### 2. Platform Setup
@@ -397,10 +397,11 @@ Future<void> requestNotificationPermission() async {
 
 #### Token Collection
 
-##### Option A: Using Firebase Messaging (Required for Android)
+The Klaviyo SDK needs to register the device's push token to send notifications. You can choose between two approaches:
 
-If your app uses Firebase Messaging, obtain the token from Firebase and pass it
-to Klaviyo:
+##### Option A: Manual Token Management with Firebase Messaging
+
+If your app already uses Firebase Messaging for other features, or you need more control over token handling, you can manually fetch tokens and pass them to Klaviyo:
 
 ```dart
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -430,25 +431,28 @@ if (Platform.isIOS) {
 if (Platform.isAndroid) {
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
     klaviyo.setPushToken(newToken);
-  }
+  });
   // On iOS, if the APNs token changes, the OS usually relaunches the app
   // or triggers distinct native callbacks.
-});
+}
 ```
+
+**When to use this option:**
+- You're already using `firebase_messaging` for other features (e.g., foreground message handling)
+- You need to send the same token to multiple push providers
+- You want explicit control over token refresh handling
 
 ##### Option B: Using the SDK's Built-in Registration
 
-If you don't want to add `firebase_messaging` as a dependency, the Klaviyo Flutter
-SDK provides a built-in method to register for push notifications:
+The simplest approach - the SDK automatically fetches the push token on both platforms without requiring you to add `firebase_messaging` as a direct dependency:
 
 ```dart
 // Register for push notifications
-// iOS: Triggers APNs registration, captures the token, then sets it on the Klaviyo account
-// Android: No-op (requires FCM setup)
+// iOS: Triggers APNs registration and captures the token
+// Android: Fetches the FCM token from Firebase
 await klaviyo.registerForPushNotifications();
 
-// If you need to access token updates, you may subscribe to
-// the push event stream and listen for token events
+// Listen for token events via the push notification stream
 klaviyo.onPushNotification.listen((event) {
   switch (event['type']) {
     case 'push_token_received':
@@ -462,6 +466,12 @@ klaviyo.onPushNotification.listen((event) {
   }
 });
 ```
+
+**How it works:**
+- **iOS**: Calls the native APNs registration API and automatically forwards the token to Klaviyo
+- **Android**: Uses the native Firebase SDK to fetch the FCM token and registers it with Klaviyo
+- Token updates are emitted through the `onPushNotification` stream
+- No need to add `firebase_messaging` as a direct dependency in your Flutter project
 
 #### Handling Push Notification Opens
 
