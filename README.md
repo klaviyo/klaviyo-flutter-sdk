@@ -329,31 +329,35 @@ await klaviyo.setExternalId('user123');
 
 ```dart
 // Track a simple event using a predefined metric
-await klaviyo.createEvent(KlaviyoEvent(
+final openedAppEvent = KlaviyoEvent(
   name: EventMetric.openedApp,
   properties: {
-    'source': 'from_deeplink',
+    'source': 'home_screen',
   },
-));
+);
+await klaviyo.createEvent(openedAppEvent);
 
-// Track a custom event with the convenience constructor
-await klaviyo.createEvent(KlaviyoEvent.custom(
-  metric: 'App Opened',
+// Track a custom event
+final customEvent = KlaviyoEvent.custom(
+  metric: 'User Completed Tutorial',
   properties: {
-    'source': 'from_push',
+    'tutorial_id': 'intro_v2',
+    'completion_time_seconds': 245,
   },
-));
+);
+await klaviyo.createEvent(customEvent);
 
-// Track a complex event with value
-final event = KlaviyoEvent.custom(
+// Track a purchase event with value
+final purchaseEvent = KlaviyoEvent.custom(
   metric: 'Purchase Completed',
   properties: {
     'currency': 'USD',
     'product_id': 'prod_123',
+    'product_name': 'Premium Subscription',
   },
   value: 99.99,
 );
-await klaviyo.createEvent(event);
+await klaviyo.createEvent(purchaseEvent);
 ```
 
 ### 4. Push Notifications
@@ -371,35 +375,13 @@ await klaviyo.createEvent(event);
 
 #### Requesting Notification Permissions
 
-Before collecting push tokens, you need to request notification permission from the user. Use a Flutter permissions library:
-
-```dart
-import 'package:permission_handler/permission_handler.dart';
-
-Future<void> requestNotificationPermission() async {
-  final status = await Permission.notification.request();
-
-  if (status.isGranted) {
-    print('Notification permission granted');
-    // Now you can get and set the push token
-    await setupPushNotifications();
-  } else if (status.isDenied) {
-    print('Notification permission denied');
-  } else if (status.isPermanentlyDenied) {
-    print('Notification permission permanently denied');
-    // Guide user to app settings
-    await openAppSettings();
-  }
-}
-```
-
-**Note:** On Android 13+ (API 33+), the `POST_NOTIFICATIONS` permission is required. The SDK automatically adds this permission to your manifest via manifest merging.
+TODO()
 
 #### Token Collection
 
 The Klaviyo SDK needs to register the device's push token to send notifications. You can choose between two approaches:
 
-##### Option A: Manual Token Management with Firebase Messaging
+##### Option A: Manual Token Management with Firebase Messaging (Recommended)
 
 If your app already uses Firebase Messaging for other features, or you need more control over token handling, you can manually fetch tokens and pass them to Klaviyo:
 
@@ -448,8 +430,8 @@ The simplest approach - the SDK automatically fetches the push token on both pla
 
 ```dart
 // Register for push notifications
-// iOS: Triggers APNs registration and captures the token
-// Android: Fetches the FCM token from Firebase
+// iOS: Triggers APNs registration and automatically registers it with Klaviyo
+// Android: Fetches the FCM token and automatically registers it with Klaviyo
 await klaviyo.registerForPushNotifications();
 
 // Listen for token events via the push notification stream
@@ -522,9 +504,15 @@ await klaviyo.unregisterFromInAppForms();
 
 // Listen for form events
 klaviyo.onFormEvent.listen((event) {
-  print('Form event: ${event['type']} - ${event['data']}');
+  print('Form event: ${event['type']}');
 });
 ```
+
+**Session Timeout Configuration:**
+
+The `sessionTimeoutDuration` parameter controls how long forms remain eligible to display after app backgrounding. For more details on form behavior and configuration, see the native SDK documentation:
+- [Android In-App Forms](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages)
+- [iOS In-App Forms](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages)
 
 ### 8. Deep Linking
 
