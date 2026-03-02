@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.0.0
+## 0.1.0-alpha.1
 
-Initial release of the Klaviyo Flutter SDK.
+Initial alpha release of the Klaviyo Flutter SDK.
 
 ### Features
 
