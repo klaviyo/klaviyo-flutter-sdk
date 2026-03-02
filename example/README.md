@@ -210,4 +210,4 @@ Once you've tested the example app:
 3. **Handle Push Opens**: Implement your own push notification open handling
 4. **Configure Forms**: Set up in-app forms in your Klaviyo dashboard
 
-For more detailed implementation guidance, see the main SDK documentation and the `PUSH_NOTIFICATION_TRACKING_GUIDE.md`.
+For more detailed implementation guidance, see the main [SDK README](../README.md).

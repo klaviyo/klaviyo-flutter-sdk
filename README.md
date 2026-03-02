@@ -10,11 +10,8 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
 - **Profile Management**: Set user profiles, emails, phone numbers, and custom properties
 - **Event Tracking**: Track custom events and user interactions
 - **Push Notifications**: Register for and handle push notifications (Automatic Token handling)
-- **Rich Push**: Display images within push notifications
-- **Badge Count**: Set and manage app icon badge count (iOS only)
 - **In-App Forms**: Display and manage in-app forms for lead capture
-- **Cross-Platform**: Works on both iOS and Android using native SDKs
-- **Real-time Updates**: Stream-based profile updates and event handling
+- **Geofencing**: Observe geofences for location-based event tracking
 
 ## Installation
 
@@ -24,7 +21,7 @@ Add `klaviyo_flutter_sdk` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  klaviyo_flutter_sdk: ^1.0.0
+  klaviyo_flutter_sdk: ^0.1.0-alpha.1
 ```
 
 ### 2. Platform Setup
@@ -154,21 +151,67 @@ import klaviyo_flutter_sdk // <--- Add this import
 
 #### Android Setup
 
-1. Add the Klaviyo Android SDK to your `android/app/build.gradle`:
+**Requirements:**
+- `minSdkVersion` 23+
+- `compileSdkVersion` 34+
+- Kotlin 1.8.0+
 
-```gradle
-dependencies {
-    implementation 'com.klaviyo:klaviyo-android-sdk:1.0.0'
+The Android SDK is automatically included as a dependency by the Flutter plugin. Required permissions are also automatically added via manifest merging.
+
+**MainActivity Setup (Required for Push Notification Tracking)**
+
+To track when users open push notifications, you need to handle intents in your `MainActivity`. See the [example MainActivity.kt](example/android/app/src/main/kotlin/com/klaviyo/flutterexample/MainActivity.kt) for a complete implementation.
+
+Add the following to your `android/app/src/main/kotlin/.../MainActivity.kt`:
+
+```kotlin
+import android.content.Intent
+import android.os.Bundle
+import com.klaviyo.analytics.Klaviyo
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Handle notification intent on cold start (app not running)
+        intent?.let { Klaviyo.handlePush(it) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Handle notification intent on warm start (app already running)
+        Klaviyo.handlePush(intent)
+    }
 }
 ```
 
-2. Add required permissions to `android/app/src/main/AndroidManifest.xml`:
+**Why both methods?**
+- `onCreate`: Handles notifications when app is launched from scratch (cold start)
+- `onNewIntent`: Handles notifications when app is already running (warm start)
+
+**KlaviyoPushService Declaration (Required for Push Notification Tracking)**
+
+To ensure Klaviyo can properly track and handle push notifications, you must declare the `KlaviyoPushService` in your `android/app/src/main/AndroidManifest.xml`. This service intercepts FCM messages before Flutter's default `FirebaseMessagingService` processes them, allowing Klaviyo to track opens, handle rich push, and process notification data.
+
+Add this service declaration inside the `<application>` tag:
 
 ```xml
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.WAKE_LOCK" />
-<uses-permission android:name="android.permission.VIBRATE" />
+<service
+    android:name="com.klaviyo.pushFcm.KlaviyoPushService"
+    android:exported="false">
+    <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+    </intent-filter>
+</service>
 ```
+
+**Why is this required?**
+- Without this declaration, Flutter's `firebase_messaging` plugin will intercept all FCM messages first
+- Klaviyo won't be able to track notification opens or handle rich push features
+- The service declaration ensures Klaviyo processes the notification before Flutter
+
+See the [example AndroidManifest.xml](example/android/app/src/main/AndroidManifest.xml#L72-L81) for a complete implementation.
 
 ### Enabling Geofencing (Optional)
 
@@ -257,8 +300,6 @@ void main() async {
   final klaviyo = KlaviyoSDK();
   await klaviyo.initialize(
     apiKey: 'YOUR_KLAVIYO_PUBLIC_API_KEY',
-    logLevel: KlaviyoLogLevel.debug,
-    environment: PushEnvironment.development,
   );
 
   runApp(MyApp());
@@ -285,39 +326,67 @@ await klaviyo.setProfile(profile);
 await klaviyo.setEmail('user@example.com');
 await klaviyo.setPhoneNumber('+1234567890');
 await klaviyo.setExternalId('user123');
-await klaviyo.setProfileProperties({
-  'preferences': {'notifications': true},
-});
 ```
 
 ### 3. Event Tracking
 
 ```dart
-// Track a simple event
-await klaviyo.track('App Opened', {
-  'source': 'flutter_sdk',
-  'timestamp': DateTime.now().toIso8601String(),
-});
-
-// Track a complex event
-final event = KlaviyoEvent(
-  name: 'Purchase Completed',
+// Track a simple event using a predefined metric
+final openedAppEvent = KlaviyoEvent(
+  name: EventMetric.openedApp,
   properties: {
-    'value': 99.99,
+    'source': 'home_screen',
+  },
+);
+await klaviyo.createEvent(openedAppEvent);
+
+// Track a custom event
+final customEvent = KlaviyoEvent.custom(
+  metric: 'User Completed Tutorial',
+  properties: {
+    'tutorial_id': 'intro_v2',
+    'completion_time_seconds': 245,
+  },
+);
+await klaviyo.createEvent(customEvent);
+
+// Track a purchase event with value
+final purchaseEvent = KlaviyoEvent.custom(
+  metric: 'Purchase Completed',
+  properties: {
     'currency': 'USD',
     'product_id': 'prod_123',
+    'product_name': 'Premium Subscription',
   },
-  timestamp: DateTime.now(),
+  value: 99.99,
 );
-await klaviyo.createEvent(event);
+await klaviyo.createEvent(purchaseEvent);
 ```
 
 ### 4. Push Notifications
 
-#### Option A: Using Firebase Messaging (Recommended)
+#### Prerequisites
 
-If your app uses Firebase Messaging, obtain the token from Firebase and pass it
-to Klaviyo:
+**Platform-Specific Setup:**
+- **Android**: Review [Android SDK Push Notifications](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) documentation for Firebase setup requirements
+- **iOS**: Review [iOS SDK Push Notifications](https://github.com/klaviyo/klaviyo-swift-sdk#push-notifications) documentation for APNs setup requirements
+
+**Key Requirements:**
+- Firebase project configured (for both platforms)
+- `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) added to your project
+- Push notifications configured in your [Klaviyo account settings](https://help.klaviyo.com/hc/en-us/articles/14750928993307)
+
+#### Requesting Notification Permissions
+
+TODO()
+
+#### Token Collection
+
+The Klaviyo SDK needs to register the device's push token to send notifications. You can choose between two approaches:
+
+##### Option A: Manual Token Management with Firebase Messaging (Recommended)
+
+If your app already uses Firebase Messaging for other features, or you need more control over token handling, you can manually fetch tokens and pass them to Klaviyo:
 
 ```dart
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -347,25 +416,28 @@ if (Platform.isIOS) {
 if (Platform.isAndroid) {
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
     klaviyo.setPushToken(newToken);
-  }
+  });
   // On iOS, if the APNs token changes, the OS usually relaunches the app
   // or triggers distinct native callbacks.
-});
+}
 ```
 
-#### Option B: Using the SDK's Built-in Registration
+**When to use this option:**
+- You're already using `firebase_messaging` for other features (e.g., foreground message handling)
+- You need to send the same token to multiple push providers
+- You want explicit control over token refresh handling
 
-If you don't want to add `firebase_messaging` as a dependency, the Klaviyo Flutter
-SDK provides a built-in method to register for push notifications:
+##### Option B: Using the SDK's Built-in Registration
+
+The simplest approach - the SDK automatically fetches the push token on both platforms without requiring you to add `firebase_messaging` as a direct dependency:
 
 ```dart
 // Register for push notifications
-// iOS: Triggers APNs registration, captures the token, then sets it on the Klaviyo account
-// Android: No-op (requires FCM setup)
+// iOS: Triggers APNs registration and automatically registers it with Klaviyo
+// Android: Fetches the FCM token and automatically registers it with Klaviyo
 await klaviyo.registerForPushNotifications();
 
-// If you need to access token updates, you may subscribe to
-// the push event stream and listen for token events
+// Listen for token events via the push notification stream
 klaviyo.onPushNotification.listen((event) {
   switch (event['type']) {
     case 'push_token_received':
@@ -379,6 +451,12 @@ klaviyo.onPushNotification.listen((event) {
   }
 });
 ```
+
+**How it works:**
+- **iOS**: Calls the native APNs registration API and automatically forwards the token to Klaviyo
+- **Android**: Uses the native Firebase SDK to fetch the FCM token and registers it with Klaviyo
+- Token updates are emitted through the `onPushNotification` stream
+- No need to add `firebase_messaging` as a direct dependency in your Flutter project
 
 #### Handling Push Notification Opens
 
@@ -411,25 +489,33 @@ Android automatically handles badge counts, and no additional setup is needed.
 ### 7. In-App Forms
 
 ```dart
-// Register for in-app forms
+// Register for in-app forms with default session timeout (1 hour)
+await klaviyo.registerForInAppForms();
+
+// Register with a custom session timeout
 final config = InAppFormConfig(
-  enabled: true,
-  autoShow: true,
-  position: 'bottom',
-  theme: {
-    'primary_color': '#007bff',
-    'text_color': '#333333',
-  },
+  sessionTimeoutDuration: Duration(minutes: 30),
 );
 await klaviyo.registerForInAppForms(configuration: config);
 
-// Show a specific form
-final success = await klaviyo.showForm('newsletter_signup',
-  customData: {'source': 'flutter_app'});
+// Register with infinite session timeout (no timeout)
+final infiniteConfig = InAppFormConfig.infinite();
+await klaviyo.registerForInAppForms(configuration: infiniteConfig);
 
-// Hide a form
-await klaviyo.hideForm('newsletter_signup');
+// Unregister from in-app forms
+await klaviyo.unregisterFromInAppForms();
+
+// Listen for form events
+klaviyo.onFormEvent.listen((event) {
+  print('Form event: ${event['type']}');
+});
 ```
+
+**Session Timeout Configuration:**
+
+The `sessionTimeoutDuration` parameter controls how long forms remain eligible to display after app backgrounding. For more details on form behavior and configuration, see the native SDK documentation:
+- [Android In-App Forms](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages)
+- [iOS In-App Forms](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages)
 
 ### 8. Deep Linking
 
@@ -443,8 +529,67 @@ Klaviyo supports [Deep Links](https://help.klaviyo.com/hc/en-us/articles/1475040
    - Flutter's built-in `WidgetsBindingObserver`
 
 2. Configure platform-specific deep linking:
-   - [iOS Universal Links Setup](https://github.com/klaviyo/klaviyo-swift-sdk#deep-linking)
-   - [Android App Links Setup](https://github.com/klaviyo/klaviyo-android-sdk#deep-linking)
+   - **iOS**: [Universal Links Setup](https://github.com/klaviyo/klaviyo-swift-sdk#deep-linking)
+   - **Android**: Configure intent filters in your `AndroidManifest.xml` (see below)
+
+#### Android Deep Linking Configuration
+
+The [example AndroidManifest.xml](example/android/app/src/main/AndroidManifest.xml#L31-L60) demonstrates three types of deep links:
+
+**1. Custom URL Schemes** (e.g., `myapp://product/123`)
+
+Add to your `MainActivity` in `AndroidManifest.xml`:
+
+```xml
+<intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="YOUR_CUSTOM_SCHEME" />
+</intent-filter>
+```
+
+Additionally, this can be configured natively on Flutter. Just be sure that the deeplink path you use for actions matches your app package schema.
+
+**2. App Links (Universal Links)** (e.g., `https://yourdomain.com/product/123`)
+
+```xml
+<intent-filter android:autoVerify="true">
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="https" />
+    <data android:host="yourdomain.com" />
+</intent-filter>
+```
+
+**3. Klaviyo Universal Tracking Links** (e.g., `https://trk.yourdomain.com/u/abc123`)
+
+```xml
+<intent-filter android:autoVerify="true">
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="https" />
+    <data android:host="trk.send.yourdomain.com" />
+    <data android:pathPrefix="/u/" />
+</intent-filter>
+```
+
+**Testing Deep Links:**
+
+```bash
+# Test custom URL scheme
+adb shell am start -W -a android.intent.action.VIEW -d "myapp://product/123" com.your.package
+
+# Test app link
+adb shell am start -W -a android.intent.action.VIEW -d "https://yourdomain.com/product/123" com.your.package
+
+# Test Klaviyo tracking link
+adb shell am start -W -a android.intent.action.VIEW -d "https://trk.yourdomain.com/u/abc123" com.your.package
+```
+
+For complete Android App Links setup including domain verification, see the [Android SDK Deep Linking Guide](https://github.com/klaviyo/klaviyo-android-sdk#deep-linking).
 
 #### Integration with go_router
 
@@ -515,24 +660,29 @@ The main SDK class that provides all functionality.
 
 #### Methods
 
-- `initialize(apiKey, logLevel, environment, configuration)` - Initialize the SDK
-- `setProfile(profile)` - Set a complete user profile
-- `setEmail(email)` - Set user email
-- `setPhoneNumber(phoneNumber)` - Set user phone number
-- `setExternalId(externalId)` - Set external user ID
-- `setProfileProperties(properties)` - Set custom profile properties
-- `createEvent(event)` - Create a new event to track a profile's activity
-- `setProfileAttribute(propertyKey, value)` - Set a single profile attribute
+- `initialize({required String apiKey})` - Initialize the SDK
+- `setProfile(KlaviyoProfile profile)` - Set a complete user profile
+- `setEmail(String email)` - Set user email
+- `setPhoneNumber(String phoneNumber)` - Set user phone number
+- `setExternalId(String externalId)` - Set external user ID
+- `getEmail()` - Get user email
+- `getPhoneNumber()` - Get user phone number
+- `getExternalId()` - Get external user ID
+- `setProfileProperties(Map<String, dynamic> properties)` - Set custom profile properties
+- `setProfileAttribute(String propertyKey, dynamic value)` - Set a single profile attribute
+- `setLocation(KlaviyoLocation location)` - Set profile location
+- `createEvent(KlaviyoEvent event)` - Create a new event to track a profile's activity
 - `registerForPushNotifications()` - Register for push notifications (iOS: triggers APNs registration, Android: fetches FCM token)
-- `setPushToken(token, environment)` - Set push notification token (usually handled automatically by native SDKs)
+- `setPushToken(String token)` - Set push notification token (usually handled automatically by native SDKs)
 - `getPushToken()` - Get current push token
-- `registerForInAppForms(configuration)` - Register for in-app forms
-- `showForm(formId, customData)` - Show a specific form
-- `hideForm(formId)` - Hide a specific form
-- `handleUniversalTrackingLink(url)` - Validates and handles Klaviyo universal tracking links, returns `bool`
+- `registerForInAppForms({InAppFormConfig? configuration})` - Register for in-app forms
+- `unregisterFromInAppForms()` - Unregister from in-app forms
+- `registerGeofencing()` - Begin monitoring geofences (requires location permissions)
+- `unregisterGeofencing()` - Stop monitoring all geofences
+- `handleUniversalTrackingLink(String url)` - Validates and handles Klaviyo universal tracking links, returns `bool`
 - `resetProfile()` - Reset user profile
-- `setBadgeCount(count)` - Set the badge count on the app icon (iOS only)
-- `setLogLevel(logLevel)` - Set logging level
+- `setBadgeCount(int count)` - Set the badge count on the app icon (iOS only)
+- `setLogLevel(KlaviyoLogLevel logLevel)` - Set logging level (Flutter-side only)
 - `dispose()` - Clean up resources
 
 #### Properties
@@ -565,9 +715,18 @@ KlaviyoProfile({
 
 ```dart
 KlaviyoEvent({
-  required String name,
+  required EventMetric name,
   Map<String, dynamic>? properties,
-  DateTime? timestamp,
+  double? value,
+  String? uniqueId,
+})
+
+// Convenience constructor for custom events
+KlaviyoEvent.custom({
+  required String metric,
+  Map<String, dynamic>? properties,
+  double? value,
+  String? uniqueId,
 })
 ```
 
@@ -589,12 +748,13 @@ KlaviyoLocation({
 #### InAppFormConfig
 
 ```dart
+// Default configuration (1 hour session timeout)
 InAppFormConfig({
-  bool? enabled,
-  bool? autoShow,
-  String? position,
-  Map<String, dynamic>? theme,
+  Duration? sessionTimeoutDuration,
 })
+
+// Infinite session timeout (no timeout)
+InAppFormConfig.infinite()
 ```
 
 ### Enums
@@ -607,14 +767,137 @@ InAppFormConfig({
 - `info` - Info, warning, and error messages
 - `debug` - All messages including debug
 
-#### PushEnvironment
+#### EventMetric
 
-- `development` - Development environment
-- `production` - Production environment
+Predefined event metrics:
+- `EventMetric.openedApp` - The 'Opened App' event
+- `EventMetric.viewedProduct` - The 'Viewed Product' event
+- `EventMetric.addedToCart` - The 'Added to Cart' event
+- `EventMetric.startedCheckout` - The 'Started Checkout' event
+
+Custom event metrics:
+- `EventMetric.custom(String name)` - Create a custom event with any name
 
 ## Example
 
 See the `example/` directory for a complete working example.
+
+## Troubleshooting
+
+### Android Issues
+
+#### Push Notifications Not Tracking Opens
+
+**Problem:** Push notifications arrive but opens are not tracked in Klaviyo.
+
+**Solutions:**
+1. **Verify MainActivity setup:** Ensure `Klaviyo.handlePush(intent)` is called in both `onCreate` and `onNewIntent` methods. See [example MainActivity.kt](example/android/app/src/main/kotlin/com/klaviyo/flutterexample/MainActivity.kt)
+2. **Check launch mode:** In `AndroidManifest.xml`, your MainActivity should use `android:launchMode="singleTop"` or `singleTask`
+3. **Enable debug logging:** Add to `AndroidManifest.xml` to see detailed logs:
+   ```xml
+   <meta-data
+       android:name="com.klaviyo.core.log_level"
+       android:value="1" />
+   ```
+4. **Check logcat:** Run `adb logcat | grep -i klaviyo` to see if push opens are being processed
+
+#### Push Notifications Not Displaying
+
+**Problem:** Notifications don't appear in the system tray.
+
+**Solutions:**
+1. **Check Firebase setup:**
+   - Verify `google-services.json` is in `android/app/`
+   - Ensure Firebase plugin is applied in `android/app/build.gradle`
+   - Test with Firebase Console first to rule out Klaviyo-specific issues
+2. **Check notification permission:**
+   - On Android 13+, runtime permission is required
+   - Verify permission is granted: Use `permission_handler` to check status
+3. **Check Klaviyo account configuration:** Verify FCM server key is configured in [Klaviyo settings](https://help.klaviyo.com/hc/en-us/articles/14750928993307)
+
+#### Push Tokens Not Being Set
+
+**Problem:** Tokens are not being registered with Klaviyo.
+
+**Solutions:**
+1. **Verify Firebase is configured:** Ensure Firebase is properly initialized before calling `FirebaseMessaging.instance.getToken()`
+2. **Check SDK initialization:** Call `klaviyo.initialize()` before `klaviyo.setPushToken()`
+3. **Check network connectivity:** Token registration requires internet connection
+4. **Verify token is retrieved:** Add logging to confirm token is not null:
+   ```dart
+   final token = await FirebaseMessaging.instance.getToken();
+   print('FCM Token: $token'); // Should not be null
+   ```
+
+#### Deep Links Not Working
+
+**Problem:** Deep links don't open the app or navigate correctly.
+
+**Solutions:**
+1. **Verify intent filters:** Check `AndroidManifest.xml` has correct intent filters for your URL schemes. See [example AndroidManifest.xml](example/android/app/src/main/AndroidManifest.xml#L31-L60)
+2. **Test with adb:**
+   ```bash
+   adb shell am start -W -a android.intent.action.VIEW -d "yourscheme://path" com.your.package
+   ```
+3. **Check launchMode:** Use `singleTop` or `singleTask` to avoid creating multiple activity instances
+4. **Verify App Links (HTTPS links):** Run `adb shell pm verify-app-links --re-verify com.your.package` and ensure `assetlinks.json` is accessible
+
+#### Build Issues
+
+**Problem:** Build fails with SDK-related errors.
+
+**Solutions:**
+1. **MinSdk error:** Ensure `android/app/build.gradle` has `minSdkVersion 23` or higher
+2. **Duplicate class errors:** Remove any direct references to `com.klaviyo:klaviyo-android-sdk` from your gradle files (the Flutter plugin includes it automatically)
+3. **Manifest merger errors:** Check for conflicting permissions or activities in your manifest
+
+### iOS Issues
+
+For iOS-specific troubleshooting, refer to the [iOS SDK documentation](https://github.com/klaviyo/klaviyo-swift-sdk#troubleshooting).
+
+### Common Issues (Both Platforms)
+
+#### Events Not Showing in Klaviyo Dashboard
+
+**Problem:** Events are sent but don't appear in the dashboard.
+
+**Solutions:**
+1. **Wait 5-10 minutes:** There's a processing delay for events to appear
+2. **Verify API key:** Ensure you're using the correct public API key
+3. **Check profile is set:** Events require a profile (email, phone, or external_id). Call `klaviyo.setEmail()` or `klaviyo.setExternalId()` before tracking events
+4. **Check account status:** Verify your Klaviyo account is active
+
+#### SDK Not Initializing
+
+**Problem:** SDK methods throw "not initialized" errors.
+
+**Solutions:**
+1. **Call initialize early:** Call `klaviyo.initialize()` in `main()` before `runApp()`:
+   ```dart
+   void main() async {
+     WidgetsFlutterBinding.ensureInitialized();
+     final klaviyo = KlaviyoSDK();
+     await klaviyo.initialize(apiKey: 'YOUR_API_KEY');
+     runApp(MyApp());
+   }
+   ```
+2. **Check for async issues:** Ensure `await` is used when calling `initialize()`
+
+### Getting Additional Help
+
+- **Native SDK Documentation:**
+  - [Android SDK](https://github.com/klaviyo/klaviyo-android-sdk)
+  - [iOS SDK](https://github.com/klaviyo/klaviyo-swift-sdk)
+- **Klaviyo Support:** [https://help.klaviyo.com/](https://help.klaviyo.com/)
+- **GitHub Issues:** Report bugs at [https://github.com/klaviyo/klaviyo-flutter-sdk/issues](https://github.com/klaviyo/klaviyo-flutter-sdk/issues)
+
+When reporting issues, include:
+- SDK version
+- Flutter version
+- Platform (Android/iOS) and OS version
+- Steps to reproduce
+- Relevant logs (with debug logging enabled)
+- Code snippets showing SDK usage
 
 ## Contributing
 
