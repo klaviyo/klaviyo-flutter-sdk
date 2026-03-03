@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'klaviyo_flutter_sdk'
-  s.version          = '1.0.0'
+  s.version          = '0.1.0-alpha.1'
   s.summary          = 'A Flutter plugin for Klaviyo SDK integration'
   s.description      = <<-DESC
 A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS and Android.
