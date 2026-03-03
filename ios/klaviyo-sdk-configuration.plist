@@ -6,6 +6,6 @@
     <key>klaviyo_sdk_name</key>
     <string>flutter</string>
     <key>klaviyo_sdk_version</key>
-    <string>1.0.0</string>
+    <string>0.1.0-alpha.1</string>
 </dict>
 </plist>
