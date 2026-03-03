@@ -13,6 +13,14 @@ repos:
   # Language-specific formatters/linters
   - repo: local
     hooks:
+      # ----- Version sync -----
+      - id: sync-sdk-version
+        name: sync SDK version to plist
+        entry: scripts/sync_version.sh
+        language: script
+        files: ^pubspec\.yaml$
+        pass_filenames: false
+
       # ----- Dart / Flutter -----
       - id: dart-fix
         name: dart fix

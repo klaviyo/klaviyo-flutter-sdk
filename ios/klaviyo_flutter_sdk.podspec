@@ -1,6 +1,9 @@
+require 'yaml'
+pubspec = YAML.load_file(File.join(__dir__, '..', 'pubspec.yaml'))
+
 Pod::Spec.new do |s|
   s.name             = 'klaviyo_flutter_sdk'
-  s.version          = '0.1.0-alpha.1'
+  s.version          = pubspec['version']
   s.summary          = 'A Flutter plugin for Klaviyo SDK integration'
   s.description      = <<-DESC
 A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS and Android.
@@ -10,6 +13,8 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
   s.author           = { 'Klaviyo' => 'support@klaviyo.com' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
+  s.resources        = ['klaviyo-sdk-configuration.plist']
+
   s.dependency 'Flutter'
   s.dependency 'KlaviyoSwift', '~> 5.2.0'
   # Forms: included by default, set to 'false' to exclude
