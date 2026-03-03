@@ -571,13 +571,15 @@ extension Data {
 extension KlaviyoFlutterSdkPlugin {
     /// Subscribe to form lifecycle events from the iOS SDK
     func subscribeToFormLifecycleEvents() {
-        KlaviyoSDK().registerFormLifecycleHandler { [weak self] event in
+        KlaviyoSDK().registerFormLifecycleHandler { [weak self] event, context in
             guard let self = self else { return }
 
             let eventPayload: [String: Any] = [
                 "type": "form_lifecycle_event",
                 "data": [
-                    "event": event.rawValue
+                    "event": event.rawValue,
+                    "formId": context.formId as Any,
+                    "formName": context.formName as Any
                 ]
             ]
 
