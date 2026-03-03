@@ -209,8 +209,20 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
         case "registerForInAppForms":
             #if canImport(KlaviyoForms)
+            let configuration = (call.arguments as? [String: Any])?["configuration"] as? [String: Any]
+            let sessionTimeout: TimeInterval
+            if let timeout = configuration?["sessionTimeoutDuration"] as? Int, timeout == -1 {
+                sessionTimeout = TimeInterval.infinity
+            } else if let timeout = configuration?["sessionTimeoutDuration"] as? Int {
+                sessionTimeout = TimeInterval(timeout)
+            } else {
+                sessionTimeout = 3600 // default: 1 hour
+            }
+
             DispatchQueue.main.async {
-                KlaviyoSDK().registerForInAppForms()
+                KlaviyoSDK().registerForInAppForms(
+                    configuration: InAppFormsConfig(sessionTimeoutDuration: sessionTimeout)
+                )
             }
             result(nil)
             #else
@@ -303,7 +315,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                         code: "INVALID_ARGUMENTS",
                         message: "Invalid badge count argument",
                         details: nil
-                    ))
+                    )
+                )
                 return
             }
             KlaviyoSDK().setBadgeCount(count)
