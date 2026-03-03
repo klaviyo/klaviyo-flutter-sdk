@@ -26,12 +26,16 @@ class FormLifecycleEvent {
   /// The type of lifecycle event
   final FormLifecycleEventType eventType;
 
-  /// Optional form ID (available on Android)
+  /// Optional form ID
   final String? formId;
+
+  /// Optional form name
+  final String? formName;
 
   const FormLifecycleEvent({
     required this.eventType,
     this.formId,
+    this.formName,
   });
 
   /// Create a FormLifecycleEvent from a map received from the event channel
@@ -42,12 +46,13 @@ class FormLifecycleEvent {
     return FormLifecycleEvent(
       eventType: FormLifecycleEventType.fromString(eventString),
       formId: data['formId'] as String?,
+      formName: data['formName'] as String?,
     );
   }
 
   @override
   String toString() {
-    return 'FormLifecycleEvent(eventType: $eventType, formId: $formId)';
+    return 'FormLifecycleEvent(eventType: $eventType, formId: $formId, formName: $formName)';
   }
 
   @override
@@ -56,9 +61,10 @@ class FormLifecycleEvent {
 
     return other is FormLifecycleEvent &&
         other.eventType == eventType &&
-        other.formId == formId;
+        other.formId == formId &&
+        other.formName == formName;
   }
 
   @override
-  int get hashCode => eventType.hashCode ^ formId.hashCode;
+  int get hashCode => eventType.hashCode ^ formId.hashCode ^ formName.hashCode;
 }

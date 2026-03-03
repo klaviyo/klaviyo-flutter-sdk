@@ -340,7 +340,7 @@ class KlaviyoFlutterSdkPlugin :
                     )
 
                     // Register form lifecycle callback
-                    Klaviyo.registerFormLifecycleCallback { event, formId ->
+                    Klaviyo.registerFormLifecycleCallback { event, context ->
                         val eventName =
                             when (event) {
                                 com.klaviyo.forms.FormLifecycleEvent.FORM_SHOWN -> "form_shown"
@@ -354,7 +354,8 @@ class KlaviyoFlutterSdkPlugin :
                                 "data" to
                                     mapOf(
                                         "event" to eventName,
-                                        "formId" to formId,
+                                        "formId" to context.formId,
+                                        "formName" to context.formName,
                                     ),
                             ),
                         )

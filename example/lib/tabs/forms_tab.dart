@@ -46,8 +46,10 @@ class _FormsTabState extends State<FormsTab> {
       setState(() {
         final timestamp = DateTime.now().toIso8601String().substring(11, 19);
         final formIdInfo = event.formId != null ? ' (${event.formId})' : '';
-        _lifecycleEvents
-            .add('[$timestamp] ${event.eventType.name}$formIdInfo');
+        final formNameInfo =
+            event.formName != null ? ' [${event.formName}]' : '';
+        _lifecycleEvents.add(
+            '[$timestamp] ${event.eventType.name}$formIdInfo$formNameInfo');
       });
     });
   }
