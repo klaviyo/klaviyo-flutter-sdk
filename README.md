@@ -541,6 +541,10 @@ Follow steps 1 & 2 ("Register the URL scheme" and "Whitelist your URL scheme", r
 under the [Handling URL Schemes](https://github.com/klaviyo/klaviyo-swift-sdk#handling-url-schemes)
 section of the Swift SDK's README.
 
+No additional native code is required — `FlutterAppDelegate` already handles
+`application(_:open:options:)` and forwards custom URL scheme deep links to the Flutter layer
+automatically.
+
 **2. Klaviyo Universal Tracking Links** (e.g., `https://trk.yourdomain.com/u/abc123`)
 
 Follow steps 1 & 2 ("Configure Universal Links in your Klaviyo account" and
