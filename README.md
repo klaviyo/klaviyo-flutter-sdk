@@ -530,7 +530,7 @@ Klaviyo supports [Deep Links](https://help.klaviyo.com/hc/en-us/articles/1475040
    - Flutter's built-in `WidgetsBindingObserver`
 
 2. Configure platform-specific deep linking:
-   - **iOS**: [Universal Links Setup](https://github.com/klaviyo/klaviyo-swift-sdk#deep-linking)
+   - **iOS**: [Deep Linking Setup](https://github.com/klaviyo/klaviyo-swift-sdk#deep-linking)
    - **Android**: Configure intent filters in your `AndroidManifest.xml` (see below)
 
 #### Android Deep Linking Configuration
