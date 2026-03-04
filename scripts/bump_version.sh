@@ -79,13 +79,9 @@ else
     sed -i "s/<string name=\"klaviyo_sdk_version_override\">.*<\/string>/<string name=\"klaviyo_sdk_version_override\">$NEW_VERSION<\/string>/" android/src/main/res/values/strings.xml
 fi
 
-# 4. Update iOS podspec
-echo -e "${GREEN}✓${NC} Updating ios/klaviyo_flutter_sdk.podspec"
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s/s.version.*=.*/s.version          = '$NEW_VERSION'/" ios/klaviyo_flutter_sdk.podspec
-else
-    sed -i "s/s.version.*=.*/s.version          = '$NEW_VERSION'/" ios/klaviyo_flutter_sdk.podspec
-fi
+# 4. Update iOS plist via sync_version.sh
+echo -e "${GREEN}✓${NC} Updating ios/klaviyo-sdk-configuration.plist"
+./scripts/sync_version.sh
 
 # 5. Update CHANGELOG.md (add new section at top if version doesn't exist)
 echo -e "${GREEN}✓${NC} Updating CHANGELOG.md"
@@ -113,7 +109,7 @@ ERRORS=0
 check_file_version() {
     local file=$1
     local pattern=$2
-    local version=$(grep "$pattern" "$file" | head -1)
+    local version=$(grep -A1 "$pattern" "$file")
 
     if [[ $version == *"$NEW_VERSION"* ]]; then
         echo -e "${GREEN}✓${NC} $file"
@@ -126,7 +122,7 @@ check_file_version() {
 check_file_version "pubspec.yaml" "^version:"
 check_file_version "README.md" "klaviyo_flutter_sdk:"
 check_file_version "android/src/main/res/values/strings.xml" "klaviyo_sdk_version_override"
-check_file_version "ios/klaviyo_flutter_sdk.podspec" "s.version"
+check_file_version "ios/klaviyo-sdk-configuration.plist" "klaviyo_sdk_version"
 check_file_version "CHANGELOG.md" "## $NEW_VERSION"
 
 echo ""
