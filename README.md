@@ -530,7 +530,7 @@ Klaviyo supports [Deep Links](https://help.klaviyo.com/hc/en-us/articles/1475040
    - Flutter's built-in `WidgetsBindingObserver`
 
 2. Configure platform-specific deep linking:
-   - **iOS**: [Deep Linking Setup](https://github.com/klaviyo/klaviyo-swift-sdk#deep-linking)
+   - **iOS**: Configure your project settings in Xcode to handle deep links (see below)
    - **Android**: Configure intent filters in your `AndroidManifest.xml` (see below)
 
 #### iOS Deep Linking Configuration
@@ -541,9 +541,9 @@ Follow steps 1 & 2 ("Register the URL scheme" and "Whitelist your URL scheme", r
 under the [Handling URL Schemes](https://github.com/klaviyo/klaviyo-swift-sdk#handling-url-schemes)
 section of the Swift SDK's README.
 
-No additional native code is required — `FlutterAppDelegate` already handles
-`application(_:open:options:)` and forwards custom URL scheme deep links to the Flutter layer
-automatically.
+> No additional native code is required — `FlutterAppDelegate` already handles
+> `application(_:open:options:)` and forwards custom URL scheme deep links to the Flutter layer
+> automatically.
 
 **2. Klaviyo Universal Tracking Links** (e.g., `https://trk.yourdomain.com/u/abc123`)
 
@@ -552,7 +552,13 @@ Follow steps 1 & 2 ("Configure Universal Links in your Klaviyo account" and
 [Handling Universal Links](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#handling-universal-links)
 section of the Swift SDK's README.
 
-example/ios/Runner/AppDelegate.swift#L28-L45
+> No native AppDelegate override is needed for universal link handling.
+> `FlutterAppDelegate` implements `application(_:continue:restorationHandler:)` and forwards
+> universal links to the Flutter layer automatically.
+
+Once universal links are arriving in your Flutter app, call `handleUniversalTrackingLink` from
+your router to let the Klaviyo SDK resolve tracking URLs. See the
+[go_router integration](#integration-with-go_router) section for an example.
 
 #### Android Deep Linking Configuration
 
