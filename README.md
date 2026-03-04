@@ -533,6 +533,23 @@ Klaviyo supports [Deep Links](https://help.klaviyo.com/hc/en-us/articles/1475040
    - **iOS**: [Deep Linking Setup](https://github.com/klaviyo/klaviyo-swift-sdk#deep-linking)
    - **Android**: Configure intent filters in your `AndroidManifest.xml` (see below)
 
+#### iOS Deep Linking Configuration
+
+**1. Custom URL Schemes** (e.g., `myapp://product/123`)
+
+Follow steps 1 & 2 ("Register the URL scheme" and "Whitelist your URL scheme", respectively)
+under the [Handling URL Schemes](https://github.com/klaviyo/klaviyo-swift-sdk#handling-url-schemes)
+section of the Swift SDK's README.
+
+**2. Klaviyo Universal Tracking Links** (e.g., `https://trk.yourdomain.com/u/abc123`)
+
+Follow steps 1 & 2 ("Configure Universal Links in your Klaviyo account" and
+"Add the Associated Domains Entitlement", respectively) under the
+[Handling Universal Links](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#handling-universal-links)
+section of the Swift SDK's README.
+
+example/ios/Runner/AppDelegate.swift#L28-L45
+
 #### Android Deep Linking Configuration
 
 The [example AndroidManifest.xml](example/android/app/src/main/AndroidManifest.xml#L31-L60) demonstrates three types of deep links:
