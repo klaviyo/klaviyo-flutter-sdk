@@ -24,6 +24,6 @@ Initial alpha release of the Klaviyo Flutter SDK.
 
 ### Platform Support
 
-- **iOS**: Minimum deployment target 13.0, wraps [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk) ~> 5.2.0
-- **Android**: Wraps [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk)
+- **iOS**: Minimum deployment target 13.0, wraps [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk) ~> 5.2.1
+- **Android**: Minimum SDK version 23, wraps [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk) 4.3.0
 - **Flutter**: Minimum Flutter 3.24.0, Dart 3.0.0+
