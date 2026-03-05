@@ -47,7 +47,7 @@ android {
     }
 }
 
-def klaviyoSdkVersion = "feat~flutter-support-SNAPSHOT"
+def klaviyoSdkVersion = "4.3.0"
 
 // Whether to include the full forms module (in-app forms rendering).
 // Set klaviyoIncludeForms=false in your host app's gradle.properties to exclude forms.
