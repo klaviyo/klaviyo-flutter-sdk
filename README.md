@@ -283,8 +283,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final klaviyo = KlaviyoSDK();
-  await klaviyo.initialize(
+  await KlaviyoSDK().initialize(
     apiKey: 'YOUR_KLAVIYO_PUBLIC_API_KEY',
   );
 
@@ -330,7 +329,7 @@ final openedAppEvent = KlaviyoEvent(
     'source': 'home_screen',
   },
 );
-await klaviyo.createEvent(openedAppEvent);
+await KlaviyoSDK().createEvent(openedAppEvent);
 
 // Track a custom event
 final customEvent = KlaviyoEvent.custom(
@@ -340,7 +339,7 @@ final customEvent = KlaviyoEvent.custom(
     'completion_time_seconds': 245,
   },
 );
-await klaviyo.createEvent(customEvent);
+await KlaviyoSDK().createEvent(customEvent);
 
 // Track a purchase event with value
 final purchaseEvent = KlaviyoEvent.custom(
@@ -352,7 +351,7 @@ final purchaseEvent = KlaviyoEvent.custom(
   },
   value: 99.99,
 );
-await klaviyo.createEvent(purchaseEvent);
+await KlaviyoSDK().createEvent(purchaseEvent);
 ```
 
 ### 4. Push Notifications
@@ -393,7 +392,7 @@ if (Platform.isIOS) {
   String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
 
   if (apnsToken != null) {
-    await klaviyo.setPushToken(apnsToken);
+    await KlaviyoSDK().setPushToken(apnsToken);
     print("Sent APNs token to Klaviyo");
   } else {
     print("APNs token was null. Waiting for refresh...");
@@ -402,7 +401,7 @@ if (Platform.isIOS) {
   String? fcmToken = await FirebaseMessaging.instance.getToken();
 
   if (fcmToken != null) {
-    await klaviyo.setPushToken(fcmToken);
+    await KlaviyoSDK().setPushToken(fcmToken);
     print("Sent FCM token to Klaviyo");
   }
 }
@@ -412,7 +411,7 @@ if (Platform.isIOS) {
 // Native APNs token changes are rare, but for Android this is crucial.
 if (Platform.isAndroid) {
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-    klaviyo.setPushToken(newToken);
+    KlaviyoSDK().setPushToken(newToken);
   });
   // On iOS, if the APNs token changes, the OS usually relaunches the app
   // or triggers distinct native callbacks.
@@ -432,10 +431,10 @@ The simplest approach - the SDK automatically fetches the push token on both pla
 // Register for push notifications
 // iOS: Triggers APNs registration and automatically registers it with Klaviyo
 // Android: Fetches the FCM token and automatically registers it with Klaviyo
-await klaviyo.registerForPushNotifications();
+await KlaviyoSDK().registerForPushNotifications();
 
 // Listen for token events via the push notification stream
-klaviyo.onPushNotification.listen((event) {
+KlaviyoSDK().onPushNotification.listen((event) {
   switch (event['type']) {
     case 'push_token_received':
       final token = event['data']['token'];
@@ -491,23 +490,23 @@ Android automatically handles badge counts, and no additional setup is needed.
 
 ```dart
 // Register for in-app forms with default session timeout (1 hour)
-await klaviyo.registerForInAppForms();
+await KlaviyoSDK().registerForInAppForms();
 
 // Register with a custom session timeout
 final config = InAppFormConfig(
   sessionTimeoutDuration: Duration(minutes: 30),
 );
-await klaviyo.registerForInAppForms(configuration: config);
+await KlaviyoSDK().registerForInAppForms(configuration: config);
 
 // Register with infinite session timeout (no timeout)
 final infiniteConfig = InAppFormConfig.infinite();
-await klaviyo.registerForInAppForms(configuration: infiniteConfig);
+await KlaviyoSDK().registerForInAppForms(configuration: infiniteConfig);
 
 // Unregister from in-app forms
-await klaviyo.unregisterFromInAppForms();
+await KlaviyoSDK().unregisterFromInAppForms();
 
 // Listen for form events
-klaviyo.onFormEvent.listen((event) {
+KlaviyoSDK().onFormEvent.listen((event) {
   print('Form event: ${event['type']}');
 });
 ```
@@ -645,7 +644,7 @@ final router = GoRouter(
   redirect: (context, state) {
     // Fire-and-forget - Klaviyo tracks the link in the background
     final klaviyo = KlaviyoSDK();
-    klaviyo.handleUniversalTrackingLink(state.uri.toString());
+    KlaviyoSDK().handleUniversalTrackingLink(state.uri.toString());
 
     // Continue with normal navigation
     return null;
@@ -655,8 +654,7 @@ final router = GoRouter(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final klaviyo = KlaviyoSDK();
-  await klaviyo.initialize(apiKey: 'YOUR_API_KEY');
+  await KlaviyoSDK().initialize(apiKey: 'YOUR_API_KEY');
 
   runApp(MaterialApp.router(routerConfig: router));
 }
@@ -677,7 +675,7 @@ void main() async {
 
 ```dart
 // Reset profile when user logs out
-await klaviyo.resetProfile();
+await KlaviyoSDK().resetProfile();
 ```
 
 ## API Reference
@@ -849,7 +847,7 @@ See the `example/` directory for a complete working example.
 
 **Solutions:**
 1. **Verify Firebase is configured:** Ensure Firebase is properly initialized before calling `FirebaseMessaging.instance.getToken()`
-2. **Check SDK initialization:** Call `klaviyo.initialize()` before `klaviyo.setPushToken()`
+2. **Check SDK initialization:** Call `KlaviyoSDK().initialize()` before `KlaviyoSDK().setPushToken()`
 3. **Check network connectivity:** Token registration requires internet connection
 4. **Verify token is retrieved:** Add logging to confirm token is not null:
    ```dart
@@ -892,7 +890,7 @@ For iOS-specific troubleshooting, refer to the [iOS SDK documentation](https://g
 **Solutions:**
 1. **Wait 5-10 minutes:** There's a processing delay for events to appear
 2. **Verify API key:** Ensure you're using the correct public API key
-3. **Check profile is set:** Events require a profile (email, phone, or external_id). Call `klaviyo.setEmail()` or `klaviyo.setExternalId()` before tracking events
+3. **Check profile is set:** Events require a profile (email, phone, or external_id). Call `KlaviyoSDK().setEmail()` or `KlaviyoSDK().setExternalId()` before tracking events
 4. **Check account status:** Verify your Klaviyo account is active
 
 #### SDK Not Initializing
@@ -900,12 +898,11 @@ For iOS-specific troubleshooting, refer to the [iOS SDK documentation](https://g
 **Problem:** SDK methods throw "not initialized" errors.
 
 **Solutions:**
-1. **Call initialize early:** Call `klaviyo.initialize()` in `main()` before `runApp()`:
+1. **Call initialize early:** Call `KlaviyoSDK().initialize()` in `main()` before `runApp()`:
    ```dart
    void main() async {
      WidgetsFlutterBinding.ensureInitialized();
-     final klaviyo = KlaviyoSDK();
-     await klaviyo.initialize(apiKey: 'YOUR_API_KEY');
+     await KlaviyoSDK().initialize(apiKey: 'YOUR_API_KEY');
      runApp(MyApp());
    }
    ```
