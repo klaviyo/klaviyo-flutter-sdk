@@ -210,7 +210,7 @@ class KlaviyoSDK {
   /// klaviyo.onPushNotification.listen((event) {
   ///   if (event['type'] == 'push_token_received') {
   ///     final token = event['data']['token'];
-  ///     print('Token received: $token');
+  ///     log('Token received: $token');
   ///   }
   /// });
   /// ```
