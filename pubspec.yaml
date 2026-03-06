@@ -12,7 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  meta: any
+  meta: ^1.17.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
