@@ -13,6 +13,7 @@ import UserNotifications
 
 // MARK: - Logger
 
+@available(iOS 14.0, *)
 extension Logger {
     static let klaviyoFlutterSDK = Logger(
         subsystem: "com.klaviyo.flutter",
@@ -189,7 +190,9 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
 
             guard !token.isEmpty else {
-                Logger.klaviyoFlutterSDK.warning("Attempted to set empty push token")
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.warning("Attempted to set empty push token")
+                }
                 result(FlutterError(
                     code: "INVALID_TOKEN",
                     message: "Push token cannot be empty",
@@ -214,7 +217,9 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         case "getPushToken":
             let token = KlaviyoSDK().pushToken
             if let token {
-                Logger.klaviyoFlutterSDK.info("Retrieved push token from SDK: \(token)")
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.info("Retrieved push token from SDK: \(token)")
+                }
             }
             result(token)
 
@@ -404,7 +409,9 @@ extension KlaviyoFlutterSdkPlugin {
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
-        Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString)")
+        if #available(iOS 14.0, *) {
+            Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString)")
+        }
 
         // Pass to Klaviyo Swift SDK
         KlaviyoSDK().set(pushToken: deviceToken)
@@ -419,7 +426,9 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink {
             eventSink(eventData)
         } else {
-            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token event.")
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token event.")
+            }
             cachedToken = eventData
         }
     }
@@ -429,10 +438,12 @@ extension KlaviyoFlutterSdkPlugin {
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
-        let description = error.localizedDescription
-        Logger.klaviyoFlutterSDK.warning(
-            "Failed to register for remote notifications: \(description)"
-        )
+        if #available(iOS 14.0, *) {
+            let description = error.localizedDescription
+            Logger.klaviyoFlutterSDK.warning(
+                "Failed to register for remote notifications: \(description)"
+            )
+        }
 
         // Create error payload
         let errorData: [String: Any] = [
@@ -444,14 +455,18 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink {
             eventSink(errorData)
         } else {
-            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token error event.")
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token error event.")
+            }
             cachedError = errorData
         }
     }
 
     public func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
-        Logger.klaviyoFlutterSDK.info("Push notification opened")
+        if #available(iOS 14.0, *) {
+            Logger.klaviyoFlutterSDK.info("Push notification opened")
+        }
 
         // 1. Prepare Payload
         let eventPayload: [String: Any] = [
@@ -463,7 +478,9 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink = eventSink {
             eventSink(eventPayload)
         } else {
-            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching notification open event.")
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching notification open event.")
+            }
             cachedOpenedNotification = eventPayload
         }
 
@@ -478,7 +495,9 @@ extension KlaviyoFlutterSdkPlugin {
     /// in `didReceiveRemoteNotification:fetchCompletionHandler:`.
     /// Note: The host app is responsible for calling the completion handler after this method returns.
     public func handleSilentPush(userInfo: [AnyHashable: Any]) {
-        Logger.klaviyoFlutterSDK.info("Silent push received")
+        if #available(iOS 14.0, *) {
+            Logger.klaviyoFlutterSDK.info("Silent push received")
+        }
 
         // Prepare payload
         let eventPayload: [String: Any] = [
@@ -490,7 +509,9 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink = eventSink {
             eventSink(eventPayload)
         } else {
-            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching silent push event.")
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching silent push event.")
+            }
             cachedSilentPush = eventPayload
         }
     }
