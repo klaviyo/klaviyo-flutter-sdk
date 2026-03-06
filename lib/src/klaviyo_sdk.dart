@@ -10,7 +10,8 @@ import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
-import 'utils/logger.dart';
+import 'package:logging/logging.dart';
+
 import 'exceptions/klaviyo_exception.dart';
 
 /// Main Klaviyo SDK class for Flutter applications
@@ -19,11 +20,14 @@ import 'exceptions/klaviyo_exception.dart';
 class KlaviyoSDK {
   static final KlaviyoSDK _instance = KlaviyoSDK._internal();
   factory KlaviyoSDK() => _instance;
-  KlaviyoSDK._internal();
+  KlaviyoSDK._internal() {
+    hierarchicalLoggingEnabled = true;
+    _logger.level = Level.INFO;
+  }
 
   // Native wrapper service
   late KlaviyoNativeWrapper _nativeWrapper;
-  final Logger _logger = Logger();
+  final Logger _logger = Logger('KlaviyoSDK');
 
   // State
   bool _isInitialized = false;
@@ -258,7 +262,7 @@ class KlaviyoSDK {
       );
       _logger.info('Registered for in-app forms');
     } on KlaviyoException catch (e) {
-      _logger.error('Failed to register for in-app forms: ${e.message}');
+      _logger.warning('Failed to register for in-app forms: ${e.message}');
     }
   }
 
@@ -269,7 +273,7 @@ class KlaviyoSDK {
       await _nativeWrapper.unregisterFromInAppForms();
       _logger.info('Unregistered from in-app forms');
     } on KlaviyoException catch (e) {
-      _logger.error('Failed to unregister from in-app forms: ${e.message}');
+      _logger.warning('Failed to unregister from in-app forms: ${e.message}');
     }
   }
 
@@ -281,7 +285,7 @@ class KlaviyoSDK {
       await _nativeWrapper.registerGeofencing();
       _logger.info('Registered for geofencing');
     } on KlaviyoException catch (e) {
-      _logger.error('Failed to register for geofencing: ${e.message}');
+      _logger.warning('Failed to register for geofencing: ${e.message}');
     }
   }
 
@@ -292,7 +296,7 @@ class KlaviyoSDK {
       await _nativeWrapper.unregisterGeofencing();
       _logger.info('Unregistered from geofencing');
     } on KlaviyoException catch (e) {
-      _logger.error('Failed to unregister from geofencing: ${e.message}');
+      _logger.warning('Failed to unregister from geofencing: ${e.message}');
     }
   }
 
@@ -308,7 +312,7 @@ class KlaviyoSDK {
     try {
       return await _nativeWrapper.getCurrentGeofences();
     } on KlaviyoException catch (e) {
-      _logger.error('Failed to get current geofences: ${e.message}');
+      _logger.warning('Failed to get current geofences: ${e.message}');
       return [];
     }
   }
@@ -345,7 +349,7 @@ class KlaviyoSDK {
 
     // Validate empty/null URL
     if (url.trim().isEmpty) {
-      _logger.error('[DeepLink SDK] Error: Empty tracking link provided');
+      _logger.warning('[DeepLink SDK] Error: Empty tracking link provided');
       return false;
     }
 
@@ -369,7 +373,7 @@ class KlaviyoSDK {
         _logger.warning('Link $url rejected by native SDK');
       }
     }).catchError((e) {
-      _logger.error('Failed to handle universal tracking link $url: $e');
+      _logger.warning('Failed to handle universal tracking link $url: $e');
     });
 
     return true;
@@ -406,7 +410,7 @@ class KlaviyoSDK {
   /// Set log level for Flutter-side logging only
   /// Note: This only affects Flutter console logs, not native SDK logs
   void setLogLevel(KlaviyoLogLevel logLevel) {
-    _logger.setLogLevel(logLevel);
+    _logger.level = logLevel.toLevel();
   }
 
   /// Get push notification events stream

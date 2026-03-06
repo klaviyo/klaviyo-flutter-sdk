@@ -5,7 +5,7 @@ import '../models/klaviyo_event.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
-import '../utils/logger.dart';
+import 'package:logging/logging.dart';
 
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
@@ -18,7 +18,7 @@ class KlaviyoNativeWrapper {
 
   KlaviyoNativeWrapper._internal();
 
-  final Logger _logger = Logger();
+  final Logger _logger = Logger('KlaviyoSDK');
   bool _isInitialized = false;
   String? _apiKey;
 
@@ -356,7 +356,7 @@ class KlaviyoNativeWrapper {
           break;
       }
     } catch (e) {
-      _logger.error('Error handling native event: $e');
+      _logger.warning('Error handling native event: $e');
     }
   }
 

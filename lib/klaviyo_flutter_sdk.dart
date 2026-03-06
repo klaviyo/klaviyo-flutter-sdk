@@ -10,4 +10,3 @@ export 'src/models/geofence.dart';
 export 'src/enums/klaviyo_log_level.dart';
 export 'src/services/klaviyo_native_wrapper.dart';
 export 'src/exceptions/klaviyo_exception.dart';
-export 'src/utils/logger.dart';
