@@ -386,6 +386,9 @@ If your app already uses Firebase Messaging for other features, or you need more
 
 ```dart
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:logging/logging.dart';
+
+final _logger = Logger('MyApp');
 
 // Get token from Firebase and pass to Klaviyo
 if (Platform.isIOS) {
@@ -393,16 +396,16 @@ if (Platform.isIOS) {
 
   if (apnsToken != null) {
     await KlaviyoSDK().setPushToken(apnsToken);
-    print("Sent APNs token to Klaviyo");
+    _logger.info('Sent APNs token to Klaviyo');
   } else {
-    print("APNs token was null. Waiting for refresh...");
+    _logger.warning('APNs token was null. Waiting for refresh...');
   }
 } else if (Platform.isAndroid) {
   String? fcmToken = await FirebaseMessaging.instance.getToken();
 
   if (fcmToken != null) {
     await KlaviyoSDK().setPushToken(fcmToken);
-    print("Sent FCM token to Klaviyo");
+    _logger.info('Sent FCM token to Klaviyo');
   }
 }
 
@@ -438,11 +441,11 @@ KlaviyoSDK().onPushNotification.listen((event) {
   switch (event['type']) {
     case 'push_token_received':
       final token = event['data']['token'];
-      print('Token received: $token');
+      _logger.info('Token received: $token');
       break;
     case 'push_token_error':
       final error = event['data']['error'];
-      print('Token error: $error');
+      _logger.warning('Token error: $error');
       break;
   }
 });
@@ -460,7 +463,7 @@ KlaviyoSDK().onPushNotification.listen((event) {
 // Listen for notification open events
 KlaviyoSDK().onPushNotification.listen((event) {
   if (event['type'] == 'push_notification_opened') {
-    print('Notification opened: ${event['data']}');
+    _logger.info('Notification opened: ${event['data']}');
   }
 });
 ```
@@ -507,7 +510,7 @@ await KlaviyoSDK().unregisterFromInAppForms();
 
 // Listen for form events
 KlaviyoSDK().onFormEvent.listen((event) {
-  print('Form event: ${event['type']}');
+  _logger.info('Form event: ${event['type']}');
 });
 ```
 
@@ -852,7 +855,7 @@ See the `example/` directory for a complete working example.
 4. **Verify token is retrieved:** Add logging to confirm token is not null:
    ```dart
    final token = await FirebaseMessaging.instance.getToken();
-   print('FCM Token: $token'); // Should not be null
+   _logger.info('FCM Token: $token'); // Should not be null
    ```
 
 #### Deep Links Not Working

@@ -1,3 +1,5 @@
+import 'package:logging/logging.dart';
+
 enum KlaviyoLogLevel {
   none,
   error,
@@ -5,6 +7,23 @@ enum KlaviyoLogLevel {
   info,
   debug,
   verbose;
+
+  Level toLevel() {
+    switch (this) {
+      case KlaviyoLogLevel.none:
+        return Level.OFF;
+      case KlaviyoLogLevel.error:
+        return Level.SEVERE;
+      case KlaviyoLogLevel.warning:
+        return Level.WARNING;
+      case KlaviyoLogLevel.info:
+        return Level.INFO;
+      case KlaviyoLogLevel.debug:
+        return Level.FINE;
+      case KlaviyoLogLevel.verbose:
+        return Level.FINER;
+    }
+  }
 
   static KlaviyoLogLevel fromString(String value) {
     switch (value.toLowerCase()) {
