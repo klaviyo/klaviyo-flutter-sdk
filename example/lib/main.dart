@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
 
 import 'tabs/profile_tab.dart';
 import 'tabs/events_tab.dart';
@@ -13,8 +15,21 @@ import 'tabs/forms_tab.dart';
 import 'tabs/push_tab.dart';
 import 'tabs/geofencing_tab.dart';
 
+final _logger = Logger('KlaviyoExample');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  Logger.root.onRecord.listen((record) {
+    developer.log(
+      record.message,
+      time: record.time,
+      level: record.level.value,
+      name: record.loggerName,
+      error: record.error,
+      stackTrace: record.stackTrace,
+    );
+  });
 
   // Initialize Firebase for FCM (Android only)
   if (Platform.isAndroid) {
@@ -22,7 +37,7 @@ void main() async {
       await Firebase.initializeApp();
       _setupFCM();
     } catch (e) {
-      print('Firebase initialization failed: $e');
+      _logger.warning('Firebase initialization failed: $e');
     }
   }
 
@@ -41,25 +56,29 @@ Future<void> _setupFCM() async {
     // Note: Initial token registration happens in ProfileTab after SDK initialization
     FirebaseMessaging.instance.onTokenRefresh.listen(
       (newToken) {
-        print('FCM Token refreshed: $newToken');
+        _logger.info('FCM Token refreshed: $newToken');
         final klaviyo = KlaviyoSDK();
         if (klaviyo.isInitialized) {
           klaviyo.setPushToken(newToken).catchError((error) {
-            print('Failed to register refreshed FCM token: $error');
+            _logger.warning(
+              'Failed to register refreshed FCM token: $error',
+            );
           });
         }
       },
       onError: (error) {
-        print('Error listening for token refresh: $error');
+        _logger.warning('Error listening for token refresh: $error');
       },
     );
 
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Foreground message received: ${message.notification?.title}');
+      _logger.info(
+        'Foreground message received: ${message.notification?.title}',
+      );
     });
   } catch (e) {
-    print('FCM setup failed: $e');
+    _logger.warning('FCM setup failed: $e');
   }
 }
 
@@ -72,7 +91,9 @@ StreamSubscription<Map<String, dynamic>>? _silentPushSubscription;
 void setupSilentPushListener() {
   final klaviyo = KlaviyoSDK();
   if (!klaviyo.isInitialized) {
-    print('Cannot set up silent push listener: SDK not initialized');
+    _logger.warning(
+      'Cannot set up silent push listener: SDK not initialized',
+    );
     return;
   }
 
@@ -87,7 +108,7 @@ void setupSilentPushListener() {
       final userInfo =
           data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
 
-      print('Silent push received: $userInfo');
+      _logger.info('Silent push received: $userInfo');
       _showSilentPushAlert(userInfo);
     }
   });
@@ -96,7 +117,7 @@ void setupSilentPushListener() {
 void _showSilentPushAlert(Map<String, dynamic> userInfo) {
   final context = _router.routerDelegate.navigatorKey.currentContext;
   if (context == null) {
-    print('Cannot show alert: context not available');
+    _logger.warning('Cannot show alert: context not available');
     return;
   }
 
@@ -110,7 +131,10 @@ void _showSilentPushAlert(Map<String, dynamic> userInfo) {
             alignment: Alignment.centerLeft,
             child: Text(
               _formatUserInfo(userInfo),
-              style: const TextStyle(fontFamily: 'Courier', fontSize: 12),
+              style: const TextStyle(
+                fontFamily: 'Courier',
+                fontSize: 12,
+              ),
               textAlign: TextAlign.left,
             ),
           ),
@@ -139,7 +163,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'Klaviyo Flutter SDK Example',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+        ),
         useMaterial3: true,
       ),
       routerConfig: _router,
@@ -191,46 +217,50 @@ final GoRouter _router = GoRouter(
   ],
   redirect: (context, state) async {
     final url = state.uri.toString();
-    print('🔀 [Redirect] Called with URL: $url');
-    print(
-      '🔀 [Redirect] URI scheme: ${state.uri.scheme}, path: ${state.uri.path}',
+    _logger.info('Redirect called with URL: $url');
+    _logger.fine(
+      'URI scheme: ${state.uri.scheme}, path: ${state.uri.path}',
     );
 
     // Handle Klaviyo universal tracking links
     final klaviyo = KlaviyoSDK();
     if (klaviyo.isInitialized) {
-      print('🔀 [Redirect] Checking if tracking link...');
+      _logger.fine('Checking if tracking link...');
       final isTrackingLink = klaviyo.handleUniversalTrackingLink(url);
-      print('🔀 [Redirect] Is tracking link: $isTrackingLink');
+      _logger.info('Is tracking link: $isTrackingLink');
 
       // If this is a tracking link, stay on current page (no navigation)
       // The SDK will resolve and broadcast the destination, triggering another redirect
       if (isTrackingLink) {
-        print(
-          '🔀 [Redirect] ✅ Tracking link - staying on current location: ${state.matchedLocation}',
+        _logger.fine(
+          'Tracking link - staying on current location: ${state.matchedLocation}',
         );
-        return state.matchedLocation; // Stay on current page while SDK resolves
+        return state.matchedLocation;
       }
     }
 
     // Parse the path from custom scheme or universal link
-    print('🔀 [Redirect] URI authority: ${state.uri.authority}');
+    _logger.fine('URI authority: ${state.uri.authority}');
     final path = _parseDeepLinkPath(state.uri);
-    print('🔀 [Redirect] Parsed path: $path');
+    _logger.fine('Parsed path: $path');
 
     // Redirect root to profile
     if (path == '/' || path.isEmpty) {
-      print('🔀 [Redirect] Root path detected, redirecting to /profile');
+      _logger.fine(
+        'Root path detected, redirecting to /profile',
+      );
       return '/profile';
     }
 
     // Navigate to valid paths
     if (path != state.uri.path) {
-      print('🔀 [Redirect] Path differs from state.uri.path, returning: $path');
+      _logger.fine(
+        'Path differs from state.uri.path, returning: $path',
+      );
       return path;
     }
 
-    print('🔀 [Redirect] No redirect needed, returning null');
+    _logger.fine('No redirect needed, returning null');
     return null;
   },
 );

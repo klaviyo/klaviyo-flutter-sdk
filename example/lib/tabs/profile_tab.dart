@@ -1,11 +1,14 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../main.dart' show setupSilentPushListener;
 import 'forms_tab.dart';
 import 'geofencing_tab.dart';
+
+final _logger = Logger('KlaviyoExample');
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -59,7 +62,7 @@ class _ProfileTabState extends State<ProfileTab> {
         }
       }
     } catch (e) {
-      print('Failed to load saved API key: $e');
+      _logger.warning('Failed to load saved API key: $e');
     }
   }
 
@@ -93,7 +96,7 @@ class _ProfileTabState extends State<ProfileTab> {
             await _klaviyo.setPushToken(token);
           }
         } catch (e) {
-          print('Failed to register FCM token: $e');
+          _logger.warning('Failed to register FCM token: $e');
         }
       }
 
