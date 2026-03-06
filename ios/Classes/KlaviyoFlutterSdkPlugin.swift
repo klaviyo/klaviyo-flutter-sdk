@@ -218,7 +218,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             let token = KlaviyoSDK().pushToken
             if let token {
                 if #available(iOS 14.0, *) {
-                    Logger.klaviyoFlutterSDK.info("Retrieved push token from SDK: \(token)")
+                    Logger.klaviyoFlutterSDK.info("Retrieved push token from SDK: \(token, privacy: .public)")
                 }
             }
             result(token)
@@ -410,7 +410,7 @@ extension KlaviyoFlutterSdkPlugin {
     ) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
         if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString)")
+            Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString, privacy: .public)")
         }
 
         // Pass to Klaviyo Swift SDK
@@ -441,7 +441,7 @@ extension KlaviyoFlutterSdkPlugin {
         if #available(iOS 14.0, *) {
             let description = error.localizedDescription
             Logger.klaviyoFlutterSDK.warning(
-                "Failed to register for remote notifications: \(description)"
+                "Failed to register for remote notifications: \(description, privacy: .public)"
             )
         }
 

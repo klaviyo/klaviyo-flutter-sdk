@@ -21,6 +21,10 @@ class KlaviyoSDK {
   static final KlaviyoSDK _instance = KlaviyoSDK._internal();
   factory KlaviyoSDK() => _instance;
   KlaviyoSDK._internal() {
+    // Required for per-logger level control. This is a global setting in
+    // package:logging — without it, _logger.level is ignored and all loggers
+    // share the root logger's level. Setting it to true is additive and is
+    // the standard pattern for Dart libraries that manage their own log level.
     hierarchicalLoggingEnabled = true;
     _logger.level = Level.INFO;
   }
