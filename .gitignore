@@ -64,3 +64,7 @@ flutter_macos_arm64_stable.zip
 # Firebase
 **/google-services.json
 **/GoogleService-Info.plist
+
+# Claude Code
+.claude/settings.local.json
+.claude/checkpoint.md
