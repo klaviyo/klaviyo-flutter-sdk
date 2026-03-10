@@ -63,8 +63,8 @@ All public exports are declared in `lib/klaviyo_flutter_sdk.dart`. Models live i
 - **Geofencing**: `klaviyoIncludeLocation` (opt-in, requires additional native dependencies)
 
 ### Native SDK Versions
-- iOS: `KlaviyoSwift ~> 5.2.1` (CocoaPods, podspec at `ios/klaviyo_flutter_sdk.podspec`)
-- Android: `klaviyo-android-sdk:4.3.0` (Gradle, config at `android/build.gradle`)
+- iOS: `KlaviyoSwift` (CocoaPods, podspec at `ios/klaviyo_flutter_sdk.podspec`)
+- Android: `klaviyo-android-sdk` (Gradle, config at `android/build.gradle`)
 
 ## Code Style & Pre-commit Hooks
 
