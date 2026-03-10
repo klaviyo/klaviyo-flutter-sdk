@@ -3,57 +3,84 @@
 This file provides guidance to AI coding agents (Claude Code, Cursor, GitHub Copilot, etc.) when
 working with code in this repository.
 
-You are working on the **Klaviyo Flutter SDK**, a Flutter plugin that wraps Klaviyo's native iOS (KlaviyoSwift) and Android (klaviyo-android-sdk) SDKs via platform channels. Every feature must have parity across both platforms.
+Assume the role of an experienced Flutter/Dart SDK engineer familiar with Flutter plugins, platform channels, CocoaPods, and Gradle.
+Prioritize code quality, maintainability, and reuse — search for existing implementations before adding new ones.
+Keep the 3rd-party developer integration experience smooth and simple.
 
-## Commands
+## Intro
+
+This is the Flutter SDK for Klaviyo, a marketing automation platform. It is a Flutter plugin that wraps
+Klaviyo's native iOS (KlaviyoSwift) and Android (klaviyo-android-sdk) SDKs via platform channels.
+Every feature must have parity across both platforms. The SDK provides analytics, push notifications,
+in-app messaging (forms), and geofencing.
+
+## Common Commands
+
+### Build Commands
 
 ```bash
-# Dependencies
-flutter pub get
-cd example/ios && pod install
-
-# Build (example app — there is no standalone build for the plugin itself)
+# Build iOS example app (no codesigning)
 cd example && flutter build ios --no-codesign
+
+# Build Android example app
 cd example && flutter build apk
-
-# Test
-flutter test                          # all tests
-flutter test test/some_test.dart      # single file
-flutter test --coverage               # with lcov coverage
-
-# Lint & format (CI runs all of these)
-dart format .                         # Dart formatter (page width: 80)
-flutter analyze --no-fatal-infos      # Dart static analysis
-cd android && ktlint --reporter=plain # Kotlin lint
-cd ios && swiftlint lint --strict     # Swift lint
-
-# Version bump (interactive — updates pubspec.yaml, README, plist, strings.xml, CHANGELOG)
-scripts/bump_version.sh <version>
 ```
 
-## Architecture
+There is no standalone build for the plugin itself — builds go through the example app.
 
-```
-lib/
-  klaviyo_flutter_sdk.dart            # Public barrel file — all exports go here
-  src/
-    klaviyo_sdk.dart                  # KlaviyoSDK singleton — the public API
-    services/
-      klaviyo_native_wrapper.dart     # MethodChannel "klaviyo_sdk" + EventChannel "klaviyo_events"
-    models/                           # Data classes (KlaviyoProfile, KlaviyoEvent, etc.)
-    utils/
-      buffered_broadcast_stream_controller.dart  # Buffers events before listeners attach
+### Test Commands
 
-ios/Classes/
-  KlaviyoFlutterSdkPlugin.swift       # FlutterPlugin wrapping KlaviyoSwift
+```bash
+# Run all tests
+flutter test
 
-android/src/main/kotlin/.../
-  KlaviyoFlutterSdkPlugin.kt          # FlutterPlugin wrapping klaviyo-android-sdk
+# Run a single test file
+flutter test test/some_test.dart
+
+# Run tests with coverage (generates coverage/lcov.info)
+flutter test --coverage
 ```
 
-**Data flow:** Dart API (`KlaviyoSDK`) → platform bridge (`KlaviyoNativeWrapper`) → native plugin (Swift/Kotlin) → native Klaviyo SDK. Push/form events flow back via `EventChannel` streams.
+### Linting & Formatting Commands
 
-## Native SDK Dependencies
+```bash
+# Dart formatter (page width: 80)
+dart format .
+
+# Dart/Flutter static analysis
+flutter analyze --no-fatal-infos
+
+# Kotlin lint (run from android/)
+cd android && ktlint --reporter=plain
+
+# Swift lint (run from ios/)
+cd ios && swiftlint lint --strict
+```
+
+### Branching
+
+Branch format: `<initials>/<ticket-id>/<short-description>` (e.g. `ab/MAGE-123/fix-push-token`).
+
+### Commits & Pull Requests
+
+If prompted to commit, push, or open pull requests:
+
+- Keep commit messages concise
+- Open pull requests in **draft** mode first unless otherwise directed
+- Use the PR template at `.github/pull_request_template.md`
+- Include a brief changelog and test plan with reproducible steps
+
+## Architecture Overview
+
+The plugin follows a three-layer pattern: Dart API → platform bridge → native plugin → native Klaviyo SDK.
+Push/form events flow back via `EventChannel` streams.
+
+- `lib/klaviyo_flutter_sdk.dart` — public barrel file, all exports go here
+- `lib/src/klaviyo_sdk.dart` — `KlaviyoSDK` singleton, the public API entry point
+- `lib/src/services/klaviyo_native_wrapper.dart` — MethodChannel `"klaviyo_sdk"` + EventChannel `"klaviyo_events"`
+- `lib/src/models/` — data classes (`KlaviyoProfile`, `KlaviyoEvent`, etc.)
+- `ios/Classes/KlaviyoFlutterSdkPlugin.swift` — `FlutterPlugin` wrapping KlaviyoSwift
+- `android/src/main/kotlin/.../KlaviyoFlutterSdkPlugin.kt` — `FlutterPlugin` wrapping klaviyo-android-sdk
 
 Native SDK versions are pinned in two places — keep them in sync when bumping:
 - **iOS**: `ios/klaviyo_flutter_sdk.podspec` — `KlaviyoSwift ~> X.Y.Z`
@@ -63,11 +90,20 @@ Optional features controlled by host app build properties:
 - **Forms** (`klaviyoIncludeForms`): defaults to **true**
 - **Geofencing** (`klaviyoIncludeLocation`): defaults to **false**, opt-in
 
-## Gotchas
+### Code Style
 
-- **Trailing commas are required** (`require_trailing_commas: true`). The formatter won't add them — the analyzer will flag them.
-- **No `print()`** — `avoid_print` is enforced. Use `package:logging` (see `klaviyo_sdk.dart` for the pattern).
-- **Pre-commit hooks** run `dart fix --apply`, `dart format`, `flutter analyze`, `ktlint -F`, `swiftformat`, and `swiftlint` automatically. If a commit is rejected, check which hook failed.
+The project enforces code style via pre-commit hooks (`.pre-commit-config.yaml`):
+- Dart: `dart fix --apply`, `dart format`, `flutter analyze --no-fatal-infos`
+- Kotlin: `ktlint -F`
+- Swift: `swiftformat`, `swiftlint lint --strict`
+
+Key lint rules (`analysis_options.yaml`):
+- `require_trailing_commas: true` — the formatter won't add them, the analyzer will flag them
+- `avoid_print: true` — use `package:logging` instead (see `klaviyo_sdk.dart` for the pattern)
+- `prefer_const_constructors: true`
+
+### Gotchas
+
 - **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist. Use `scripts/bump_version.sh` to update all version references at once.
 - **Flutter version** is pinned to `3.38.7` via `.fvmrc`.
 - `BufferedBroadcastStreamController` exists because native events (push tokens, notifications) can fire before Dart listeners are attached. Don't replace it with a plain `StreamController.broadcast`.
