@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Klaviyo Flutter SDK — a Flutter plugin wrapping Klaviyo's native iOS (Swift) and Android (Kotlin) SDKs. Provides push notifications, in-app messaging, event tracking, profile management, geofencing, and deep linking.
+Klaviyo Flutter SDK — a Flutter plugin wrapping Klaviyo's native iOS (Swift) and Android (Kotlin) SDKs. Provides push notifications, in-app messaging, event tracking, profile management, and geofencing.
 
 ## Common Commands
 
