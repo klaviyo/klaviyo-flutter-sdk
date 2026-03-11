@@ -16,25 +16,6 @@ in-app messaging (forms), and geofencing.
 Builds go through the example app — there is no standalone build for the plugin itself.
 Use `--no-codesign` for iOS: `cd example && flutter build ios --no-codesign`
 
-### Linting & Formatting Commands
-
-```bash
-# Auto-fix Dart issues
-dart fix --apply
-
-# Dart formatter
-dart format .
-
-# Dart/Flutter static analysis
-flutter analyze --no-fatal-infos
-
-# Kotlin lint (run from android/)
-cd android && ktlint -F
-
-# Swift lint (run from ios/)
-cd ios && swiftlint lint --strict
-```
-
 ### Branching
 
 Branch format: `<initials>/<ticket-id>/<short-description>` (e.g. `ab/MAGE-123/fix-push-token`).
