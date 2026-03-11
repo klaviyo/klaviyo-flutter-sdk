@@ -13,30 +13,8 @@ in-app messaging (forms), and geofencing.
 
 ## Common Commands
 
-### Build Commands
-
-```bash
-# Build iOS example app (no codesigning)
-cd example && flutter build ios --no-codesign
-
-# Build Android example app
-cd example && flutter build apk
-```
-
-There is no standalone build for the plugin itself — builds go through the example app.
-
-### Test Commands
-
-```bash
-# Run all tests
-flutter test
-
-# Run a single test file
-flutter test test/some_test.dart
-
-# Run tests with coverage (generates coverage/lcov.info)
-flutter test --coverage
-```
+Builds go through the example app — there is no standalone build for the plugin itself.
+Use `--no-codesign` for iOS: `cd example && flutter build ios --no-codesign`
 
 ### Linting & Formatting Commands
 
