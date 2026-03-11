@@ -7,7 +7,7 @@ Assume the role of an experienced Flutter/Dart SDK engineer familiar with Flutte
 Prioritize code quality, maintainability, and reuse — search for existing implementations before adding new ones.
 Keep the 3rd-party developer integration experience smooth and simple.
 
-## Intro
+## Overview
 
 This is the Flutter SDK for Klaviyo, a marketing automation platform. It is a Flutter plugin that wraps
 Klaviyo's native iOS (KlaviyoSwift) and Android (klaviyo-android-sdk) SDKs via platform channels.
@@ -54,7 +54,7 @@ dart format .
 flutter analyze --no-fatal-infos
 
 # Kotlin lint (run from android/)
-cd android && ktlint
+cd android && ktlint -F
 
 # Swift lint (run from ios/)
 cd ios && swiftlint lint --strict
