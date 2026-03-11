@@ -44,14 +44,17 @@ flutter test --coverage
 ### Linting & Formatting Commands
 
 ```bash
-# Dart formatter (page width: 80)
+# Auto-fix Dart issues
+dart fix --apply
+
+# Dart formatter
 dart format .
 
 # Dart/Flutter static analysis
 flutter analyze --no-fatal-infos
 
 # Kotlin lint (run from android/)
-cd android && ktlint --reporter=plain
+cd android && ktlint
 
 # Swift lint (run from ios/)
 cd ios && swiftlint lint --strict
@@ -80,7 +83,7 @@ Push/form events flow back via `EventChannel` streams.
 - `lib/src/services/klaviyo_native_wrapper.dart` — MethodChannel `"klaviyo_sdk"` + EventChannel `"klaviyo_events"`
 - `lib/src/models/` — data classes (`KlaviyoProfile`, `KlaviyoEvent`, etc.)
 - `ios/Classes/KlaviyoFlutterSdkPlugin.swift` — `FlutterPlugin` wrapping KlaviyoSwift
-- `android/src/main/kotlin/.../KlaviyoFlutterSdkPlugin.kt` — `FlutterPlugin` wrapping klaviyo-android-sdk
+- `android/src/main/kotlin/com/klaviyo/klaviyo_flutter_sdk/KlaviyoFlutterSdkPlugin.kt` — `FlutterPlugin` wrapping klaviyo-android-sdk
 
 Native SDK versions are pinned in two places — keep them in sync when bumping:
 - **iOS**: `ios/klaviyo_flutter_sdk.podspec` — `KlaviyoSwift ~> X.Y.Z`
@@ -101,6 +104,12 @@ Key lint rules (`analysis_options.yaml`):
 - `require_trailing_commas: true` — the formatter won't add them, the analyzer will flag them
 - `avoid_print: true` — use `package:logging` instead (see `klaviyo_sdk.dart` for the pattern)
 - `prefer_const_constructors: true`
+
+### Native SDK Development
+
+To test against a local native SDK build:
+- **iOS**: In `ios/klaviyo_flutter_sdk.podspec`, replace the `KlaviyoSwift ~> X.Y.Z` dependency with a local path: `s.dependency 'KlaviyoSwift', :path => '../path/to/KlaviyoSwift'`
+- **Android**: In `android/build.gradle`, replace the version string with a local Maven path or use `includeBuild()` in the example app's `settings.gradle`
 
 ### Gotchas
 
