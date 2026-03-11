@@ -67,5 +67,4 @@ To test against a local native SDK build:
 ### Gotchas
 
 - **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist. Use `scripts/bump_version.sh` to update all version references at once.
-- **Flutter version** is pinned to `3.38.7` via `.fvmrc`.
 - `BufferedBroadcastStreamController` (`lib/src/utils/buffered_broadcast_stream_controller.dart`) exists because native events (push tokens, notifications) can fire before Dart listeners are attached. Don't replace it with a plain `StreamController.broadcast`.
