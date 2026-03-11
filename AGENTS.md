@@ -1,8 +1,5 @@
 # AI Agent Guidelines
 
-This file provides guidance to AI coding agents (Claude Code, Cursor, GitHub Copilot, etc.) when
-working with code in this repository.
-
 Assume the role of an experienced Flutter/Dart SDK engineer familiar with Flutter plugins, platform channels, CocoaPods, and Gradle.
 Prioritize code quality, maintainability, and reuse — search for existing implementations before adding new ones.
 Keep the 3rd-party developer integration experience smooth and simple.
@@ -66,7 +63,7 @@ Branch format: `<initials>/<ticket-id>/<short-description>` (e.g. `ab/MAGE-123/f
 
 ### Commits & Pull Requests
 
-If prompted to commit, push, or open pull requests:
+When committing, pushing, or opening pull requests:
 
 - Keep commit messages concise
 - Open pull requests in **draft** mode first unless otherwise directed
