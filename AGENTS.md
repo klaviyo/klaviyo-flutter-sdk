@@ -92,10 +92,7 @@ Optional features controlled by host app build properties:
 
 ### Code Style
 
-The project enforces code style via pre-commit hooks (`.pre-commit-config.yaml`):
-- Dart: `dart fix --apply`, `dart format`, `flutter analyze --no-fatal-infos`
-- Kotlin: `ktlint -F`
-- Swift: `swiftformat`, `swiftlint lint --strict`
+The project enforces code style via pre-commit hooks (`.pre-commit-config.yaml`).
 
 Key lint rules (`analysis_options.yaml`):
 - `require_trailing_commas: true` — the formatter won't add them, the analyzer will flag them
@@ -106,7 +103,7 @@ Key lint rules (`analysis_options.yaml`):
 
 To test against a local native SDK build:
 - **iOS**: In `ios/klaviyo_flutter_sdk.podspec`, replace the `KlaviyoSwift ~> X.Y.Z` dependency with a local path: `s.dependency 'KlaviyoSwift', :path => '../path/to/KlaviyoSwift'`
-- **Android**: In `android/build.gradle`, replace the version string with a local Maven path or use `includeBuild()` in the example app's `settings.gradle`
+- **Android**: In `android/build.gradle`, replace the version string with a local Maven path or use `includeBuild()` in `example/android/settings.gradle`
 
 ### Gotchas
 
