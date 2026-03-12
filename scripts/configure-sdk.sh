@@ -62,18 +62,26 @@ LATEST_ANDROID_VERSION=""
 
 get_latest_ios_version() {
     if [[ -z "$LATEST_IOS_VERSION" ]]; then
-        LATEST_IOS_VERSION=$(fetch_latest_version "klaviyo-swift-sdk")
-        [[ -z "$LATEST_IOS_VERSION" ]] && LATEST_IOS_VERSION="FAILED"
+        LATEST_IOS_VERSION=$(fetch_latest_version "klaviyo-swift-sdk") || true
+        if [[ -z "$LATEST_IOS_VERSION" ]]; then
+            LATEST_IOS_VERSION="FAILED"
+        fi
     fi
-    [[ "$LATEST_IOS_VERSION" != "FAILED" ]] && printf '%s' "$LATEST_IOS_VERSION"
+    if [[ "$LATEST_IOS_VERSION" != "FAILED" ]]; then
+        printf '%s' "$LATEST_IOS_VERSION"
+    fi
 }
 
 get_latest_android_version() {
     if [[ -z "$LATEST_ANDROID_VERSION" ]]; then
-        LATEST_ANDROID_VERSION=$(fetch_latest_version "klaviyo-android-sdk")
-        [[ -z "$LATEST_ANDROID_VERSION" ]] && LATEST_ANDROID_VERSION="FAILED"
+        LATEST_ANDROID_VERSION=$(fetch_latest_version "klaviyo-android-sdk") || true
+        if [[ -z "$LATEST_ANDROID_VERSION" ]]; then
+            LATEST_ANDROID_VERSION="FAILED"
+        fi
     fi
-    [[ "$LATEST_ANDROID_VERSION" != "FAILED" ]] && printf '%s' "$LATEST_ANDROID_VERSION"
+    if [[ "$LATEST_ANDROID_VERSION" != "FAILED" ]]; then
+        printf '%s' "$LATEST_ANDROID_VERSION"
+    fi
 }
 
 # Prompt for a published version, using the fetched latest as the default if available.
@@ -81,8 +89,12 @@ get_latest_android_version() {
 # Prints the chosen version.
 prompt_version() {
     local platform="$1"
-    local latest
-    [[ "$platform" == "ios" ]] && latest="$(get_latest_ios_version)" || latest="$(get_latest_android_version)"
+    local latest=""
+    if [[ "$platform" == "ios" ]]; then
+        latest="$(get_latest_ios_version)"
+    else
+        latest="$(get_latest_android_version)"
+    fi
 
     local version
     if [[ -n "$latest" ]]; then
@@ -138,10 +150,10 @@ arrow_menu() {
             read -rsn1 key3
             case "$key3" in
                 A) # Up arrow
-                    ((selected > 0)) && ((selected--))
+                    ((selected > 0)) && ((--selected)) || true
                     ;;
                 B) # Down arrow
-                    ((selected < count - 1)) && ((selected++))
+                    ((selected < count - 1)) && ((++selected)) || true
                     ;;
             esac
         elif [[ "$key" == "" ]]; then
