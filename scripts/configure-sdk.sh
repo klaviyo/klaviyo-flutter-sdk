@@ -64,35 +64,6 @@ fetch_latest_version() {
         | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/'
 }
 
-# Resolved latest versions (fetched lazily and cached)
-# Empty string = not yet fetched, special value "FAILED" = fetch attempted and failed
-LATEST_IOS_VERSION=""
-LATEST_ANDROID_VERSION=""
-
-get_latest_ios_version() {
-    if [[ -z "$LATEST_IOS_VERSION" ]]; then
-        LATEST_IOS_VERSION=$(fetch_latest_version "klaviyo-swift-sdk") || true
-        if [[ -z "$LATEST_IOS_VERSION" ]]; then
-            LATEST_IOS_VERSION="FAILED"
-        fi
-    fi
-    if [[ "$LATEST_IOS_VERSION" != "FAILED" ]]; then
-        printf '%s' "$LATEST_IOS_VERSION"
-    fi
-}
-
-get_latest_android_version() {
-    if [[ -z "$LATEST_ANDROID_VERSION" ]]; then
-        LATEST_ANDROID_VERSION=$(fetch_latest_version "klaviyo-android-sdk") || true
-        if [[ -z "$LATEST_ANDROID_VERSION" ]]; then
-            LATEST_ANDROID_VERSION="FAILED"
-        fi
-    fi
-    if [[ "$LATEST_ANDROID_VERSION" != "FAILED" ]]; then
-        printf '%s' "$LATEST_ANDROID_VERSION"
-    fi
-}
-
 # Prompt for a published version, using the fetched latest as the default if available.
 # $1 = platform ("ios" or "android")
 # Prints the chosen version.
@@ -100,9 +71,9 @@ prompt_version() {
     local platform="$1"
     local latest=""
     if [[ "$platform" == "ios" ]]; then
-        latest="$(get_latest_ios_version)"
+        latest="$(fetch_latest_version "klaviyo-swift-sdk")"
     else
-        latest="$(get_latest_android_version)"
+        latest="$(fetch_latest_version "klaviyo-android-sdk")"
     fi
 
     # All prompts go to stderr since stdout is captured by the caller
@@ -554,8 +525,8 @@ parse_args() {
 
     if $reset; then
         local latest_ios latest_android
-        latest_ios="$(get_latest_ios_version)"
-        latest_android="$(get_latest_android_version)"
+        latest_ios="$(fetch_latest_version "klaviyo-swift-sdk")"
+        latest_android="$(fetch_latest_version "klaviyo-android-sdk")"
         if [[ -z "$latest_ios" || -z "$latest_android" ]]; then
             error "Cannot reset: failed to fetch latest versions from GitHub."
             [[ -z "$latest_ios" ]] && error "  Could not determine latest iOS SDK version."
