@@ -17,8 +17,8 @@ ANDROID_REPO="https://github.com/klaviyo/klaviyo-android-sdk.git"
 GITHUB_API="https://api.github.com/repos/klaviyo"
 
 # Default local SDK paths (relative to repo root)
-DEFAULT_IOS_LOCAL_PATH="../klaviyo-swift-sdk"
-DEFAULT_ANDROID_LOCAL_PATH="../klaviyo-android-sdk"
+DEFAULT_IOS_LOCAL_PATH="$ROOT_DIR/../klaviyo-swift-sdk"
+DEFAULT_ANDROID_LOCAL_PATH="$ROOT_DIR/../klaviyo-android-sdk"
 
 # Marker comments for injected overrides
 IOS_MARKER_START='# \[KLAVIYO-SDK-OVERRIDE-START\]'
@@ -44,6 +44,15 @@ info()    { printf '%b\n' "${BLUE}ℹ${NC}  $*"; }
 success() { printf '%b\n' "${GREEN}✔${NC}  $*"; }
 warn()    { printf '%b\n' "${YELLOW}⚠${NC}  $*" >&2; }
 error()   { printf '%b\n' "${RED}✖${NC}  $*" >&2; }
+
+# Portable in-place sed (macOS vs Linux)
+sedi() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
 
 # Fetch the latest release tag from a GitHub repo.
 # $1 = repo name (e.g. "klaviyo-swift-sdk")
@@ -201,7 +210,7 @@ validate_remote_branch() {
 # Remove any existing Podfile override block
 remove_ios_override() {
     if grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$PODFILE" 2>/dev/null; then
-        sed -i '' "/${IOS_MARKER_START}/,/${IOS_MARKER_END}/d" "$PODFILE"
+        sedi "/${IOS_MARKER_START}/,/${IOS_MARKER_END}/d" "$PODFILE"
     fi
 }
 
@@ -210,13 +219,13 @@ remove_ios_override() {
 update_podspec_versions() {
     local version="$1"
     if [[ -n "$version" ]]; then
-        sed -i '' -E "s|(s\.dependency 'KlaviyoSwift').*|\1, '$version'|" "$PODSPEC"
-        sed -i '' -E "s|(s\.dependency 'KlaviyoForms').*|\1, '$version'|" "$PODSPEC"
-        sed -i '' -E "s|(s\.dependency 'KlaviyoLocation').*|\1, '$version'|" "$PODSPEC"
+        sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1, '$version'|" "$PODSPEC"
+        sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1, '$version'|" "$PODSPEC"
+        sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1, '$version'|" "$PODSPEC"
     else
-        sed -i '' -E "s|(s\.dependency 'KlaviyoSwift').*|\1|" "$PODSPEC"
-        sed -i '' -E "s|(s\.dependency 'KlaviyoForms').*|\1|" "$PODSPEC"
-        sed -i '' -E "s|(s\.dependency 'KlaviyoLocation').*|\1|" "$PODSPEC"
+        sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1|" "$PODSPEC"
+        sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1|" "$PODSPEC"
+        sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1|" "$PODSPEC"
     fi
 }
 
@@ -224,7 +233,7 @@ update_podspec_versions() {
 # $1 = full pod arguments, e.g. "'KlaviyoSwiftExtension', '~> 5.2.1'"
 update_podfile_extension() {
     local pod_spec="$1"
-    sed -i '' -E "s|pod 'KlaviyoSwiftExtension'.*|pod $pod_spec|" "$PODFILE"
+    sedi -E "s|pod 'KlaviyoSwiftExtension'.*|pod $pod_spec|" "$PODFILE"
 }
 
 # Inject an override block into the Podfile, right after the flutter_install_all_ios_pods line.
@@ -310,13 +319,13 @@ pod 'KlaviyoLocation', :path => '$path'"
 # Remove any existing settings.gradle override block
 remove_android_override() {
     if grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$SETTINGS_GRADLE" 2>/dev/null; then
-        sed -i '' "\\#${ANDROID_MARKER_START}#,\\#${ANDROID_MARKER_END}#d" "$SETTINGS_GRADLE"
+        sedi "\\#${ANDROID_MARKER_START}#,\\#${ANDROID_MARKER_END}#d" "$SETTINGS_GRADLE"
     fi
 }
 
 update_android_version() {
     local version="$1"
-    sed -i '' -E "s|def klaviyoSdkVersion = \".*\"|def klaviyoSdkVersion = \"$version\"|" "$BUILD_GRADLE"
+    sedi -E "s|def klaviyoSdkVersion = \".*\"|def klaviyoSdkVersion = \"$version\"|" "$BUILD_GRADLE"
 }
 
 # Inject an includeBuild block into settings.gradle for local development.
