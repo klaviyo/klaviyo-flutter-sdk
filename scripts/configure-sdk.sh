@@ -324,7 +324,6 @@ update_android_version() {
 inject_android_include_build() {
     local path="$1"
     cat >> "$SETTINGS_GRADLE" << EOF
-
 $ANDROID_MARKER_START_LITERAL
 includeBuild('$path') {
     dependencySubstitution {
