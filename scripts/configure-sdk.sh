@@ -42,7 +42,7 @@ NC='\033[0m'
 
 info()    { printf '%b\n' "${BLUE}ℹ${NC}  $*"; }
 success() { printf '%b\n' "${GREEN}✔${NC}  $*"; }
-warn()    { printf '%b\n' "${YELLOW}⚠${NC}  $*"; }
+warn()    { printf '%b\n' "${YELLOW}⚠${NC}  $*" >&2; }
 error()   { printf '%b\n' "${RED}✖${NC}  $*" >&2; }
 
 # Fetch the latest release tag from a GitHub repo.
@@ -96,13 +96,14 @@ prompt_version() {
         latest="$(get_latest_android_version)"
     fi
 
+    # All prompts go to stderr since stdout is captured by the caller
     local version
     if [[ -n "$latest" ]]; then
-        read -rp "Enter version [$latest]: " version
+        read -rp "Enter version [$latest]: " version </dev/tty
         version="${version:-$latest}"
     else
         warn "Could not fetch latest version from GitHub."
-        read -rp "Enter version: " version
+        read -rp "Enter version: " version </dev/tty
         [[ -z "$version" ]] && { error "Version cannot be empty"; return 1; }
     fi
     printf '%s' "$version"
@@ -387,7 +388,7 @@ show_status() {
     printf '%b\n' "  ${CYAN}iOS${NC}:     $ios_version"
     if grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$PODFILE" 2>/dev/null; then
         printf '%b\n' "          ${YELLOW}(Podfile override active)${NC}"
-        grep -A1 'KLAVIYO-SDK-OVERRIDE-START' "$PODFILE" | grep -v 'OVERRIDE' | sed 's/^/          /' || true
+        sed -n '/KLAVIYO-SDK-OVERRIDE-START/,/KLAVIYO-SDK-OVERRIDE-END/p' "$PODFILE" | grep -v 'OVERRIDE' | sed 's/^/          /' || true
     fi
 
     # Android
