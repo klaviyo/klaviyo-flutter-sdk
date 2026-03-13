@@ -234,7 +234,7 @@ inject_ios_override() {
     local temp_file
     temp_file=$(mktemp)
 
-    while IFS= read -r line; do
+    while IFS= read -r line || [[ -n "$line" ]]; do
         printf '%s\n' "$line" >> "$temp_file"
         if [[ "$line" == *"flutter_install_all_ios_pods"* ]]; then
             echo "  $IOS_MARKER_START_LITERAL" >> "$temp_file"
