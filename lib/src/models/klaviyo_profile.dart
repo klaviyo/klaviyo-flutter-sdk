@@ -14,18 +14,75 @@ class KlaviyoProfile {
   final KlaviyoLocation? location;
   final Map<String, dynamic>? properties;
 
-  const KlaviyoProfile({
+  /// Creates a new [KlaviyoProfile].
+  ///
+  /// The [id], [address1], [address2], [region], [latitude], and [longitude]
+  /// parameters are provided for migration from the `klaviyo_flutter` community
+  /// package and are deprecated. Use [externalId] and [location] instead.
+  ///
+  /// If both [externalId] and [id] are provided, [externalId] takes precedence.
+  /// If both [location] and any flat location fields are provided, [location]
+  /// takes precedence.
+  KlaviyoProfile({
     this.email,
     this.phoneNumber,
-    this.externalId,
+    String? externalId,
+    @Deprecated(
+      'Use externalId instead. '
+      'Provided for migration from klaviyo_flutter. '
+      'Will be removed in 2.0.',
+    )
+    String? id,
     this.firstName,
     this.lastName,
     this.organization,
     this.title,
     this.image,
-    this.location,
+    KlaviyoLocation? location,
     this.properties,
-  });
+    @Deprecated(
+      'Use location: KlaviyoLocation(address1: ...) instead. '
+      'Provided for migration from klaviyo_flutter. '
+      'Will be removed in 2.0.',
+    )
+    String? address1,
+    @Deprecated(
+      'Use location: KlaviyoLocation(address2: ...) instead. '
+      'Provided for migration from klaviyo_flutter. '
+      'Will be removed in 2.0.',
+    )
+    String? address2,
+    @Deprecated(
+      'Use location: KlaviyoLocation(region: ...) instead. '
+      'Provided for migration from klaviyo_flutter. '
+      'Will be removed in 2.0.',
+    )
+    String? region,
+    @Deprecated(
+      'Use location: KlaviyoLocation(latitude: ...) instead. '
+      'Provided for migration from klaviyo_flutter. '
+      'Will be removed in 2.0.',
+    )
+    String? latitude,
+    @Deprecated(
+      'Use location: KlaviyoLocation(longitude: ...) instead. '
+      'Provided for migration from klaviyo_flutter. '
+      'Will be removed in 2.0.',
+    )
+    String? longitude,
+  })  : externalId = externalId ?? id,
+        location = location ??
+            ((address1 ?? address2 ?? region ?? latitude ?? longitude) != null
+                ? KlaviyoLocation(
+                    address1: address1,
+                    address2: address2,
+                    region: region,
+                    latitude:
+                        latitude != null ? double.tryParse(latitude) : null,
+                    longitude:
+                        longitude != null ? double.tryParse(longitude) : null,
+                  )
+                : null);
 
   /// Create a copy of this profile with updated values
   KlaviyoProfile copyWith({
