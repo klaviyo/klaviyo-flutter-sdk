@@ -21,6 +21,7 @@ extension Logger {
     )
 }
 
+// swiftlint:disable:next type_body_length
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     // MARK: - Properties
 
@@ -152,6 +153,23 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             for (key, value) in properties {
                 let profileKey = Profile.ProfileKey.from(key)
                 KlaviyoSDK().set(profileAttribute: profileKey, value: value)
+            }
+            result(nil)
+
+        case "setLocation":
+            guard let args = call.arguments as? [String: Any],
+                  args["location"] is [String: Any]
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Invalid location data",
+                    details: nil
+                ))
+                return
+            }
+
+            if let location = parseLocation(from: args) {
+                KlaviyoSDK().set(profile: Profile(location: location))
             }
             result(nil)
 
