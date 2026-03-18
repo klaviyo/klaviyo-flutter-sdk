@@ -34,7 +34,7 @@ dependencies:
 
 # Add:
 dependencies:
-  klaviyo_flutter_sdk: ^0.1.0-alpha.1
+  klaviyo_flutter_sdk: ^0.1.0
 ```
 
 Then run `flutter pub get`.
