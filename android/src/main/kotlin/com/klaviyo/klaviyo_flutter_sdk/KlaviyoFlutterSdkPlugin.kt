@@ -99,6 +99,19 @@ class KlaviyoFlutterSdkPlugin :
                     (profileJson?.get("title") as? String)?.let { properties[ProfileKey.TITLE] = it }
                     (profileJson?.get("image") as? String)?.let { properties[ProfileKey.IMAGE] = it }
 
+                    // Add location properties if present
+                    (profileJson?.get("location") as? Map<String, Any>)?.let { locationData ->
+                        (locationData["address1"] as? String)?.let { properties[ProfileKey.ADDRESS1] = it }
+                        (locationData["address2"] as? String)?.let { properties[ProfileKey.ADDRESS2] = it }
+                        (locationData["city"] as? String)?.let { properties[ProfileKey.CITY] = it }
+                        (locationData["country"] as? String)?.let { properties[ProfileKey.COUNTRY] = it }
+                        (locationData["region"] as? String)?.let { properties[ProfileKey.REGION] = it }
+                        (locationData["zip"] as? String)?.let { properties[ProfileKey.ZIP] = it }
+                        (locationData["latitude"] as? Number)?.let { properties[ProfileKey.LATITUDE] = it.toDouble() }
+                        (locationData["longitude"] as? Number)?.let { properties[ProfileKey.LONGITUDE] = it.toDouble() }
+                        (locationData["timezone"] as? String)?.let { properties[ProfileKey.TIMEZONE] = it }
+                    }
+
                     // Add any custom properties from the properties field
                     (profileJson?.get("properties") as? Map<String, Any>)?.forEach { (key, value) ->
                         if (value is java.io.Serializable) {

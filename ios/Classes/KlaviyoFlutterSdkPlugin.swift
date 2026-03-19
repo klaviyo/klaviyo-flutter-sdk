@@ -82,6 +82,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid profile data", details: nil))
                 return
             }
+            let location = parseLocation(from: profileData)
             let profile = Profile(
                 email: profileData["email"] as? String,
                 phoneNumber: profileData["phone_number"] as? String,
@@ -91,7 +92,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 organization: profileData["organization"] as? String,
                 title: profileData["title"] as? String,
                 image: profileData["image"] as? String,
-                location: nil,
+                location: location,
                 properties: profileData["properties"] as? [String: Any]
             )
             KlaviyoSDK().set(profile: profile)
@@ -518,6 +519,23 @@ extension KlaviyoFlutterSdkPlugin {
 }
 
 // MARK: - Helpers
+
+extension KlaviyoFlutterSdkPlugin {
+    private func parseLocation(from profileData: [String: Any]) -> Profile.Location? {
+        guard let locationData = profileData["location"] as? [String: Any] else { return nil }
+        return Profile.Location(
+            address1: locationData["address1"] as? String,
+            address2: locationData["address2"] as? String,
+            city: locationData["city"] as? String,
+            country: locationData["country"] as? String,
+            latitude: locationData["latitude"] as? Double,
+            longitude: locationData["longitude"] as? Double,
+            region: locationData["region"] as? String,
+            zip: locationData["zip"] as? String,
+            timezone: locationData["timezone"] as? String
+        )
+    }
+}
 
 extension Data {
     init?(hexString: String) {
