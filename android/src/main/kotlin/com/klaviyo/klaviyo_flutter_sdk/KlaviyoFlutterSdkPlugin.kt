@@ -191,6 +191,26 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "setLocation" -> {
+                val locationData = call.argument<Map<String, Any>>("location")
+                try {
+                    locationData?.let { loc ->
+                        (loc["address1"] as? String)?.let { Klaviyo.setProfileAttribute(ProfileKey.ADDRESS1, it) }
+                        (loc["address2"] as? String)?.let { Klaviyo.setProfileAttribute(ProfileKey.ADDRESS2, it) }
+                        (loc["city"] as? String)?.let { Klaviyo.setProfileAttribute(ProfileKey.CITY, it) }
+                        (loc["country"] as? String)?.let { Klaviyo.setProfileAttribute(ProfileKey.COUNTRY, it) }
+                        (loc["region"] as? String)?.let { Klaviyo.setProfileAttribute(ProfileKey.REGION, it) }
+                        (loc["zip"] as? String)?.let { Klaviyo.setProfileAttribute(ProfileKey.ZIP, it) }
+                        (loc["latitude"] as? Number)?.let { Klaviyo.setProfileAttribute(ProfileKey.LATITUDE, it.toDouble()) }
+                        (loc["longitude"] as? Number)?.let { Klaviyo.setProfileAttribute(ProfileKey.LONGITUDE, it.toDouble()) }
+                        (loc["timezone"] as? String)?.let { Klaviyo.setProfileAttribute(ProfileKey.TIMEZONE, it) }
+                    }
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("LOCATION_ERROR", "Failed to set location", e.message)
+                }
+            }
+
             "setProfileProperties" -> {
                 val properties = call.argument<Map<String, Any>>("properties")
                 try {
