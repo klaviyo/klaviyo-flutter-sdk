@@ -5,7 +5,6 @@ import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
-import 'models/klaviyo_location.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'enums/klaviyo_log_level.dart';
@@ -175,19 +174,6 @@ class KlaviyoSDK {
   /// ```
   Future<void> setProfileAttribute(String propertyKey, dynamic value) async {
     await setProfileProperties({propertyKey: value});
-  }
-
-  /// Set profile location
-  /// Calls the native SDK directly - native SDK manages profile state
-  Future<void> setLocation(KlaviyoLocation location) async {
-    _ensureInitialized();
-
-    try {
-      await _nativeWrapper.setLocation(location);
-      _logger.info('Location set');
-    } catch (e) {
-      throw KlaviyoException('Failed to set location: $e');
-    }
   }
 
   /// Create a new event to track a profile's activity.
