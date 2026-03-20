@@ -699,7 +699,6 @@ The main SDK class that provides all functionality.
 - `getExternalId()` - Get external user ID
 - `setProfileProperties(Map<String, dynamic> properties)` - Set custom profile properties
 - `setProfileAttribute(String propertyKey, dynamic value)` - Set a single profile attribute
-- `setLocation(KlaviyoLocation location)` - Set profile location
 - `createEvent(KlaviyoEvent event)` - Create a new event to track a profile's activity
 - `registerForPushNotifications()` - Register for push notifications (iOS: triggers APNs registration, Android: fetches FCM token)
 - `setPushToken(String token)` - Set push notification token (usually handled automatically by native SDKs)

@@ -153,19 +153,6 @@ class KlaviyoNativeWrapper {
     }
   }
 
-  /// Set profile location using native SDK
-  Future<void> setLocation(dynamic location) async {
-    _ensureInitialized();
-
-    try {
-      await _channel.invokeMethod('setLocation', {
-        'location': location is Map ? location : (location as dynamic).toJson(),
-      });
-    } catch (e) {
-      throw KlaviyoException('Failed to set location: $e');
-    }
-  }
-
   /// Track event using native SDK
   Future<void> trackEvent(KlaviyoEvent event) async {
     _ensureInitialized();
