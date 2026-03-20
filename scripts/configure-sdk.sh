@@ -254,6 +254,7 @@ configure_ios_branch() {
     remove_ios_override
     update_podspec_versions ""
     inject_ios_override "pod 'KlaviyoSwift', :git => '$SWIFT_REPO', :branch => '$branch'
+pod 'KlaviyoCore', :git => '$SWIFT_REPO', :branch => '$branch'
 pod 'KlaviyoForms', :git => '$SWIFT_REPO', :branch => '$branch'
 pod 'KlaviyoLocation', :git => '$SWIFT_REPO', :branch => '$branch'"
     update_podfile_extension "'KlaviyoSwiftExtension', :git => '$SWIFT_REPO', :branch => '$branch'"
@@ -266,6 +267,7 @@ configure_ios_commit() {
     remove_ios_override
     update_podspec_versions ""
     inject_ios_override "pod 'KlaviyoSwift', :git => '$SWIFT_REPO', :commit => '$commit'
+pod 'KlaviyoCore', :git => '$SWIFT_REPO', :commit => '$commit'
 pod 'KlaviyoForms', :git => '$SWIFT_REPO', :commit => '$commit'
 pod 'KlaviyoLocation', :git => '$SWIFT_REPO', :commit => '$commit'"
     update_podfile_extension "'KlaviyoSwiftExtension', :git => '$SWIFT_REPO', :commit => '$commit'"
@@ -279,6 +281,7 @@ configure_ios_local() {
     remove_ios_override
     update_podspec_versions ""
     inject_ios_override "pod 'KlaviyoSwift', :path => '$path'
+pod 'KlaviyoCore', :path => '$path'
 pod 'KlaviyoForms', :path => '$path'
 pod 'KlaviyoLocation', :path => '$path'"
     update_podfile_extension "'KlaviyoSwiftExtension', :path => '$path'"
