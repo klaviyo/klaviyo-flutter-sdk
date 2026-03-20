@@ -210,53 +210,53 @@ class Klaviyo {
   // Individual profile attribute setters
   //
   // The community SDK exposed these as dedicated methods. In the official SDK,
-  // use setProfileProperties() or setProfile() with a KlaviyoProfile instead.
+  // use setProfileAttribute() or setProfile() with a KlaviyoProfile instead.
   // ---------------------------------------------------------------------------
 
   /// Set the first name of the currently tracked profile.
   ///
   /// Migrate to:
   /// ```dart
-  /// await KlaviyoSDK().setProfileProperties({'first_name': firstName});
+  /// await KlaviyoSDK().setProfileAttribute('first_name', firstName);
   /// ```
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'first_name': name}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('first_name', name) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setFirstName(String firstName) =>
-      _sdk.setProfileProperties({'first_name': firstName});
+      _sdk.setProfileAttribute('first_name', firstName);
 
   /// Set the last name of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'last_name': name}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('last_name', name) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setLastName(String lastName) =>
-      _sdk.setProfileProperties({'last_name': lastName});
+      _sdk.setProfileAttribute('last_name', lastName);
 
   /// Set the organization of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'organization': org}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('organization', org) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setOrganization(String organization) =>
-      _sdk.setProfileProperties({'organization': organization});
+      _sdk.setProfileAttribute('organization', organization);
 
   /// Set the title of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'title': title}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('title', title) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setTitle(String title) =>
-      _sdk.setProfileProperties({'title': title});
+      _sdk.setProfileAttribute('title', title);
 
   /// Set the image URL of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'image': url}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('image', url) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setImage(String image) =>
-      _sdk.setProfileProperties({'image': image});
+      _sdk.setProfileAttribute('image', image);
 
   // ---------------------------------------------------------------------------
   // Location setters
@@ -264,74 +264,73 @@ class Klaviyo {
 
   /// Set address line 1 of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'address1': addr}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('address1', addr) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setAddress1(String address) =>
-      _sdk.setProfileProperties({'address1': address});
+      _sdk.setProfileAttribute('address1', address);
 
   /// Set address line 2 of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'address2': addr}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('address2', addr) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setAddress2(String address) =>
-      _sdk.setProfileProperties({'address2': address});
+      _sdk.setProfileAttribute('address2', address);
 
   /// Set the city of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'city': city}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('city', city) instead. "
     'Will be removed in 2.0.',
   )
-  Future<void> setCity(String city) =>
-      _sdk.setProfileProperties({'city': city});
+  Future<void> setCity(String city) => _sdk.setProfileAttribute('city', city);
 
   /// Set the country of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'country': country}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('country', country) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setCountry(String country) =>
-      _sdk.setProfileProperties({'country': country});
+      _sdk.setProfileAttribute('country', country);
 
   /// Set the latitude of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'latitude': lat}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('latitude', lat) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setLatitude(double latitude) =>
-      _sdk.setProfileProperties({'latitude': latitude});
+      _sdk.setProfileAttribute('latitude', latitude);
 
   /// Set the longitude of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'longitude': lng}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('longitude', lng) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setLongitude(double longitude) =>
-      _sdk.setProfileProperties({'longitude': longitude});
+      _sdk.setProfileAttribute('longitude', longitude);
 
   /// Set the region of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'region': region}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('region', region) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setRegion(String region) =>
-      _sdk.setProfileProperties({'region': region});
+      _sdk.setProfileAttribute('region', region);
 
   /// Set the zip code of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'zip': zip}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('zip', zip) instead. "
     'Will be removed in 2.0.',
   )
-  Future<void> setZip(String zip) => _sdk.setProfileProperties({'zip': zip});
+  Future<void> setZip(String zip) => _sdk.setProfileAttribute('zip', zip);
 
   /// Set the timezone of the currently tracked profile.
   @Deprecated(
-    "Use KlaviyoSDK().setProfileProperties({'timezone': tz}) instead. "
+    "Use KlaviyoSDK().setProfileAttribute('timezone', tz) instead. "
     'Will be removed in 2.0.',
   )
   Future<void> setTimezone(String timezone) =>
-      _sdk.setProfileProperties({'timezone': timezone});
+      _sdk.setProfileAttribute('timezone', timezone);
 
   /// Set a custom attribute on the currently tracked profile.
   ///

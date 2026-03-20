@@ -232,7 +232,8 @@ Klaviyo.instance.resetProfile()              KlaviyoSDK().resetProfile()
 ### Profile management — attribute setters
 
 The community SDK had dedicated methods for individual profile attributes. The
-official SDK uses `setProfileProperties()` with a map, or `setProfile()` with a
+official SDK uses `setProfileAttribute()` for individual fields,
+`setProfileProperties()` for batching multiple fields, or `setProfile()` with a
 full `KlaviyoProfile` object.
 
 ```dart
@@ -243,14 +244,14 @@ await Klaviyo.instance.setTitle('Engineer');
 await Klaviyo.instance.setOrganization('Acme');
 await Klaviyo.instance.setImage('https://example.com/photo.jpg');
 
-// After — option A: individual calls via setProfileProperties
-await KlaviyoSDK().setProfileProperties({'first_name': 'Jane'});
-await KlaviyoSDK().setProfileProperties({'last_name': 'Doe'});
-await KlaviyoSDK().setProfileProperties({'title': 'Engineer'});
-await KlaviyoSDK().setProfileProperties({'organization': 'Acme'});
-await KlaviyoSDK().setProfileProperties({'image': 'https://example.com/photo.jpg'});
+// After — option A: individual calls via setProfileAttribute
+await KlaviyoSDK().setProfileAttribute('first_name', 'Jane');
+await KlaviyoSDK().setProfileAttribute('last_name', 'Doe');
+await KlaviyoSDK().setProfileAttribute('title', 'Engineer');
+await KlaviyoSDK().setProfileAttribute('organization', 'Acme');
+await KlaviyoSDK().setProfileAttribute('image', 'https://example.com/photo.jpg');
 
-// After — option B (recommended): batch them in one call
+// After — option B: batch them in one call via setProfileProperties
 await KlaviyoSDK().setProfileProperties({
   'first_name': 'Jane',
   'last_name': 'Doe',
@@ -272,7 +273,8 @@ await KlaviyoSDK().setProfile(KlaviyoProfile(
 ### Profile management — location setters
 
 The community SDK had flat setters for individual location fields. The official
-SDK uses `setProfileProperties()` with the same keys.
+SDK uses `setProfileAttribute()` for individual fields, or
+`setProfileProperties()` for batching multiple fields.
 
 ```dart
 // Before
@@ -285,13 +287,17 @@ await Klaviyo.instance.setLatitude(42.3601);
 await Klaviyo.instance.setLongitude(-71.0589);
 await Klaviyo.instance.setTimezone('America/New_York');
 
-// After — option A: individual calls
-await KlaviyoSDK().setProfileProperties({'address1': '123 Main St'});
-await KlaviyoSDK().setProfileProperties({'city': 'Boston'});
-await KlaviyoSDK().setProfileProperties({'region': 'MA'});
-// ... etc.
+// After — option A: individual calls via setProfileAttribute
+await KlaviyoSDK().setProfileAttribute('address1', '123 Main St');
+await KlaviyoSDK().setProfileAttribute('city', 'Boston');
+await KlaviyoSDK().setProfileAttribute('region', 'MA');
+await KlaviyoSDK().setProfileAttribute('country', 'US');
+await KlaviyoSDK().setProfileAttribute('zip', '02101');
+await KlaviyoSDK().setProfileAttribute('latitude', 42.3601);
+await KlaviyoSDK().setProfileAttribute('longitude', -71.0589);
+await KlaviyoSDK().setProfileAttribute('timezone', 'America/New_York');
 
-// After — option B (recommended): batch them in one call
+// After — option B: batch them in one call via setProfileProperties
 await KlaviyoSDK().setProfileProperties({
   'address1': '123 Main St',
   'city': 'Boston',
@@ -413,20 +419,20 @@ documentation on these features.
 | `.handlePush(data)` | Remove — handled automatically by native layer |
 | `.isKlaviyoPush(data)` | `data.containsKey('_k')` |
 | `.updateProfile(profile)` | `.setProfile(profile)` |
-| `.setFirstName(name)` | `.setProfileProperties({'first_name': name})` |
-| `.setLastName(name)` | `.setProfileProperties({'last_name': name})` |
-| `.setOrganization(org)` | `.setProfileProperties({'organization': org})` |
-| `.setTitle(title)` | `.setProfileProperties({'title': title})` |
-| `.setImage(url)` | `.setProfileProperties({'image': url})` |
-| `.setAddress1(addr)` | `.setProfileProperties({'address1': addr})` |
-| `.setAddress2(addr)` | `.setProfileProperties({'address2': addr})` |
-| `.setCity(city)` | `.setProfileProperties({'city': city})` |
-| `.setCountry(country)` | `.setProfileProperties({'country': country})` |
-| `.setRegion(region)` | `.setProfileProperties({'region': region})` |
-| `.setZip(zip)` | `.setProfileProperties({'zip': zip})` |
-| `.setLatitude(lat)` | `.setProfileProperties({'latitude': lat})` |
-| `.setLongitude(lng)` | `.setProfileProperties({'longitude': lng})` |
-| `.setTimezone(tz)` | `.setProfileProperties({'timezone': tz})` |
+| `.setFirstName(name)` | `.setProfileAttribute('first_name', name)` |
+| `.setLastName(name)` | `.setProfileAttribute('last_name', name)` |
+| `.setOrganization(org)` | `.setProfileAttribute('organization', org)` |
+| `.setTitle(title)` | `.setProfileAttribute('title', title)` |
+| `.setImage(url)` | `.setProfileAttribute('image', url)` |
+| `.setAddress1(addr)` | `.setProfileAttribute('address1', addr)` |
+| `.setAddress2(addr)` | `.setProfileAttribute('address2', addr)` |
+| `.setCity(city)` | `.setProfileAttribute('city', city)` |
+| `.setCountry(country)` | `.setProfileAttribute('country', country)` |
+| `.setRegion(region)` | `.setProfileAttribute('region', region)` |
+| `.setZip(zip)` | `.setProfileAttribute('zip', zip)` |
+| `.setLatitude(lat)` | `.setProfileAttribute('latitude', lat)` |
+| `.setLongitude(lng)` | `.setProfileAttribute('longitude', lng)` |
+| `.setTimezone(tz)` | `.setProfileAttribute('timezone', tz)` |
 | `.setCustomAttribute(k, v)` | `.setProfileAttribute(k, v)` |
 | `.setBadgeCount(n)` (async) | `.setBadgeCount(n)` (sync, no await) |
 | `KlaviyoProfile(id: ...)` | `KlaviyoProfile(externalId: ...)` |
