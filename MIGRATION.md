@@ -53,6 +53,8 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
 ### That's it
 
+Run `flutter pub get` if you haven't already.
+
 Your existing Dart code — `Klaviyo.instance.initialize(...)`,
 `Klaviyo.instance.logEvent(...)`, `Klaviyo.instance.setEmail(...)`,
 `KlaviyoProfile(id: '...', address1: '...')`, and so on — will compile and work
@@ -401,7 +403,7 @@ community SDK:
   without needing `firebase_messaging` as a dependency.
 - **Push event stream:** `onPushNotification` for token events, open events,
   and errors.
-- **Log level control:** `setLogLevel()` with granular levels.
+- **Log level control:** `setLogLevel(KlaviyoLogLevel)` with granular levels.
 
 See the [README](https://pub.dev/packages/klaviyo_flutter_sdk) for full
 documentation on these features.
@@ -413,6 +415,7 @@ documentation on these features.
 | Community SDK (`klaviyo_flutter`) | Official SDK (`klaviyo_flutter_sdk`) |
 |---|---|
 | `Klaviyo.instance` | `KlaviyoSDK()` |
+| `.isInitialized` | `.isInitialized` |
 | `.initialize('key')` | `.initialize(apiKey: 'key')` |
 | `.logEvent(name, meta)` | `.createEvent(KlaviyoEvent.custom(metric: name, properties: meta))` |
 | `.sendTokenToKlaviyo(token)` | `.setPushToken(token)` |
