@@ -3,6 +3,9 @@ platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+# Conditionally include optional modules
+ENV['KLAVIYO_INCLUDE_FORMS'] = 'true'
+ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
 
 project 'Runner', {
   'Debug' => :debug,

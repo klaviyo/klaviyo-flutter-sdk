@@ -11,6 +11,7 @@ import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
+import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.InAppFormsConfig
@@ -77,18 +78,10 @@ class KlaviyoFlutterSdkPlugin :
         when (call.method) {
             "initialize" -> {
                 val apiKey = call.argument<String>("apiKey")
-                val environment = call.argument<String>("environment")
-                val configuration = call.argument<Map<String, Any>>("configuration")
 
                 try {
                     // Initialize Klaviyo SDK
                     Klaviyo.initialize(apiKey!!, applicationContext)
-
-                    // Apply configuration if provided
-                    configuration?.let { config ->
-                        // Handle configuration options
-                    }
-
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("INIT_ERROR", "Failed to initialize Klaviyo", e.message)
@@ -105,6 +98,19 @@ class KlaviyoFlutterSdkPlugin :
                     (profileJson?.get("organization") as? String)?.let { properties[ProfileKey.ORGANIZATION] = it }
                     (profileJson?.get("title") as? String)?.let { properties[ProfileKey.TITLE] = it }
                     (profileJson?.get("image") as? String)?.let { properties[ProfileKey.IMAGE] = it }
+
+                    // Add location properties if present
+                    (profileJson?.get("location") as? Map<String, Any>)?.let { locationData ->
+                        (locationData["address1"] as? String)?.let { properties[ProfileKey.ADDRESS1] = it }
+                        (locationData["address2"] as? String)?.let { properties[ProfileKey.ADDRESS2] = it }
+                        (locationData["city"] as? String)?.let { properties[ProfileKey.CITY] = it }
+                        (locationData["country"] as? String)?.let { properties[ProfileKey.COUNTRY] = it }
+                        (locationData["region"] as? String)?.let { properties[ProfileKey.REGION] = it }
+                        (locationData["zip"] as? String)?.let { properties[ProfileKey.ZIP] = it }
+                        (locationData["latitude"] as? Number)?.let { properties[ProfileKey.LATITUDE] = it.toDouble() }
+                        (locationData["longitude"] as? Number)?.let { properties[ProfileKey.LONGITUDE] = it.toDouble() }
+                        (locationData["timezone"] as? String)?.let { properties[ProfileKey.TIMEZONE] = it }
+                    }
 
                     // Add any custom properties from the properties field
                     (profileJson?.get("properties") as? Map<String, Any>)?.forEach { (key, value) ->
@@ -218,6 +224,11 @@ class KlaviyoFlutterSdkPlugin :
                         event = event.setValue(value.toDouble())
                     }
 
+                    // Add uniqueId if provided
+                    (eventJson?.get("unique_id") as? String)?.let { uniqueId ->
+                        event = event.setUniqueId(uniqueId)
+                    }
+
                     Klaviyo.createEvent(event)
                     result.success(null)
                 } catch (e: Exception) {
@@ -306,9 +317,9 @@ class KlaviyoFlutterSdkPlugin :
             }
 
             "registerForInAppForms" -> {
-                val configuration = call.argument<Map<String, Any>>("configuration")
-
                 try {
+                    val configuration = call.argument<Map<String, Any>>("configuration")
+
                     val sessionTimeout: Duration =
                         when (val timeout = configuration?.get("sessionTimeoutDuration") as? Int) {
                             null -> {
@@ -333,6 +344,8 @@ class KlaviyoFlutterSdkPlugin :
                     )
 
                     result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
                 }
@@ -342,6 +355,8 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.unregisterFromInAppForms()
                     result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to unregister from in-app forms", e.message)
                 }
@@ -351,7 +366,15 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.registerGeofencing()
                     result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Geofencing not available: location module not included", e)
+                    result.error(
+                        "GEOFENCING_NOT_AVAILABLE",
+                        "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties",
+                        e.message,
+                    )
                 } catch (e: Exception) {
+                    Registry.log.error("Failed to register for geofencing: ${e.message}", e)
                     result.error("GEOFENCING_ERROR", "Failed to register for geofencing", e.message)
                 }
             }
@@ -360,18 +383,38 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.unregisterGeofencing()
                     result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Geofencing not available: location module not included", e)
+                    result.error(
+                        "GEOFENCING_NOT_AVAILABLE",
+                        "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties",
+                        e.message,
+                    )
                 } catch (e: Exception) {
+                    Registry.log.error("Failed to unregister from geofencing: ${e.message}", e)
                     result.error("GEOFENCING_ERROR", "Failed to unregister from geofencing", e.message)
                 }
             }
 
             "getCurrentGeofences" -> {
                 try {
+                    val locationManager = Registry.getOrNull<LocationManager>()
+
+                    if (locationManager == null) {
+                        Registry.log.error("Geofencing not available: location module not included")
+                        result.error(
+                            "GEOFENCING_NOT_AVAILABLE",
+                            "Geofencing requires the full location module. Add 'klaviyoIncludeLocation=true' to gradle.properties",
+                            null,
+                        )
+                        return
+                    }
+
                     // Follow the same pattern as React Native SDK
                     // Note: in the future, we may be storing more fences than we are observing
                     val geofencesArray = mutableListOf<Map<String, Any>>()
 
-                    Registry.getOrNull<LocationManager>()?.getStoredGeofences()?.forEach { geofence ->
+                    locationManager.getStoredGeofences()?.forEach { geofence ->
                         geofencesArray.add(
                             mapOf(
                                 "identifier" to geofence.id,
@@ -380,12 +423,11 @@ class KlaviyoFlutterSdkPlugin :
                                 "radius" to geofence.radius.toDouble(),
                             ),
                         )
-                    } ?: run {
-                        Registry.log.warning("Geofencing is not yet registered")
                     }
 
                     result.success(mapOf("geofences" to geofencesArray))
                 } catch (e: Exception) {
+                    Registry.log.error("Failed to get current geofences: ${e.message}", e)
                     result.error("GEOFENCING_ERROR", "Failed to get current geofences", e.message)
                 }
             }
@@ -396,18 +438,6 @@ class KlaviyoFlutterSdkPlugin :
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("RESET_ERROR", "Failed to reset profile", e.message)
-                }
-            }
-
-            "setLogLevel" -> {
-                val logLevel = call.argument<String>("logLevel")
-
-                try {
-                    // Log level is typically set during initialization
-                    // This method is not directly available in the Android SDK
-                    result.success(null)
-                } catch (e: Exception) {
-                    result.error("LOG_LEVEL_ERROR", "Failed to set log level", e.message)
                 }
             }
 

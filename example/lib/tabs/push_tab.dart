@@ -3,7 +3,10 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+final _logger = Logger('KlaviyoExample');
 
 class PushTab extends StatefulWidget {
   const PushTab({super.key});
@@ -88,7 +91,7 @@ class _PushTabState extends State<PushTab> {
         _pushToken = token;
       });
     } catch (e) {
-      print('Failed to get push token: $e');
+      _logger.warning('Failed to get push token: $e');
     }
   }
 

@@ -15,35 +15,6 @@ class AppDelegate: FlutterAppDelegate {
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
-    // Handle custom URL scheme deep links (e.g., com.klaviyo.flutterexample://push)
-    override func application(
-    _ application: UIApplication,
-    open deepLink: URL,
-    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
-    ) -> Bool {
-        // Let Flutter handle the navigation via go_router
-        super.application(application, open: deepLink, options: options)
-    }
-
-    // Handle universal links (e.g., https://yourdomain.com/path)
-    override func application(
-    _ application: UIApplication,
-    continue userActivity: NSUserActivity,
-    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
-    ) -> Bool {
-        // Let Flutter handle navigation via go_router
-        // Flutter's redirect handler will call handleUniversalTrackingLink if needed
-        // IMPORTANT: Call super first to let Flutter receive the URL
-        _ = super.application(
-            application,
-            continue: userActivity,
-            restorationHandler: restorationHandler
-        )
-
-        // Return true to indicate we handled it (prevents SDK from falling back to UIApplication.open)
-        return true
-    }
-
     override func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,

@@ -1,0 +1,22 @@
+name: version-check
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  verify-version-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run version sync script
+        run: ./scripts/sync_version.sh
+
+      - name: Check for drift
+        run: |
+          if ! git diff --exit-code ios/klaviyo-sdk-configuration.plist; then
+            echo "::error::ios/klaviyo-sdk-configuration.plist is out of sync with pubspec.yaml. Run ./scripts/sync_version.sh and commit the result."
+            exit 1
+          fi

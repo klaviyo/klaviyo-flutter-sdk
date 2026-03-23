@@ -1,6 +1,6 @@
 name: klaviyo_flutter_sdk
 description: A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS and Android.
-version: 1.0.0
+version: 0.1.0-alpha.1
 
 homepage: https://github.com/klaviyo/klaviyo-flutter-sdk
 
@@ -12,7 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
 
-  meta: any
+  logging: ^1.3.0
+  meta: ^1.17.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

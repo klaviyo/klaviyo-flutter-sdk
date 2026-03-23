@@ -3,10 +3,9 @@ import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
 import '../models/geofence.dart';
-import '../enums/push_environment.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
-import '../utils/logger.dart';
+import 'package:logging/logging.dart';
 
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
@@ -19,7 +18,7 @@ class KlaviyoNativeWrapper {
 
   KlaviyoNativeWrapper._internal();
 
-  final Logger _logger = Logger();
+  final Logger _logger = Logger('KlaviyoSDK');
   bool _isInitialized = false;
   String? _apiKey;
 
@@ -39,8 +38,6 @@ class KlaviyoNativeWrapper {
   /// Initialize the native SDK wrapper
   Future<void> initialize({
     required String apiKey,
-    PushEnvironment environment = PushEnvironment.development,
-    Map<String, dynamic>? configuration,
   }) async {
     if (_isInitialized) return;
 
@@ -53,8 +50,6 @@ class KlaviyoNativeWrapper {
       // Initialize native SDK
       await _channel.invokeMethod('initialize', {
         'apiKey': apiKey,
-        'environment': environment.toString(),
-        'configuration': configuration,
       });
 
       _isInitialized = true;
@@ -158,19 +153,6 @@ class KlaviyoNativeWrapper {
     }
   }
 
-  /// Set profile location using native SDK
-  Future<void> setLocation(dynamic location) async {
-    _ensureInitialized();
-
-    try {
-      await _channel.invokeMethod('setLocation', {
-        'location': location is Map ? location : (location as dynamic).toJson(),
-      });
-    } catch (e) {
-      throw KlaviyoException('Failed to set location: $e');
-    }
-  }
-
   /// Track event using native SDK
   Future<void> trackEvent(KlaviyoEvent event) async {
     _ensureInitialized();
@@ -212,16 +194,12 @@ class KlaviyoNativeWrapper {
   }
 
   /// Set push token using native SDK
-  Future<void> setPushToken(
-    String token, {
-    PushEnvironment? environment,
-  }) async {
+  Future<void> setPushToken(String token) async {
     _ensureInitialized();
 
     try {
       await _channel.invokeMethod('setPushToken', {
         'token': token,
-        'environment': environment?.toString(),
       });
     } catch (e) {
       throw KlaviyoException('Failed to set push token: $e');
@@ -315,17 +293,6 @@ class KlaviyoNativeWrapper {
     }
   }
 
-  /// Set log level using native SDK
-  Future<void> setLogLevel(String logLevel) async {
-    _ensureInitialized();
-
-    try {
-      await _channel.invokeMethod('setLogLevel', {'logLevel': logLevel});
-    } catch (e) {
-      throw KlaviyoException('Failed to set log level: $e');
-    }
-  }
-
   /// Set badge count on the app icon (iOS only)
   /// This is a synchronous fire-and-forget operation
   void setBadgeCount(int count) {
@@ -376,11 +343,11 @@ class KlaviyoNativeWrapper {
           break;
       }
     } catch (e) {
-      _logger.error('Error handling native event: $e');
+      _logger.warning('Error handling native event: $e');
     }
   }
 
-  /// Recursively convert platform channel maps to Map<String, dynamic>
+  /// Recursively convert platform channel maps to Map`<`String, dynamic`>`
   Map<String, dynamic> _deepConvertMap(dynamic value) {
     assert(
       value == null || value is Map,

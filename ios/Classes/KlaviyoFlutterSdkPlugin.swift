@@ -1,9 +1,25 @@
+// swiftlint:disable file_length
 import Flutter
+#if canImport(KlaviyoForms)
 import KlaviyoForms
+#endif
 import KlaviyoSwift
+#if canImport(KlaviyoLocation)
 @_spi(KlaviyoPrivate) import KlaviyoLocation
+#endif
+import os
 import UIKit
 import UserNotifications
+
+// MARK: - Logger
+
+@available(iOS 14.0, *)
+extension Logger {
+    static let klaviyoFlutterSDK = Logger(
+        subsystem: "com.klaviyo.flutter",
+        category: "KlaviyoFlutterSDK"
+    )
+}
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     // MARK: - Properties
@@ -66,6 +82,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid profile data", details: nil))
                 return
             }
+            let location = parseLocation(from: profileData)
             let profile = Profile(
                 email: profileData["email"] as? String,
                 phoneNumber: profileData["phone_number"] as? String,
@@ -75,7 +92,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 organization: profileData["organization"] as? String,
                 title: profileData["title"] as? String,
                 image: profileData["image"] as? String,
-                location: nil,
+                location: location,
                 properties: profileData["properties"] as? [String: Any]
             )
             KlaviyoSDK().set(profile: profile)
@@ -148,10 +165,12 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
             let properties = eventData["properties"] as? [String: Any] ?? [:]
             let value = eventData["value"] as? Double
+            let uniqueId = eventData["unique_id"] as? String
             let event = Event(
                 name: .customEvent(name),
                 properties: properties,
-                value: value
+                value: value,
+                uniqueId: uniqueId
             )
             KlaviyoSDK().create(event: event)
             result(nil)
@@ -172,7 +191,9 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             }
 
             guard !token.isEmpty else {
-                print("⚠️ Attempted to set empty push token")
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.warning("Attempted to set empty push token")
+                }
                 result(FlutterError(
                     code: "INVALID_TOKEN",
                     message: "Push token cannot be empty",
@@ -197,35 +218,86 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         case "getPushToken":
             let token = KlaviyoSDK().pushToken
             if let token {
-                print("Retrieved push token from SDK: \(token)")
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.info("Retrieved push token from SDK: \(token, privacy: .public)")
+                }
             }
             result(token)
 
         case "registerForInAppForms":
+            #if canImport(KlaviyoForms)
+            let configuration = (call.arguments as? [String: Any])?["configuration"] as? [String: Any]
+            let sessionTimeout: TimeInterval
+            if let timeout = configuration?["sessionTimeoutDuration"] as? Int, timeout == -1 {
+                sessionTimeout = TimeInterval.infinity
+            } else if let timeout = configuration?["sessionTimeoutDuration"] as? Int {
+                sessionTimeout = TimeInterval(timeout)
+            } else {
+                sessionTimeout = 3600 // default: 1 hour
+            }
+
             DispatchQueue.main.async {
-                KlaviyoSDK().registerForInAppForms()
+                KlaviyoSDK().registerForInAppForms(
+                    configuration: InAppFormsConfig(sessionTimeoutDuration: sessionTimeout)
+                )
             }
             result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
 
         case "unregisterFromInAppForms":
+            #if canImport(KlaviyoForms)
             Task { @MainActor in
                 KlaviyoSDK().unregisterFromInAppForms()
             }
             result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
 
         case "registerGeofencing":
+            #if canImport(KlaviyoLocation)
             Task { @MainActor in
                 await KlaviyoSDK().registerGeofencing()
                 result(nil)
             }
+            #else
+            result(FlutterError(
+                code: "GEOFENCING_NOT_AVAILABLE",
+                message: "Geofencing requires the location module. " +
+                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                details: nil
+            ))
+            #endif
 
         case "unregisterGeofencing":
+            #if canImport(KlaviyoLocation)
             Task { @MainActor in
                 await KlaviyoSDK().unregisterGeofencing()
                 result(nil)
             }
+            #else
+            result(FlutterError(
+                code: "GEOFENCING_NOT_AVAILABLE",
+                message: "Geofencing requires the location module. " +
+                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                details: nil
+            ))
+            #endif
 
         case "getCurrentGeofences":
+            #if canImport(KlaviyoLocation)
             Task { @MainActor in
                 let geofences = await KlaviyoSDK().getCurrentGeofences()
                 let geofencesArray = geofences.map { region -> [String: Any] in
@@ -238,12 +310,17 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 }
                 result(["geofences": geofencesArray])
             }
+            #else
+            result(FlutterError(
+                code: "GEOFENCING_NOT_AVAILABLE",
+                message: "Geofencing requires the location module. " +
+                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                details: nil
+            ))
+            #endif
 
         case "resetProfile":
             KlaviyoSDK().resetProfile()
-            result(nil)
-
-        case "setLogLevel":
             result(nil)
 
         case "setBadgeCount":
@@ -255,7 +332,8 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                         code: "INVALID_ARGUMENTS",
                         message: "Invalid badge count argument",
                         details: nil
-                    ))
+                    )
+                )
                 return
             }
             KlaviyoSDK().setBadgeCount(count)
@@ -332,7 +410,9 @@ extension KlaviyoFlutterSdkPlugin {
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
-        print("📱 APNs Token received: \(tokenString)")
+        if #available(iOS 14.0, *) {
+            Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString, privacy: .public)")
+        }
 
         // Pass to Klaviyo Swift SDK
         KlaviyoSDK().set(pushToken: deviceToken)
@@ -347,7 +427,9 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink {
             eventSink(eventData)
         } else {
-            print("⚠️ [Plugin] Flutter not ready. Caching push token event.")
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token event.")
+            }
             cachedToken = eventData
         }
     }
@@ -357,7 +439,12 @@ extension KlaviyoFlutterSdkPlugin {
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
-        print("❌ Failed to register for remote notifications: \(error)")
+        if #available(iOS 14.0, *) {
+            let description = error.localizedDescription
+            Logger.klaviyoFlutterSDK.warning(
+                "Failed to register for remote notifications: \(description, privacy: .public)"
+            )
+        }
 
         // Create error payload
         let errorData: [String: Any] = [
@@ -369,14 +456,18 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink {
             eventSink(errorData)
         } else {
-            print("⚠️ [Plugin] Flutter not ready. Caching push token error event.")
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token error event.")
+            }
             cachedError = errorData
         }
     }
 
     public func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
-        print("📱 Push notification opened: \(userInfo)")
+        if #available(iOS 14.0, *) {
+            Logger.klaviyoFlutterSDK.info("Push notification opened")
+        }
 
         // 1. Prepare Payload
         let eventPayload: [String: Any] = [
@@ -388,7 +479,9 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink = eventSink {
             eventSink(eventPayload)
         } else {
-            print("⚠️ [Plugin] Flutter not ready. Caching notification open event.")
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching notification open event.")
+            }
             cachedOpenedNotification = eventPayload
         }
 
@@ -403,7 +496,9 @@ extension KlaviyoFlutterSdkPlugin {
     /// in `didReceiveRemoteNotification:fetchCompletionHandler:`.
     /// Note: The host app is responsible for calling the completion handler after this method returns.
     public func handleSilentPush(userInfo: [AnyHashable: Any]) {
-        print("📱 Silent push received: \(userInfo)")
+        if #available(iOS 14.0, *) {
+            Logger.klaviyoFlutterSDK.info("Silent push received")
+        }
 
         // Prepare payload
         let eventPayload: [String: Any] = [
@@ -415,13 +510,32 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink = eventSink {
             eventSink(eventPayload)
         } else {
-            print("⚠️ [Plugin] Flutter not ready. Caching silent push event.")
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching silent push event.")
+            }
             cachedSilentPush = eventPayload
         }
     }
 }
 
 // MARK: - Helpers
+
+extension KlaviyoFlutterSdkPlugin {
+    private func parseLocation(from profileData: [String: Any]) -> Profile.Location? {
+        guard let locationData = profileData["location"] as? [String: Any] else { return nil }
+        return Profile.Location(
+            address1: locationData["address1"] as? String,
+            address2: locationData["address2"] as? String,
+            city: locationData["city"] as? String,
+            country: locationData["country"] as? String,
+            latitude: locationData["latitude"] as? Double,
+            longitude: locationData["longitude"] as? Double,
+            region: locationData["region"] as? String,
+            zip: locationData["zip"] as? String,
+            timezone: locationData["timezone"] as? String
+        )
+    }
+}
 
 extension Data {
     init?(hexString: String) {

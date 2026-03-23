@@ -5,13 +5,12 @@ import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
-import 'models/klaviyo_location.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'enums/klaviyo_log_level.dart';
-import 'enums/push_environment.dart';
 import 'services/klaviyo_native_wrapper.dart';
-import 'utils/logger.dart';
+import 'package:logging/logging.dart';
+
 import 'exceptions/klaviyo_exception.dart';
 
 /// Main Klaviyo SDK class for Flutter applications
@@ -20,11 +19,18 @@ import 'exceptions/klaviyo_exception.dart';
 class KlaviyoSDK {
   static final KlaviyoSDK _instance = KlaviyoSDK._internal();
   factory KlaviyoSDK() => _instance;
-  KlaviyoSDK._internal();
+  KlaviyoSDK._internal() {
+    // Required for per-logger level control. This is a global setting in
+    // package:logging — without it, _logger.level is ignored and all loggers
+    // share the root logger's level. Setting it to true is additive and is
+    // the standard pattern for Dart libraries that manage their own log level.
+    hierarchicalLoggingEnabled = true;
+    _logger.level = Level.INFO;
+  }
 
   // Native wrapper service
   late KlaviyoNativeWrapper _nativeWrapper;
-  final Logger _logger = Logger();
+  final Logger _logger = Logger('KlaviyoSDK');
 
   // State
   bool _isInitialized = false;
@@ -37,9 +43,6 @@ class KlaviyoSDK {
   /// Initialize the Klaviyo SDK with your public API key
   Future<KlaviyoSDK> initialize({
     required String apiKey,
-    KlaviyoLogLevel logLevel = KlaviyoLogLevel.none,
-    PushEnvironment environment = PushEnvironment.development,
-    Map<String, dynamic>? configuration,
   }) async {
     if (_isInitialized) {
       _logger.warning('SDK already initialized');
@@ -49,16 +52,9 @@ class KlaviyoSDK {
     try {
       _apiKey = apiKey;
 
-      // Set logger level
-      _logger.setLogLevel(logLevel);
-
       // Initialize native wrapper
       _nativeWrapper = KlaviyoNativeWrapper();
-      await _nativeWrapper.initialize(
-        apiKey: apiKey,
-        environment: environment,
-        configuration: configuration,
-      );
+      await _nativeWrapper.initialize(apiKey: apiKey);
 
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
@@ -167,21 +163,21 @@ class KlaviyoSDK {
     }
   }
 
-  /// Set profile location
-  /// Calls the native SDK directly - native SDK manages profile state
-  Future<void> setLocation(KlaviyoLocation location) async {
-    _ensureInitialized();
-
-    try {
-      await _nativeWrapper.setLocation(location);
-      _logger.info('Location set');
-    } catch (e) {
-      throw KlaviyoException('Failed to set location: $e');
-    }
+  /// Set a single profile attribute
+  ///
+  /// This is a convenience method to set a single profile property.
+  /// To match the React Native SDK API.
+  ///
+  /// Example:
+  /// ```dart
+  /// await klaviyo.setProfileAttribute('first_name', 'John');
+  /// ```
+  Future<void> setProfileAttribute(String propertyKey, dynamic value) async {
+    await setProfileProperties({propertyKey: value});
   }
 
-  /// Track an event
-  Future<void> trackEvent(KlaviyoEvent event) async {
+  /// Create a new event to track a profile's activity.
+  Future<void> createEvent(KlaviyoEvent event) async {
     _ensureInitialized();
 
     try {
@@ -204,7 +200,7 @@ class KlaviyoSDK {
   /// klaviyo.onPushNotification.listen((event) {
   ///   if (event['type'] == 'push_token_received') {
   ///     final token = event['data']['token'];
-  ///     print('Token received: $token');
+  ///     log('Token received: $token');
   ///   }
   /// });
   /// ```
@@ -214,12 +210,9 @@ class KlaviyoSDK {
   }
 
   /// Set push token
-  Future<void> setPushToken(
-    String token, {
-    PushEnvironment? environment,
-  }) async {
+  Future<void> setPushToken(String token) async {
     _ensureInitialized();
-    await _nativeWrapper.setPushToken(token, environment: environment);
+    await _nativeWrapper.setPushToken(token);
   }
 
   /// Get push token
@@ -253,32 +246,48 @@ class KlaviyoSDK {
   /// Register for in-app forms
   Future<void> registerForInAppForms({InAppFormConfig? configuration}) async {
     _ensureInitialized();
-    await _nativeWrapper.registerForInAppForms(
-      configuration: configuration?.toJson(),
-    );
-    _logger.info('Registered for in-app forms');
+    try {
+      await _nativeWrapper.registerForInAppForms(
+        configuration: configuration?.toJson(),
+      );
+      _logger.info('Registered for in-app forms');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to register for in-app forms: ${e.message}');
+    }
   }
 
   /// Unregister from in-app forms
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
-    await _nativeWrapper.unregisterFromInAppForms();
-    _logger.info('Unregistered from in-app forms');
+    try {
+      await _nativeWrapper.unregisterFromInAppForms();
+      _logger.info('Unregistered from in-app forms');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to unregister from in-app forms: ${e.message}');
+    }
   }
 
   /// Begin monitoring geofences configured in your Klaviyo account
   /// Requires location permissions to be granted by user
   Future<void> registerGeofencing() async {
     _ensureInitialized();
-    await _nativeWrapper.registerGeofencing();
-    _logger.info('Registered for geofencing');
+    try {
+      await _nativeWrapper.registerGeofencing();
+      _logger.info('Registered for geofencing');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to register for geofencing: ${e.message}');
+    }
   }
 
   /// Stop monitoring all geofences
   Future<void> unregisterGeofencing() async {
     _ensureInitialized();
-    await _nativeWrapper.unregisterGeofencing();
-    _logger.info('Unregistered from geofencing');
+    try {
+      await _nativeWrapper.unregisterGeofencing();
+      _logger.info('Unregistered from geofencing');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to unregister from geofencing: ${e.message}');
+    }
   }
 
   /// Get currently monitored geofences
@@ -290,7 +299,12 @@ class KlaviyoSDK {
   @internal
   Future<List<Geofence>> getCurrentGeofences() async {
     _ensureInitialized();
-    return await _nativeWrapper.getCurrentGeofences();
+    try {
+      return await _nativeWrapper.getCurrentGeofences();
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to get current geofences: ${e.message}');
+      return [];
+    }
   }
 
   // ============================================================================
@@ -325,7 +339,7 @@ class KlaviyoSDK {
 
     // Validate empty/null URL
     if (url.trim().isEmpty) {
-      _logger.error('[DeepLink SDK] Error: Empty tracking link provided');
+      _logger.warning('[DeepLink SDK] Error: Empty tracking link provided');
       return false;
     }
 
@@ -349,7 +363,7 @@ class KlaviyoSDK {
         _logger.warning('Link $url rejected by native SDK');
       }
     }).catchError((e) {
-      _logger.error('Failed to handle universal tracking link $url: $e');
+      _logger.warning('Failed to handle universal tracking link $url: $e');
     });
 
     return true;
@@ -383,10 +397,10 @@ class KlaviyoSDK {
     }
   }
 
-  /// Set log level
+  /// Set log level for Flutter-side logging only
+  /// Note: This only affects Flutter console logs, not native SDK logs
   void setLogLevel(KlaviyoLogLevel logLevel) {
-    _logger.setLogLevel(logLevel);
-    _nativeWrapper.setLogLevel(logLevel.toString());
+    _logger.level = logLevel.toLevel();
   }
 
   /// Get push notification events stream
