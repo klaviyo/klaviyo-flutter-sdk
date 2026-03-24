@@ -1,3 +1,4 @@
+import '../extensions/map_extensions.dart';
 import '../klaviyo_sdk.dart';
 import '../models/klaviyo_event.dart';
 import '../models/klaviyo_profile.dart';
@@ -116,13 +117,16 @@ class Klaviyo {
 
   /// Check if a push notification payload originated from Klaviyo.
   ///
-  /// There is no direct equivalent in [KlaviyoSDK]. If you need this check,
-  /// you can inline it: `message.containsKey('_k')`.
+  /// Migrate to:
+  /// ```dart
+  /// message.isKlaviyoNotification
+  /// ```
   @Deprecated(
-    "Inline the check: message.containsKey('_k'). "
+    'Use message.isKlaviyoNotification instead. '
     'Will be removed in 1.0.',
   )
-  bool isKlaviyoPush(Map<String, dynamic> message) => message.containsKey('_k');
+  bool isKlaviyoPush(Map<String, dynamic> message) =>
+      message.isKlaviyoNotification;
 
   /// Handle a push notification payload.
   ///
