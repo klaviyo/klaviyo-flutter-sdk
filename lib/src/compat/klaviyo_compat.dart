@@ -21,12 +21,12 @@ import '../models/klaviyo_profile.dart';
 /// await KlaviyoSDK().initialize(apiKey: 'KEY');
 /// ```
 ///
-/// All methods on this class will be removed in version 2.0. Please migrate to
+/// All methods on this class will be removed in version 1.0. Please migrate to
 /// the [KlaviyoSDK] API at your earliest convenience.
 @Deprecated(
   'Use KlaviyoSDK instead. '
   'This class is provided for migration from the klaviyo_flutter community '
-  'package and will be removed in 2.0.',
+  'package and will be removed in 1.0.',
 )
 class Klaviyo {
   Klaviyo._();
@@ -44,7 +44,7 @@ class Klaviyo {
   /// ```
   @Deprecated(
     'Use KlaviyoSDK() instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   static Klaviyo get instance => _instance;
 
@@ -57,7 +57,7 @@ class Klaviyo {
   /// Whether the SDK has been initialized.
   @Deprecated(
     'Use KlaviyoSDK().isInitialized instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   bool get isInitialized => _sdk.isInitialized;
 
@@ -69,7 +69,7 @@ class Klaviyo {
   /// ```
   @Deprecated(
     'Use KlaviyoSDK().initialize(apiKey: apiKey) instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> initialize(String apiKey) => _sdk.initialize(apiKey: apiKey);
 
@@ -87,7 +87,7 @@ class Klaviyo {
   /// ```
   @Deprecated(
     'Use KlaviyoSDK().createEvent(KlaviyoEvent.custom(...)) instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<String> logEvent(String name, [Map<String, dynamic>? metaData]) async {
     await _sdk.createEvent(
@@ -110,7 +110,7 @@ class Klaviyo {
   /// ```
   @Deprecated(
     'Use KlaviyoSDK().setPushToken(token) instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> sendTokenToKlaviyo(String token) => _sdk.setPushToken(token);
 
@@ -120,7 +120,7 @@ class Klaviyo {
   /// you can inline it: `message.containsKey('_k')`.
   @Deprecated(
     "Inline the check: message.containsKey('_k'). "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   bool isKlaviyoPush(Map<String, dynamic> message) => message.containsKey('_k');
 
@@ -133,7 +133,7 @@ class Klaviyo {
   @Deprecated(
     'Push handling is now automatic in the native layer. '
     'Remove calls to handlePush(). '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<bool> handlePush(Map<String, dynamic> message) async => true;
 
@@ -149,7 +149,7 @@ class Klaviyo {
   /// ```
   @Deprecated(
     'Use KlaviyoSDK().setProfile(profile) instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<String> updateProfile(KlaviyoProfile profile) async {
     await _sdk.setProfile(profile);
@@ -159,42 +159,42 @@ class Klaviyo {
   /// Set the external ID of the currently tracked profile.
   @Deprecated(
     'Use KlaviyoSDK().setExternalId(id) instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setExternalId(String id) => _sdk.setExternalId(id);
 
   /// Get the external ID of the currently tracked profile.
   @Deprecated(
     'Use KlaviyoSDK().getExternalId() instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<String?> getExternalId() => _sdk.getExternalId();
 
   /// Clear all stored profile identifiers and start a new tracked profile.
   @Deprecated(
     'Use KlaviyoSDK().resetProfile() instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> resetProfile() => _sdk.resetProfile();
 
   /// Set the email of the currently tracked profile.
   @Deprecated(
     'Use KlaviyoSDK().setEmail(email) instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setEmail(String email) => _sdk.setEmail(email);
 
   /// Get the email of the currently tracked profile.
   @Deprecated(
     'Use KlaviyoSDK().getEmail() instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<String?> getEmail() => _sdk.getEmail();
 
   /// Set the phone number of the currently tracked profile.
   @Deprecated(
     'Use KlaviyoSDK().setPhoneNumber(phoneNumber) instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setPhoneNumber(String phoneNumber) =>
       _sdk.setPhoneNumber(phoneNumber);
@@ -202,7 +202,7 @@ class Klaviyo {
   /// Get the phone number of the currently tracked profile.
   @Deprecated(
     'Use KlaviyoSDK().getPhoneNumber() instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<String?> getPhoneNumber() => _sdk.getPhoneNumber();
 
@@ -221,7 +221,7 @@ class Klaviyo {
   /// ```
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('first_name', name) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setFirstName(String firstName) =>
       _sdk.setProfileAttribute('first_name', firstName);
@@ -229,7 +229,7 @@ class Klaviyo {
   /// Set the last name of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('last_name', name) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setLastName(String lastName) =>
       _sdk.setProfileAttribute('last_name', lastName);
@@ -237,7 +237,7 @@ class Klaviyo {
   /// Set the organization of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('organization', org) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setOrganization(String organization) =>
       _sdk.setProfileAttribute('organization', organization);
@@ -245,7 +245,7 @@ class Klaviyo {
   /// Set the title of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('title', title) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setTitle(String title) =>
       _sdk.setProfileAttribute('title', title);
@@ -253,7 +253,7 @@ class Klaviyo {
   /// Set the image URL of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('image', url) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setImage(String image) =>
       _sdk.setProfileAttribute('image', image);
@@ -265,7 +265,7 @@ class Klaviyo {
   /// Set address line 1 of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('address1', addr) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setAddress1(String address) =>
       _sdk.setProfileAttribute('address1', address);
@@ -273,7 +273,7 @@ class Klaviyo {
   /// Set address line 2 of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('address2', addr) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setAddress2(String address) =>
       _sdk.setProfileAttribute('address2', address);
@@ -281,14 +281,14 @@ class Klaviyo {
   /// Set the city of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('city', city) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setCity(String city) => _sdk.setProfileAttribute('city', city);
 
   /// Set the country of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('country', country) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setCountry(String country) =>
       _sdk.setProfileAttribute('country', country);
@@ -296,7 +296,7 @@ class Klaviyo {
   /// Set the latitude of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('latitude', lat) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setLatitude(double latitude) =>
       _sdk.setProfileAttribute('latitude', latitude);
@@ -304,7 +304,7 @@ class Klaviyo {
   /// Set the longitude of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('longitude', lng) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setLongitude(double longitude) =>
       _sdk.setProfileAttribute('longitude', longitude);
@@ -312,7 +312,7 @@ class Klaviyo {
   /// Set the region of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('region', region) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setRegion(String region) =>
       _sdk.setProfileAttribute('region', region);
@@ -320,14 +320,14 @@ class Klaviyo {
   /// Set the zip code of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('zip', zip) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setZip(String zip) => _sdk.setProfileAttribute('zip', zip);
 
   /// Set the timezone of the currently tracked profile.
   @Deprecated(
     "Use KlaviyoSDK().setProfileAttribute('timezone', tz) instead. "
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setTimezone(String timezone) =>
       _sdk.setProfileAttribute('timezone', timezone);
@@ -340,7 +340,7 @@ class Klaviyo {
   /// ```
   @Deprecated(
     'Use KlaviyoSDK().setProfileAttribute(key, value) instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setCustomAttribute(String key, String value) =>
       _sdk.setProfileAttribute(key, value);
@@ -357,7 +357,7 @@ class Klaviyo {
   /// ```
   @Deprecated(
     'Use KlaviyoSDK().setBadgeCount(count) instead. '
-    'Will be removed in 2.0.',
+    'Will be removed in 1.0.',
   )
   Future<void> setBadgeCount(int count) async => _sdk.setBadgeCount(count);
 }
