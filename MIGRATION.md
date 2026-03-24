@@ -198,8 +198,8 @@ Future<void> _handler(RemoteMessage message) async {
 // Before
 if (Klaviyo.instance.isKlaviyoPush(message.data)) { ... }
 
-// After — inline the check
-if (message.data.containsKey('_k')) { ... }
+// After — use the extension
+if (message.data.isKlaviyoNotification) { ... }
 ```
 
 ### Profile management — `updateProfile`
@@ -420,7 +420,7 @@ documentation on these features.
 | `.logEvent(name, meta)` | `.createEvent(KlaviyoEvent.custom(metric: name, properties: meta))` |
 | `.sendTokenToKlaviyo(token)` | `.setPushToken(token)` |
 | `.handlePush(data)` | Remove — handled automatically by native layer |
-| `.isKlaviyoPush(data)` | `data.containsKey('_k')` |
+| `.isKlaviyoPush(data)` | `data.isKlaviyoNotification` |
 | `.updateProfile(profile)` | `.setProfile(profile)` |
 | `.setFirstName(name)` | `.setProfileAttribute('first_name', name)` |
 | `.setLastName(name)` | `.setProfileAttribute('last_name', name)` |
