@@ -16,6 +16,7 @@ import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.unregisterFromInAppForms
+import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.registerFormLifecycleCallback
 import com.klaviyo.forms.unregisterFormLifecycleCallback
 import com.klaviyo.location.LocationManager
@@ -340,23 +341,26 @@ class KlaviyoFlutterSdkPlugin :
                     )
 
                     // Register form lifecycle callback
-                    Klaviyo.registerFormLifecycleCallback { event, context ->
-                        val eventName =
-                            when (event) {
-                                com.klaviyo.forms.FormLifecycleEvent.FORM_SHOWN -> "form_shown"
-                                com.klaviyo.forms.FormLifecycleEvent.FORM_DISMISSED -> "form_dismissed"
-                                com.klaviyo.forms.FormLifecycleEvent.FORM_CTA_CLICKED -> "form_cta_clicked"
+                    Klaviyo.registerFormLifecycleCallback { event ->
+                        val data = mutableMapOf<String, Any?>(
+                            "formId" to event.formId,
+                            "formName" to event.formName,
+                        )
+
+                        when (event) {
+                            is FormLifecycleEvent.FormShown -> data["event"] = "form_shown"
+                            is FormLifecycleEvent.FormDismissed -> data["event"] = "form_dismissed"
+                            is FormLifecycleEvent.FormCtaClicked -> {
+                                data["event"] = "form_cta_clicked"
+                                data["buttonLabel"] = event.buttonLabel
+                                data["deepLinkUrl"] = event.deepLinkUrl
                             }
+                        }
 
                         eventSink?.success(
                             mapOf(
                                 "type" to "form_lifecycle_event",
-                                "data" to
-                                    mapOf(
-                                        "event" to eventName,
-                                        "formId" to context.formId,
-                                        "formName" to context.formName,
-                                    ),
+                                "data" to data,
                             ),
                         )
                     }
