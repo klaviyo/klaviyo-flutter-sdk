@@ -43,7 +43,7 @@ end
 # Notification Service Extension target for rich push and badge count support
 target 'NotificationServiceExtension' do
   use_frameworks!
-  pod 'KlaviyoSwiftExtension', '~> 5.2.0'
+  pod 'KlaviyoSwiftExtension', '~> 5.2.1'
 end
 
 post_install do |installer|
