@@ -54,7 +54,7 @@ class _FormsTabState extends State<FormsTab> {
           _ => '',
         };
         _lifecycleEvents.add(
-            '[$timestamp] ${event.eventName}$formIdInfo$formNameInfo$extra',
+          '[$timestamp] ${event.eventName}$formIdInfo$formNameInfo$extra',
         );
       });
     });

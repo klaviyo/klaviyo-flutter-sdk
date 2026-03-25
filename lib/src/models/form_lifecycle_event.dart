@@ -74,8 +74,7 @@ class FormShown extends FormLifecycleEvent {
   String get eventName => 'formShown';
 
   @override
-  String toString() =>
-      'FormShown(formId: $formId, formName: $formName)';
+  String toString() => 'FormShown(formId: $formId, formName: $formName)';
 
   @override
   bool operator ==(Object other) =>
@@ -96,8 +95,7 @@ class FormDismissed extends FormLifecycleEvent {
   String get eventName => 'formDismissed';
 
   @override
-  String toString() =>
-      'FormDismissed(formId: $formId, formName: $formName)';
+  String toString() => 'FormDismissed(formId: $formId, formName: $formName)';
 
   @override
   bool operator ==(Object other) =>
@@ -129,8 +127,7 @@ class FormCtaClicked extends FormLifecycleEvent {
   String get eventName => 'formCtaClicked';
 
   @override
-  String toString() =>
-      'FormCtaClicked(formId: $formId, formName: $formName, '
+  String toString() => 'FormCtaClicked(formId: $formId, formName: $formName, '
       'buttonLabel: $buttonLabel, deepLinkUrl: $deepLinkUrl)';
 
   @override
