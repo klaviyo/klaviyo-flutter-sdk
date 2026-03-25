@@ -1,6 +1,3 @@
-⚠️ STILL WORK IN PROGRESS AND NOT READY FOR PRODUCTION APPs YET ⚠️
-
-
 # Klaviyo Flutter SDK
 
 A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS and Android. This SDK allows you to integrate Klaviyo's powerful marketing automation features into your Flutter applications.
