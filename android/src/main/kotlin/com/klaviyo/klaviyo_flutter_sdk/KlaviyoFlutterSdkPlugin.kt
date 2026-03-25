@@ -13,12 +13,12 @@ import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
+import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
-import com.klaviyo.forms.unregisterFromInAppForms
-import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.registerFormLifecycleCallback
 import com.klaviyo.forms.unregisterFormLifecycleCallback
+import com.klaviyo.forms.unregisterFromInAppForms
 import com.klaviyo.location.LocationManager
 import com.klaviyo.location.registerGeofencing
 import com.klaviyo.location.unregisterGeofencing
@@ -342,14 +342,21 @@ class KlaviyoFlutterSdkPlugin :
 
                     // Register form lifecycle callback
                     Klaviyo.registerFormLifecycleCallback { event ->
-                        val data = mutableMapOf<String, Any?>(
-                            "formId" to event.formId,
-                            "formName" to event.formName,
-                        )
+                        val data =
+                            mutableMapOf<String, Any?>(
+                                "formId" to event.formId,
+                                "formName" to event.formName,
+                            )
 
                         when (event) {
-                            is FormLifecycleEvent.FormShown -> data["event"] = "form_shown"
-                            is FormLifecycleEvent.FormDismissed -> data["event"] = "form_dismissed"
+                            is FormLifecycleEvent.FormShown -> {
+                                data["event"] = "form_shown"
+                            }
+
+                            is FormLifecycleEvent.FormDismissed -> {
+                                data["event"] = "form_dismissed"
+                            }
+
                             is FormLifecycleEvent.FormCtaClicked -> {
                                 data["event"] = "form_cta_clicked"
                                 data["buttonLabel"] = event.buttonLabel
