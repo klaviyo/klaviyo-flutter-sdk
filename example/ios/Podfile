@@ -31,6 +31,12 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+  # Override Klaviyo pods to point at feature branch
+  pod 'KlaviyoCore', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :branch => 'ecm/form-lifecycle-events'
+  pod 'KlaviyoSwift', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :branch => 'ecm/form-lifecycle-events'
+  pod 'KlaviyoForms', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :branch => 'ecm/form-lifecycle-events'
+  pod 'KlaviyoLocation', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :branch => 'ecm/form-lifecycle-events'
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
