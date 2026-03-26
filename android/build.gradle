@@ -58,9 +58,9 @@ if (rootProject.hasProperty('klaviyoIncludeForms')) {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation "com.github.klaviyo.klaviyo-android-sdk:core:$klaviyoSdkVersion"
-    api "com.github.klaviyo.klaviyo-android-sdk:analytics:$klaviyoSdkVersion"
-    api "com.github.klaviyo.klaviyo-android-sdk:push-fcm:$klaviyoSdkVersion"
+    implementation "com.github.klaviyo.klaviyo-android-sdk:core:ecm~form-lifecycle-events-SNAPSHOT"
+    api "com.github.klaviyo.klaviyo-android-sdk:analytics:ecm~form-lifecycle-events-SNAPSHOT"
+    api "com.github.klaviyo.klaviyo-android-sdk:push-fcm:ecm~form-lifecycle-events-SNAPSHOT"
 
     // Location: full module (includes -core transitively), or just -core for lightweight
     def includeLocation = false
@@ -69,16 +69,16 @@ dependencies {
     }
 
     if (includeLocation) {
-        api "com.github.klaviyo.klaviyo-android-sdk:location:$klaviyoSdkVersion"
+        api "com.github.klaviyo.klaviyo-android-sdk:location:ecm~form-lifecycle-events-SNAPSHOT"
     } else {
-        implementation "com.github.klaviyo.klaviyo-android-sdk:location-core:$klaviyoSdkVersion"
+        implementation "com.github.klaviyo.klaviyo-android-sdk:location-core:ecm~form-lifecycle-events-SNAPSHOT"
     }
 
     // Forms: full module (includes -core transitively), or just -core for lightweight
     if (includeForms) {
-        api "com.github.klaviyo.klaviyo-android-sdk:forms:$klaviyoSdkVersion"
+        api "com.github.klaviyo.klaviyo-android-sdk:forms:ecm~form-lifecycle-events-SNAPSHOT"
     } else {
-        implementation "com.github.klaviyo.klaviyo-android-sdk:forms-core:$klaviyoSdkVersion"
+        implementation "com.github.klaviyo.klaviyo-android-sdk:forms-core:ecm~form-lifecycle-events-SNAPSHOT"
     }
 
     implementation "com.google.firebase:firebase-messaging:24.1.0"

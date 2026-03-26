@@ -571,16 +571,23 @@ extension Data {
 extension KlaviyoFlutterSdkPlugin {
     /// Subscribe to form lifecycle events from the iOS SDK
     func subscribeToFormLifecycleEvents() {
-        KlaviyoSDK().registerFormLifecycleHandler { [weak self] event, context in
+        KlaviyoSDK().registerFormLifecycleHandler { [weak self] event in
             guard let self = self else { return }
+
+            var data: [String: Any] = [
+                "event": event.eventName,
+                "formId": event.formId as Any,
+                "formName": event.formName as Any
+            ]
+
+            if case let .formCtaClicked(_, _, buttonLabel, deepLinkUrl) = event {
+                data["buttonLabel"] = buttonLabel as Any
+                data["deepLinkUrl"] = deepLinkUrl?.absoluteString as Any
+            }
 
             let eventPayload: [String: Any] = [
                 "type": "form_lifecycle_event",
-                "data": [
-                    "event": event.rawValue,
-                    "formId": context.formId as Any,
-                    "formName": context.formName as Any
-                ]
+                "data": data
             ]
 
             // Send to Flutter (or cache if Flutter is not ready)

@@ -48,8 +48,14 @@ class _FormsTabState extends State<FormsTab> {
         final formIdInfo = event.formId != null ? ' (${event.formId})' : '';
         final formNameInfo =
             event.formName != null ? ' [${event.formName}]' : '';
+        final extra = switch (event) {
+          FormCtaClicked(:final buttonLabel, :final deepLinkUrl) =>
+            ' button=$buttonLabel url=$deepLinkUrl',
+          _ => '',
+        };
         _lifecycleEvents.add(
-            '[$timestamp] ${event.eventType.name}$formIdInfo$formNameInfo');
+          '[$timestamp] ${event.eventName}$formIdInfo$formNameInfo$extra',
+        );
       });
     });
   }
