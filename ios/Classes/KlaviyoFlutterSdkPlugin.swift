@@ -594,7 +594,9 @@ extension KlaviyoFlutterSdkPlugin {
             if let eventSink = self.eventSink {
                 eventSink(eventPayload)
             } else {
-                print("⚠️ [Plugin] Flutter not ready. Caching form lifecycle event.")
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching form lifecycle event.")
+                }
                 self.cachedFormLifecycleEvents.append(eventPayload)
             }
         }

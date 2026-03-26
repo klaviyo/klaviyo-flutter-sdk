@@ -44,6 +44,7 @@ class KlaviyoFlutterSdkPlugin :
     private var eventSink: EventChannel.EventSink? = null
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
+    private val cachedFormLifecycleEvents = mutableListOf<Map<String, Any?>>()
 
     companion object {
         private const val TAG = "KlaviyoFlutter"
@@ -65,6 +66,9 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
+                    // Flush any cached form lifecycle events
+                    cachedFormLifecycleEvents.forEach { events?.success(it) }
+                    cachedFormLifecycleEvents.clear()
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -370,12 +374,18 @@ class KlaviyoFlutterSdkPlugin :
                             }
                         }
 
-                        eventSink?.success(
+                        val eventPayload =
                             mapOf(
                                 "type" to "form_lifecycle_event",
                                 "data" to data,
-                            ),
-                        )
+                            )
+
+                        val sink = eventSink
+                        if (sink != null) {
+                            sink.success(eventPayload)
+                        } else {
+                            cachedFormLifecycleEvents.add(eventPayload)
+                        }
                     }
 
                     result.success(null)
