@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="klaviyo_sdk_name_override">flutter</string>
-    <string name="klaviyo_sdk_version_override">0.1.0-alpha.1</string>
+    <string name="klaviyo_sdk_version_override">0.1.0</string>
 </resources>
