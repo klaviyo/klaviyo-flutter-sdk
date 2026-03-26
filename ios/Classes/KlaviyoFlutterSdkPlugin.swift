@@ -35,7 +35,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedError: [String: Any]?
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
-    private var cachedFormLifecycleEvents: [[String: Any]] = []
 
     // MARK: - Flutter Plugin Registration
 
@@ -393,10 +392,6 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedSilentPush)
             self.cachedSilentPush = nil
         }
-        for cachedFormEvent in cachedFormLifecycleEvents {
-            events(cachedFormEvent)
-        }
-        cachedFormLifecycleEvents.removeAll()
         return nil
     }
 
@@ -590,15 +585,7 @@ extension KlaviyoFlutterSdkPlugin {
                 "data": data
             ]
 
-            // Send to Flutter (or cache if Flutter is not ready)
-            if let eventSink = self.eventSink {
-                eventSink(eventPayload)
-            } else {
-                if #available(iOS 14.0, *) {
-                    Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching form lifecycle event.")
-                }
-                self.cachedFormLifecycleEvents.append(eventPayload)
-            }
+            self.eventSink?(eventPayload)
         }
     }
 }
