@@ -240,6 +240,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 KlaviyoSDK().registerForInAppForms(
                     configuration: InAppFormsConfig(sessionTimeoutDuration: sessionTimeout)
                 )
+                self.subscribeToFormLifecycleEvents()
             }
             result(nil)
             #else
@@ -254,6 +255,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         case "unregisterFromInAppForms":
             #if canImport(KlaviyoForms)
             Task { @MainActor in
+                KlaviyoSDK().unregisterFormLifecycleHandler()
                 KlaviyoSDK().unregisterFromInAppForms()
             }
             result(nil)
@@ -555,5 +557,35 @@ extension Data {
         }
 
         self = data
+    }
+}
+
+// MARK: - Form Lifecycle Events
+
+@MainActor
+extension KlaviyoFlutterSdkPlugin {
+    /// Subscribe to form lifecycle events from the iOS SDK
+    func subscribeToFormLifecycleEvents() {
+        KlaviyoSDK().registerFormLifecycleHandler { [weak self] event in
+            guard let self = self else { return }
+
+            var data: [String: Any] = [
+                "event": event.eventName,
+                "formId": event.formId as Any,
+                "formName": event.formName as Any
+            ]
+
+            if case let .formCtaClicked(_, _, buttonLabel, deepLinkUrl) = event {
+                data["buttonLabel"] = buttonLabel as Any
+                data["deepLinkUrl"] = deepLinkUrl?.absoluteString as Any
+            }
+
+            let eventPayload: [String: Any] = [
+                "type": "form_lifecycle_event",
+                "data": data
+            ]
+
+            self.eventSink?(eventPayload)
+        }
     }
 }

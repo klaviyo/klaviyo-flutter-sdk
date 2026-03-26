@@ -14,8 +14,11 @@ import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
+import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
+import com.klaviyo.forms.registerFormLifecycleCallback
+import com.klaviyo.forms.unregisterFormLifecycleCallback
 import com.klaviyo.forms.unregisterFromInAppForms
 import com.klaviyo.location.LocationManager
 import com.klaviyo.location.registerGeofencing
@@ -343,6 +346,38 @@ class KlaviyoFlutterSdkPlugin :
                         InAppFormsConfig(sessionTimeoutDuration = sessionTimeout),
                     )
 
+                    // Register form lifecycle callback
+                    Klaviyo.registerFormLifecycleCallback { event ->
+                        val data =
+                            mutableMapOf<String, Any?>(
+                                "formId" to event.formId,
+                                "formName" to event.formName,
+                            )
+
+                        when (event) {
+                            is FormLifecycleEvent.FormShown -> {
+                                data["event"] = "form_shown"
+                            }
+
+                            is FormLifecycleEvent.FormDismissed -> {
+                                data["event"] = "form_dismissed"
+                            }
+
+                            is FormLifecycleEvent.FormCtaClicked -> {
+                                data["event"] = "form_cta_clicked"
+                                data["buttonLabel"] = event.buttonLabel
+                                data["deepLinkUrl"] = event.deepLinkUrl
+                            }
+                        }
+
+                        eventSink?.success(
+                            mapOf(
+                                "type" to "form_lifecycle_event",
+                                "data" to data,
+                            ),
+                        )
+                    }
+
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
@@ -353,6 +388,7 @@ class KlaviyoFlutterSdkPlugin :
 
             "unregisterFromInAppForms" -> {
                 try {
+                    Klaviyo.unregisterFormLifecycleCallback()
                     Klaviyo.unregisterFromInAppForms()
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
