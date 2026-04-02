@@ -173,8 +173,15 @@ import klaviyo_flutter_sdk
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        // Forward silent push to Klaviyo plugin
-        KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo: userInfo)
+        // This method fires for both pure silent pushes (content-available: 1, no alert)
+        // and standard pushes that include content-available. Only forward pure silent
+        // pushes to the Klaviyo plugin — standard pushes are handled by willPresent/didReceive.
+        // Per the APNs spec, title/body are nested inside alert, so checking alert covers
+        // all visible-content cases.
+        let apsPayload = userInfo["aps"] as? [String: Any]
+        if apsPayload?["alert"] == nil {
+            KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo: userInfo)
+        }
 
         // ... Your custom logic (if any) ...
 
@@ -406,6 +413,31 @@ void handlePushPayload(Map<String, dynamic> payload) {
   }
 }
 ```
+
+### Silent Push
+
+Silent push notifications (`content-available: 1`) deliver data to your app in the background without showing a banner. They are commonly used to prefetch content, sync state, or trigger background tasks.
+
+> **iOS requirement**: Enable "Remote notifications" under **Background Modes** in Xcode (covered in [iOS Setup](#ios-setup)).
+
+#### iOS
+
+iOS delivers silent pushes via `didReceiveRemoteNotification:fetchCompletionHandler:` in your `AppDelegate.swift`. The setup in [iOS Setup](#ios-setup) already handles this — it differentiates pure silent pushes from standard pushes that carry `content-available` and forwards only the former to the Klaviyo plugin.
+
+#### Dart-Side Listener
+
+Subscribe to `onPushNotification` to react to silent push events in Flutter:
+
+```dart
+KlaviyoSDK().onPushNotification.listen((event) {
+  if (event['type'] == 'silent_push_received') {
+    final payload = Map<String, dynamic>.from(event['data'] as Map);
+    // Perform background work: refresh content, sync state, etc.
+  }
+});
+```
+
+> **Note**: This event fires only for pure silent pushes (no visible content). Standard notifications that include `content-available` are handled by `willPresent`/`didReceive` and will not trigger this event.
 
 ### Rich Push
 

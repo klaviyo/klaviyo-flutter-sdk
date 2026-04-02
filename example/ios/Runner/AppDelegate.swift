@@ -43,10 +43,9 @@ class AppDelegate: FlutterAppDelegate {
     ) {
         // Only forward to the Klaviyo plugin for pure silent pushes (no visible content).
         // Standard pushes that include content-available are handled by willPresent/didReceive.
+        // Per the APNs spec, title/body are nested inside alert, so this covers all visible-content cases.
         let apsPayload = userInfo["aps"] as? [String: Any]
         let hasVisibleContent = apsPayload?["alert"] != nil
-            || apsPayload?["title"] != nil
-            || apsPayload?["body"] != nil
 
         if !hasVisibleContent {
             KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo: userInfo)
