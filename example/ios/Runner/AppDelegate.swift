@@ -41,12 +41,17 @@ class AppDelegate: FlutterAppDelegate {
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        // 1. Forward silent push to Klaviyo plugin
-        KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo: userInfo)
+        // Only forward to the Klaviyo plugin for pure silent pushes (no visible content).
+        // Standard pushes that include content-available are handled by willPresent/didReceive.
+        let apsPayload = userInfo["aps"] as? [String: Any]
+        let hasVisibleContent = apsPayload?["alert"] != nil
+            || apsPayload?["title"] != nil
+            || apsPayload?["body"] != nil
 
-        // 2. You MUST call the completion handler within ~30 seconds.
-        //    Failing to do so will cause iOS to throttle or stop delivering
-        //    silent push notifications to your app.
+        if !hasVisibleContent {
+            KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo: userInfo)
+        }
+
         completionHandler(.newData)
     }
 }
