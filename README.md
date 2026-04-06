@@ -179,7 +179,8 @@ import klaviyo_flutter_sdk
         // Per the APNs spec, title/body are nested inside alert, so checking alert covers
         // all visible-content cases.
         let apsPayload = userInfo["aps"] as? [String: Any]
-        if apsPayload?["alert"] == nil {
+        let hasVisibleContent = apsPayload?["alert"] != nil
+        if !hasVisibleContent {
             KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo: userInfo)
         }
 
