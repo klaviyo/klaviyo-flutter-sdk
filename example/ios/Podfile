@@ -35,6 +35,12 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  # [KLAVIYO-SDK-OVERRIDE-START]
+  pod 'KlaviyoSwift', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => 'e90dbb943b053c9fa62f75732e8fc0c3025514f4'
+  pod 'KlaviyoCore', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => 'e90dbb943b053c9fa62f75732e8fc0c3025514f4'
+  pod 'KlaviyoForms', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => 'e90dbb943b053c9fa62f75732e8fc0c3025514f4'
+  pod 'KlaviyoLocation', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => 'e90dbb943b053c9fa62f75732e8fc0c3025514f4'
+  # [KLAVIYO-SDK-OVERRIDE-END]
   target 'RunnerTests' do
     inherit! :search_paths
   end
@@ -43,7 +49,7 @@ end
 # Notification Service Extension target for rich push and badge count support
 target 'NotificationServiceExtension' do
   use_frameworks!
-  pod 'KlaviyoSwiftExtension', '~> 5.2.2'
+  pod 'KlaviyoSwiftExtension', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => 'e90dbb943b053c9fa62f75732e8fc0c3025514f4'
 end
 
 post_install do |installer|
