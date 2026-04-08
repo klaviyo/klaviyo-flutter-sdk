@@ -35,11 +35,11 @@ sealed class FormLifecycleEvent {
   /// {
   ///   "type": "form_lifecycle_event",
   ///   "data": {
-  ///     "event": "form_shown" | "form_dismissed" | "form_cta_clicked",
+  ///     "event": "formShown" | "formDismissed" | "formCtaClicked",
   ///     "formId": "...",
   ///     "formName": "...",
-  ///     "buttonLabel": "...",   // only for form_cta_clicked
-  ///     "deepLinkUrl": "..."    // only for form_cta_clicked
+  ///     "buttonLabel": "...",   // only for formCtaClicked
+  ///     "deepLinkUrl": "..."    // only for formCtaClicked
   ///   }
   /// }
   /// ```
@@ -50,9 +50,9 @@ sealed class FormLifecycleEvent {
     final formName = data['formName'] as String? ?? '';
 
     return switch (eventString) {
-      'form_shown' => FormShown(formId: formId, formName: formName),
-      'form_dismissed' => FormDismissed(formId: formId, formName: formName),
-      'form_cta_clicked' => FormCtaClicked(
+      'formShown' => FormShown(formId: formId, formName: formName),
+      'formDismissed' => FormDismissed(formId: formId, formName: formName),
+      'formCtaClicked' => FormCtaClicked(
           formId: formId,
           formName: formName,
           buttonLabel: data['buttonLabel'] as String? ?? '',

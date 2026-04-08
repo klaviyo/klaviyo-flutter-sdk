@@ -7,7 +7,7 @@ void main() {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
-          'event': 'form_shown',
+          'event': 'formShown',
           'formId': 'abc123',
           'formName': 'Welcome Form',
         },
@@ -23,7 +23,7 @@ void main() {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
-          'event': 'form_dismissed',
+          'event': 'formDismissed',
           'formId': 'abc123',
           'formName': 'Welcome Form',
         },
@@ -39,7 +39,7 @@ void main() {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
-          'event': 'form_cta_clicked',
+          'event': 'formCtaClicked',
           'formId': 'abc123',
           'formName': 'Welcome Form',
           'buttonLabel': 'Shop Now',
@@ -60,7 +60,7 @@ void main() {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
-          'event': 'form_cta_clicked',
+          'event': 'formCtaClicked',
           'formId': null,
           'formName': null,
           'buttonLabel': null,
@@ -81,7 +81,7 @@ void main() {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
-          'event': 'form_cta_clicked',
+          'event': 'formCtaClicked',
           'formId': null,
           'formName': null,
           'buttonLabel': null,
@@ -101,7 +101,7 @@ void main() {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
-          'event': 'form_shown',
+          'event': 'formShown',
           'formId': null,
           'formName': null,
         },

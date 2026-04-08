@@ -356,15 +356,15 @@ class KlaviyoFlutterSdkPlugin :
 
                         when (event) {
                             is FormLifecycleEvent.FormShown -> {
-                                data["event"] = "form_shown"
+                                data["event"] = "formShown"
                             }
 
                             is FormLifecycleEvent.FormDismissed -> {
-                                data["event"] = "form_dismissed"
+                                data["event"] = "formDismissed"
                             }
 
                             is FormLifecycleEvent.FormCtaClicked -> {
-                                data["event"] = "form_cta_clicked"
+                                data["event"] = "formCtaClicked"
                                 data["buttonLabel"] = event.buttonLabel
                                 data["deepLinkUrl"] = event.deepLinkUrl.toString()
                             }
