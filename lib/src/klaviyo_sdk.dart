@@ -419,14 +419,14 @@ class KlaviyoSDK {
   Stream<FormLifecycleEvent> get onFormLifecycleEvent =>
       _nativeWrapper.onFormEvent
           .where((event) => event['type'] == 'form_lifecycle_event')
-          .map((event) {
+          .expand((event) {
         try {
-          return FormLifecycleEvent.fromMap(event);
+          return [FormLifecycleEvent.fromMap(event)];
         } catch (e) {
           _logger.warning('Dropping malformed form lifecycle event: $e');
-          return null;
+          return [];
         }
-      }).where((event) => event != null).cast<FormLifecycleEvent>();
+      });
 
   /// Private methods
   void _ensureInitialized() {

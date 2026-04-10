@@ -346,13 +346,13 @@ void main() {
     test('FormCtaClicked not equal with different buttonLabel', () {
       const a = FormCtaClicked(
         formId: 'x',
-        formName: '',
+        formName: 'y',
         buttonLabel: 'Go',
         deepLinkUrl: 'app://x',
       );
       const b = FormCtaClicked(
         formId: 'x',
-        formName: '',
+        formName: 'y',
         buttonLabel: 'Stop',
         deepLinkUrl: 'app://x',
       );
