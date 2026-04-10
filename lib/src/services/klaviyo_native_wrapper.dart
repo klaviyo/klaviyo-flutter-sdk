@@ -335,6 +335,7 @@ class KlaviyoNativeWrapper {
           _pushNotificationController.add(eventData);
           break;
         case 'form_event':
+        case 'form_lifecycle_event':
           _logger.info('Native form event: $eventData');
           _formEventController.add(eventData);
           break;
