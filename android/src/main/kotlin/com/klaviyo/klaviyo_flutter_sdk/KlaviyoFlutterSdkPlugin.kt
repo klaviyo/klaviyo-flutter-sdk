@@ -509,6 +509,15 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
+        eventSink = null
+
+        // Best-effort cleanup of form lifecycle handler when the Flutter engine detaches.
+        // The native SDK may already be torn down, so we swallow exceptions here.
+        try {
+            Klaviyo.unregisterFormLifecycleHandler()
+        } catch (_: Exception) {
+            // Ignored – plugin is being torn down
+        }
     }
 
     // ActivityAware implementation

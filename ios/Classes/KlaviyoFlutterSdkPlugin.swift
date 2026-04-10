@@ -397,6 +397,16 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
 
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
         eventSink = nil
+
+        // Clean up form lifecycle handler when the event stream is cancelled
+        // (e.g. Flutter engine detaches). Prevents the native SDK from
+        // dispatching events to a stale sink.
+        #if canImport(KlaviyoForms)
+        Task { @MainActor in
+            KlaviyoSDK().unregisterFormLifecycleHandler()
+        }
+        #endif
+
         return nil
     }
 }
