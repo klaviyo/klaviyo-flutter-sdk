@@ -57,7 +57,7 @@ Add `klaviyo_flutter_sdk` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  klaviyo_flutter_sdk: ^0.1.0
+  klaviyo_flutter_sdk: ^0.2.0
 ```
 
 A complete working example is available in the [`example/`](example/) directory.

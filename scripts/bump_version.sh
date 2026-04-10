@@ -42,14 +42,6 @@ echo -e "${YELLOW}Current version:${NC} $CURRENT_VERSION"
 echo -e "${YELLOW}New version:${NC}     $NEW_VERSION"
 echo ""
 
-# Confirm with user
-read -p "Continue with version bump? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${YELLOW}Version bump cancelled${NC}"
-    exit 0
-fi
-
 echo ""
 echo -e "${BLUE}Updating files...${NC}"
 

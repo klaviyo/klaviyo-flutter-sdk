@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0 - 2026-04-10
+
+### Changes
+- TODO: Add changelog entries
+
+
 ## 0.1.0-alpha.1
 
 Initial alpha release of the Klaviyo Flutter SDK.
