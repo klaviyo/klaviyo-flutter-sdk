@@ -526,6 +526,29 @@ class KlaviyoSDK {
         }
       });
 
+  /// Get form will display events stream for form gating.
+  ///
+  /// Subscribe to this stream to receive [FormWillDisplay] events before
+  /// a form is shown. Call [FormWillDisplay.accept] to allow the form,
+  /// or [FormWillDisplay.reject] to block it. Only the first call takes
+  /// effect; subsequent calls are ignored.
+  ///
+  /// If neither is called, the native SDK's timeout will fail-open and
+  /// allow the form to display.
+  ///
+  /// Example:
+  /// ```dart
+  /// klaviyo.onFormWillDisplay.listen((event) {
+  ///   if (shouldBlockForm(event.formId)) {
+  ///     event.reject();
+  ///   } else {
+  ///     event.accept();
+  ///   }
+  /// });
+  /// ```
+  Stream<FormWillDisplay> get onFormWillDisplay =>
+      _nativeWrapper.onFormWillDisplay;
+
   /// Private methods
   void _ensureInitialized() {
     if (!_isInitialized) {

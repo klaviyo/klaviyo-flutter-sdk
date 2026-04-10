@@ -29,6 +29,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     public static let shared = KlaviyoFlutterSdkPlugin()
 
     private var eventSink: FlutterEventSink?
+    private var methodChannel: FlutterMethodChannel?
 
     // Cache values to handle the race condition where the value arrives
     // before Flutter has finished initializing the EventChannel.
@@ -46,6 +47,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
         // 1. Setup Method Channel (For Commands: initialize, setProfile, etc.)
         let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: registrar.messenger())
+        instance.methodChannel = channel
         registrar.addMethodCallDelegate(instance, channel: channel)
 
         // 2. Setup Event Channel (For Data Streams: tokens, opened notifications)
@@ -774,17 +776,31 @@ extension KlaviyoFlutterSdkPlugin {
         KlaviyoSDK().registerFormLifecycleHandler { [weak self] event in
             guard let self = self else { return }
 
-            // Explicitly map each native enum case to its bridge string. This decouples
-            // the wrapper's serialization contract from the native SDK's `eventName`
-            // property and mirrors the explicit mapping used on the Android side, so
-            // adding a new event type natively becomes a compile error here rather than
-            // a silent runtime drop on the Dart `fromMap` parser.
             var data: [String: Any] = [
                 "formId": event.formId,
                 "formName": event.formName
             ]
 
             switch event {
+            case let .formWillDisplay(formId, formName, formType, continuation):
+                DispatchQueue.main.async {
+                    guard let channel = self.methodChannel else {
+                        continuation.accept()
+                        return
+                    }
+                    channel.invokeMethod("formWillDisplay", arguments: [
+                        "formId": formId,
+                        "formName": formName,
+                        "formType": formType
+                    ]) { result in
+                        if let allowed = result as? Bool, !allowed {
+                            continuation.reject()
+                        } else {
+                            continuation.accept()
+                        }
+                    }
+                }
+                return
             case .formShown:
                 data["event"] = "formShown"
             case .formDismissed:

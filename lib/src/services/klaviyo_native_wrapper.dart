@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
 import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
+import '../models/form_lifecycle_event.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
 import 'package:logging/logging.dart';
@@ -17,7 +19,9 @@ class KlaviyoNativeWrapper {
 
   factory KlaviyoNativeWrapper() => _instance;
 
-  KlaviyoNativeWrapper._internal();
+  KlaviyoNativeWrapper._internal() {
+    _channel.setMethodCallHandler(_handleMethodCall);
+  }
 
   final Logger _logger = Logger('KlaviyoSDK');
   bool _isInitialized = false;
@@ -370,6 +374,54 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Handle reverse method calls from native (native → Dart).
+  /// Used for form gating where native needs a synchronous response.
+  Future<dynamic> _handleMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'formWillDisplay':
+        return _handleFormWillDisplay(call.arguments as Map);
+      default:
+        throw MissingPluginException(
+          'No handler for method ${call.method}',
+        );
+    }
+  }
+
+  /// Handle the formWillDisplay reverse method call from native.
+  /// Returns true (allow) or false (reject) back to the native caller.
+  Future<bool> _handleFormWillDisplay(Map arguments) async {
+    final formId = arguments['formId'] as String? ?? '';
+    final formName = arguments['formName'] as String? ?? '';
+    final formType = arguments['formType'] as String? ?? '';
+
+    final completer = Completer<bool>();
+    final event = FormWillDisplay(
+      formId: formId,
+      formName: formName,
+      formType: formType,
+      completer: completer,
+    );
+
+    _formWillDisplayController.add(event);
+
+    try {
+      return await completer.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => true, // fail-open on Dart-side timeout
+      );
+    } catch (_) {
+      return true; // fail-open on error
+    }
+  }
+
+  /// Stream of [FormWillDisplay] events for form gating.
+  /// Subscribe to this to receive gating events and call accept()/reject().
+  final _formWillDisplayController =
+      BufferedBroadcastStreamController<FormWillDisplay>();
+
+  Stream<FormWillDisplay> get onFormWillDisplay =>
+      _formWillDisplayController.stream;
+
   /// Handle native events from platform channels
   void _handleNativeEvent(dynamic event) {
     try {
@@ -449,5 +501,6 @@ class KlaviyoNativeWrapper {
     _pushNotificationController.close();
     _formEventController.close();
     _pushActionController.close();
+    _formWillDisplayController.close();
   }
 }
