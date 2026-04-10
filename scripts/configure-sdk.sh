@@ -336,8 +336,10 @@ configure_android_branch() {
     validate_remote_branch "$ANDROID_REPO" "$branch"
     info "Configuring Android SDK: branch ${BOLD}$branch${NC}"
     remove_android_override
-    update_android_version "${branch}-SNAPSHOT"
-    success "Android SDK → branch '$branch' (via JitPack: ${branch}-SNAPSHOT)"
+    local tilde='~'
+    local jitpack_version="${branch//\//$tilde}-SNAPSHOT"
+    update_android_version "$jitpack_version"
+    success "Android SDK → branch '$branch' (via JitPack: ${jitpack_version})"
 }
 
 configure_android_commit() {
