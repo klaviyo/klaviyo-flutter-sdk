@@ -3,7 +3,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
 void main() {
   group('FormLifecycleEvent.fromMap', () {
-    test('parses form_shown event', () {
+    test('parses formShown event', () {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
@@ -19,7 +19,7 @@ void main() {
       expect(event.eventName, 'formShown');
     });
 
-    test('parses form_dismissed event', () {
+    test('parses formDismissed event', () {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
@@ -35,7 +35,7 @@ void main() {
       expect(event.eventName, 'formDismissed');
     });
 
-    test('parses form_cta_clicked event with all fields', () {
+    test('parses formCtaClicked event with all fields', () {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
@@ -56,67 +56,244 @@ void main() {
       expect(cta.eventName, 'formCtaClicked');
     });
 
-    test('parses form_cta_clicked with null optional fields falls back', () {
+    test('parses formCtaClicked with null deepLinkUrl', () {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
           'event': 'formCtaClicked',
-          'formId': null,
-          'formName': null,
-          'buttonLabel': null,
-          'deepLinkUrl': 'myapp://fallback',
-        },
-      });
-
-      expect(event, isA<FormCtaClicked>());
-      final cta = event as FormCtaClicked;
-      expect(cta.formId, '');
-      expect(cta.formName, '');
-      expect(cta.buttonLabel, '');
-      expect(cta.deepLinkUrl, 'myapp://fallback');
-    });
-
-    test('parses form_cta_clicked with all null fields falls back to empty',
-        () {
-      final event = FormLifecycleEvent.fromMap({
-        'type': 'form_lifecycle_event',
-        'data': {
-          'event': 'formCtaClicked',
-          'formId': null,
-          'formName': null,
-          'buttonLabel': null,
+          'formId': 'abc123',
+          'formName': 'Welcome Form',
+          'buttonLabel': 'Shop Now',
           'deepLinkUrl': null,
         },
       });
 
       expect(event, isA<FormCtaClicked>());
       final cta = event as FormCtaClicked;
-      expect(cta.formId, '');
-      expect(cta.formName, '');
-      expect(cta.buttonLabel, '');
-      expect(cta.deepLinkUrl, '');
+      expect(cta.deepLinkUrl, isNull);
     });
 
-    test('parses event with null formId and formName falls back to empty', () {
+    test('parses formCtaClicked with missing deepLinkUrl', () {
       final event = FormLifecycleEvent.fromMap({
         'type': 'form_lifecycle_event',
         'data': {
-          'event': 'formShown',
-          'formId': null,
-          'formName': null,
+          'event': 'formCtaClicked',
+          'formId': 'abc123',
+          'formName': 'Welcome Form',
+          'buttonLabel': 'Shop Now',
         },
       });
 
-      expect(event, isA<FormShown>());
-      expect(event.formId, '');
-      expect(event.formName, '');
+      expect(event, isA<FormCtaClicked>());
+      final cta = event as FormCtaClicked;
+      expect(cta.deepLinkUrl, isNull);
     });
 
-    test('parses event with missing data key defaults to empty map', () {
-      // data key missing entirely — should throw because 'event' is absent
+    group('throws on missing required fields', () {
+      test('throws on null formId', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'event': 'formShown',
+              'formId': null,
+              'formName': 'Welcome Form',
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('formId'),
+            ),
+          ),
+        );
+      });
+
+      test('throws on empty formId', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'event': 'formShown',
+              'formId': '',
+              'formName': 'Welcome Form',
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('formId'),
+            ),
+          ),
+        );
+      });
+
+      test('throws on missing formId key', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'event': 'formShown',
+              'formName': 'Welcome Form',
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('formId'),
+            ),
+          ),
+        );
+      });
+
+      test('throws on null formName', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'event': 'formShown',
+              'formId': 'abc123',
+              'formName': null,
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('formName'),
+            ),
+          ),
+        );
+      });
+
+      test('throws on empty formName', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'event': 'formShown',
+              'formId': 'abc123',
+              'formName': '',
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('formName'),
+            ),
+          ),
+        );
+      });
+
+      test('throws on null buttonLabel in formCtaClicked', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'event': 'formCtaClicked',
+              'formId': 'abc123',
+              'formName': 'Welcome Form',
+              'buttonLabel': null,
+              'deepLinkUrl': 'myapp://products',
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('buttonLabel'),
+            ),
+          ),
+        );
+      });
+
+      test('throws on empty buttonLabel in formCtaClicked', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'event': 'formCtaClicked',
+              'formId': 'abc123',
+              'formName': 'Welcome Form',
+              'buttonLabel': '',
+              'deepLinkUrl': 'myapp://products',
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('buttonLabel'),
+            ),
+          ),
+        );
+      });
+
+      test('throws on null event type', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'event': null,
+              'formId': 'abc123',
+              'formName': 'Welcome Form',
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('event'),
+            ),
+          ),
+        );
+      });
+
+      test('throws on missing event type', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'formId': 'abc123',
+              'formName': 'Welcome Form',
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('event'),
+            ),
+          ),
+        );
+      });
+    });
+
+    test('throws on empty map', () {
+      expect(
+        () => FormLifecycleEvent.fromMap({}),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('throws on map with no data key', () {
       expect(
         () => FormLifecycleEvent.fromMap({'type': 'form_lifecycle_event'}),
-        throwsA(isA<TypeError>()),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('throws on empty data map', () {
+      expect(
+        () => FormLifecycleEvent.fromMap({
+          'type': 'form_lifecycle_event',
+          'data': <String, dynamic>{},
+        }),
+        throwsA(isA<ArgumentError>()),
       );
     });
 
@@ -124,7 +301,11 @@ void main() {
       expect(
         () => FormLifecycleEvent.fromMap({
           'type': 'form_lifecycle_event',
-          'data': {'event': 'form_exploded'},
+          'data': {
+            'event': 'form_exploded',
+            'formId': 'abc123',
+            'formName': 'Welcome Form',
+          },
         }),
         throwsA(isA<ArgumentError>()),
       );
@@ -177,6 +358,36 @@ void main() {
       );
       expect(a, isNot(equals(b)));
     });
+
+    test('FormCtaClicked with null deepLinkUrl equals another with null', () {
+      const a = FormCtaClicked(
+        formId: 'x',
+        formName: 'y',
+        buttonLabel: 'Go',
+      );
+      const b = FormCtaClicked(
+        formId: 'x',
+        formName: 'y',
+        buttonLabel: 'Go',
+      );
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('FormCtaClicked with null deepLinkUrl not equal to one with url', () {
+      const a = FormCtaClicked(
+        formId: 'x',
+        formName: 'y',
+        buttonLabel: 'Go',
+      );
+      const b = FormCtaClicked(
+        formId: 'x',
+        formName: 'y',
+        buttonLabel: 'Go',
+        deepLinkUrl: 'app://go',
+      );
+      expect(a, isNot(equals(b)));
+    });
   });
 
   group('FormLifecycleEvent toString', () {
@@ -201,6 +412,19 @@ void main() {
         event.toString(),
         'FormCtaClicked(formId: abc, formName: Test, '
         'buttonLabel: Click, deepLinkUrl: app://x)',
+      );
+    });
+
+    test('FormCtaClicked toString with null deepLinkUrl', () {
+      const event = FormCtaClicked(
+        formId: 'abc',
+        formName: 'Test',
+        buttonLabel: 'Click',
+      );
+      expect(
+        event.toString(),
+        'FormCtaClicked(formId: abc, formName: Test, '
+        'buttonLabel: Click, deepLinkUrl: null)',
       );
     });
   });

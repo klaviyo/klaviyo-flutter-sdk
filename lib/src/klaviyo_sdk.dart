@@ -411,12 +411,22 @@ class KlaviyoSDK {
   /// Get form events stream
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
 
-  /// Get typed form lifecycle events stream
-  /// This is a convenience method that filters and maps lifecycle events
+  /// Get typed form lifecycle events stream.
+  ///
+  /// Filters for `form_lifecycle_event` type and parses the native map into a
+  /// [FormLifecycleEvent]. Malformed events are logged and dropped rather than
+  /// crashing the stream.
   Stream<FormLifecycleEvent> get onFormLifecycleEvent =>
       _nativeWrapper.onFormEvent
           .where((event) => event['type'] == 'form_lifecycle_event')
-          .map((event) => FormLifecycleEvent.fromMap(event));
+          .map((event) {
+        try {
+          return FormLifecycleEvent.fromMap(event);
+        } catch (e) {
+          _logger.warning('Dropping malformed form lifecycle event: $e');
+          return null;
+        }
+      }).where((event) => event != null).cast<FormLifecycleEvent>();
 
   /// Private methods
   void _ensureInitialized() {
