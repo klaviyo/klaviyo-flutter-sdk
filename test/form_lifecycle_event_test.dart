@@ -56,37 +56,69 @@ void main() {
       expect(cta.eventName, 'formCtaClicked');
     });
 
-    test('parses formCtaClicked with null deepLinkUrl', () {
-      final event = FormLifecycleEvent.fromMap({
-        'type': 'form_lifecycle_event',
-        'data': {
-          'event': 'formCtaClicked',
-          'formId': 'abc123',
-          'formName': 'Welcome Form',
-          'buttonLabel': 'Shop Now',
-          'deepLinkUrl': null,
-        },
-      });
-
-      expect(event, isA<FormCtaClicked>());
-      final cta = event as FormCtaClicked;
-      expect(cta.deepLinkUrl, isNull);
+    test('throws on null deepLinkUrl in formCtaClicked', () {
+      expect(
+        () => FormLifecycleEvent.fromMap({
+          'type': 'form_lifecycle_event',
+          'data': {
+            'event': 'formCtaClicked',
+            'formId': 'abc123',
+            'formName': 'Welcome Form',
+            'buttonLabel': 'Shop Now',
+            'deepLinkUrl': null,
+          },
+        }),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('deepLinkUrl'),
+          ),
+        ),
+      );
     });
 
-    test('parses formCtaClicked with missing deepLinkUrl', () {
-      final event = FormLifecycleEvent.fromMap({
-        'type': 'form_lifecycle_event',
-        'data': {
-          'event': 'formCtaClicked',
-          'formId': 'abc123',
-          'formName': 'Welcome Form',
-          'buttonLabel': 'Shop Now',
-        },
-      });
+    test('throws on missing deepLinkUrl in formCtaClicked', () {
+      expect(
+        () => FormLifecycleEvent.fromMap({
+          'type': 'form_lifecycle_event',
+          'data': {
+            'event': 'formCtaClicked',
+            'formId': 'abc123',
+            'formName': 'Welcome Form',
+            'buttonLabel': 'Shop Now',
+          },
+        }),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('deepLinkUrl'),
+          ),
+        ),
+      );
+    });
 
-      expect(event, isA<FormCtaClicked>());
-      final cta = event as FormCtaClicked;
-      expect(cta.deepLinkUrl, isNull);
+    test('throws on empty deepLinkUrl in formCtaClicked', () {
+      expect(
+        () => FormLifecycleEvent.fromMap({
+          'type': 'form_lifecycle_event',
+          'data': {
+            'event': 'formCtaClicked',
+            'formId': 'abc123',
+            'formName': 'Welcome Form',
+            'buttonLabel': 'Shop Now',
+            'deepLinkUrl': '',
+          },
+        }),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('deepLinkUrl'),
+          ),
+        ),
+      );
     });
 
     group('throws on missing required fields', () {
@@ -359,32 +391,18 @@ void main() {
       expect(a, isNot(equals(b)));
     });
 
-    test('FormCtaClicked with null deepLinkUrl equals another with null', () {
+    test('FormCtaClicked not equal with different deepLinkUrl', () {
       const a = FormCtaClicked(
         formId: 'x',
         formName: 'y',
         buttonLabel: 'Go',
+        deepLinkUrl: 'app://a',
       );
       const b = FormCtaClicked(
         formId: 'x',
         formName: 'y',
         buttonLabel: 'Go',
-      );
-      expect(a, equals(b));
-      expect(a.hashCode, equals(b.hashCode));
-    });
-
-    test('FormCtaClicked with null deepLinkUrl not equal to one with url', () {
-      const a = FormCtaClicked(
-        formId: 'x',
-        formName: 'y',
-        buttonLabel: 'Go',
-      );
-      const b = FormCtaClicked(
-        formId: 'x',
-        formName: 'y',
-        buttonLabel: 'Go',
-        deepLinkUrl: 'app://go',
+        deepLinkUrl: 'app://b',
       );
       expect(a, isNot(equals(b)));
     });
@@ -415,16 +433,17 @@ void main() {
       );
     });
 
-    test('FormCtaClicked toString with null deepLinkUrl', () {
+    test('FormCtaClicked toString with deepLinkUrl', () {
       const event = FormCtaClicked(
         formId: 'abc',
         formName: 'Test',
         buttonLabel: 'Click',
+        deepLinkUrl: 'app://home',
       );
       expect(
         event.toString(),
         'FormCtaClicked(formId: abc, formName: Test, '
-        'buttonLabel: Click, deepLinkUrl: null)',
+        'buttonLabel: Click, deepLinkUrl: app://home)',
       );
     });
   });

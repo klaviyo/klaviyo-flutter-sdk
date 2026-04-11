@@ -78,11 +78,17 @@ sealed class FormLifecycleEvent {
               "Missing required field 'buttonLabel' in formCtaClicked event",
             );
           }
+          final deepLinkUrl = data['deepLinkUrl'] as String?;
+          if (deepLinkUrl == null || deepLinkUrl.isEmpty) {
+            throw ArgumentError(
+              "Missing required field 'deepLinkUrl' in formCtaClicked event",
+            );
+          }
           return FormCtaClicked(
             formId: formId,
             formName: formName,
             buttonLabel: buttonLabel,
-            deepLinkUrl: data['deepLinkUrl'] as String?,
+            deepLinkUrl: deepLinkUrl,
           );
         }(),
       _ => throw ArgumentError('Unknown event type: $eventString'),
@@ -140,14 +146,17 @@ class FormCtaClicked extends FormLifecycleEvent {
   /// The text label of the CTA button.
   final String buttonLabel;
 
-  /// The deep link URL configured for the CTA, if any.
-  final String? deepLinkUrl;
+  /// The deep link URL configured for the CTA.
+  ///
+  /// Always present because native SDKs only dispatch [FormCtaClicked]
+  /// when a deep link URL exists.
+  final String deepLinkUrl;
 
   const FormCtaClicked({
     required super.formId,
     required super.formName,
     required this.buttonLabel,
-    this.deepLinkUrl,
+    required this.deepLinkUrl,
   });
 
   @override
