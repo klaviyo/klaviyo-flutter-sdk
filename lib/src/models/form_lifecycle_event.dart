@@ -100,6 +100,8 @@ sealed class FormLifecycleEvent {
 }
 
 /// Triggered when a form is shown to the user.
+///
+/// Fired after the SDK has initiated form presentation.
 class FormShown extends FormLifecycleEvent {
   const FormShown({required super.formId, required super.formName});
 
@@ -120,7 +122,12 @@ class FormShown extends FormLifecycleEvent {
   int get hashCode => Object.hash(runtimeType, formId, formName);
 }
 
-/// Triggered when a form is dismissed (closed) by the user.
+/// Triggered when a form is dismissed by the user.
+///
+/// Fired after the SDK has initiated form dismissal. Fires for
+/// user-initiated dismissals (e.g. tapping outside, close button).
+/// Does not fire when the SDK tears down the form internally
+/// (session timeouts, aborts).
 class FormDismissed extends FormLifecycleEvent {
   const FormDismissed({required super.formId, required super.formName});
 
@@ -141,15 +148,19 @@ class FormDismissed extends FormLifecycleEvent {
   int get hashCode => Object.hash(runtimeType, formId, formName);
 }
 
-/// Triggered when a user taps a call-to-action (CTA) button in the form.
+/// Triggered when a user taps a call-to-action (CTA) button in a form
+/// that has a deep link URL configured.
+///
+/// Fired after the SDK has initiated deep link navigation. Not emitted
+/// if no deep link URL is configured for the CTA.
 class FormCtaClicked extends FormLifecycleEvent {
   /// The text label of the CTA button.
   final String buttonLabel;
 
   /// The deep link URL configured for the CTA.
   ///
-  /// Always present because native SDKs only dispatch [FormCtaClicked]
-  /// when a deep link URL exists.
+  /// Always present because [FormCtaClicked] is only emitted
+  /// when a deep link URL is configured.
   final String deepLinkUrl;
 
   const FormCtaClicked({
