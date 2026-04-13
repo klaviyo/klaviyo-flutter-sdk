@@ -243,26 +243,22 @@ void main() {
         );
       });
 
-      test('throws on empty buttonLabel in formCtaClicked', () {
-        expect(
-          () => FormLifecycleEvent.fromMap({
-            'type': 'form_lifecycle_event',
-            'data': {
-              'event': 'formCtaClicked',
-              'formId': 'abc123',
-              'formName': 'Welcome Form',
-              'buttonLabel': '',
-              'deepLinkUrl': 'myapp://products',
-            },
-          }),
-          throwsA(
-            isA<ArgumentError>().having(
-              (e) => e.message,
-              'message',
-              contains('buttonLabel'),
-            ),
-          ),
-        );
+      test('parses empty buttonLabel in formCtaClicked', () {
+        final event = FormLifecycleEvent.fromMap({
+          'type': 'form_lifecycle_event',
+          'data': {
+            'event': 'formCtaClicked',
+            'formId': 'abc123',
+            'formName': 'Welcome Form',
+            'buttonLabel': '',
+            'deepLinkUrl': 'myapp://products',
+          },
+        });
+
+        expect(event, isA<FormCtaClicked>());
+        final cta = event as FormCtaClicked;
+        expect(cta.buttonLabel, '');
+        expect(cta.deepLinkUrl, 'myapp://products');
       });
 
       test('throws on null event type', () {

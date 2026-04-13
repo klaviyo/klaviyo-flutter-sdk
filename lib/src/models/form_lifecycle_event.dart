@@ -73,7 +73,7 @@ sealed class FormLifecycleEvent {
       'formDismissed' => FormDismissed(formId: formId, formName: formName),
       'formCtaClicked' => () {
           final buttonLabel = data['buttonLabel'] as String?;
-          if (buttonLabel == null || buttonLabel.isEmpty) {
+          if (buttonLabel == null) {
             throw ArgumentError(
               "Missing required field 'buttonLabel' in formCtaClicked event",
             );
