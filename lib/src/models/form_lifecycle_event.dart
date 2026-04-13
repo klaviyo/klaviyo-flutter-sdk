@@ -72,12 +72,6 @@ sealed class FormLifecycleEvent {
       'formShown' => FormShown(formId: formId, formName: formName),
       'formDismissed' => FormDismissed(formId: formId, formName: formName),
       'formCtaClicked' => () {
-          final buttonLabel = data['buttonLabel'] as String?;
-          if (buttonLabel == null) {
-            throw ArgumentError(
-              "Missing required field 'buttonLabel' in formCtaClicked event",
-            );
-          }
           final deepLinkUrl = data['deepLinkUrl'] as String?;
           if (deepLinkUrl == null || deepLinkUrl.isEmpty) {
             throw ArgumentError(
@@ -87,7 +81,7 @@ sealed class FormLifecycleEvent {
           return FormCtaClicked(
             formId: formId,
             formName: formName,
-            buttonLabel: buttonLabel,
+            buttonLabel: (data['buttonLabel'] as String?) ?? '',
             deepLinkUrl: deepLinkUrl,
           );
         }(),
