@@ -44,21 +44,48 @@ sealed class FormLifecycleEvent {
   /// }
   /// ```
   factory FormLifecycleEvent.fromMap(Map<String, dynamic> map) {
-    final data = map['data'] as Map<String, dynamic>? ?? {};
-    final eventString = data['event'] as String;
-    final formId = data['formId'] as String? ?? '';
-    final formName = data['formName'] as String? ?? '';
+    final data = map['data'] as Map<String, dynamic>?;
+    if (data == null) {
+      throw ArgumentError("Missing 'data' field in lifecycle event map");
+    }
+
+    final eventString = data['event'] as String?;
+    if (eventString == null || eventString.isEmpty) {
+      throw ArgumentError("Missing required field 'event' in lifecycle event");
+    }
+
+    final formId = data['formId'] as String?;
+    if (formId == null || formId.isEmpty) {
+      throw ArgumentError(
+        "Missing required field 'formId' in lifecycle event",
+      );
+    }
+
+    final formName = data['formName'] as String?;
+    if (formName == null || formName.isEmpty) {
+      throw ArgumentError(
+        "Missing required field 'formName' in lifecycle event",
+      );
+    }
 
     return switch (eventString) {
       'formShown' => FormShown(formId: formId, formName: formName),
       'formDismissed' => FormDismissed(formId: formId, formName: formName),
-      'formCtaClicked' => FormCtaClicked(
-          formId: formId,
-          formName: formName,
-          buttonLabel: data['buttonLabel'] as String? ?? '',
-          deepLinkUrl: data['deepLinkUrl'] as String? ?? '',
-        ),
-      _ => throw ArgumentError('Invalid event type: $eventString'),
+      'formCtaClicked' => () {
+          final deepLinkUrl = data['deepLinkUrl'] as String?;
+          if (deepLinkUrl == null || deepLinkUrl.isEmpty) {
+            throw ArgumentError(
+              "Missing required field 'deepLinkUrl' in formCtaClicked event",
+            );
+          }
+          return FormCtaClicked(
+            formId: formId,
+            formName: formName,
+            buttonLabel: (data['buttonLabel'] as String?) ?? '',
+            deepLinkUrl: deepLinkUrl,
+          );
+        }(),
+      _ => throw ArgumentError('Unknown event type: $eventString'),
     };
   }
 
@@ -67,6 +94,8 @@ sealed class FormLifecycleEvent {
 }
 
 /// Triggered when a form is shown to the user.
+///
+/// Fired after the SDK has initiated form presentation.
 class FormShown extends FormLifecycleEvent {
   const FormShown({required super.formId, required super.formName});
 
@@ -87,7 +116,12 @@ class FormShown extends FormLifecycleEvent {
   int get hashCode => Object.hash(runtimeType, formId, formName);
 }
 
-/// Triggered when a form is dismissed (closed) by the user.
+/// Triggered when a form is dismissed by the user.
+///
+/// Fired after the SDK has initiated form dismissal. Fires for
+/// user-initiated dismissals (e.g. tapping outside, close button).
+/// Does not fire when the SDK tears down the form internally
+/// (session timeouts, aborts).
 class FormDismissed extends FormLifecycleEvent {
   const FormDismissed({required super.formId, required super.formName});
 
@@ -108,12 +142,19 @@ class FormDismissed extends FormLifecycleEvent {
   int get hashCode => Object.hash(runtimeType, formId, formName);
 }
 
-/// Triggered when a user taps a call-to-action (CTA) button in the form.
+/// Triggered when a user taps a call-to-action (CTA) button in a form
+/// that has a deep link URL configured.
+///
+/// Fired after the SDK has initiated deep link navigation. Not emitted
+/// if no deep link URL is configured for the CTA.
 class FormCtaClicked extends FormLifecycleEvent {
   /// The text label of the CTA button.
   final String buttonLabel;
 
   /// The deep link URL configured for the CTA.
+  ///
+  /// Always present because [FormCtaClicked] is only emitted
+  /// when a deep link URL is configured.
   final String deepLinkUrl;
 
   const FormCtaClicked({
