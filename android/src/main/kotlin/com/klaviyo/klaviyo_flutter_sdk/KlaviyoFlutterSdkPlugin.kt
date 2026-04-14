@@ -509,6 +509,7 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
+        eventSink = null
     }
 
     // ActivityAware implementation
