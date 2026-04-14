@@ -3,6 +3,8 @@ package com.klaviyo.klaviyo_flutter_sdk
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.NonNull
 import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.Klaviyo
@@ -370,12 +372,14 @@ class KlaviyoFlutterSdkPlugin :
                             }
                         }
 
-                        eventSink?.success(
-                            mapOf(
-                                "type" to "form_lifecycle_event",
-                                "data" to data,
-                            ),
-                        )
+                        Handler(Looper.getMainLooper()).post {
+                            eventSink?.success(
+                                mapOf(
+                                    "type" to "form_lifecycle_event",
+                                    "data" to data,
+                                ),
+                            )
+                        }
                     }
 
                     result.success(null)
@@ -510,6 +514,7 @@ class KlaviyoFlutterSdkPlugin :
     ) {
         channel.setMethodCallHandler(null)
         eventSink = null
+        Klaviyo.unregisterFormLifecycleHandler()
     }
 
     // ActivityAware implementation
