@@ -564,7 +564,9 @@ extension KlaviyoFlutterSdkPlugin {
                 "data": data
             ]
 
-            self.eventSink?(eventPayload)
+            DispatchQueue.main.async {
+                self.eventSink?(eventPayload)
+            }
         }
     }
 }
