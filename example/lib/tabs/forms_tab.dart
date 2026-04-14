@@ -41,7 +41,9 @@ class _FormsTabState extends State<FormsTab> {
       _status = 'In-app forms are registered';
     }
 
-    // Listen to form lifecycle events
+    // Listen to form lifecycle events — only if SDK is initialized to avoid
+    // LateInitializationError when navigating here before the Profile tab initializes
+    if (!_klaviyo.isInitialized) return;
     _lifecycleSubscription = _klaviyo.onFormLifecycleEvent.listen((event) {
       setState(() {
         final timestamp = DateTime.now().toIso8601String().substring(11, 19);
