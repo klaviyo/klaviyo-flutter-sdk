@@ -39,15 +39,15 @@ class KlaviyoNativeWrapper {
   Future<void> initialize({
     required String apiKey,
   }) async {
-    if (_isInitialized) return;
-
     try {
       _apiKey = apiKey;
 
-      // Set up event listeners
-      _eventChannel.receiveBroadcastStream().listen(_handleNativeEvent);
+      // Set up event listener only once — re-subscribing would cause duplicate events
+      if (!_isInitialized) {
+        _eventChannel.receiveBroadcastStream().listen(_handleNativeEvent);
+      }
 
-      // Initialize native SDK
+      // Always forward to native — allows re-initialization with a new API key
       await _channel.invokeMethod('initialize', {
         'apiKey': apiKey,
       });

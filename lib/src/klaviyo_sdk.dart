@@ -44,11 +44,6 @@ class KlaviyoSDK {
   Future<KlaviyoSDK> initialize({
     required String apiKey,
   }) async {
-    if (_isInitialized) {
-      _logger.warning('SDK already initialized');
-      return this;
-    }
-
     try {
       _apiKey = apiKey;
 
