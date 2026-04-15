@@ -74,8 +74,8 @@ void main() {
         return null;
       });
 
-      expect(
-        () => sdk.initialize(apiKey: 'KEY_BAD'),
+      await expectLater(
+        sdk.initialize(apiKey: 'KEY_BAD'),
         throwsA(isA<KlaviyoException>()),
       );
       expect(sdk.apiKey, 'KEY_1');
