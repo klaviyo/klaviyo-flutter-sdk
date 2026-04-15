@@ -55,8 +55,7 @@ void main() {
       await sdk.initialize(apiKey: 'KEY_1');
       await sdk.initialize(apiKey: 'KEY_2');
 
-      final initCalls =
-          log.where((c) => c.method == 'initialize').toList();
+      final initCalls = log.where((c) => c.method == 'initialize').toList();
       expect(initCalls.length, 2);
       expect(initCalls[0].arguments['apiKey'], 'KEY_1');
       expect(initCalls[1].arguments['apiKey'], 'KEY_2');
