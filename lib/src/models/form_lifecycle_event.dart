@@ -44,6 +44,13 @@ sealed class FormLifecycleEvent {
   /// }
   /// ```
   factory FormLifecycleEvent.fromMap(Map<String, dynamic> map) {
+    final type = map['type'];
+    if (type != 'form_lifecycle_event') {
+      throw ArgumentError(
+        "Expected 'type' to be 'form_lifecycle_event', got '$type'",
+      );
+    }
+
     final data = map['data'] as Map<String, dynamic>?;
     if (data == null) {
       throw ArgumentError("Missing 'data' field in lifecycle event map");
@@ -62,7 +69,7 @@ sealed class FormLifecycleEvent {
     }
 
     final formName = data['formName'] as String?;
-    if (formName == null || formName.isEmpty) {
+    if (formName == null) {
       throw ArgumentError(
         "Missing required field 'formName' in lifecycle event",
       );
@@ -149,12 +156,15 @@ class FormDismissed extends FormLifecycleEvent {
 /// if no deep link URL is configured for the CTA.
 class FormCtaClicked extends FormLifecycleEvent {
   /// The text label of the CTA button.
+  ///
+  /// Defaults to an empty string if absent from the native event (e.g. the
+  /// CTA has no user-visible label configured).
   final String buttonLabel;
 
   /// The deep link URL configured for the CTA.
   ///
-  /// Always present because [FormCtaClicked] is only emitted
-  /// when a deep link URL is configured.
+  /// Always present because [FormCtaClicked] is only dispatched by the native
+  /// SDK when a deep link URL is configured for the CTA button.
   final String deepLinkUrl;
 
   const FormCtaClicked({

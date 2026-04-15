@@ -348,6 +348,13 @@ class KlaviyoFlutterSdkPlugin :
                         InAppFormsConfig(sessionTimeoutDuration = sessionTimeout),
                     )
 
+                    // Unregister any existing handler to prevent duplicates
+                    try {
+                        Klaviyo.unregisterFormLifecycleHandler()
+                    } catch (_: MissingKlaviyoModule) {
+                        // Forms module may not be available
+                    }
+
                     // Register form lifecycle handler
                     Klaviyo.registerFormLifecycleHandler { event ->
                         val data =
@@ -516,8 +523,10 @@ class KlaviyoFlutterSdkPlugin :
         eventSink = null
         try {
             Klaviyo.unregisterFormLifecycleHandler()
-        } catch (_: Exception) {
-            // Forms module may not be available or SDK may not be initialized
+        } catch (_: MissingKlaviyoModule) {
+            // Forms module not available
+        } catch (e: Exception) {
+            Registry.log.warning("Unexpected error during cleanup: ${e.message}")
         }
     }
 
