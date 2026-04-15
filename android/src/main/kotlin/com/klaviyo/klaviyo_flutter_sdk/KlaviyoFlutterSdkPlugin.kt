@@ -349,11 +349,7 @@ class KlaviyoFlutterSdkPlugin :
                     )
 
                     // Unregister any existing handler to prevent duplicates
-                    try {
-                        Klaviyo.unregisterFormLifecycleHandler()
-                    } catch (_: MissingKlaviyoModule) {
-                        Registry.log.verbose("Forms lifecycle handler not available: forms module not included")
-                    }
+                    Klaviyo.unregisterFormLifecycleHandler()
 
                     // Register form lifecycle handler
                     Klaviyo.registerFormLifecycleHandler { event ->
