@@ -545,10 +545,9 @@ extension KlaviyoFlutterSdkPlugin {
 extension KlaviyoFlutterSdkPlugin {
     /// Subscribe to form lifecycle events from the iOS SDK
     func subscribeToFormLifecycleEvents() {
-        // Unregister any existing handler to prevent duplicates
         #if canImport(KlaviyoForms)
+        // Unregister any existing handler to prevent duplicates
         KlaviyoSDK().unregisterFormLifecycleHandler()
-        #endif
 
         KlaviyoSDK().registerFormLifecycleHandler { [weak self] event in
             guard let self = self else { return }
@@ -573,6 +572,9 @@ extension KlaviyoFlutterSdkPlugin {
                 self.eventSink?(eventPayload)
             }
         }
+        #else
+        Logger.klaviyoFlutterSDK.warning("Form lifecycle events not available: forms module not included")
+        #endif
     }
 }
 
