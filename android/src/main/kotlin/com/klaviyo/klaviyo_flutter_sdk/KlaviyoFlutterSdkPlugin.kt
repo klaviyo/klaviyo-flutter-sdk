@@ -514,7 +514,11 @@ class KlaviyoFlutterSdkPlugin :
     ) {
         channel.setMethodCallHandler(null)
         eventSink = null
-        Klaviyo.unregisterFormLifecycleHandler()
+        try {
+            Klaviyo.unregisterFormLifecycleHandler()
+        } catch (_: Exception) {
+            // Forms module may not be available or SDK may not be initialized
+        }
     }
 
     // ActivityAware implementation
