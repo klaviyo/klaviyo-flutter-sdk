@@ -352,7 +352,7 @@ class KlaviyoFlutterSdkPlugin :
                     try {
                         Klaviyo.unregisterFormLifecycleHandler()
                     } catch (_: MissingKlaviyoModule) {
-                        // Forms module may not be available
+                        Registry.log.verbose("Forms lifecycle handler not available: forms module not included")
                     }
 
                     // Register form lifecycle handler
@@ -391,6 +391,7 @@ class KlaviyoFlutterSdkPlugin :
 
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
@@ -403,6 +404,7 @@ class KlaviyoFlutterSdkPlugin :
                     Klaviyo.unregisterFromInAppForms()
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to unregister from in-app forms", e.message)
@@ -524,7 +526,7 @@ class KlaviyoFlutterSdkPlugin :
         try {
             Klaviyo.unregisterFormLifecycleHandler()
         } catch (_: MissingKlaviyoModule) {
-            // Forms module not available
+            Registry.log.verbose("Forms lifecycle handler not available during cleanup: forms module not included")
         } catch (e: Exception) {
             Registry.log.warning("Unexpected error during cleanup: ${e.message}")
         }
