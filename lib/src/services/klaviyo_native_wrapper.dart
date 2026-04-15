@@ -40,8 +40,6 @@ class KlaviyoNativeWrapper {
     required String apiKey,
   }) async {
     try {
-      _apiKey = apiKey;
-
       // Set up event listener only once — re-subscribing would cause duplicate events
       if (!_isInitialized) {
         _eventChannel.receiveBroadcastStream().listen(_handleNativeEvent);
@@ -52,6 +50,7 @@ class KlaviyoNativeWrapper {
         'apiKey': apiKey,
       });
 
+      _apiKey = apiKey;
       _isInitialized = true;
     } catch (e) {
       throw KlaviyoException('Failed to initialize native SDK: $e');

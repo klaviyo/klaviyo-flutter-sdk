@@ -28,8 +28,8 @@ class KlaviyoSDK {
     _logger.level = Level.INFO;
   }
 
-  // Native wrapper service
-  late KlaviyoNativeWrapper _nativeWrapper;
+  // Native wrapper service — singleton, safe to construct eagerly
+  final KlaviyoNativeWrapper _nativeWrapper = KlaviyoNativeWrapper();
   final Logger _logger = Logger('KlaviyoSDK');
 
   // State
@@ -40,17 +40,17 @@ class KlaviyoSDK {
   bool get isInitialized => _isInitialized;
   String? get apiKey => _apiKey;
 
-  /// Initialize the Klaviyo SDK with your public API key
+  /// Initialize the Klaviyo SDK with your public API key.
+  ///
+  /// Can be called multiple times to re-initialize with a different API key,
+  /// matching native Android and iOS SDK behavior.
   Future<KlaviyoSDK> initialize({
     required String apiKey,
   }) async {
     try {
-      _apiKey = apiKey;
-
-      // Initialize native wrapper
-      _nativeWrapper = KlaviyoNativeWrapper();
       await _nativeWrapper.initialize(apiKey: apiKey);
 
+      _apiKey = apiKey;
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
 

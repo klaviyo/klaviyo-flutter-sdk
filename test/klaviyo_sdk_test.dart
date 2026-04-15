@@ -61,5 +61,25 @@ void main() {
       expect(initCalls[0].arguments['apiKey'], 'KEY_1');
       expect(initCalls[1].arguments['apiKey'], 'KEY_2');
     });
+
+    test('failed re-initialization preserves previous apiKey', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      // Make the next native call throw
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        if (call.method == 'initialize') {
+          throw PlatformException(code: 'ERROR', message: 'native failure');
+        }
+        return null;
+      });
+
+      expect(
+        () => sdk.initialize(apiKey: 'KEY_BAD'),
+        throwsA(isA<KlaviyoException>()),
+      );
+      expect(sdk.apiKey, 'KEY_1');
+    });
   });
 }
