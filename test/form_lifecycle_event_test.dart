@@ -201,24 +201,19 @@ void main() {
         );
       });
 
-      test('throws on empty formName', () {
-        expect(
-          () => FormLifecycleEvent.fromMap({
-            'type': 'form_lifecycle_event',
-            'data': {
-              'event': 'formShown',
-              'formId': 'abc123',
-              'formName': '',
-            },
-          }),
-          throwsA(
-            isA<ArgumentError>().having(
-              (e) => e.message,
-              'message',
-              contains('formName'),
-            ),
-          ),
-        );
+      test('parses empty formName', () {
+        final event = FormLifecycleEvent.fromMap({
+          'type': 'form_lifecycle_event',
+          'data': {
+            'event': 'formShown',
+            'formId': 'abc123',
+            'formName': '',
+          },
+        });
+
+        expect(event, isA<FormShown>());
+        expect(event.formId, 'abc123');
+        expect(event.formName, '');
       });
 
       test('parses null buttonLabel as empty string in formCtaClicked', () {
@@ -293,6 +288,45 @@ void main() {
           ),
         );
       });
+    });
+
+    test('throws on wrong type field', () {
+      expect(
+        () => FormLifecycleEvent.fromMap({
+          'type': 'push_notification',
+          'data': {
+            'event': 'formShown',
+            'formId': 'abc123',
+            'formName': 'Welcome Form',
+          },
+        }),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('form_lifecycle_event'),
+          ),
+        ),
+      );
+    });
+
+    test('throws on missing type field', () {
+      expect(
+        () => FormLifecycleEvent.fromMap({
+          'data': {
+            'event': 'formShown',
+            'formId': 'abc123',
+            'formName': 'Welcome Form',
+          },
+        }),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('form_lifecycle_event'),
+          ),
+        ),
+      );
     });
 
     test('throws on empty map', () {
