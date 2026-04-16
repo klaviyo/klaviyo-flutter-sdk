@@ -20,6 +20,7 @@ class KlaviyoNativeWrapper {
 
   final Logger _logger = Logger('KlaviyoSDK');
   bool _isInitialized = false;
+  bool _eventListenerAttached = false;
   String? _apiKey;
 
   // Stream controllers for native events – buffer events that arrive
@@ -39,19 +40,21 @@ class KlaviyoNativeWrapper {
   Future<void> initialize({
     required String apiKey,
   }) async {
-    if (_isInitialized) return;
-
     try {
-      _apiKey = apiKey;
+      // Set up event listener only once — re-subscribing would cause duplicate
+      // events or orphaned subscriptions. Use a dedicated flag rather than
+      // _isInitialized so a failed first init doesn't re-subscribe on retry.
+      if (!_eventListenerAttached) {
+        _eventChannel.receiveBroadcastStream().listen(_handleNativeEvent);
+        _eventListenerAttached = true;
+      }
 
-      // Set up event listeners
-      _eventChannel.receiveBroadcastStream().listen(_handleNativeEvent);
-
-      // Initialize native SDK
+      // Always forward to native — allows re-initialization with a new API key
       await _channel.invokeMethod('initialize', {
         'apiKey': apiKey,
       });
 
+      _apiKey = apiKey;
       _isInitialized = true;
     } catch (e) {
       throw KlaviyoException('Failed to initialize native SDK: $e');
