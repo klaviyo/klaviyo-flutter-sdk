@@ -573,7 +573,9 @@ extension KlaviyoFlutterSdkPlugin {
             }
         }
         #else
-        Logger.klaviyoFlutterSDK.warning("Form lifecycle events not available: forms module not included")
+        if #available(iOS 14.0, *) {
+            Logger.klaviyoFlutterSDK.warning("Form lifecycle events not available: forms module not included")
+        }
         #endif
     }
 }
