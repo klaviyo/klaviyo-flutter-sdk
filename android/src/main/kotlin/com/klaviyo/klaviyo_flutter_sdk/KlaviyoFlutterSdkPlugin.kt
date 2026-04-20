@@ -572,16 +572,19 @@ class KlaviyoFlutterSdkPlugin :
             // Let Klaviyo SDK handle push notification opens
             Klaviyo.handlePush(intent)
 
-            // Extract notification data from the intent
-            val extras = intent.extras
-            if (extras != null && extras.containsKey("_k")) {
-                // This is a Klaviyo push notification
-                val notificationData = mutableMapOf<String, Any?>()
+            // The Klaviyo Android SDK namespaces all push extras with this prefix
+            // when it builds the tap PendingIntent (see KlaviyoRemoteMessage.appendKlaviyoExtras).
+            val klaviyoExtraPrefix = "com.klaviyo."
 
-                // Extract all extras from the notification
+            val extras = intent.extras
+            if (extras != null && extras.containsKey("${klaviyoExtraPrefix}_k")) {
+                // Strip the prefix so the Dart payload matches the iOS userInfo shape.
+                val notificationData = mutableMapOf<String, Any?>()
                 for (key in extras.keySet()) {
+                    if (!key.startsWith(klaviyoExtraPrefix)) continue
+                    val unprefixedKey = key.removePrefix(klaviyoExtraPrefix)
                     val value = extras.get(key)
-                    notificationData[key] =
+                    notificationData[unprefixedKey] =
                         when (value) {
                             is String -> value
                             is Int -> value
@@ -594,7 +597,6 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
-                // Forward to Flutter via EventChannel
                 eventSink?.success(
                     mapOf(
                         "type" to "push_notification_opened",
