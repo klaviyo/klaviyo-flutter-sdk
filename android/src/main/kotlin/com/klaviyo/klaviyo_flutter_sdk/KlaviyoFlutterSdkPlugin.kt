@@ -13,6 +13,7 @@ import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
+import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
@@ -572,17 +573,17 @@ class KlaviyoFlutterSdkPlugin :
             // Let Klaviyo SDK handle push notification opens
             Klaviyo.handlePush(intent)
 
-            // The Klaviyo Android SDK namespaces all push extras with this prefix
+            // The Klaviyo Android SDK namespaces all push extras with Constants.PACKAGE_PREFIX
             // when it builds the tap PendingIntent (see KlaviyoRemoteMessage.appendKlaviyoExtras).
-            val klaviyoExtraPrefix = "com.klaviyo."
+            val klaviyoTrackingKey = Constants.PACKAGE_PREFIX + Constants.TRACKING_PARAMETER
 
             val extras = intent.extras
-            if (extras != null && extras.containsKey("${klaviyoExtraPrefix}_k")) {
+            if (extras != null && extras.containsKey(klaviyoTrackingKey)) {
                 // Strip the prefix so the Dart payload matches the iOS userInfo shape.
                 val notificationData = mutableMapOf<String, Any?>()
                 for (key in extras.keySet()) {
-                    if (!key.startsWith(klaviyoExtraPrefix)) continue
-                    val unprefixedKey = key.removePrefix(klaviyoExtraPrefix)
+                    if (!key.startsWith(Constants.PACKAGE_PREFIX)) continue
+                    val unprefixedKey = key.removePrefix(Constants.PACKAGE_PREFIX)
                     val value = extras.get(key)
                     notificationData[unprefixedKey] =
                         when (value) {
