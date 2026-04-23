@@ -8,6 +8,7 @@ import android.os.Looper
 import androidx.annotation.NonNull
 import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.Klaviyo
+import com.klaviyo.analytics.Klaviyo.isKlaviyoNotificationIntent
 import com.klaviyo.analytics.model.Event
 import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
@@ -573,13 +574,10 @@ class KlaviyoFlutterSdkPlugin :
             // Let Klaviyo SDK handle push notification opens
             Klaviyo.handlePush(intent)
 
-            // The Klaviyo Android SDK namespaces all push extras with Constants.PACKAGE_PREFIX
-            // when it builds the tap PendingIntent (see KlaviyoRemoteMessage.appendKlaviyoExtras).
-            val klaviyoTrackingKey = Constants.PACKAGE_PREFIX + Constants.TRACKING_PARAMETER
-
             val extras = intent.extras
-            if (extras != null && extras.containsKey(klaviyoTrackingKey)) {
-                // Strip the prefix so the Dart payload matches the iOS userInfo shape.
+            if (extras != null && intent.isKlaviyoNotificationIntent) {
+                // Klaviyo namespaces all push extras with Constants.PACKAGE_PREFIX when building
+                // the tap PendingIntent. Strip it so the Dart payload matches the iOS userInfo shape.
                 val notificationData = mutableMapOf<String, Any?>()
                 for (key in extras.keySet()) {
                     if (!key.startsWith(Constants.PACKAGE_PREFIX)) continue
