@@ -1,0 +1,36 @@
+android/src/main/kotlin/com/klaviyo/klaviyo_flutter_sdk/KlaviyoFlutterSdkPlugin.kt
+  ad32c4bab9b0119e 9,525-527
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "8ed9d03a664c7d1f4a8fe1d21a7d5547f99dad89",
+  "prompts": {
+    "3395018e7715c7a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17a935de-4eef-4ddf-b9e6-191bf158ee31",
+        "model": "<synthetic>"
+      },
+      "human_author": null,
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "ad32c4bab9b0119e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8263139c-0eca-4e35-8986-50492eac024d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Andrew Balmer",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 12,
+      "accepted_lines": 559,
+      "overriden_lines": 0
+    }
+  }
+}
