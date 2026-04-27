@@ -3,6 +3,7 @@ library;
 export 'src/klaviyo_sdk.dart';
 export 'src/models/klaviyo_profile.dart';
 export 'src/models/klaviyo_event.dart';
+export 'src/models/klaviyo_push_event.dart';
 export 'src/models/event_metric.dart';
 export 'src/models/klaviyo_location.dart';
 export 'src/models/in_app_form_config.dart';
