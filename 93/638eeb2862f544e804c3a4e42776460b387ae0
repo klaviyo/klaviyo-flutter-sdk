@@ -1,0 +1,29 @@
+example/lib/main.dart
+  ad32c4bab9b0119e 87,103-104
+lib/src/klaviyo_sdk.dart
+  ad32c4bab9b0119e 8,199,201-202,222,406-420
+example/lib/tabs/push_tab.dart
+  ad32c4bab9b0119e 24,44-46,51,55,57,59-60,109
+lib/src/services/klaviyo_native_wrapper.dart
+  ad32c4bab9b0119e 5,28-29,34,331-334,341-343,391
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "93638eeb2862f544e804c3a4e42776460b387ae0",
+  "prompts": {
+    "ad32c4bab9b0119e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8263139c-0eca-4e35-8986-50492eac024d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Andrew Balmer",
+      "messages": [],
+      "total_additions": 2081,
+      "total_deletions": 1741,
+      "accepted_lines": 2216,
+      "overriden_lines": 0
+    }
+  }
+}
