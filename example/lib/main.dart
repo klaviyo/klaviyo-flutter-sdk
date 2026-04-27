@@ -47,10 +47,10 @@ void main() async {
 /// Set up Firebase Cloud Messaging for Android
 Future<void> _setupFCM() async {
   try {
-    final messaging = FirebaseMessaging.instance;
-
-    // Request permission
-    await messaging.requestPermission();
+    // Note: Permission is requested from the Push tab via permission_handler when
+    // the user taps "Enable Push Notifications" — not at launch. firebase_messaging's
+    // requestPermission() targets the same Android POST_NOTIFICATIONS permission and
+    // would prompt the user before they've even initialized the SDK.
 
     // Listen for token refresh
     // Note: Initial token registration happens in ProfileTab after SDK initialization
