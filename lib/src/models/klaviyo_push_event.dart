@@ -100,9 +100,12 @@ final class PushNotificationOpened extends KlaviyoPushEvent {
 
   /// Raw APNs userInfo dictionary as iOS delivers it. **Null on Android.**
   ///
-  /// Includes the full nested `aps` structure plus any custom keys
-  /// (e.g. `_k`, `url`, `image_url`) at top level. The `_k` value is a
-  /// nested dictionary on iOS.
+  /// Layout (Klaviyo iOS conventions):
+  /// - `aps.alert.title`, `aps.alert.body` — standard APNs display fields
+  /// - `url` (top-level) — Klaviyo deep-link URL
+  /// - `rich-media`, `rich-media-type` (top-level) — image URL + format
+  /// - `body._k` — Klaviyo tracking metadata (note: nested under `body`,
+  ///   not at the top level)
   final Map<String, dynamic>? iosUserInfo;
 
   /// Raw tap-intent extras as Android delivers them. **Null on iOS.**
