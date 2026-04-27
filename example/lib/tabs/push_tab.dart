@@ -21,7 +21,7 @@ class _PushTabState extends State<PushTab> {
   String _status = 'Push notification settings';
   String? _pushToken;
   bool _notificationsEnabled = false;
-  StreamSubscription<Map<String, dynamic>>? _pushNotificationSubscription;
+  StreamSubscription<KlaviyoPushEvent>? _pushNotificationSubscription;
 
   //#region Lifecycle
 
@@ -41,34 +41,23 @@ class _PushTabState extends State<PushTab> {
     if (!_klaviyo.isInitialized) return;
 
     // Listen for push notification events (token received, opened, errors)
-    _pushNotificationSubscription = _klaviyo.onPushNotification.listen((event) {
-      final eventType = event['type'] as String?;
-
-      switch (eventType) {
-        case 'push_token_received':
-          // Update token from stream (reactive approach)
-          final data = event['data'] as Map<String, dynamic>?;
-          final token = data?['token'] as String?;
+    _pushNotificationSubscription = _klaviyo.onPushEvent.listen((event) {
+      switch (event) {
+        case PushTokenReceived(:final token):
           setState(() {
             _pushToken = token;
             _status = 'Push token received';
           });
-          break;
-
-        case 'push_token_error':
-          final data = event['data'] as Map<String, dynamic>?;
-          final error = data?['error'] as String? ?? 'Unknown error';
+        case PushTokenError(:final error):
           setState(() {
             _status = 'Push token error: $error';
           });
-          break;
-
-        case 'push_notification_opened':
-          final data = event['data'] as Map<String, dynamic>?;
+        case PushNotificationOpened(:final title):
           setState(() {
-            _status =
-                'Push notification opened: ${data?['title'] ?? 'Unknown'}';
+            _status = 'Push notification opened: ${title ?? 'Unknown'}';
           });
+        case SilentPushReceived():
+          // Handled in main.dart's setupSilentPushListener.
           break;
       }
     });
@@ -117,7 +106,7 @@ class _PushTabState extends State<PushTab> {
       }
 
       // Register for push notifications after permission is granted
-      // The token will arrive via onPushNotification stream
+      // The token will arrive via the onPushEvent stream as PushTokenReceived.
       await _klaviyo.registerForPushNotifications();
 
       // Update permission state

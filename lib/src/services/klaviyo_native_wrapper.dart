@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
+import '../models/klaviyo_push_event.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
@@ -24,14 +25,13 @@ class KlaviyoNativeWrapper {
 
   // Stream controllers for native events – buffer events that arrive
   // before any listener subscribes, then flush on first subscription.
-  final _pushNotificationController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+  final _pushEventController =
+      BufferedBroadcastStreamController<KlaviyoPushEvent>();
   final _formEventController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
 
   // Getters for streams
-  Stream<Map<String, dynamic>> get onPushNotification =>
-      _pushNotificationController.stream;
+  Stream<KlaviyoPushEvent> get onPushEvent => _pushEventController.stream;
 
   Stream<Map<String, dynamic>> get onFormEvent => _formEventController.stream;
 
@@ -326,20 +326,21 @@ class KlaviyoNativeWrapper {
       final String eventType = eventData['type'] as String? ?? '';
 
       switch (eventType) {
-        case 'push_notification_received':
-        case 'push_notification_opened':
-        case 'silent_push_received':
         case 'push_token_received':
         case 'push_token_error':
-          _logger.info('Native push notification event: $eventData');
-          _pushNotificationController.add(eventData);
+        case 'push_notification_opened':
+        case 'silent_push_received':
+          _logger.info('Native push event: $eventData');
+          _pushEventController.add(KlaviyoPushEvent.fromMap(eventData));
           break;
         case 'form_event':
           _logger.info('Native form event: $eventData');
           _formEventController.add(eventData);
           break;
         default:
-          // Handle unknown event types
+          // Forward-compat: silently ignore unknown event types so older
+          // clients don't crash on new events introduced by a newer plugin.
+          _logger.fine('Ignoring unknown native event type: $eventType');
           break;
       }
     } catch (e) {
@@ -387,7 +388,7 @@ class KlaviyoNativeWrapper {
 
   /// Dispose resources
   void dispose() {
-    _pushNotificationController.close();
+    _pushEventController.close();
     _formEventController.close();
   }
 }

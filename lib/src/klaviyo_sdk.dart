@@ -5,6 +5,7 @@ import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
+import 'models/klaviyo_push_event.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'enums/klaviyo_log_level.dart';
@@ -195,11 +196,10 @@ class KlaviyoSDK {
   ///   and forwarded to the Klaviyo SDK.
   /// - **Android**: Fetches the FCM token and registers it with the Klaviyo SDK.
   ///
-  /// After calling this method, you can listen for the token via [onPushNotification]:
+  /// After calling this method, you can listen for the token via [onPushEvent]:
   /// ```dart
-  /// klaviyo.onPushNotification.listen((event) {
-  ///   if (event['type'] == 'push_token_received') {
-  ///     final token = event['data']['token'];
+  /// klaviyo.onPushEvent.listen((event) {
+  ///   if (event case PushTokenReceived(:final token)) {
   ///     log('Token received: $token');
   ///   }
   /// });
@@ -219,7 +219,7 @@ class KlaviyoSDK {
   ///
   /// Note: On iOS, the token may not be immediately available after calling
   /// [registerForPushNotifications]. For immediate access to the token,
-  /// listen to [onPushNotification] for `push_token_received` events instead.
+  /// listen to [onPushEvent] for [PushTokenReceived] events instead.
   Future<String?> getPushToken() async {
     _ensureInitialized();
     return await _nativeWrapper.getPushToken();
@@ -403,9 +403,21 @@ class KlaviyoSDK {
     _logger.level = logLevel.toLevel();
   }
 
-  /// Get push notification events stream
-  Stream<Map<String, dynamic>> get onPushNotification =>
-      _nativeWrapper.onPushNotification;
+  /// Stream of push-notification-related events.
+  ///
+  /// Emits typed [KlaviyoPushEvent] subtypes; use exhaustive pattern matching
+  /// to handle each variant:
+  /// ```dart
+  /// klaviyo.onPushEvent.listen((event) {
+  ///   switch (event) {
+  ///     case PushTokenReceived(:final token): /* ... */
+  ///     case PushTokenError(:final error): /* ... */
+  ///     case PushNotificationOpened(:final title, :final url): /* ... */
+  ///     case SilentPushReceived(): /* ... iOS only */
+  ///   }
+  /// });
+  /// ```
+  Stream<KlaviyoPushEvent> get onPushEvent => _nativeWrapper.onPushEvent;
 
   /// Get form events stream
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;

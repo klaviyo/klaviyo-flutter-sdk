@@ -417,10 +417,10 @@ extension KlaviyoFlutterSdkPlugin {
         // Pass to Klaviyo Swift SDK
         KlaviyoSDK().set(pushToken: deviceToken)
 
-        // Create event payload
+        // Create event payload (flat envelope; Dart side parses via KlaviyoPushEvent.fromMap)
         let eventData: [String: Any] = [
             "type": "push_token_received",
-            "data": ["token": tokenString]
+            "token": tokenString
         ]
 
         // Send to Flutter (or cache if Flutter is not ready)
@@ -446,10 +446,10 @@ extension KlaviyoFlutterSdkPlugin {
             )
         }
 
-        // Create error payload
+        // Create error payload (flat envelope; Dart side parses via KlaviyoPushEvent.fromMap)
         let errorData: [String: Any] = [
             "type": "push_token_error",
-            "data": ["error": error.localizedDescription]
+            "error": error.localizedDescription
         ]
 
         // Send to Flutter (or cache if Flutter is not ready)
@@ -469,11 +469,26 @@ extension KlaviyoFlutterSdkPlugin {
             Logger.klaviyoFlutterSDK.info("Push notification opened")
         }
 
-        // 1. Prepare Payload
-        let eventPayload: [String: Any] = [
+        // 1. Prepare Payload (flat envelope with typed fields hoisted; Dart side
+        //    parses via KlaviyoPushEvent.fromMap → PushNotificationOpened).
+        //    Klaviyo iOS conventions: aps.alert.* for title/body; top-level "url"
+        //    for the deep link; top-level "rich-media" for the image.
+        var eventPayload: [String: Any] = [
             "type": "push_notification_opened",
-            "data": userInfo
+            "iosUserInfo": stringKeyedDict(userInfo)
         ]
+        // swiftlint:disable identifier_name
+        if let aps = userInfo["aps"] as? [String: Any] {
+            if let alert = aps["alert"] as? [String: Any] {
+                if let title = alert["title"] as? String { eventPayload["title"] = title }
+                if let body = alert["body"] as? String { eventPayload["body"] = body }
+            } else if let alertString = aps["alert"] as? String {
+                eventPayload["body"] = alertString
+            }
+        }
+        if let url = userInfo["url"] as? String { eventPayload["url"] = url }
+        if let imageUrl = userInfo["rich-media"] as? String { eventPayload["imageUrl"] = imageUrl }
+        // swiftlint:enable identifier_name
 
         // 2. Send to Flutter (or Cache if Flutter is asleep)
         if let eventSink = eventSink {
@@ -500,10 +515,10 @@ extension KlaviyoFlutterSdkPlugin {
             Logger.klaviyoFlutterSDK.info("Silent push received")
         }
 
-        // Prepare payload
+        // Prepare payload (flat envelope; Dart side parses via KlaviyoPushEvent.fromMap)
         let eventPayload: [String: Any] = [
             "type": "silent_push_received",
-            "data": userInfo
+            "userInfo": stringKeyedDict(userInfo)
         ]
 
         // Send to Flutter (or cache if Flutter is not ready)
@@ -521,6 +536,19 @@ extension KlaviyoFlutterSdkPlugin {
 // MARK: - Helpers
 
 extension KlaviyoFlutterSdkPlugin {
+    /// Converts an `[AnyHashable: Any]` dict (APNs userInfo) into `[String: Any]`
+    /// for transport over Flutter's MethodChannel codec, which requires string keys.
+    private func stringKeyedDict(_ dict: [AnyHashable: Any]) -> [String: Any] {
+        var result: [String: Any] = [:]
+        // swiftlint:disable:next identifier_name
+        for (key, value) in dict {
+            if let stringKey = key as? String {
+                result[stringKey] = value
+            }
+        }
+        return result
+    }
+
     private func parseLocation(from profileData: [String: Any]) -> Profile.Location? {
         guard let locationData = profileData["location"] as? [String: Any] else { return nil }
         return Profile.Location(

@@ -290,7 +290,7 @@ class KlaviyoFlutterSdkPlugin :
                             eventSink?.success(
                                 mapOf(
                                     "type" to "push_token_received",
-                                    "data" to mapOf("token" to token),
+                                    "token" to token,
                                 ),
                             )
                         }.addOnFailureListener { exception ->
@@ -300,7 +300,7 @@ class KlaviyoFlutterSdkPlugin :
                             eventSink?.success(
                                 mapOf(
                                     "type" to "push_token_error",
-                                    "data" to mapOf("error" to (exception.message ?: "Unknown error")),
+                                    "error" to (exception.message ?: "Unknown error"),
                                 ),
                             )
                         }
@@ -310,7 +310,7 @@ class KlaviyoFlutterSdkPlugin :
                     eventSink?.success(
                         mapOf(
                             "type" to "push_token_error",
-                            "data" to mapOf("error" to (e.message ?: "Unknown error")),
+                            "error" to (e.message ?: "Unknown error"),
                         ),
                     )
                 }
@@ -521,35 +521,42 @@ class KlaviyoFlutterSdkPlugin :
             // Let Klaviyo SDK handle push notification opens
             Klaviyo.handlePush(intent)
 
-            val extras = intent.extras
-            if (extras != null && intent.isKlaviyoNotificationIntent) {
-                // Klaviyo namespaces all push extras with Constants.PACKAGE_PREFIX when building
-                // the tap PendingIntent. Strip it so the Dart payload matches the iOS userInfo shape.
-                val notificationData = mutableMapOf<String, Any?>()
-                for (key in extras.keySet()) {
-                    if (!key.startsWith(Constants.PACKAGE_PREFIX)) continue
-                    val unprefixedKey = key.removePrefix(Constants.PACKAGE_PREFIX)
-                    val value = extras.get(key)
-                    notificationData[unprefixedKey] =
-                        when (value) {
-                            is String -> value
-                            is Int -> value
-                            is Long -> value
-                            is Double -> value
-                            is Boolean -> value
-                            else -> value?.toString()
-                        }
-                }
+            if (!intent.isKlaviyoNotificationIntent) return
+            val extras = intent.extras ?: return
 
-                Registry.log.verbose("Push notification opened: $notificationData")
-
-                eventSink?.success(
-                    mapOf(
-                        "type" to "push_notification_opened",
-                        "data" to notificationData,
-                    ),
-                )
+            // Raw extras passthrough — keep the com.klaviyo. prefix on Klaviyo-authored
+            // keys; system-added extras are passed through as-is. Bundle values may be
+            // non-string types (system extras), so coerce to platform-channel-safe types.
+            val androidIntentExtras = mutableMapOf<String, Any?>()
+            for (key in extras.keySet()) {
+                val value = extras.get(key)
+                androidIntentExtras[key] =
+                    when (value) {
+                        is String -> value
+                        is Int -> value
+                        is Long -> value
+                        is Double -> value
+                        is Boolean -> value
+                        else -> value?.toString()
+                    }
             }
+
+            // Hoist commonly-used fields onto the typed event for cross-platform ergonomics.
+            // Klaviyo's Android SDK namespaces these with com.klaviyo. (see appendKlaviyoExtras).
+            val prefix = Constants.PACKAGE_PREFIX
+            val payload =
+                mapOf<String, Any?>(
+                    "type" to "push_notification_opened",
+                    "title" to extras.getString("${prefix}title"),
+                    "body" to extras.getString("${prefix}body"),
+                    "url" to extras.getString("${prefix}url"),
+                    "imageUrl" to extras.getString("${prefix}image_url"),
+                    "androidIntentExtras" to androidIntentExtras,
+                )
+
+            Registry.log.verbose("Push notification opened: $payload")
+
+            eventSink?.success(payload)
         } catch (e: Exception) {
             Registry.log.error("Error handling push: ${e.message}", e)
         }
