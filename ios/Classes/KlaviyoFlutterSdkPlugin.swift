@@ -488,6 +488,9 @@ extension KlaviyoFlutterSdkPlugin {
         }
         if let url = userInfo["url"] as? String { eventPayload["url"] = url }
         if let imageUrl = userInfo["rich-media"] as? String { eventPayload["imageUrl"] = imageUrl }
+        if let kvPairs = userInfo["key_value_pairs"] as? [String: Any] {
+            eventPayload["keyValuePairs"] = kvPairs
+        }
         // swiftlint:enable identifier_name
 
         // 2. Send to Flutter (or Cache if Flutter is asleep)
@@ -516,10 +519,13 @@ extension KlaviyoFlutterSdkPlugin {
         }
 
         // Prepare payload (flat envelope; Dart side parses via KlaviyoPushEvent.fromMap)
-        let eventPayload: [String: Any] = [
+        var eventPayload: [String: Any] = [
             "type": "silent_push_received",
             "userInfo": stringKeyedDict(userInfo)
         ]
+        if let kvPairs = userInfo["key_value_pairs"] as? [String: Any] {
+            eventPayload["keyValuePairs"] = kvPairs
+        }
 
         // Send to Flutter (or cache if Flutter is not ready)
         if let eventSink = eventSink {

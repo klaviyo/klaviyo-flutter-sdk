@@ -30,6 +30,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.INFINITE
 import kotlin.time.Duration.Companion.seconds
@@ -544,6 +546,13 @@ class KlaviyoFlutterSdkPlugin :
             // Hoist commonly-used fields onto the typed event for cross-platform ergonomics.
             // Klaviyo's Android SDK namespaces these with com.klaviyo. (see appendKlaviyoExtras).
             val prefix = Constants.PACKAGE_PREFIX
+            // FCM only carries strings, so customer key-value pairs arrive as a
+            // JSON-encoded string under com.klaviyo.key_value_pairs. Parse it into a
+            // Map so the Dart-side typed field matches iOS (where it's pre-parsed).
+            val keyValuePairs =
+                parseJsonStringToMap(
+                    extras.getString("$prefix${Constants.KEY_VALUE_PAIRS}"),
+                )
             val payload =
                 mapOf<String, Any?>(
                     "type" to "push_notification_opened",
@@ -551,6 +560,7 @@ class KlaviyoFlutterSdkPlugin :
                     "body" to extras.getString("${prefix}body"),
                     "url" to extras.getString("${prefix}url"),
                     "imageUrl" to extras.getString("${prefix}image_url"),
+                    "keyValuePairs" to keyValuePairs,
                     "androidIntentExtras" to androidIntentExtras,
                 )
 
@@ -561,4 +571,35 @@ class KlaviyoFlutterSdkPlugin :
             Registry.log.error("Error handling push: ${e.message}", e)
         }
     }
+
+    // / Parse a JSON-encoded string into a `Map<String, Any?>` whose values are
+    // / platform-channel-safe (nested `JSONObject`/`JSONArray` are recursively
+    // / converted to `Map`/`List`). Returns null if input is null or unparseable.
+    private fun parseJsonStringToMap(jsonString: String?): Map<String, Any?>? {
+        if (jsonString.isNullOrEmpty()) return null
+        return try {
+            jsonObjectToMap(JSONObject(jsonString))
+        } catch (e: Exception) {
+            Registry.log.warning("Failed to parse JSON string to Map: ${e.message}")
+            null
+        }
+    }
+
+    private fun jsonObjectToMap(obj: JSONObject): Map<String, Any?> {
+        val result = mutableMapOf<String, Any?>()
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            result[key] = jsonValueToNative(obj.opt(key))
+        }
+        return result
+    }
+
+    private fun jsonValueToNative(value: Any?): Any? =
+        when {
+            value == null || value == JSONObject.NULL -> null
+            value is JSONObject -> jsonObjectToMap(value)
+            value is JSONArray -> (0 until value.length()).map { jsonValueToNative(value.opt(it)) }
+            else -> value
+        }
 }

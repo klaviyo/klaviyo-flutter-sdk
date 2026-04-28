@@ -43,6 +43,8 @@ sealed class KlaviyoPushEvent {
           body: map['body'] as String?,
           url: map['url'] as String?,
           imageUrl: map['imageUrl'] as String?,
+          keyValuePairs:
+              (map['keyValuePairs'] as Map?)?.cast<String, dynamic>(),
           iosUserInfo: (map['iosUserInfo'] as Map?)?.cast<String, dynamic>(),
           androidIntentExtras:
               (map['androidIntentExtras'] as Map?)?.cast<String, dynamic>(),
@@ -50,6 +52,8 @@ sealed class KlaviyoPushEvent {
       case 'silent_push_received':
         return SilentPushReceived(
           userInfo: (map['userInfo'] as Map).cast<String, dynamic>(),
+          keyValuePairs:
+              (map['keyValuePairs'] as Map?)?.cast<String, dynamic>(),
         );
       default:
         throw ArgumentError('Unknown push event type: $type');
@@ -78,13 +82,14 @@ final class PushTokenError extends KlaviyoPushEvent {
 
 /// User tapped a Klaviyo-authored push notification.
 ///
-/// The four typed fields ([title], [body], [url], [imageUrl]) are extracted
-/// by the native plugin from the platform's payload, so cross-platform code
-/// can handle a tap without dropping into platform-specific maps.
+/// Typed fields ([title], [body], [url], [imageUrl], [keyValuePairs]) are
+/// extracted by the native plugin from the platform's payload, so
+/// cross-platform code can handle a tap without dropping into
+/// platform-specific maps.
 ///
-/// For access to the full platform payload (e.g. APNs `aps` dict, custom
-/// key-value pairs, Klaviyo tracking metadata), use [iosUserInfo] or
-/// [androidIntentExtras] — exactly one will be non-null.
+/// For access to the full platform payload (e.g. APNs `aps` dict, Klaviyo
+/// tracking metadata), use [iosUserInfo] or [androidIntentExtras] —
+/// exactly one will be non-null.
 final class PushNotificationOpened extends KlaviyoPushEvent {
   /// Notification title, if delivered.
   final String? title;
@@ -98,12 +103,21 @@ final class PushNotificationOpened extends KlaviyoPushEvent {
   /// URL of the rich-push image, if any.
   final String? imageUrl;
 
+  /// Custom key-value pairs configured in the Klaviyo dashboard's
+  /// "Key/Value Pairs" section. `null` if the push had no key-value pairs.
+  ///
+  /// Both platforms namespace these into a single `key_value_pairs` field
+  /// in the underlying payload; the native plugin parses Android's
+  /// JSON-string form into a Map so callers see the same shape on both.
+  final Map<String, dynamic>? keyValuePairs;
+
   /// Raw APNs userInfo dictionary as iOS delivers it. **Null on Android.**
   ///
   /// Layout (Klaviyo iOS conventions):
   /// - `aps.alert.title`, `aps.alert.body` — standard APNs display fields
   /// - `url` (top-level) — Klaviyo deep-link URL
   /// - `rich-media`, `rich-media-type` (top-level) — image URL + format
+  /// - `key_value_pairs` (top-level) — already-parsed dict of customer KV pairs
   /// - `body._k` — Klaviyo tracking metadata (note: nested under `body`,
   ///   not at the top level)
   final Map<String, dynamic>? iosUserInfo;
@@ -115,8 +129,9 @@ final class PushNotificationOpened extends KlaviyoPushEvent {
   /// may also be present. Values are typically `String`, but `Bundle`
   /// can carry other types so the value side is `dynamic`.
   ///
-  /// Note: on Android the `_k` value is a JSON string (e.g.
-  /// `'{"Push Platform":"android"}'`), not a parsed map.
+  /// Note: on Android `com.klaviyo._k` and `com.klaviyo.key_value_pairs`
+  /// values are JSON strings (FCM data only carries strings), not parsed
+  /// maps. [keyValuePairs] above is the parsed form.
   final Map<String, dynamic>? androidIntentExtras;
 
   const PushNotificationOpened({
@@ -124,6 +139,7 @@ final class PushNotificationOpened extends KlaviyoPushEvent {
     this.body,
     this.url,
     this.imageUrl,
+    this.keyValuePairs,
     this.iosUserInfo,
     this.androidIntentExtras,
   });
@@ -134,8 +150,15 @@ final class PushNotificationOpened extends KlaviyoPushEvent {
 /// **iOS only** — Android has no equivalent path in the current SDK.
 /// Fires when an APNs payload with `content-available: 1` is received.
 final class SilentPushReceived extends KlaviyoPushEvent {
+  /// Custom key-value pairs configured in the Klaviyo dashboard's
+  /// "Key/Value Pairs" section. `null` if the push had no key-value pairs.
+  ///
+  /// Silent pushes are commonly used as a transport for app-specific
+  /// metadata, so KV pairs are typically the most useful payload to read.
+  final Map<String, dynamic>? keyValuePairs;
+
   /// Raw APNs userInfo dictionary.
   final Map<String, dynamic> userInfo;
 
-  const SilentPushReceived({required this.userInfo});
+  const SilentPushReceived({required this.userInfo, this.keyValuePairs});
 }
