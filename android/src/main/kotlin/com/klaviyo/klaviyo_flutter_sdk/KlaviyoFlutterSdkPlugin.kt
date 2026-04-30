@@ -8,11 +8,13 @@ import android.os.Looper
 import androidx.annotation.NonNull
 import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.Klaviyo
+import com.klaviyo.analytics.Klaviyo.isKlaviyoNotificationIntent
 import com.klaviyo.analytics.model.Event
 import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
+import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
@@ -572,16 +574,16 @@ class KlaviyoFlutterSdkPlugin :
             // Let Klaviyo SDK handle push notification opens
             Klaviyo.handlePush(intent)
 
-            // Extract notification data from the intent
             val extras = intent.extras
-            if (extras != null && extras.containsKey("_k")) {
-                // This is a Klaviyo push notification
+            if (extras != null && intent.isKlaviyoNotificationIntent) {
+                // Klaviyo namespaces all push extras with Constants.PACKAGE_PREFIX when building
+                // the tap PendingIntent. Strip it so the Dart payload matches the iOS userInfo shape.
                 val notificationData = mutableMapOf<String, Any?>()
-
-                // Extract all extras from the notification
                 for (key in extras.keySet()) {
+                    if (!key.startsWith(Constants.PACKAGE_PREFIX)) continue
+                    val unprefixedKey = key.removePrefix(Constants.PACKAGE_PREFIX)
                     val value = extras.get(key)
-                    notificationData[key] =
+                    notificationData[unprefixedKey] =
                         when (value) {
                             is String -> value
                             is Int -> value
@@ -594,7 +596,6 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
-                // Forward to Flutter via EventChannel
                 eventSink?.success(
                     mapOf(
                         "type" to "push_notification_opened",
