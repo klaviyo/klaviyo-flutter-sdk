@@ -49,9 +49,20 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
+    // Cached silent push event for the cold-start race where a Klaviyo silent push
+    // is delivered to the FCM service before Flutter has subscribed to the EventChannel.
+    // Replayed on the next onListen.
+    private var cachedSilentPush: Map<String, Any?>? = null
+
     companion object {
         private const val TAG = "KlaviyoFlutter"
         private const val INFINITE_TIMEOUT_SENTINEL = -1
+
+        // Static reference so KlaviyoFlutterPushService (which runs in a separate
+        // Android service lifecycle) can forward silent push data to the active
+        // plugin instance. Mirrors iOS's KlaviyoFlutterSdkPlugin.shared pattern.
+        @Volatile
+        internal var instance: KlaviyoFlutterSdkPlugin? = null
     }
 
     override fun onAttachedToEngine(
@@ -69,6 +80,11 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
+                    // Replay any cached silent push that arrived before Flutter subscribed.
+                    cachedSilentPush?.let {
+                        events?.success(it)
+                        cachedSilentPush = null
+                    }
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -76,6 +92,19 @@ class KlaviyoFlutterSdkPlugin :
                 }
             },
         )
+
+        // Rehydrate any silent push persisted across a process boundary (e.g. FCM
+        // delivered a message while the app was killed). Stash it in
+        // cachedSilentPush so it replays when Flutter subscribes via onListen.
+        SilentPushCache.consume(applicationContext)?.let { data ->
+            cachedSilentPush =
+                mapOf(
+                    "type" to "silent_push_received",
+                    "data" to data,
+                )
+        }
+
+        instance = this
     }
 
     override fun onMethodCall(
@@ -520,6 +549,9 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
+        if (instance === this) {
+            instance = null
+        }
         eventSink = null
         try {
             Klaviyo.unregisterFormLifecycleHandler()
@@ -527,6 +559,33 @@ class KlaviyoFlutterSdkPlugin :
             Registry.log.verbose("Forms lifecycle handler not available during cleanup: forms module not included")
         } catch (e: Exception) {
             Registry.log.warning("Unexpected error during cleanup: ${e.message}")
+        }
+    }
+
+    /**
+     * Forwards a Klaviyo silent push to the Flutter event stream as
+     * `{type: 'silent_push_received', data: <RemoteMessage.data>}`.
+     *
+     * Called from [KlaviyoFlutterPushService] (or a host's subclass of it) on the
+     * FCM background thread. Posts to the main thread before touching the EventChannel,
+     * matching how the rest of the plugin emits events. If Flutter hasn't subscribed
+     * yet (cold start), the event is cached and replayed on the next `onListen`.
+     */
+    fun handleSilentPush(data: Map<String, Any?>) {
+        val payload =
+            mapOf(
+                "type" to "silent_push_received",
+                "data" to data,
+            )
+
+        Handler(Looper.getMainLooper()).post {
+            val sink = eventSink
+            if (sink != null) {
+                sink.success(payload)
+            } else {
+                Registry.log.verbose("Flutter not ready. Caching silent push event.")
+                cachedSilentPush = payload
+            }
         }
     }
 

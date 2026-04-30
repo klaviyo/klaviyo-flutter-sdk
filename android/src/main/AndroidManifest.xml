@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.klaviyo.klaviyo_flutter_sdk">
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -9,5 +10,34 @@
 
     <application>
         <!-- Klaviyo SDK configuration -->
+
+        <!-- The Klaviyo Android SDK's push-fcm AAR auto-registers
+             com.klaviyo.pushFcm.KlaviyoPushService for MESSAGING_EVENT. We strip
+             that contribution so it doesn't compete with KlaviyoFlutterPushService
+             in the merged manifest — leaving both can cause FCM to pick a service
+             non-deterministically. KlaviyoFlutterPushService extends KlaviyoPushService,
+             so push processing is preserved. -->
+        <service
+            android:name="com.klaviyo.pushFcm.KlaviyoPushService"
+            tools:node="remove" />
+
+        <!-- Auto-registers KlaviyoFlutterPushService for the default case
+             (Option B in the README): host apps need no manifest changes and silent
+             pushes are forwarded to the Flutter event stream automatically.
+
+             android:priority on the intent-filter is set above 0 so this service
+             wins FCM resolution against firebase_messaging's
+             FlutterFirebaseMessagingService (which registers at default priority
+             0). KlaviyoFlutterPushService still calls super.onMessageReceived() so
+             non-Klaviyo FCM messages flow through the standard path; hosts that
+             need custom onMessageReceived handling can use Option A in the README
+             to opt out of this auto-registration and declare their own subclass. -->
+        <service
+            android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService"
+            android:exported="false">
+            <intent-filter android:priority="100">
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

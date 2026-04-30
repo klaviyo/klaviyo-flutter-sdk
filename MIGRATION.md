@@ -71,9 +71,15 @@ official SDK you will need to update your native setup:
 
 - **iOS:** Update `AppDelegate.swift` — see the
   [README](https://pub.dev/packages/klaviyo_flutter_sdk) for details.
-- **Android:** Update `MainActivity.kt` and declare `KlaviyoPushService` in
-  `AndroidManifest.xml` — see the
-  [README](https://pub.dev/packages/klaviyo_flutter_sdk) for details.
+- **Android:** Update `MainActivity.kt` — see the
+  [README](https://pub.dev/packages/klaviyo_flutter_sdk) for details. The
+  plugin auto-registers its FCM service, so no `AndroidManifest.xml` changes
+  are required by default. If you previously declared
+  `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for the
+  community SDK, remove it — leaving it alongside the plugin's auto-registered
+  service causes a manifest-merger conflict. Hosts that need a custom subclass
+  of `KlaviyoPushService` should follow the README's "Silent Push → Android"
+  Option A.
 
 If you aren't using push notifications, no native changes are needed.
 
