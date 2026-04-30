@@ -77,9 +77,7 @@ official SDK you will need to update your native setup:
   are required by default. If you previously declared
   `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for the
   community SDK, remove it — leaving it alongside the plugin's auto-registered
-  service causes a manifest-merger conflict. Hosts that need a custom subclass
-  of `KlaviyoPushService` should follow the README's "Silent Push → Android"
-  Option A.
+  service causes a manifest-merger conflict.
 
 If you aren't using push notifications, no native changes are needed.
 

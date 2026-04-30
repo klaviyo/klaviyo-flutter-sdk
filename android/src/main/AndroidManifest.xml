@@ -21,17 +21,15 @@
             android:name="com.klaviyo.pushFcm.KlaviyoPushService"
             tools:node="remove" />
 
-        <!-- Auto-registers KlaviyoFlutterPushService for the default case
-             (Option B in the README): host apps need no manifest changes and silent
-             pushes are forwarded to the Flutter event stream automatically.
+        <!-- Auto-registers KlaviyoFlutterPushService so host apps need no
+             manifest changes and silent pushes are forwarded to the Flutter
+             event stream automatically.
 
              android:priority on the intent-filter is set above 0 so this service
              wins FCM resolution against firebase_messaging's
              FlutterFirebaseMessagingService (which registers at default priority
-             0). KlaviyoFlutterPushService still calls super.onMessageReceived() so
-             non-Klaviyo FCM messages flow through the standard path; hosts that
-             need custom onMessageReceived handling can use Option A in the README
-             to opt out of this auto-registration and declare their own subclass. -->
+             0). KlaviyoFlutterPushService still calls super.onMessageReceived()
+             so non-Klaviyo FCM messages flow through the standard path. -->
         <service
             android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService"
             android:exported="false">

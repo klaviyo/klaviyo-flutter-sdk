@@ -226,9 +226,7 @@ class MainActivity : FlutterActivity() {
 
 **2. FCM Service Registration**
 
-The plugin auto-registers `KlaviyoFlutterPushService` (a subclass of `KlaviyoPushService`) for `com.google.firebase.MESSAGING_EVENT` so Klaviyo processes FCM messages before Flutter's default `FirebaseMessagingService` and forwards Klaviyo silent pushes to the Dart event stream. **No host-app manifest changes are required by default.**
-
-If you need a custom subclass (e.g. to override `onMessageReceived` for your own push handling), see [Silent Push → Android](#android) for the opt-out path.
+The plugin auto-registers `KlaviyoFlutterPushService` (a subclass of `KlaviyoPushService`) for `com.google.firebase.MESSAGING_EVENT` so Klaviyo processes FCM messages before Flutter's default `FirebaseMessagingService` and forwards Klaviyo silent pushes to the Dart event stream. **No host-app manifest changes are required.**
 
 > **Migrating from earlier versions**: if your app previously declared `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for `MESSAGING_EVENT`, **remove it**. Leaving both declarations in the merged manifest causes FCM to pick a service non-deterministically.
 
@@ -421,56 +419,7 @@ iOS delivers silent pushes via `didReceiveRemoteNotification:fetchCompletionHand
 
 #### Android
 
-The Klaviyo Flutter plugin ships an FCM service (`KlaviyoFlutterPushService`) that forwards Klaviyo silent pushes to the Dart event stream. Choose one of the following:
-
-##### Option A: Custom subclass (Recommended for advanced cases)
-
-Best if you need to override push behavior in `KlaviyoPushService` (for example, to add a custom `onMessageReceived`). Extend `KlaviyoFlutterPushService` (not the base `KlaviyoPushService`) so silent push forwarding to Flutter is preserved, then opt out of the plugin's auto-registered service in your `android/app/src/main/AndroidManifest.xml`:
-
-```xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-    <application>
-        <!-- Opt out of the plugin's auto-registered service -->
-        <service
-            android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService"
-            tools:node="remove" />
-
-        <!-- Register your own subclass.
-             The android:priority="100" matches the plugin's auto-registration so
-             this service wins FCM resolution against firebase_messaging's
-             FlutterFirebaseMessagingService (which registers at default priority
-             0) when both libraries are present. -->
-        <service
-            android:name=".MyKlaviyoFlutterPushService"
-            android:exported="false">
-            <intent-filter android:priority="100">
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
-            </intent-filter>
-        </service>
-    </application>
-</manifest>
-```
-
-```kotlin
-package com.example.myapp
-
-import com.google.firebase.messaging.RemoteMessage
-import com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService
-
-class MyKlaviyoFlutterPushService : KlaviyoFlutterPushService() {
-    override fun onMessageReceived(message: RemoteMessage) {
-        // Your custom handling here.
-        // Always call super so Klaviyo continues to process the message and
-        // silent pushes continue to forward to Flutter.
-        super.onMessageReceived(message)
-    }
-}
-```
-
-##### Option B: Auto setup (Default, zero-config)
-
-The plugin's manifest already contributes `KlaviyoFlutterPushService`. No host configuration is required — silent push events flow to your Dart listener automatically.
+The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM service that forwards Klaviyo silent pushes to the Dart event stream. No host configuration is required — silent push events flow to your Dart listener automatically.
 
 #### Dart-Side Listener
 
