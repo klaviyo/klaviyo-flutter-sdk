@@ -9,6 +9,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PUBSPEC="$REPO_ROOT/pubspec.yaml"
 PLIST="$REPO_ROOT/ios/klaviyo-sdk-configuration.plist"
 EXAMPLE_PUBSPEC="$REPO_ROOT/example/pubspec.yaml"
+EXAMPLE_PBXPROJ="$REPO_ROOT/example/ios/Runner.xcodeproj/project.pbxproj"
 
 # Extract version from pubspec.yaml
 VERSION=$(grep '^version:' "$PUBSPEC" | awk '{print $2}')
@@ -52,4 +53,17 @@ if [ -f "$EXAMPLE_PUBSPEC" ]; then
   fi
 
   echo "Synced version $NEW_EXAMPLE_VERSION to $EXAMPLE_PUBSPEC"
+fi
+
+# Update hardcoded MARKETING_VERSION in example app pbxproj (RunnerTests + NotificationServiceExtension targets).
+# The main Runner target reads $(FLUTTER_BUILD_NAME) via Info.plist + Generated.xcconfig, so it isn't hardcoded
+# and won't match this pattern.
+if [ -f "$EXAMPLE_PBXPROJ" ]; then
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s/MARKETING_VERSION = [0-9][0-9.]*;/MARKETING_VERSION = $VERSION;/g" "$EXAMPLE_PBXPROJ"
+  else
+    sed -i "s/MARKETING_VERSION = [0-9][0-9.]*;/MARKETING_VERSION = $VERSION;/g" "$EXAMPLE_PBXPROJ"
+  fi
+
+  echo "Synced MARKETING_VERSION to $VERSION in $EXAMPLE_PBXPROJ"
 fi
