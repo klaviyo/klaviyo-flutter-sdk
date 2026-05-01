@@ -11,8 +11,11 @@ PLIST="$REPO_ROOT/ios/klaviyo-sdk-configuration.plist"
 EXAMPLE_PUBSPEC="$REPO_ROOT/example/pubspec.yaml"
 EXAMPLE_PBXPROJ="$REPO_ROOT/example/ios/Runner.xcodeproj/project.pbxproj"
 
-# Extract version from pubspec.yaml
-VERSION=$(grep '^version:' "$PUBSPEC" | awk '{print $2}')
+# Extract version from pubspec.yaml. Strip any +<buildnumber> suffix — the plugin convention
+# is to omit it, but if it's ever present we don't want to propagate it into downstream files
+# (would produce e.g. "0.3.0+2+1" when reassembled with the example app's build number).
+RAW_VERSION=$(grep '^version:' "$PUBSPEC" | awk '{print $2}')
+VERSION="${RAW_VERSION%%+*}"
 
 if [ -z "$VERSION" ]; then
   echo "Error: Could not read version from $PUBSPEC" >&2
