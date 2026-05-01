@@ -1,0 +1,47 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "606549238ec7eb8e94afacea3b889739e7075737",
+  "prompts": {
+    "a3f1da7ab0b4c2ee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2f13875f-06bd-424b-8b52-bdc6f25ba81c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Andrew Balmer",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 69,
+      "overriden_lines": 0
+    },
+    "ad32c4bab9b0119e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8263139c-0eca-4e35-8986-50492eac024d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Andrew Balmer",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2394,
+      "overriden_lines": 0
+    },
+    "edf0ab75bb864430": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c6610edc-fe15-455e-a415-9808d273abd7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Andrew Balmer",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1442,
+      "overriden_lines": 0
+    }
+  }
+}
