@@ -56,13 +56,15 @@ if [ -f "$EXAMPLE_PUBSPEC" ]; then
 fi
 
 # Update hardcoded MARKETING_VERSION in example app pbxproj (RunnerTests + NotificationServiceExtension targets).
-# The main Runner target reads $(FLUTTER_BUILD_NAME) via Info.plist + Generated.xcconfig, so it isn't hardcoded
-# and won't match this pattern.
+# The main Runner target reads $(FLUTTER_BUILD_NAME) via Info.plist + Generated.xcconfig, so it isn't hardcoded.
+# The character class accepts SemVer pre-release identifiers (digits, letters, dots, hyphens) so values like
+# "0.3.0-alpha.1" round-trip correctly. It deliberately excludes "$" / "(" / ")" / quotes so dynamic references
+# like `MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";` are left untouched.
 if [ -f "$EXAMPLE_PBXPROJ" ]; then
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s/MARKETING_VERSION = [0-9][0-9.]*;/MARKETING_VERSION = $VERSION;/g" "$EXAMPLE_PBXPROJ"
+    sed -i '' "s/MARKETING_VERSION = [0-9A-Za-z.-][0-9A-Za-z.-]*;/MARKETING_VERSION = $VERSION;/g" "$EXAMPLE_PBXPROJ"
   else
-    sed -i "s/MARKETING_VERSION = [0-9][0-9.]*;/MARKETING_VERSION = $VERSION;/g" "$EXAMPLE_PBXPROJ"
+    sed -i "s/MARKETING_VERSION = [0-9A-Za-z.-][0-9A-Za-z.-]*;/MARKETING_VERSION = $VERSION;/g" "$EXAMPLE_PBXPROJ"
   fi
 
   echo "Synced MARKETING_VERSION to $VERSION in $EXAMPLE_PBXPROJ"
