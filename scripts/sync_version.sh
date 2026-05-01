@@ -12,8 +12,7 @@ EXAMPLE_PUBSPEC="$REPO_ROOT/example/pubspec.yaml"
 EXAMPLE_PBXPROJ="$REPO_ROOT/example/ios/Runner.xcodeproj/project.pbxproj"
 
 # Extract version from pubspec.yaml. Strip any +<buildnumber> suffix — the plugin convention
-# is to omit it, but if it's ever present we don't want to propagate it into downstream files
-# (would produce e.g. "0.3.0+2+1" when reassembled with the example app's build number).
+# is to omit it, but if it's ever present we don't want to propagate it into downstream files.
 RAW_VERSION=$(grep '^version:' "$PUBSPEC" | awk '{print $2}')
 VERSION="${RAW_VERSION%%+*}"
 
@@ -39,23 +38,17 @@ PLIST
 
 echo "Synced version $VERSION to $PLIST"
 
-# Update example app pubspec.yaml — peg build name to plugin version, preserve build number
+# Update example app pubspec.yaml — peg version to plugin version. The example app is
+# publish_to: 'none' and never goes to a store, so no build number suffix is needed; Flutter
+# defaults FLUTTER_BUILD_NUMBER to 1 when omitted.
 if [ -f "$EXAMPLE_PUBSPEC" ]; then
-  CURRENT_EXAMPLE_VERSION=$(grep '^version:' "$EXAMPLE_PUBSPEC" | awk '{print $2}')
-  if [[ "$CURRENT_EXAMPLE_VERSION" == *"+"* ]]; then
-    BUILD_NUMBER="${CURRENT_EXAMPLE_VERSION#*+}"
-  else
-    BUILD_NUMBER=1
-  fi
-  NEW_EXAMPLE_VERSION="$VERSION+$BUILD_NUMBER"
-
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s/^version: .*/version: $NEW_EXAMPLE_VERSION/" "$EXAMPLE_PUBSPEC"
+    sed -i '' "s/^version: .*/version: $VERSION/" "$EXAMPLE_PUBSPEC"
   else
-    sed -i "s/^version: .*/version: $NEW_EXAMPLE_VERSION/" "$EXAMPLE_PUBSPEC"
+    sed -i "s/^version: .*/version: $VERSION/" "$EXAMPLE_PUBSPEC"
   fi
 
-  echo "Synced version $NEW_EXAMPLE_VERSION to $EXAMPLE_PUBSPEC"
+  echo "Synced version $VERSION to $EXAMPLE_PUBSPEC"
 fi
 
 # Update hardcoded MARKETING_VERSION in example app pbxproj (RunnerTests + NotificationServiceExtension targets).
