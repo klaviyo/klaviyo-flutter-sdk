@@ -8,6 +8,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PUBSPEC="$REPO_ROOT/pubspec.yaml"
 PLIST="$REPO_ROOT/ios/klaviyo-sdk-configuration.plist"
+EXAMPLE_PUBSPEC="$REPO_ROOT/example/pubspec.yaml"
 
 # Extract version from pubspec.yaml
 VERSION=$(grep '^version:' "$PUBSPEC" | awk '{print $2}')
@@ -33,3 +34,22 @@ cat > "$PLIST" <<PLIST
 PLIST
 
 echo "Synced version $VERSION to $PLIST"
+
+# Update example app pubspec.yaml — peg build name to plugin version, preserve build number
+if [ -f "$EXAMPLE_PUBSPEC" ]; then
+  CURRENT_EXAMPLE_VERSION=$(grep '^version:' "$EXAMPLE_PUBSPEC" | awk '{print $2}')
+  if [[ "$CURRENT_EXAMPLE_VERSION" == *"+"* ]]; then
+    BUILD_NUMBER="${CURRENT_EXAMPLE_VERSION#*+}"
+  else
+    BUILD_NUMBER=1
+  fi
+  NEW_EXAMPLE_VERSION="$VERSION+$BUILD_NUMBER"
+
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s/^version: .*/version: $NEW_EXAMPLE_VERSION/" "$EXAMPLE_PUBSPEC"
+  else
+    sed -i "s/^version: .*/version: $NEW_EXAMPLE_VERSION/" "$EXAMPLE_PUBSPEC"
+  fi
+
+  echo "Synced version $NEW_EXAMPLE_VERSION to $EXAMPLE_PUBSPEC"
+fi
