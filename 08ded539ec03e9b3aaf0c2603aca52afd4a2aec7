@@ -1,0 +1,29 @@
+README.md
+  f73fb7d447509913 227,420
+android/src/main/AndroidManifest.xml
+  f73fb7d447509913 24-26,31-32
+MIGRATION.md
+  f73fb7d447509913 80
+android/src/main/kotlin/com/klaviyo/klaviyo_flutter_sdk/KlaviyoFlutterPushService.kt
+  f73fb7d447509913 6-7,15-16,18,22-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "08ded539ec03e9b3aaf0c2603aca52afd4a2aec7",
+  "prompts": {
+    "f73fb7d447509913": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7b37d6a-8a23-42d9-911f-5895d5adc6f7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "aahil nishad",
+      "messages": [],
+      "total_additions": 23,
+      "total_deletions": 101,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    }
+  }
+}
