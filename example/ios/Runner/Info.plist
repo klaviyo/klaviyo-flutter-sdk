@@ -2,6 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Bluetooth usage required for testing the Flutter SDK</string>
+	<key>NSSiriUsageDescription</key>
+	<string>Siri usage required for testing the Flutter SDK</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech Recognition usage required for testing the Flutter SDK</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Motion usage required for testing the Flutter SDK</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Apple Music usage required for testing the Flutter SDK</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Contacts usage required for testing the Flutter SDK</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Calendar usage required for testing the Flutter SDK</string>
 	<key>klaviyo_app_group</key>
 	<string>group.com.klaviyo.FlutterExample</string>
 	<key>klaviyo_badge_autoclearing</key>
