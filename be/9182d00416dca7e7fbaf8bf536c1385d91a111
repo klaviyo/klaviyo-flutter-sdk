@@ -1,0 +1,23 @@
+android/src/main/kotlin/com/klaviyo/klaviyo_flutter_sdk/KlaviyoFlutterPushService.kt
+  f73fb7d447509913 15-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "be9182d00416dca7e7fbaf8bf536c1385d91a111",
+  "prompts": {
+    "f73fb7d447509913": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7b37d6a-8a23-42d9-911f-5895d5adc6f7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "aahil nishad",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 16,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}
