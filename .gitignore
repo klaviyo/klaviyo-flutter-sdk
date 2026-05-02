@@ -48,6 +48,7 @@ build/
 # IDE
 .vscode/
 .idea/*
+android/.idea/
 !.idea/runConfigurations/
 *.iml
 *.ipr
