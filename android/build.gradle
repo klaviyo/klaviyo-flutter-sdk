@@ -2,14 +2,14 @@ group 'com.klaviyo.klaviyo_flutter_sdk'
 version '1.0'
 
 buildscript {
-    ext.kotlin_version = '1.9.25'
+    ext.kotlin_version = '2.2.20'
     repositories {
         google()
         mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.11.0'
+        classpath 'com.android.tools.build:gradle:8.13.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -47,7 +47,7 @@ android {
     }
 }
 
-def klaviyoSdkVersion = "4.3.1"
+def klaviyoSdkVersion = "4.4.0"
 
 // Whether to include the full forms module (in-app forms rendering).
 // Set klaviyoIncludeForms=false in your host app's gradle.properties to exclude forms.
@@ -81,5 +81,5 @@ dependencies {
         implementation "com.github.klaviyo.klaviyo-android-sdk:forms-core:$klaviyoSdkVersion"
     }
 
-    implementation "com.google.firebase:firebase-messaging:24.1.0"
+    implementation "com.google.firebase:firebase-messaging:25.0.1"
 }
