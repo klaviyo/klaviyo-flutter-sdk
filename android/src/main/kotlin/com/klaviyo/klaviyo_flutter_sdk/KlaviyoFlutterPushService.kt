@@ -30,18 +30,16 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
     private fun forwardSilentPush(message: RemoteMessage) {
         Registry.log.info("Silent push received: forwarding to Flutter event stream.")
 
-        val plugin = KlaviyoFlutterSdkPlugin.instance
-        if (plugin != null) {
+        KlaviyoFlutterSdkPlugin.instance?.let { plugin ->
             plugin.handleSilentPush(message.data)
-            return
+        } ?: run {
+            // Plugin not attached — typically because FCM woke the app process to
+            // deliver this message while the user had the app killed. Persist so the
+            // plugin can replay it on the next engine attach.
+            Registry.log.info(
+                "KlaviyoFlutterSdkPlugin not attached; persisting silent push for replay.",
+            )
+            SilentPushCache.persist(applicationContext, message.data)
         }
-
-        // Plugin not attached — typically because FCM woke the app process to
-        // deliver this message while the user had the app killed. Persist so the
-        // plugin can replay it on the next engine attach.
-        Registry.log.info(
-            "KlaviyoFlutterSdkPlugin not attached; persisting silent push for replay.",
-        )
-        SilentPushCache.persist(applicationContext, message.data)
     }
 }

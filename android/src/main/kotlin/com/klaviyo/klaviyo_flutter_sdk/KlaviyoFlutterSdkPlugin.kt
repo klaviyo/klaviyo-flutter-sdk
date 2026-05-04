@@ -49,10 +49,10 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
-    // Cached silent push event for the cold-start race where a Klaviyo silent push
-    // is delivered to the FCM service before Flutter has subscribed to the EventChannel.
-    // Replayed on the next onListen.
-    private var cachedSilentPush: Map<String, Any?>? = null
+    // Cached silent push events for the cold-start race where Klaviyo silent pushes
+    // are delivered to the FCM service before Flutter has subscribed to the EventChannel.
+    // All pending events are replayed on the next onListen.
+    private val cachedSilentPushes: MutableList<Map<String, Any?>> = mutableListOf()
 
     companion object {
         private const val TAG = "KlaviyoFlutter"
@@ -80,11 +80,9 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
-                    // Replay any cached silent push that arrived before Flutter subscribed.
-                    cachedSilentPush?.let {
-                        events?.success(it)
-                        cachedSilentPush = null
-                    }
+                    // Replay any cached silent pushes that arrived before Flutter subscribed.
+                    cachedSilentPushes.forEach { events?.success(it) }
+                    cachedSilentPushes.clear()
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -93,18 +91,19 @@ class KlaviyoFlutterSdkPlugin :
             },
         )
 
-        // Rehydrate any silent push persisted across a process boundary (e.g. FCM
-        // delivered a message while the app was killed). Stash it in
-        // cachedSilentPush so it replays when Flutter subscribes via onListen.
-        SilentPushCache.consume(applicationContext)?.let { data ->
-            cachedSilentPush =
+        instance = this
+
+        // Rehydrate any silent pushes persisted across a process boundary (e.g. FCM
+        // delivered messages while the app was killed). Stash them in
+        // cachedSilentPushes so they replay when Flutter subscribes via onListen.
+        SilentPushCache.consume(applicationContext).forEach { data ->
+            cachedSilentPushes.add(
                 mapOf(
                     "type" to "silent_push_received",
                     "data" to data,
-                )
+                ),
+            )
         }
-
-        instance = this
     }
 
     override fun onMethodCall(
@@ -584,7 +583,7 @@ class KlaviyoFlutterSdkPlugin :
                 sink.success(payload)
             } else {
                 Registry.log.verbose("Flutter not ready. Caching silent push event.")
-                cachedSilentPush = payload
+                cachedSilentPushes.add(payload)
             }
         }
     }
