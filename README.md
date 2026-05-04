@@ -463,7 +463,7 @@ Android handles badge counts automatically.
 
 ## In-App Forms
 
-In-app forms — including modal, full-screen, and floating/flyout layouts — are configured in the Klaviyo dashboard and rendered automatically by the SDK. No Flutter or native integration changes are required to support new presentation styles.
+In-app forms — these are configured in the Klaviyo dashboard and rendered automatically by the SDK. No Flutter or native integration changes are required to support new presentation styles.
 
 ```dart
 // Register with default session timeout (1 hour)
