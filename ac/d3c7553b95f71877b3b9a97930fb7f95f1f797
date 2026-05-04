@@ -1,0 +1,38 @@
+test/form_lifecycle_event_test.dart
+  7a0b14020dde491f 204-221
+lib/src/models/form_lifecycle_event.dart
+  7a0b14020dde491f 72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "acd3c7553b95f71877b3b9a97930fb7f95f1f797",
+  "prompts": {
+    "7a0b14020dde491f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9430e4c0-2e7a-480f-947e-f061999ce4a6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew Balmer",
+      "messages": [],
+      "total_additions": 31,
+      "total_deletions": 16,
+      "accepted_lines": 1039,
+      "overriden_lines": 2
+    },
+    "ad32c4bab9b0119e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8263139c-0eca-4e35-8986-50492eac024d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null,
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
