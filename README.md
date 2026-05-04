@@ -18,9 +18,11 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Requesting Permissions](#requesting-notification-permissions)
   - [Token Collection](#token-collection)
   - [Handling Push Opens](#handling-push-notification-opens)
+  - [Action Buttons](#action-buttons)
   - [Rich Push](#rich-push)
   - [Badge Count (iOS)](#badge-count-ios-only)
 - [In-App Forms](#in-app-forms)
+  - [Form Lifecycle Events](#form-lifecycle-events)
 - [Deep Linking](#deep-linking)
 - [Geofencing](#geofencing)
 - [Optional Module Configuration](#optional-module-configuration)
@@ -440,6 +442,12 @@ KlaviyoSDK().onPushNotification.listen((event) {
 
 > **Note**: This event fires only for pure silent pushes (no visible content). Standard notifications that include `content-available` are handled by `willPresent`/`didReceive` and will not trigger this event.
 
+### Action Buttons
+
+Klaviyo push messages can include up to three tappable action buttons, each with a custom label and either a deep link or an open-app action. Buttons are configured in the Klaviyo dashboard — no Flutter or native integration changes are required, and tapping a button dismisses the notification automatically.
+
+If a button is configured with a deep link, your existing [Deep Linking](#deep-linking) setup handles navigation when the user taps it.
+
 ### Rich Push
 
 [Rich Push](https://help.klaviyo.com/hc/en-us/articles/16917302437275) lets you add images and videos (iOS only) to push notifications.
@@ -454,6 +462,8 @@ Klaviyo supports setting or incrementing the badge count on iOS push notificatio
 Android handles badge counts automatically.
 
 ## In-App Forms
+
+In-app forms — these are configured in the Klaviyo dashboard and rendered automatically by the SDK. No Flutter or native integration changes are required to support new presentation styles.
 
 ```dart
 // Register with default session timeout (1 hour)
@@ -475,14 +485,27 @@ await KlaviyoSDK().registerForInAppForms(configuration: infiniteConfig);
 // Unregister from in-app forms
 await KlaviyoSDK().unregisterFromInAppForms();
 ```
+
+The `sessionTimeoutDuration` controls how long forms remain eligible to display after app backgrounding. For more details, see the native SDK documentation: [Android](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) | [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages)
+
+### Form Lifecycle Events
+
+Subscribe to `onFormLifecycleEvent` to observe when forms are shown, dismissed, or have a CTA tapped. Events are typed and exhaustive — Dart's pattern matching ensures every case is handled.
+
 ```dart
-// Listen for form events
-KlaviyoSDK().onFormEvent.listen((event) {
-  _logger.info('Form event: ${event['type']}');
+KlaviyoSDK().onFormLifecycleEvent.listen((event) {
+  switch (event) {
+    case FormShown():
+      _logger.info('Form shown: ${event.formId} (${event.formName})');
+    case FormDismissed():
+      _logger.info('Form dismissed: ${event.formId}');
+    case FormCtaClicked():
+      _logger.info('CTA "${event.buttonLabel}" clicked → ${event.deepLinkUrl}');
+  }
 });
 ```
 
-The `sessionTimeoutDuration` controls how long forms remain eligible to display after app backgrounding. For more details, see the native SDK documentation: [Android](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) | [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages)
+`FormCtaClicked` fires only when the tapped CTA has a deep link configured — the native SDK initiates the deep link before this event is emitted, so your existing [Deep Linking](#deep-linking) setup handles navigation. `FormDismissed` fires for user-initiated dismissals (tap outside, close button) and not for SDK-internal teardown such as session timeouts.
 
 ## Deep Linking
 
@@ -769,7 +792,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `isInitialized` | `bool` | Whether the SDK is initialized |
 | `apiKey` | `String?` | Current API key |
 | `onPushNotification` | `Stream<Map<String, dynamic>>` | Push notification events |
-| `onFormEvent` | `Stream<Map<String, dynamic>>` | In-app form events |
+| `onFormLifecycleEvent` | `Stream<FormLifecycleEvent>` | Typed in-app form lifecycle events |
 
 ### Models
 
@@ -835,6 +858,24 @@ InAppFormConfig({
 
 // Infinite session timeout (no timeout)
 InAppFormConfig.infinite()
+```
+
+#### FormLifecycleEvent
+
+Sealed class representing in-app form lifecycle events. Use Dart's pattern matching to handle each subtype exhaustively.
+
+```dart
+sealed class FormLifecycleEvent {
+  final String formId;
+  final String formName;
+}
+
+class FormShown extends FormLifecycleEvent { ... }
+class FormDismissed extends FormLifecycleEvent { ... }
+class FormCtaClicked extends FormLifecycleEvent {
+  final String buttonLabel;
+  final String deepLinkUrl;
+}
 ```
 
 ### Enums
