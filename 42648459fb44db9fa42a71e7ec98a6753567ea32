@@ -1,0 +1,73 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "42648459fb44db9fa42a71e7ec98a6753567ea32",
+  "prompts": {
+    "4e6a915dd623df08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44823565-c19f-4dcc-a04e-0a65313e4db6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "aahil nishad",
+      "messages": [],
+      "total_additions": 54,
+      "total_deletions": 37,
+      "accepted_lines": 47,
+      "overriden_lines": 0
+    },
+    "6902d2775c9a7397": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1efaebd2-c59f-477c-8327-c1012c45c491",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "aahil nishad",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "73d3bb467435aab2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f820e0c9-e5a9-4fa6-b35e-789d61cb513f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "aahil nishad",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 37,
+      "accepted_lines": 0,
+      "overriden_lines": 6
+    },
+    "d4ac7bc02e5fffd3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f19a54b3-4e74-41ee-8175-3fe05c81b573",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "aahil nishad",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "f89ea4d8a84ce168": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea75f9c6-9fb0-408b-919d-ad549e5fed35",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "aahil nishad",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 11,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
