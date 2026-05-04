@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "fbf6fd16a51cfbb370a0ba19fab3a86c0e995878",
+  "prompts": {
+    "73d3bb467435aab2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f820e0c9-e5a9-4fa6-b35e-789d61cb513f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "aahil nishad",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
