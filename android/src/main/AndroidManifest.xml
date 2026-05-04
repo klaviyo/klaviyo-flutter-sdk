@@ -10,17 +10,6 @@
 
     <application>
         <!-- Klaviyo SDK configuration -->
-
-        <!-- The Klaviyo Android SDK's push-fcm AAR auto-registers
-             com.klaviyo.pushFcm.KlaviyoPushService for MESSAGING_EVENT. We strip
-             that contribution so it doesn't compete with KlaviyoFlutterPushService
-             in the merged manifest — leaving both can cause FCM to pick a service
-             non-deterministically. KlaviyoFlutterPushService extends KlaviyoPushService,
-             so push processing is preserved. -->
-        <service
-            android:name="com.klaviyo.pushFcm.KlaviyoPushService"
-            tools:node="remove" />
-
         <!-- Auto-registers KlaviyoFlutterPushService so host apps need no
              manifest changes and silent pushes are forwarded to the Flutter
              event stream automatically.
@@ -33,7 +22,7 @@
         <service
             android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService"
             android:exported="false">
-            <intent-filter android:priority="100">
+            <intent-filter android:priority="1">
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
