@@ -552,13 +552,23 @@ extension KlaviyoFlutterSdkPlugin {
         KlaviyoSDK().registerFormLifecycleHandler { [weak self] event in
             guard let self = self else { return }
 
+            // Explicitly map each native enum case to its bridge string. This decouples
+            // the wrapper's serialization contract from the native SDK's `eventName`
+            // property and mirrors the explicit mapping used on the Android side, so
+            // adding a new event type natively becomes a compile error here rather than
+            // a silent runtime drop on the Dart `fromMap` parser.
             var data: [String: Any] = [
-                "event": event.eventName,
                 "formId": event.formId,
                 "formName": event.formName
             ]
 
-            if case let .formCtaClicked(_, _, buttonLabel, deepLinkUrl) = event {
+            switch event {
+            case .formShown:
+                data["event"] = "formShown"
+            case .formDismissed:
+                data["event"] = "formDismissed"
+            case let .formCtaClicked(_, _, buttonLabel, deepLinkUrl):
+                data["event"] = "formCtaClicked"
                 data["buttonLabel"] = buttonLabel
                 data["deepLinkUrl"] = deepLinkUrl.absoluteString
             }
