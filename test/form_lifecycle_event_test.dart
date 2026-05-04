@@ -201,19 +201,24 @@ void main() {
         );
       });
 
-      test('parses empty formName', () {
-        final event = FormLifecycleEvent.fromMap({
-          'type': 'form_lifecycle_event',
-          'data': {
-            'event': 'formShown',
-            'formId': 'abc123',
-            'formName': '',
-          },
-        });
-
-        expect(event, isA<FormShown>());
-        expect(event.formId, 'abc123');
-        expect(event.formName, '');
+      test('throws on empty formName', () {
+        expect(
+          () => FormLifecycleEvent.fromMap({
+            'type': 'form_lifecycle_event',
+            'data': {
+              'event': 'formShown',
+              'formId': 'abc123',
+              'formName': '',
+            },
+          }),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('formName'),
+            ),
+          ),
+        );
       });
 
       test('parses null buttonLabel as empty string in formCtaClicked', () {
