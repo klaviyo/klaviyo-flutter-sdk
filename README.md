@@ -523,8 +523,6 @@ final StreamSubscription<FormLifecycleEvent> subscription =
 subscription.cancel();
 ```
 
-The `switch` above is exhaustive — the Dart compiler enforces that all three subtypes (`FormShown`, `FormDismissed`, `FormCtaClicked`) are handled, so you will get a compile-time warning if a new subtype is ever added.
-
 **Field reference:**
 
 | Field | Type | Subtypes | Notes |
