@@ -77,7 +77,8 @@ official SDK you will need to update your native setup:
   are required by default. If you previously declared
   `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for the
   community SDK, remove it — leaving it alongside the plugin's auto-registered
-  service results in a redundant service declaration.
+  service causes Android to deliver FCM messages to the wrong service, which
+  breaks silent push forwarding to Flutter.
 
 If you aren't using push notifications, no native changes are needed.
 
