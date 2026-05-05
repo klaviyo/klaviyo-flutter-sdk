@@ -22,7 +22,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Rich Push](#rich-push)
   - [Badge Count (iOS)](#badge-count-ios-only)
 - [In-App Forms](#in-app-forms)
-  - [Form Lifecycle Events](#form-lifecycle-events)
+  - [Monitoring Form Lifecycle Events](#monitoring-form-lifecycle-events)
 - [Deep Linking](#deep-linking)
 - [Geofencing](#geofencing)
 - [Optional Module Configuration](#optional-module-configuration)
@@ -488,24 +488,49 @@ await KlaviyoSDK().unregisterFromInAppForms();
 
 The `sessionTimeoutDuration` controls how long forms remain eligible to display after app backgrounding. For more details, see the native SDK documentation: [Android](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) | [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages)
 
-### Form Lifecycle Events
+### Monitoring Form Lifecycle Events
 
-Subscribe to `onFormLifecycleEvent` to observe when forms are shown, dismissed, or have a CTA tapped. Events are typed and exhaustive — Dart's pattern matching ensures every case is handled.
+> Available in Flutter SDK 0.2.0 and higher. For the equivalent API on other platforms, see the [Android SDK](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) and [iOS SDK](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages) documentation.
+
+Subscribe to `onFormLifecycleEvent` to observe in-app form lifecycle changes. This is useful for forwarding form engagement data to a third-party analytics platform such as Amplitude, Segment, or Mixpanel, or for triggering app-specific logic when a form is shown or dismissed.
+
+Events are delivered on the main isolate (Flutter's UI thread) via the native `EventChannel`, in the same order they are emitted by the native SDK.
 
 ```dart
-KlaviyoSDK().onFormLifecycleEvent.listen((event) {
+import 'dart:async';
+import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
+
+final _logger = Logger('MyApp');
+
+// Subscribe to form lifecycle events
+final StreamSubscription<FormLifecycleEvent> subscription =
+    KlaviyoSDK().onFormLifecycleEvent.listen((event) {
   switch (event) {
     case FormShown():
-      _logger.info('Form shown: ${event.formId} (${event.formName})');
+      _logger.info('Form shown — id: ${event.formId}, name: ${event.formName}');
     case FormDismissed():
-      _logger.info('Form dismissed: ${event.formId}');
+      _logger.info('Form dismissed — id: ${event.formId}, name: ${event.formName}');
     case FormCtaClicked():
-      _logger.info('CTA "${event.buttonLabel}" clicked → ${event.deepLinkUrl}');
+      _logger.info(
+        'CTA tapped — id: ${event.formId}, name: ${event.formName}, '
+        'button: "${event.buttonLabel}", url: ${event.deepLinkUrl}',
+      );
   }
 });
+
+// Cancel when no longer needed (e.g. in dispose())
+subscription.cancel();
 ```
 
-`FormCtaClicked` fires only when the tapped CTA has a deep link configured — the native SDK initiates the deep link before this event is emitted, so your existing [Deep Linking](#deep-linking) setup handles navigation. `FormDismissed` fires for user-initiated dismissals (tap outside, close button) and not for SDK-internal teardown such as session timeouts.
+**Field reference:**
+
+| Field | Type | Subtypes | Notes |
+|-------|------|----------|-------|
+| `formId` | `String` | All | Unique identifier for the form |
+| `formName` | `String` | All | Display name configured in Klaviyo dashboard |
+| `buttonLabel` | `String` | `FormCtaClicked` only | Label of the tapped CTA button |
+| `deepLinkUrl` | `String` | `FormCtaClicked` only | Deep link URL configured for the CTA |
 
 ## Deep Linking
 
