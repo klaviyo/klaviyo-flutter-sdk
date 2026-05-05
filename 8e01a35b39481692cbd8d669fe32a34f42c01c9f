@@ -1,0 +1,36 @@
+ios/Classes/KlaviyoFlutterSdkPlugin.swift
+  7a0b14020dde491f 555-559,565-571
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "8e01a35b39481692cbd8d669fe32a34f42c01c9f",
+  "prompts": {
+    "7a0b14020dde491f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9430e4c0-2e7a-480f-947e-f061999ce4a6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew Balmer",
+      "messages": [],
+      "total_additions": 612,
+      "total_deletions": 0,
+      "accepted_lines": 1632,
+      "overriden_lines": 0
+    },
+    "ad32c4bab9b0119e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8263139c-0eca-4e35-8986-50492eac024d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null,
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
