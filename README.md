@@ -494,7 +494,7 @@ The `sessionTimeoutDuration` controls how long forms remain eligible to display 
 
 Subscribe to `onFormLifecycleEvent` to observe in-app form lifecycle changes. This is useful for forwarding form engagement data to a third-party analytics platform such as Amplitude, Segment, or Mixpanel, or for triggering app-specific logic when a form is shown or dismissed.
 
-Events are delivered on the main isolate (Flutter's UI thread) via the native `EventChannel`, in the same order they are emitted by the native SDK. Subscribe before calling `registerForInAppForms()` to ensure no events are missed — the stream buffers any events that arrive before a listener is attached.
+Events are delivered on the main isolate (Flutter's UI thread) via the native `EventChannel`, in the same order they are emitted by the native SDK.
 
 ```dart
 import 'dart:async';
@@ -508,17 +508,10 @@ final StreamSubscription<FormLifecycleEvent> subscription =
     KlaviyoSDK().onFormLifecycleEvent.listen((event) {
   switch (event) {
     case FormShown():
-      // Fires when the SDK presents a form to the user.
       _logger.info('Form shown — id: ${event.formId}, name: ${event.formName}');
     case FormDismissed():
-      // Fires only on user-initiated dismissal (tap outside, close button).
-      // Does NOT fire when the SDK tears down the form internally (e.g. session
-      // timeout, programmatic unregister).
       _logger.info('Form dismissed — id: ${event.formId}, name: ${event.formName}');
     case FormCtaClicked():
-      // Fires only when the tapped CTA has a deep link URL configured.
-      // The native SDK initiates deep link navigation before emitting this event,
-      // so your existing Deep Linking setup handles routing automatically.
       _logger.info(
         'CTA tapped — id: ${event.formId}, name: ${event.formName}, '
         'button: "${event.buttonLabel}", url: ${event.deepLinkUrl}',
@@ -538,8 +531,8 @@ The `switch` above is exhaustive — the Dart compiler enforces that all three s
 |-------|------|----------|-------|
 | `formId` | `String` | All | Unique identifier for the form |
 | `formName` | `String` | All | Display name configured in Klaviyo dashboard |
-| `buttonLabel` | `String` | `FormCtaClicked` only | Label of the tapped CTA button; empty string if no label is configured |
-| `deepLinkUrl` | `String` | `FormCtaClicked` only | Deep link URL configured for the CTA; always present (event is not emitted without it) |
+| `buttonLabel` | `String` | `FormCtaClicked` only | Label of the tapped CTA button |
+| `deepLinkUrl` | `String` | `FormCtaClicked` only | Deep link URL configured for the CTA |
 
 ## Deep Linking
 
