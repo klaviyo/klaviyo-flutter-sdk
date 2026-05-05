@@ -69,7 +69,7 @@ sealed class FormLifecycleEvent {
     }
 
     final formName = data['formName'] as String?;
-    if (formName == null) {
+    if (formName == null || formName.isEmpty) {
       throw ArgumentError(
         "Missing required field 'formName' in lifecycle event",
       );
