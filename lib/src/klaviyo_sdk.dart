@@ -7,6 +7,7 @@ import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
+import 'models/form_lifecycle_event.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
@@ -28,8 +29,8 @@ class KlaviyoSDK {
     _logger.level = Level.INFO;
   }
 
-  // Native wrapper service
-  late KlaviyoNativeWrapper _nativeWrapper;
+  // Native wrapper service — singleton, safe to construct eagerly
+  final KlaviyoNativeWrapper _nativeWrapper = KlaviyoNativeWrapper();
   final Logger _logger = Logger('KlaviyoSDK');
 
   // State
@@ -40,22 +41,17 @@ class KlaviyoSDK {
   bool get isInitialized => _isInitialized;
   String? get apiKey => _apiKey;
 
-  /// Initialize the Klaviyo SDK with your public API key
+  /// Initialize the Klaviyo SDK with your public API key.
+  ///
+  /// Can be called multiple times to re-initialize with a different API key,
+  /// matching native Android and iOS SDK behavior.
   Future<KlaviyoSDK> initialize({
     required String apiKey,
   }) async {
-    if (_isInitialized) {
-      _logger.warning('SDK already initialized');
-      return this;
-    }
-
     try {
-      _apiKey = apiKey;
-
-      // Initialize native wrapper
-      _nativeWrapper = KlaviyoNativeWrapper();
       await _nativeWrapper.initialize(apiKey: apiKey);
 
+      _apiKey = apiKey;
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
 
@@ -409,6 +405,23 @@ class KlaviyoSDK {
 
   /// Get form events stream
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
+
+  /// Get typed form lifecycle events stream.
+  ///
+  /// Filters for `form_lifecycle_event` type and parses the native map into a
+  /// [FormLifecycleEvent]. Malformed events are logged and dropped rather than
+  /// crashing the stream.
+  Stream<FormLifecycleEvent> get onFormLifecycleEvent =>
+      _nativeWrapper.onFormEvent
+          .where((event) => event['type'] == 'form_lifecycle_event')
+          .expand((event) {
+        try {
+          return [FormLifecycleEvent.fromMap(event)];
+        } catch (e) {
+          _logger.warning('Dropping malformed form lifecycle event: $e');
+          return [];
+        }
+      });
 
   /// Private methods
   void _ensureInitialized() {

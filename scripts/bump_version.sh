@@ -42,14 +42,6 @@ echo -e "${YELLOW}Current version:${NC} $CURRENT_VERSION"
 echo -e "${YELLOW}New version:${NC}     $NEW_VERSION"
 echo ""
 
-# Confirm with user
-read -p "Continue with version bump? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${YELLOW}Version bump cancelled${NC}"
-    exit 0
-fi
-
 echo ""
 echo -e "${BLUE}Updating files...${NC}"
 
@@ -123,7 +115,26 @@ check_file_version "pubspec.yaml" "^version:"
 check_file_version "README.md" "klaviyo_flutter_sdk:"
 check_file_version "android/src/main/res/values/strings.xml" "klaviyo_sdk_version_override"
 check_file_version "ios/klaviyo-sdk-configuration.plist" "klaviyo_sdk_version"
+check_file_version "example/pubspec.yaml" "^version:"
 check_file_version "CHANGELOG.md" "## $NEW_VERSION"
+
+# Verify ALL hardcoded MARKETING_VERSION entries in the example pbxproj are at the new
+# version. sync_version.sh rewrites entries matching `MARKETING_VERSION = <semver>;`; the
+# main Runner target's dynamic `$(FLUTTER_BUILD_NAME)` reference is intentionally excluded
+# from both the sync and this check. If sync_version.sh's sed silently fails to match
+# (e.g. the pbxproj format changes), a stale entry would otherwise slip through.
+PBXPROJ="example/ios/Runner.xcodeproj/project.pbxproj"
+escaped_version=${NEW_VERSION//./\\.}
+# `grep -c` already prints `0` on no-match; `|| true` keeps that count and prevents
+# the non-zero exit from tripping `set -e`.
+hardcoded_total=$(grep -Ec 'MARKETING_VERSION = [0-9A-Za-z.-]+;' "$PBXPROJ" || true)
+matching=$(grep -Ec "MARKETING_VERSION = ${escaped_version};" "$PBXPROJ" || true)
+if [ "$hardcoded_total" -gt 0 ] && [ "$matching" -eq "$hardcoded_total" ]; then
+    echo -e "${GREEN}✓${NC} $PBXPROJ ($matching MARKETING_VERSION entries)"
+else
+    echo -e "${RED}✗${NC} $PBXPROJ — $matching of $hardcoded_total MARKETING_VERSION entries at $NEW_VERSION"
+    ERRORS=$((ERRORS + 1))
+fi
 
 echo ""
 

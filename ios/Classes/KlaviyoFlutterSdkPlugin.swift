@@ -240,6 +240,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
                 KlaviyoSDK().registerForInAppForms(
                     configuration: InAppFormsConfig(sessionTimeoutDuration: sessionTimeout)
                 )
+                self.subscribeToFormLifecycleEvents()
             }
             result(nil)
             #else
@@ -254,6 +255,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         case "unregisterFromInAppForms":
             #if canImport(KlaviyoForms)
             Task { @MainActor in
+                KlaviyoSDK().unregisterFormLifecycleHandler()
                 KlaviyoSDK().unregisterFromInAppForms()
             }
             result(nil)
@@ -534,6 +536,57 @@ extension KlaviyoFlutterSdkPlugin {
             zip: locationData["zip"] as? String,
             timezone: locationData["timezone"] as? String
         )
+    }
+}
+
+// MARK: - Form Lifecycle Events
+
+@MainActor
+extension KlaviyoFlutterSdkPlugin {
+    /// Subscribe to form lifecycle events from the iOS SDK
+    func subscribeToFormLifecycleEvents() {
+        #if canImport(KlaviyoForms)
+        // Unregister any existing handler to prevent duplicates
+        KlaviyoSDK().unregisterFormLifecycleHandler()
+
+        KlaviyoSDK().registerFormLifecycleHandler { [weak self] event in
+            guard let self = self else { return }
+
+            // Explicitly map each native enum case to its bridge string. This decouples
+            // the wrapper's serialization contract from the native SDK's `eventName`
+            // property and mirrors the explicit mapping used on the Android side, so
+            // adding a new event type natively becomes a compile error here rather than
+            // a silent runtime drop on the Dart `fromMap` parser.
+            var data: [String: Any] = [
+                "formId": event.formId,
+                "formName": event.formName
+            ]
+
+            switch event {
+            case .formShown:
+                data["event"] = "formShown"
+            case .formDismissed:
+                data["event"] = "formDismissed"
+            case let .formCtaClicked(_, _, buttonLabel, deepLinkUrl):
+                data["event"] = "formCtaClicked"
+                data["buttonLabel"] = buttonLabel
+                data["deepLinkUrl"] = deepLinkUrl.absoluteString
+            }
+
+            let eventPayload: [String: Any] = [
+                "type": "form_lifecycle_event",
+                "data": data
+            ]
+
+            DispatchQueue.main.async {
+                self.eventSink?(eventPayload)
+            }
+        }
+        #else
+        if #available(iOS 14.0, *) {
+            Logger.klaviyoFlutterSDK.warning("Form lifecycle events not available: forms module not included")
+        }
+        #endif
     }
 }
 

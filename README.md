@@ -18,9 +18,11 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Requesting Permissions](#requesting-notification-permissions)
   - [Token Collection](#token-collection)
   - [Handling Push Opens](#handling-push-notification-opens)
+  - [Action Buttons](#action-buttons)
   - [Rich Push](#rich-push)
   - [Badge Count (iOS)](#badge-count-ios-only)
 - [In-App Forms](#in-app-forms)
+  - [Monitoring Form Lifecycle Events](#monitoring-form-lifecycle-events)
 - [Deep Linking](#deep-linking)
 - [Geofencing](#geofencing)
 - [Optional Module Configuration](#optional-module-configuration)
@@ -57,7 +59,7 @@ Add `klaviyo_flutter_sdk` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  klaviyo_flutter_sdk: ^0.1.0
+  klaviyo_flutter_sdk: ^0.2.0
 ```
 
 A complete working example is available in the [`example/`](example/) directory.
@@ -440,6 +442,12 @@ KlaviyoSDK().onPushNotification.listen((event) {
 
 > **Note**: This event fires only for pure silent pushes (no visible content). Standard notifications that include `content-available` are handled by `willPresent`/`didReceive` and will not trigger this event.
 
+### Action Buttons
+
+Klaviyo push messages can include up to three tappable action buttons, each with a custom label and either a deep link or an open-app action. Buttons are configured in the Klaviyo dashboard — no Flutter or native integration changes are required, and tapping a button dismisses the notification automatically.
+
+If a button is configured with a deep link, your existing [Deep Linking](#deep-linking) setup handles navigation when the user taps it.
+
 ### Rich Push
 
 [Rich Push](https://help.klaviyo.com/hc/en-us/articles/16917302437275) lets you add images and videos (iOS only) to push notifications.
@@ -454,6 +462,8 @@ Klaviyo supports setting or incrementing the badge count on iOS push notificatio
 Android handles badge counts automatically.
 
 ## In-App Forms
+
+In-app forms — these are configured in the Klaviyo dashboard and rendered automatically by the SDK. No Flutter or native integration changes are required to support new presentation styles.
 
 ```dart
 // Register with default session timeout (1 hour)
@@ -475,14 +485,52 @@ await KlaviyoSDK().registerForInAppForms(configuration: infiniteConfig);
 // Unregister from in-app forms
 await KlaviyoSDK().unregisterFromInAppForms();
 ```
-```dart
-// Listen for form events
-KlaviyoSDK().onFormEvent.listen((event) {
-  _logger.info('Form event: ${event['type']}');
-});
-```
 
 The `sessionTimeoutDuration` controls how long forms remain eligible to display after app backgrounding. For more details, see the native SDK documentation: [Android](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) | [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages)
+
+### Monitoring Form Lifecycle Events
+
+> Available in Flutter SDK 0.2.0 and higher. For the equivalent API on other platforms, see the [Android SDK](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) and [iOS SDK](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages) documentation.
+
+Subscribe to `onFormLifecycleEvent` to observe in-app form lifecycle changes. This is useful for forwarding form engagement data to a third-party analytics platform such as Amplitude, Segment, or Mixpanel, or for triggering app-specific logic when a form is shown or dismissed.
+
+Events are delivered on the main isolate (Flutter's UI thread) via the native `EventChannel`, in the same order they are emitted by the native SDK.
+
+```dart
+import 'dart:async';
+import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
+
+final _logger = Logger('MyApp');
+
+// Subscribe to form lifecycle events
+final StreamSubscription<FormLifecycleEvent> subscription =
+    KlaviyoSDK().onFormLifecycleEvent.listen((event) {
+  switch (event) {
+    case FormShown():
+      _logger.info('Form shown — id: ${event.formId}, name: ${event.formName}');
+    case FormDismissed():
+      _logger.info('Form dismissed — id: ${event.formId}, name: ${event.formName}');
+    case FormCtaClicked():
+      _logger.info(
+        'CTA tapped — id: ${event.formId}, name: ${event.formName}, '
+        'button: "${event.buttonLabel}", url: ${event.deepLinkUrl}',
+      );
+  }
+});
+
+// Cancel when no longer needed (e.g. in dispose())
+subscription.cancel();
+```
+
+**Field reference:**
+
+| Field | Type | Subtypes | Notes |
+|-------|------|----------|-------|
+| `formId` | `String` | All | Unique identifier for the form |
+| `formName` | `String` | All | Display name configured in Klaviyo dashboard |
+| `buttonLabel` | `String` | `FormCtaClicked` only | Label of the tapped CTA button |
+| `deepLinkUrl` | `String` | `FormCtaClicked` only | Deep link URL configured for the CTA |
 
 ## Deep Linking
 
@@ -769,7 +817,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `isInitialized` | `bool` | Whether the SDK is initialized |
 | `apiKey` | `String?` | Current API key |
 | `onPushNotification` | `Stream<Map<String, dynamic>>` | Push notification events |
-| `onFormEvent` | `Stream<Map<String, dynamic>>` | In-app form events |
+| `onFormLifecycleEvent` | `Stream<FormLifecycleEvent>` | Typed in-app form lifecycle events |
 
 ### Models
 
@@ -835,6 +883,24 @@ InAppFormConfig({
 
 // Infinite session timeout (no timeout)
 InAppFormConfig.infinite()
+```
+
+#### FormLifecycleEvent
+
+Sealed class representing in-app form lifecycle events. Use Dart's pattern matching to handle each subtype exhaustively.
+
+```dart
+sealed class FormLifecycleEvent {
+  final String formId;
+  final String formName;
+}
+
+class FormShown extends FormLifecycleEvent { ... }
+class FormDismissed extends FormLifecycleEvent { ... }
+class FormCtaClicked extends FormLifecycleEvent {
+  final String buttonLabel;
+  final String deepLinkUrl;
+}
 ```
 
 ### Enums
