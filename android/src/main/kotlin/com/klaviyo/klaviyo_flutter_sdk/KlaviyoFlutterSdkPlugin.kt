@@ -68,6 +68,7 @@ class KlaviyoFlutterSdkPlugin :
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
+        instance = this
         applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
@@ -90,8 +91,6 @@ class KlaviyoFlutterSdkPlugin :
                 }
             },
         )
-
-        instance = this
 
         // Rehydrate any silent pushes persisted across a process boundary (e.g. FCM
         // delivered messages while the app was killed). Stash them in
