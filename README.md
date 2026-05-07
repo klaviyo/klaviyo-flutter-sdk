@@ -224,21 +224,11 @@ class MainActivity : FlutterActivity() {
 }
 ```
 
-**2. KlaviyoPushService Declaration**
+**2. FCM Service Registration**
 
-Declare `KlaviyoPushService` in your `android/app/src/main/AndroidManifest.xml` inside the `<application>` tag. This ensures Klaviyo processes FCM messages before Flutter's default `FirebaseMessagingService`, enabling open tracking and rich push features.
+The plugin auto-registers `KlaviyoFlutterPushService` (a subclass of `KlaviyoPushService`) for `com.google.firebase.MESSAGING_EVENT`. The subclass invokes `super.onMessageReceived(message)` so all standard Klaviyo push handling still runs, and additionally forwards Klaviyo silent pushes to the Dart event stream. **No host-app manifest changes are required.**
 
-```xml
-<service
-    android:name="com.klaviyo.pushFcm.KlaviyoPushService"
-    android:exported="false">
-    <intent-filter>
-        <action android:name="com.google.firebase.MESSAGING_EVENT" />
-    </intent-filter>
-</service>
-```
-
-See the [example AndroidManifest.xml](example/android/app/src/main/AndroidManifest.xml#L72-L81) for a complete implementation.
+> **Migrating from earlier versions**: if your app previously declared `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for `MESSAGING_EVENT`, **remove it**. Leaving both declarations in the merged manifest causes FCM to pick a service non-deterministically.
 
 ## Profile Management
 
@@ -426,6 +416,10 @@ Silent push notifications (`content-available: 1`) deliver data to your app in t
 #### iOS
 
 iOS delivers silent pushes via `didReceiveRemoteNotification:fetchCompletionHandler:` in your `AppDelegate.swift`. The setup in [iOS Setup](#ios-setup) already handles this — it differentiates pure silent pushes from standard pushes that carry `content-available` and forwards only the former to the Klaviyo plugin.
+
+#### Android
+
+The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM service that forwards Klaviyo silent pushes to the Dart event stream. No host configuration is required — silent push events flow to your Dart listener automatically.
 
 #### Dart-Side Listener
 
