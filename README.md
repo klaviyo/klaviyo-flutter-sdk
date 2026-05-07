@@ -226,7 +226,7 @@ class MainActivity : FlutterActivity() {
 
 **2. FCM Service Registration**
 
-The plugin auto-registers `KlaviyoFlutterPushService` (a subclass of `KlaviyoPushService`) for `com.google.firebase.MESSAGING_EVENT` so Klaviyo processes FCM messages before Flutter's default `FirebaseMessagingService` and forwards Klaviyo silent pushes to the Dart event stream. **No host-app manifest changes are required.**
+The plugin auto-registers `KlaviyoFlutterPushService` (a subclass of `KlaviyoPushService`) for `com.google.firebase.MESSAGING_EVENT`. The subclass invokes `super.onMessageReceived(message)` so all standard Klaviyo push handling still runs, and additionally forwards Klaviyo silent pushes to the Dart event stream. **No host-app manifest changes are required.**
 
 > **Migrating from earlier versions**: if your app previously declared `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for `MESSAGING_EVENT`, **remove it**. Leaving both declarations in the merged manifest causes FCM to pick a service non-deterministically.
 

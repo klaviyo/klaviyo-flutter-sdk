@@ -35,6 +35,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import kotlin.concurrent.Volatile
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.INFINITE
 import kotlin.time.Duration.Companion.seconds
@@ -577,10 +578,7 @@ class KlaviyoFlutterSdkPlugin :
             )
 
         Handler(Looper.getMainLooper()).post {
-            val sink = eventSink
-            if (sink != null) {
-                sink.success(payload)
-            } else {
+            eventSink?.let { it.success(payload) } ?: run {
                 Registry.log.verbose("Flutter not ready. Caching silent push event.")
                 cachedSilentPushes.add(payload)
             }

@@ -19,6 +19,7 @@ internal object SilentPushCache {
     private const val PREFS_NAME = "klaviyo_flutter_sdk"
     private const val KEY_PENDING_SILENT_PUSH = "pending_silent_push"
 
+    @Synchronized
     fun persist(
         context: Context,
         data: Map<String, String>,
@@ -29,7 +30,10 @@ internal object SilentPushCache {
             existing?.let {
                 try {
                     JSONArray(it)
-                } catch (_: JSONException) {
+                } catch (e: JSONException) {
+                    Registry.log.warning(
+                        "Failed to parse existing cached silent pushes; starting fresh: ${e.message} — payload: $it",
+                    )
                     JSONArray()
                 }
             } ?: JSONArray()
@@ -37,6 +41,7 @@ internal object SilentPushCache {
         prefs.edit().putString(KEY_PENDING_SILENT_PUSH, array.toString()).apply()
     }
 
+    @Synchronized
     fun consume(context: Context): List<Map<String, String>> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val json = prefs.getString(KEY_PENDING_SILENT_PUSH, null) ?: return emptyList()
@@ -48,7 +53,7 @@ internal object SilentPushCache {
                 val obj = array.optJSONObject(i) ?: return@mapNotNull null
                 obj.keys().asSequence().associateWith { key: String -> obj.optString(key) }
             }
-        } catch (e: Exception) {
+        } catch (e: JSONException) {
             Registry.log.warning("Failed to deserialize cached silent pushes: ${e.message} — payload: $json")
             emptyList()
         }
