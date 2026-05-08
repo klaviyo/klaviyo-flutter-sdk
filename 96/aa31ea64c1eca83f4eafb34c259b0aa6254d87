@@ -1,0 +1,23 @@
+example/android/settings.gradle
+  7691947a3fddb0d1 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "96aa31ea64c1eca83f4eafb34c259b0aa6254d87",
+  "prompts": {
+    "7691947a3fddb0d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "30a1867e-c242-41e0-8724-403772b777cf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Evan Masseau",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4033,
+      "overriden_lines": 0
+    }
+  }
+}
