@@ -1,0 +1,23 @@
+Makefile
+  c93fececd8d934a4 5,9,15,20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "3adb526ea4cab6445e0a2b9c74498f7e3eb2631e",
+  "prompts": {
+    "c93fececd8d934a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1a40e6d-c916-4832-a395-9ad745a9af0e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Daniel Peluso",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
