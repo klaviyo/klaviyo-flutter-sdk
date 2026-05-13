@@ -27,4 +27,3 @@ flutter:
         pluginClass: KlaviyoFlutterSdkPlugin
       ios:
         pluginClass: KlaviyoFlutterSdkPlugin
-        minSdkVersion: 14
