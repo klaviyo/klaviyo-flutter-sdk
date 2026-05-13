@@ -1,0 +1,23 @@
+example/ios/Runner.xcodeproj/project.pbxproj
+  c93fececd8d934a4 6,416-417,422-423,496-497,502
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "ee687023877b21c9aa2fc93a677254ea42e7a7fd",
+  "prompts": {
+    "c93fececd8d934a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1a40e6d-c916-4832-a395-9ad745a9af0e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Daniel Peluso",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 2,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}
