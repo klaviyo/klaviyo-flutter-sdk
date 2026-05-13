@@ -1,0 +1,25 @@
+Makefile
+  c93fececd8d934a4 1-24
+ios/klaviyo_flutter_sdk.podspec
+  c93fececd8d934a4 32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "50aa8c3e6a9dfd4ac64a808b3a29505811f31b5e",
+  "prompts": {
+    "c93fececd8d934a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1a40e6d-c916-4832-a395-9ad745a9af0e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Daniel Peluso",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 2,
+      "accepted_lines": 25,
+      "overriden_lines": 0
+    }
+  }
+}
