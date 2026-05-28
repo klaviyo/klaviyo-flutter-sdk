@@ -4,7 +4,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 void main() {
   group('KlaviyoProfile', () {
     test('creates profile with basic properties', () {
-      final profile = const KlaviyoProfile(
+      final profile = KlaviyoProfile(
         email: 'test@example.com',
         firstName: 'John',
         lastName: 'Doe',
@@ -16,7 +16,7 @@ void main() {
     });
 
     test('toJson converts profile to map', () {
-      final profile = const KlaviyoProfile(
+      final profile = KlaviyoProfile(
         email: 'test@example.com',
         firstName: 'John',
         phoneNumber: '+1234567890',
@@ -44,7 +44,7 @@ void main() {
     });
 
     test('copyWith creates new profile with updated values', () {
-      final original = const KlaviyoProfile(
+      final original = KlaviyoProfile(
         email: 'test@example.com',
         firstName: 'John',
       );
@@ -58,7 +58,7 @@ void main() {
     });
 
     test('toJson includes custom properties', () {
-      final profile = const KlaviyoProfile(
+      final profile = KlaviyoProfile(
         email: 'test@example.com',
         properties: {'custom_field': 'custom_value', 'age': 25},
       );

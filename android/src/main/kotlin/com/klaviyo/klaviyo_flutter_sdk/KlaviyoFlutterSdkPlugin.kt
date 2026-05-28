@@ -3,19 +3,26 @@ package com.klaviyo.klaviyo_flutter_sdk
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.NonNull
 import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.Klaviyo
+import com.klaviyo.analytics.Klaviyo.isKlaviyoNotificationIntent
 import com.klaviyo.analytics.model.Event
 import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
+import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
+import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
+import com.klaviyo.forms.registerFormLifecycleHandler
+import com.klaviyo.forms.unregisterFormLifecycleHandler
 import com.klaviyo.forms.unregisterFromInAppForms
 import com.klaviyo.location.LocationManager
 import com.klaviyo.location.registerGeofencing
@@ -343,8 +350,46 @@ class KlaviyoFlutterSdkPlugin :
                         InAppFormsConfig(sessionTimeoutDuration = sessionTimeout),
                     )
 
+                    // Unregister any existing handler to prevent duplicates
+                    Klaviyo.unregisterFormLifecycleHandler()
+
+                    // Register form lifecycle handler
+                    Klaviyo.registerFormLifecycleHandler { event ->
+                        val data =
+                            mutableMapOf<String, Any>(
+                                "formId" to event.formId,
+                                "formName" to event.formName,
+                            )
+
+                        when (event) {
+                            is FormLifecycleEvent.FormShown -> {
+                                data["event"] = "formShown"
+                            }
+
+                            is FormLifecycleEvent.FormDismissed -> {
+                                data["event"] = "formDismissed"
+                            }
+
+                            is FormLifecycleEvent.FormCtaClicked -> {
+                                data["event"] = "formCtaClicked"
+                                data["buttonLabel"] = event.buttonLabel
+                                data["deepLinkUrl"] = event.deepLinkUrl.toString()
+                            }
+                        }
+
+                        Handler(Looper.getMainLooper()).post {
+                            eventSink?.success(
+                                mapOf(
+                                    "type" to "form_lifecycle_event",
+                                    "data" to data,
+                                ),
+                            )
+                        }
+                    }
+
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
@@ -353,9 +398,11 @@ class KlaviyoFlutterSdkPlugin :
 
             "unregisterFromInAppForms" -> {
                 try {
+                    Klaviyo.unregisterFormLifecycleHandler()
                     Klaviyo.unregisterFromInAppForms()
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to unregister from in-app forms", e.message)
@@ -473,6 +520,14 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
+        eventSink = null
+        try {
+            Klaviyo.unregisterFormLifecycleHandler()
+        } catch (_: MissingKlaviyoModule) {
+            Registry.log.verbose("Forms lifecycle handler not available during cleanup: forms module not included")
+        } catch (e: Exception) {
+            Registry.log.warning("Unexpected error during cleanup: ${e.message}")
+        }
     }
 
     // ActivityAware implementation
@@ -519,16 +574,16 @@ class KlaviyoFlutterSdkPlugin :
             // Let Klaviyo SDK handle push notification opens
             Klaviyo.handlePush(intent)
 
-            // Extract notification data from the intent
             val extras = intent.extras
-            if (extras != null && extras.containsKey("_k")) {
-                // This is a Klaviyo push notification
+            if (extras != null && intent.isKlaviyoNotificationIntent) {
+                // Klaviyo namespaces all push extras with Constants.PACKAGE_PREFIX when building
+                // the tap PendingIntent. Strip it so the Dart payload matches the iOS userInfo shape.
                 val notificationData = mutableMapOf<String, Any?>()
-
-                // Extract all extras from the notification
                 for (key in extras.keySet()) {
+                    if (!key.startsWith(Constants.PACKAGE_PREFIX)) continue
+                    val unprefixedKey = key.removePrefix(Constants.PACKAGE_PREFIX)
                     val value = extras.get(key)
-                    notificationData[key] =
+                    notificationData[unprefixedKey] =
                         when (value) {
                             is String -> value
                             is Int -> value
@@ -541,7 +596,6 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
-                // Forward to Flutter via EventChannel
                 eventSink?.success(
                     mapOf(
                         "type" to "push_notification_opened",

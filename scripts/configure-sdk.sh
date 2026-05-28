@@ -310,13 +310,13 @@ inject_android_include_build() {
 $ANDROID_MARKER_START_LITERAL
 includeBuild('$path') {
     dependencySubstitution {
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:analytics') using project(':analytics')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:core') using project(':core')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:push-fcm') using project(':push-fcm')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:location') using project(':location')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:location-core') using project(':location-core')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:forms') using project(':forms')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:forms-core') using project(':forms-core')
+        substitute module('com.github.klaviyo.klaviyo-android-sdk:analytics') using project(':sdk:analytics')
+        substitute module('com.github.klaviyo.klaviyo-android-sdk:core') using project(':sdk:core')
+        substitute module('com.github.klaviyo.klaviyo-android-sdk:push-fcm') using project(':sdk:push-fcm')
+        substitute module('com.github.klaviyo.klaviyo-android-sdk:location') using project(':sdk:location')
+        substitute module('com.github.klaviyo.klaviyo-android-sdk:location-core') using project(':sdk:location-core')
+        substitute module('com.github.klaviyo.klaviyo-android-sdk:forms') using project(':sdk:forms')
+        substitute module('com.github.klaviyo.klaviyo-android-sdk:forms-core') using project(':sdk:forms-core')
     }
 }
 $ANDROID_MARKER_END_LITERAL
@@ -336,8 +336,10 @@ configure_android_branch() {
     validate_remote_branch "$ANDROID_REPO" "$branch"
     info "Configuring Android SDK: branch ${BOLD}$branch${NC}"
     remove_android_override
-    update_android_version "${branch}-SNAPSHOT"
-    success "Android SDK → branch '$branch' (via JitPack: ${branch}-SNAPSHOT)"
+    local tilde='~'
+    local jitpack_version="${branch//\//$tilde}-SNAPSHOT"
+    update_android_version "$jitpack_version"
+    success "Android SDK → branch '$branch' (via JitPack: ${jitpack_version})"
 }
 
 configure_android_commit() {
