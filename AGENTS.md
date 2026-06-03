@@ -38,7 +38,7 @@ Push/form events flow back via `EventChannel` streams.
 - `lib/src/klaviyo_sdk.dart` — `KlaviyoSDK` singleton, the public API entry point
 - `lib/src/services/klaviyo_native_wrapper.dart` — MethodChannel `"klaviyo_sdk"` + EventChannel `"klaviyo_events"`
 - `lib/src/models/` — data classes (`KlaviyoProfile`, `KlaviyoEvent`, etc.)
-- `ios/Classes/KlaviyoFlutterSdkPlugin.swift` — `FlutterPlugin` wrapping KlaviyoSwift
+- `ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/KlaviyoFlutterSdkPlugin.swift` — `FlutterPlugin` wrapping KlaviyoSwift
 - `android/src/main/kotlin/com/klaviyo/klaviyo_flutter_sdk/KlaviyoFlutterSdkPlugin.kt` — `FlutterPlugin` wrapping klaviyo-android-sdk
 
 Native SDK versions are pinned in two places — keep them in sync when bumping:
