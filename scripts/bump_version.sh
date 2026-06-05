@@ -72,7 +72,7 @@ else
 fi
 
 # 4. Update iOS plist via sync_version.sh
-echo -e "${GREEN}✓${NC} Updating ios/klaviyo-sdk-configuration.plist"
+echo -e "${GREEN}✓${NC} Updating ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist"
 ./scripts/sync_version.sh
 
 # 5. Update CHANGELOG.md (add new section at top if version doesn't exist)
@@ -114,7 +114,7 @@ check_file_version() {
 check_file_version "pubspec.yaml" "^version:"
 check_file_version "README.md" "klaviyo_flutter_sdk:"
 check_file_version "android/src/main/res/values/strings.xml" "klaviyo_sdk_version_override"
-check_file_version "ios/klaviyo-sdk-configuration.plist" "klaviyo_sdk_version"
+check_file_version "ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist" "klaviyo_sdk_version"
 check_file_version "example/pubspec.yaml" "^version:"
 check_file_version "CHANGELOG.md" "## $NEW_VERSION"
 

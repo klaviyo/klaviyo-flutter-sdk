@@ -7,7 +7,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PUBSPEC="$REPO_ROOT/pubspec.yaml"
-PLIST="$REPO_ROOT/ios/klaviyo-sdk-configuration.plist"
+PLIST="$REPO_ROOT/ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist"
 EXAMPLE_PUBSPEC="$REPO_ROOT/example/pubspec.yaml"
 EXAMPLE_PBXPROJ="$REPO_ROOT/example/ios/Runner.xcodeproj/project.pbxproj"
 

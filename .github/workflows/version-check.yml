@@ -17,7 +17,7 @@ jobs:
       - name: Check for drift
         run: |
           files=(
-            ios/klaviyo-sdk-configuration.plist
+            ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist
             example/pubspec.yaml
             example/ios/Runner.xcodeproj/project.pbxproj
           )
