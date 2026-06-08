@@ -9,7 +9,6 @@ reviews:
     - "!**/pubspec.lock"
     - "!**/Pods/**"
     - "!**/*.xcodeproj/**"
-    - "!example/**"
   auto_review:
     drafts: false
     base_branches:
