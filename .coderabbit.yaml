@@ -8,7 +8,6 @@ reviews:
     - "!**/*.mocks.dart"
     - "!**/pubspec.lock"
     - "!**/Pods/**"
-    - "!**/*.xcodeproj/**"
   auto_review:
     drafts: false
     base_branches:
