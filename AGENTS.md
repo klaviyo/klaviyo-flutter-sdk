@@ -68,3 +68,9 @@ To test against a local native SDK build:
 
 - **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist, the example app's `pubspec.yaml`, and `MARKETING_VERSION` in the example app's Xcode project. Use `scripts/bump_version.sh` to update all version references at once.
 - `BufferedBroadcastStreamController` (`lib/src/utils/buffered_broadcast_stream_controller.dart`) exists because native events (push tokens, notifications) can fire before Dart listeners are attached. Don't replace it with a plain `StreamController.broadcast`.
+
+## Code Review
+
+CodeRabbit is active on this repo and auto-reviews PRs. It reads this file as a code guidelines
+source. When performing code reviews, avoid re-surfacing findings CodeRabbit may have already flagged.
+If you notice patterns worth encoding as review guidance, suggest adding them to `.coderabbit.yaml`.
