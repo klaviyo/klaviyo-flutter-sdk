@@ -462,6 +462,51 @@ iOS delivers silent pushes via `didReceiveRemoteNotification:fetchCompletionHand
 
 The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM service that forwards Klaviyo silent pushes to the Dart event stream. No host configuration is required — silent push events flow to your Dart listener automatically.
 
+> **Conflict with another push service**: Android FCM delivers `MESSAGING_EVENT` to exactly one registered `FirebaseMessagingService`. If another push SDK in your app also auto-registers its own FCM service via manifest merging, only one service will receive messages.
+>
+> To resolve this, create a custom service in your app that subclasses `KlaviyoFlutterPushService` and delegates to the other provider, then suppress both auto-registered entries with `tools:node="remove"` in your app manifest:
+>
+> ```kotlin
+> // android/app/src/main/kotlin/.../MyPushService.kt
+> import com.google.firebase.messaging.RemoteMessage
+> import com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService
+>
+> class MyPushService : KlaviyoFlutterPushService() {
+>     override fun onMessageReceived(message: RemoteMessage) {
+>         super.onMessageReceived(message)         // Klaviyo: standard + silent push handling
+>         OtherPushSdk.handleRemoteMessage(message) // your other push service
+>     }
+>
+>     override fun onNewToken(token: String) {
+>         super.onNewToken(token)                  // Klaviyo token registration
+>         OtherPushSdk.onNewToken(token)           // your other push service
+>     }
+> }
+> ```
+>
+> ```xml
+> <!-- android/app/src/main/AndroidManifest.xml -->
+> <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+>     xmlns:tools="http://schemas.android.com/tools">
+>     <application>
+>         <!-- Suppress both auto-registered services -->
+>         <service android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService"
+>             tools:node="remove" />
+>         <service android:name="com.other.sdk.OtherPushService"
+>             tools:node="remove" />
+>
+>         <!-- Register your combined service -->
+>         <service android:name=".MyPushService" android:exported="false">
+>             <intent-filter>
+>                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
+>             </intent-filter>
+>         </service>
+>     </application>
+> </manifest>
+> ```
+>
+> Replace `OtherPushSdk` and `com.other.sdk.OtherPushService` with the actual class names from the other SDK's documentation.
+
 #### Dart-Side Listener
 
 Subscribe to `onPushNotification` to react to silent push events in Flutter:
