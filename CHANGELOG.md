@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- **Android — AGP 9 / Built-in Kotlin compatibility** — The Android module no longer unconditionally applies the Kotlin Gradle Plugin (KGP). AGP 9 removes support for applying KGP, so apps depending on this plugin currently fail to build under AGP 9 (and Flutter 3.44+ warns about it). The plugin now applies KGP only when built-in Kotlin is inactive (AGP < 9, or `android.builtInKotlin=false`) and relies on built-in Kotlin otherwise, migrates the deprecated `kotlinOptions` block to the `compilerOptions` DSL, bumps its Kotlin Gradle Plugin to 2.3.0, and raises `compileSdk` to 35 (required by transitive androidx dependencies under AGP 9's AAR-metadata check). No change to `minSdk` (23) or the supported Flutter/Dart SDK range. The example app is migrated to built-in Kotlin as well. ([#106](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/106))
+
 ## 0.2.0 - 2026-05-04
 
 ### What's New
