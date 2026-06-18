@@ -10,8 +10,7 @@ run-android:
 
 # Full clean iOS build: wipe CocoaPods cache, re-run pod install, then run
 clean-ios:
-	cd example/ios && rm -rf Pods Podfile.lock
-	cd example/ios && pod install --repo-update
+	cd example/ios && rm -rf Pods Podfile.lock && pod install --repo-update
 	cd example && flutter run -d ios
 
 # Full clean Android build: clear Gradle cache, then run
