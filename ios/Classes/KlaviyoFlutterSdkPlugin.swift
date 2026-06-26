@@ -359,6 +359,20 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             let isKlaviyoLink = KlaviyoSDK().handleUniversalTrackingLink(trackingUrl)
             result(isKlaviyoLink)
 
+        // One-shot pull of the push-opened payload that launched the app
+        // from a terminated state. Mirrors
+        // `FirebaseMessaging.Messaging().getInitialMessage()`. Returns nil
+        // when the app wasn't cold-started via a Klaviyo push, or when the
+        // EventChannel listener already flushed `cachedOpenedNotification`
+        // in `onListen` (no double-delivery). The cache is the single source
+        // of truth: `onListen` and this handler race, and whichever runs
+        // first drains the cached value.
+        // See klaviyo/klaviyo-flutter-sdk#86.
+        case "getInitialNotification":
+            let payload = cachedOpenedNotification
+            cachedOpenedNotification = nil
+            result(payload)
+
         default:
             result(FlutterMethodNotImplemented)
         }

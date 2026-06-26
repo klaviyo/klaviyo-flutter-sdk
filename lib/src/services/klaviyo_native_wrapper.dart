@@ -322,6 +322,37 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Retrieve the push notification payload that launched the app from a
+  /// terminated state, if any. Returns `null` when the app was not cold-
+  /// started via a Klaviyo push, or when the [onPushNotification] stream
+  /// listener has already drained the cached event (no double-delivery).
+  ///
+  /// This is the Klaviyo equivalent of
+  /// `FirebaseMessaging.instance.getInitialMessage()`. On Android the
+  /// payload previously went missing because the native side emitted it
+  /// through an EventChannel before the Dart listener was attached; the
+  /// native plugin now caches it (in-memory + SharedPreferences, mirroring
+  /// the upstream `SilentPushCache` cold-start pattern) until either this
+  /// method is called or the stream subscribes, whichever runs first.
+  ///
+  /// The returned map mirrors the [onPushNotification] event shape:
+  /// `{ 'type': 'push_notification_opened', 'data': {...} }`.
+  ///
+  /// See klaviyo/klaviyo-flutter-sdk#86.
+  Future<Map<String, dynamic>?> getInitialNotification() async {
+    _ensureInitialized();
+
+    try {
+      final result = await _channel.invokeMethod<dynamic>(
+        'getInitialNotification',
+      );
+      if (result == null) return null;
+      return _deepConvertMap(result);
+    } catch (e) {
+      throw KlaviyoException('Failed to get initial notification: $e');
+    }
+  }
+
   /// Handle native events from platform channels
   void _handleNativeEvent(dynamic event) {
     try {

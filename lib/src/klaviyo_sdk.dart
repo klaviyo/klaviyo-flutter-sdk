@@ -403,6 +403,25 @@ class KlaviyoSDK {
   Stream<Map<String, dynamic>> get onPushNotification =>
       _nativeWrapper.onPushNotification;
 
+  /// Retrieve the push notification payload that launched the app from a
+  /// terminated state, if any.
+  ///
+  /// This is the Klaviyo equivalent of
+  /// `FirebaseMessaging.instance.getInitialMessage()`. Returns `null` when
+  /// the app was not cold-started via a Klaviyo push, or when the
+  /// [onPushNotification] stream listener has already drained the cached
+  /// event (no double-delivery). The stream and this pull-based entry point
+  /// race on the native side; whichever runs first drains the cache.
+  ///
+  /// Call once on app startup. Subsequent calls return `null`.
+  ///
+  /// The returned map mirrors the [onPushNotification] event shape:
+  /// `{ 'type': 'push_notification_opened', 'data': {...} }`.
+  ///
+  /// See klaviyo/klaviyo-flutter-sdk#86.
+  Future<Map<String, dynamic>?> getInitialNotification() =>
+      _nativeWrapper.getInitialNotification();
+
   /// Get form events stream
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
 
