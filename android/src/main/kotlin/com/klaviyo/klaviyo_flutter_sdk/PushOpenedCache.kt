@@ -57,10 +57,11 @@ internal object PushOpenedCache {
         return try {
             val obj = JSONObject(json)
             obj.keys().asSequence().associateWith { key ->
-                when (val v = obj.get(key)) {
-                    is JSONObject.NULL -> null
-                    else -> v
-                }
+                // `putTyped` skips null writes, so stored values are never the
+                // NULL sentinel — but guard defensively in case the prefs
+                // blob was written by a future variant that does emit NULL.
+                val v = obj.get(key)
+                if (v === JSONObject.NULL) null else v
             }
         } catch (e: JSONException) {
             Registry.log.warning(
@@ -75,8 +76,12 @@ internal object PushOpenedCache {
         key: String,
         value: Any?,
     ) {
+        // Skip null values — org.json's `put(key, null)` removes the key, which
+        // would lose the entry; instead we just don't write it, and the read
+        // side iterates only existing keys. `handleIntent`'s `else -> value?.toString()`
+        // branch keeps real values non-null in practice.
+        if (value == null) return
         when (value) {
-            null -> put(key, JSONObject.NULL)
             is String -> put(key, value)
             is Int -> put(key, value)
             is Long -> put(key, value)
