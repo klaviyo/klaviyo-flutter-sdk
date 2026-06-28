@@ -67,6 +67,22 @@ class KlaviyoFlutterSdkPlugin :
     @Volatile
     private var cachedPushOpened: Map<String, Any?>? = null
 
+    // The last intent we ran through handleIntent. Guards against re-processing
+    // the same launch intent when onAttachedToActivity fires more than once for
+    // it — e.g. a retained/cached FlutterEngine re-attaching to the activity.
+    // Without this guard, a second pass over the original launch intent would
+    // re-emit (or, if the cache was already drained by getInitialNotification,
+    // re-populate) the push-opened event and double-deliver it (#86).
+    //
+    // Referential equality is the right test: Activity.getIntent() returns the
+    // same object across attaches until setIntent() replaces it on a new tap.
+    // Scope note: this only dedupes a given Intent *object*. A genuine relaunch
+    // that re-delivers the same push as a fresh Intent (e.g. resuming from
+    // recents after activity recreation) is intentionally treated as a new open,
+    // matching iOS, where the system also re-invokes the notification delegate.
+    // Touched only on the main thread (all activity callbacks), so no @Volatile.
+    private var handledLaunchIntent: Intent? = null
+
     companion object {
         private const val TAG = "KlaviyoFlutter"
         private const val INFINITE_TIMEOUT_SENTINEL = -1
@@ -634,13 +650,22 @@ class KlaviyoFlutterSdkPlugin :
 
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
-        // Handle the intent that launched this activity (cold start)
+        // Handle the intent that launched this activity (cold start), but only
+        // once per intent: if onAttachedToActivity fires again for the same
+        // launch intent (e.g. a retained FlutterEngine re-attaching), skip it so
+        // we don't re-emit or re-cache the push-opened event (#86).
         binding.activity.intent?.let { intent ->
-            handleIntent(intent)
+            if (intent !== handledLaunchIntent) {
+                handledLaunchIntent = intent
+                handleIntent(intent)
+            }
         }
 
         // Listen for new intents (warm start)
         binding.addOnNewIntentListener { intent ->
+            // Track warm-start intents so that if onAttachedToActivity fires
+            // after setIntent() updates activity.intent, we don't double-handle.
+            handledLaunchIntent = intent
             handleIntent(intent)
             false // Return false to allow other listeners
         }
@@ -657,6 +682,7 @@ class KlaviyoFlutterSdkPlugin :
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
         binding.addOnNewIntentListener { intent ->
+            handledLaunchIntent = intent
             handleIntent(intent)
             false
         }
