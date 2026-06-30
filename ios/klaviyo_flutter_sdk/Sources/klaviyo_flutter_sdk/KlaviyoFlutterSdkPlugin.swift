@@ -35,6 +35,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedError: [String: Any]?
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
+    private var cachedPushAction: [String: Any]?
 
     // MARK: - Flutter Plugin Registration
 
@@ -392,6 +393,10 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedSilentPush)
             self.cachedSilentPush = nil
         }
+        if let cachedPushAction = cachedPushAction {
+            events(cachedPushAction)
+            self.cachedPushAction = nil
+        }
         return nil
     }
 
@@ -487,10 +492,80 @@ extension KlaviyoFlutterSdkPlugin {
             cachedOpenedNotification = eventPayload
         }
 
-        // 3. Pass to Native Klaviyo SDK
+        // 3. Surface the open_url action / action-button tap as a typed push action
+        // event, in parallel with the raw opened-notification event above.
+        forwardPushAction(for: response, userInfo: userInfo)
+
+        // 4. Pass to Native Klaviyo SDK
         // We pass a dummy completion handler because the Host App owns the real one.
         // No-op: We let the host app finish the system callback
         _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
+    }
+
+    /// Mirrors an `open_url` body tap or an action-button tap to Flutter as a
+    /// typed push-action event. The native SDK still performs the actual
+    /// dispatch (opening the URL / launching the app); this only forwards the
+    /// event so Flutter apps can react.
+    ///
+    /// Scheme handling is deliberately left to the native SDK: whatever URL the
+    /// payload carries is forwarded verbatim, including special schemes such as
+    /// `mailto:`/`tel:`/`sms:`. The plugin does not re-implement the SDK's
+    /// scheme allowlist.
+    private func forwardPushAction(
+        for response: UNNotificationResponse,
+        userInfo: [AnyHashable: Any]
+    ) {
+        let actionIdentifier = response.actionIdentifier
+
+        var eventPayload: [String: Any]?
+
+        if actionIdentifier == UNNotificationDefaultActionIdentifier {
+            // Body tap. A deep-link `url` takes precedence over `web_url` in the
+            // native SDK, so only treat this as open_url when no deep link is set.
+            if userInfo["url"] == nil,
+               let webUrl = userInfo["web_url"] as? String, !webUrl.isEmpty {
+                eventPayload = [
+                    "type": "push_open_web_url",
+                    "data": ["url": webUrl]
+                ]
+            }
+        } else if actionIdentifier != UNNotificationDismissActionIdentifier {
+            // Action-button tap: the identifier is the tapped button's id. Look
+            // it up in body.action_buttons to recover its label/action/url.
+            if let body = userInfo["body"] as? [String: Any],
+               let buttons = body["action_buttons"] as? [[String: Any]],
+               let button = buttons.first(where: {
+                   $0["id"] as? String == actionIdentifier
+               }) {
+                var data: [String: Any] = ["id": actionIdentifier]
+                if let label = button["label"] as? String {
+                    data["label"] = label
+                }
+                if let action = button["action"] as? String {
+                    data["action"] = action
+                }
+                if let url = button["url"] as? String {
+                    data["url"] = url
+                }
+                eventPayload = [
+                    "type": "push_action_button_tapped",
+                    "data": data
+                ]
+            }
+        }
+
+        guard let eventPayload = eventPayload else { return }
+
+        if let eventSink = eventSink {
+            eventSink(eventPayload)
+        } else {
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push action event.")
+            }
+            // Single-slot cache is sufficient: a cold-start tap corresponds to
+            // exactly one notification interaction, mirroring cachedOpenedNotification.
+            cachedPushAction = eventPayload
+        }
     }
 
     /// Manual Forwarding Helper - Silent Push
