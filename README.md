@@ -532,6 +532,46 @@ subscription.cancel();
 | `buttonLabel` | `String` | `FormCtaClicked` only | Label of the tapped CTA button |
 | `deepLinkUrl` | `String` | `FormCtaClicked` only | Deep link URL configured for the CTA |
 
+## Push Action Events
+
+Subscribe to `onPushAction` to observe taps on Klaviyo pushes that carry an **Open External URL** (`open_url`) action or **action buttons**. Events are typed via the sealed `KlaviyoPushAction` class, so Dart pattern matching is exhaustive.
+
+```dart
+import 'dart:async';
+import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
+
+final _logger = Logger('MyApp');
+
+final StreamSubscription<KlaviyoPushAction> subscription =
+    KlaviyoSDK().onPushAction.listen((action) {
+  switch (action) {
+    case OpenWebUrl():
+      _logger.info('Open external URL: ${action.url}');
+    case ActionButtonTapped():
+      _logger.info(
+        'Action button "${action.label}" (${action.action}) — '
+        'id: ${action.buttonId}, url: ${action.url}',
+      );
+  }
+});
+
+// Cancel when no longer needed (e.g. in dispose())
+subscription.cancel();
+```
+
+**Field reference:**
+
+| Field | Type | Subtypes | Notes |
+|-------|------|----------|-------|
+| `url` | `String` | `OpenWebUrl` | The external URL. May be `http(s)` or a special scheme such as `mailto:`, `tel:`, `sms:` |
+| `buttonId` | `String` | `ActionButtonTapped` | Identifier of the tapped action button |
+| `label` | `String` | `ActionButtonTapped` | Display label of the tapped button |
+| `action` | `String` | `ActionButtonTapped` | One of `open_app`, `deep_link`, `open_url` |
+| `url` | `String?` | `ActionButtonTapped` | URL for `deep_link` / `open_url` buttons; `null` for `open_app` |
+
+> **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. On **iOS**, both body `open_url` taps and action-button taps surface. On **Android**, `open_url` is dispatched to an external handler by the native SDK and does **not** reach the app, so only `deep_link` / `open_app` action-button taps surface on Android.
+
 ## Deep Linking
 
 Klaviyo supports [Deep Links](https://help.klaviyo.com/hc/en-us/articles/14750403974043) for tracking link clicks and navigating to specific content within your app. This works with push notifications, in-app messages, and Klaviyo tracking links.
@@ -818,6 +858,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `apiKey` | `String?` | Current API key |
 | `onPushNotification` | `Stream<Map<String, dynamic>>` | Push notification events |
 | `onFormLifecycleEvent` | `Stream<FormLifecycleEvent>` | Typed in-app form lifecycle events |
+| `onPushAction` | `Stream<KlaviyoPushAction>` | Typed `open_url` / action-button push tap events |
 
 ### Models
 
