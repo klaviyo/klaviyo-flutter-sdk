@@ -8,6 +8,7 @@ import 'models/klaviyo_event.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
+import 'models/klaviyo_push_action.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
@@ -419,6 +420,27 @@ class KlaviyoSDK {
           return [FormLifecycleEvent.fromMap(event)];
         } catch (e) {
           _logger.warning('Dropping malformed form lifecycle event: $e');
+          return [];
+        }
+      });
+
+  /// Get typed push action events stream.
+  ///
+  /// Emits a [KlaviyoPushAction] when a user taps a push whose action opens an
+  /// external web URL ([OpenWebUrl]), or taps an action button on a push
+  /// ([ActionButtonTapped]). Filters for the `push_open_web_url` and
+  /// `push_action_button_tapped` event types and parses the native map.
+  /// Malformed events are logged and dropped rather than crashing the stream.
+  Stream<KlaviyoPushAction> get onPushAction =>
+      _nativeWrapper.onPushActionEvent
+          .where((event) =>
+              event['type'] == 'push_open_web_url' ||
+              event['type'] == 'push_action_button_tapped')
+          .expand((event) {
+        try {
+          return [KlaviyoPushAction.fromMap(event)];
+        } catch (e) {
+          _logger.warning('Dropping malformed push action event: $e');
           return [];
         }
       });

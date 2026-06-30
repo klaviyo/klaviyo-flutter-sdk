@@ -29,12 +29,21 @@ class KlaviyoNativeWrapper {
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _formEventController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
+  final _pushActionController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>();
 
   // Getters for streams
   Stream<Map<String, dynamic>> get onPushNotification =>
       _pushNotificationController.stream;
 
   Stream<Map<String, dynamic>> get onFormEvent => _formEventController.stream;
+
+  /// Raw push-action events (`push_open_web_url`,
+  /// `push_action_button_tapped`). Kept on a dedicated stream so they do not
+  /// surface on [onPushNotification]; see [KlaviyoSDK.onPushAction] for the
+  /// typed view.
+  Stream<Map<String, dynamic>> get onPushActionEvent =>
+      _pushActionController.stream;
 
   /// Initialize the native SDK wrapper
   Future<void> initialize({
@@ -342,6 +351,11 @@ class KlaviyoNativeWrapper {
           _logger.info('Native form event: $eventData');
           _formEventController.add(eventData);
           break;
+        case 'push_open_web_url':
+        case 'push_action_button_tapped':
+          _logger.info('Native push action event: $eventData');
+          _pushActionController.add(eventData);
+          break;
         default:
           // Handle unknown event types
           break;
@@ -393,5 +407,6 @@ class KlaviyoNativeWrapper {
   void dispose() {
     _pushNotificationController.close();
     _formEventController.close();
+    _pushActionController.close();
   }
 }
