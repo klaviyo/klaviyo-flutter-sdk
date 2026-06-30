@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### What's New
+
+- **Push action events** — New `onPushAction` stream emits typed `KlaviyoPushAction` events (`OpenWebUrl`, `ActionButtonTapped`) when a user taps a Klaviyo push carrying an Open External URL (`open_url`) action or an action button. URLs are forwarded verbatim, including special schemes such as `mailto:`, `tel:`, and `sms:`. On iOS both body `open_url` taps and action-button taps surface; on Android `open_url` is handled externally by the native SDK, so only `deep_link` / `open_app` action-button taps surface.
+
 ## 0.3.0 - 2026-07-28
 
 ### What's New
@@ -16,7 +22,6 @@
 - **Flutter**: Minimum Flutter 3.27.0, Dart 3.0.0+
 
 [Full Changelog](https://github.com/klaviyo/klaviyo-flutter-sdk/compare/0.2.0...0.3.0)
-
 
 ## 0.2.0 - 2026-05-04
 

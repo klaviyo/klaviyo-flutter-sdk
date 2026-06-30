@@ -4,7 +4,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import '../main.dart' show setupSilentPushListener;
+import '../main.dart' show setupSilentPushListener, setupPushActionListener;
 import 'forms_tab.dart';
 import 'geofencing_tab.dart';
 
@@ -102,6 +102,9 @@ class _ProfileTabState extends State<ProfileTab> {
 
       // Set up silent push listener now that SDK is initialized
       setupSilentPushListener();
+
+      // Set up push action (open_url / action button) listener
+      setupPushActionListener();
 
       // Sync current profile values
       await _syncCurrentProfile();
