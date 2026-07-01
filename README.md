@@ -196,6 +196,8 @@ import klaviyo_flutter_sdk
 }
 ```
 
+> **Building against the iOS 27 SDK (Xcode 27)?** Plugin registration and the app's scene setup change. After completing this step, also complete step 4 below (UIScene lifecycle); it moves `GeneratedPluginRegistrant.register` out of `didFinishLaunchingWithOptions`.
+
 **4. Adopt the UIScene lifecycle (required for iOS 27 / Xcode 27)**
 
 > **Requires Flutter 3.38 or newer.** Starting with the iOS 27 SDK (Xcode 27), UIKit apps must adopt the `UIScene` lifecycle or they fail to launch. Apps built against earlier SDKs are unaffected until rebuilt with Xcode 27. On Flutter 3.41+ this migration is applied automatically for apps with an *unmodified* `AppDelegate`. Because the Klaviyo push setup above customizes your `AppDelegate`, apply the two changes below manually.
