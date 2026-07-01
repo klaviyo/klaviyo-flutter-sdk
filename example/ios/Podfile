@@ -63,6 +63,9 @@ post_install do |installer|
       config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
       config.build_settings['DEFINES_MODULE'] = 'YES'
 
+      # Xcode 27 (iOS 27 SDK) rejects deployment targets below 15.0; some pods default lower.
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+
       # You can remove unused permissions here
       # for more information: https://github.com/Baseflow/flutter-permission-handler/blob/main/permission_handler_apple/ios/Classes/PermissionHandlerEnums.h
       # e.g. when you don't need camera permission, just add 'PERMISSION_CAMERA=0'
