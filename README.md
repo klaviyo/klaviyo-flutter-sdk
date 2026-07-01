@@ -46,7 +46,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
 
 | Platform | Minimum Version |
 |----------|----------------|
-| Flutter  | 3.x            |
+| Flutter  | 3.x (3.38+ for iOS 27 UIScene lifecycle) |
 | Dart     | 3.x            |
 | iOS      | 15.0+          |
 | Android `minSdkVersion` | 23+ |
@@ -195,6 +195,64 @@ import klaviyo_flutter_sdk
     }
 }
 ```
+
+**4. Adopt the UIScene lifecycle (required for iOS 27 / Xcode 27)**
+
+> **Requires Flutter 3.38 or newer.** Starting with the iOS 27 SDK (Xcode 27), UIKit apps must adopt the `UIScene` lifecycle or they fail to launch. Apps built against earlier SDKs are unaffected until rebuilt with Xcode 27. On Flutter 3.41+ this migration is applied automatically for apps with an *unmodified* `AppDelegate`. Because the Klaviyo push setup above customizes your `AppDelegate`, apply the two changes below manually.
+
+The Klaviyo plugin itself requires **no changes** for `UIScene`. Push token registration, notification handling, app-lifecycle events, and deep links all continue to work. You only adopt the scene lifecycle at the app level:
+
+**a. Add the scene manifest to `ios/Runner/Info.plist`:**
+
+```xml
+<key>UIApplicationSceneManifest</key>
+<dict>
+    <key>UIApplicationSupportsMultipleScenes</key>
+    <false/>
+    <key>UISceneConfigurations</key>
+    <dict>
+        <key>UIWindowSceneSessionRoleApplication</key>
+        <array>
+            <dict>
+                <key>UISceneClassName</key>
+                <string>UIWindowScene</string>
+                <key>UISceneDelegateClassName</key>
+                <string>FlutterSceneDelegate</string>
+                <key>UISceneConfigurationName</key>
+                <string>flutter</string>
+                <key>UISceneStoryboardFile</key>
+                <string>Main</string>
+            </dict>
+        </array>
+    </dict>
+</dict>
+```
+
+**b. Update `ios/Runner/AppDelegate.swift`**, conform to `FlutterImplicitEngineDelegate` and move plugin registration out of `didFinishLaunchingWithOptions`:
+
+```swift
+@main
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+
+    override func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        // GeneratedPluginRegistrant.register is no longer called here.
+        return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+
+    // Plugin registration moves here under the UIScene lifecycle.
+    func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+        GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    }
+
+    // Your userNotificationCenter(...) overrides from step 3 stay unchanged.
+}
+```
+
+You do **not** need a custom `SceneDelegate`. The built-in `FlutterSceneDelegate` referenced in the manifest handles scene setup and forwards deep links automatically. For edge cases (custom `SceneDelegate`, add-to-app, platform views), see Flutter's [UISceneDelegate migration guide](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate).
 
 ### Android Setup
 
