@@ -55,15 +55,15 @@ class KlaviyoFlutterSdkPlugin :
     // All pending events are replayed on the next onListen.
     private val cachedSilentPushes: MutableList<Map<String, Any?>> = mutableListOf()
 
-    // Cached push-opened payload for the cold-start race where a Klaviyo push
-    // tap launches the activity before Flutter has subscribed to the
-    // EventChannel. Previously this event was silently dropped on Android
-    // (klaviyo/klaviyo-flutter-sdk#86). Single-slot because only one
-    // notification can cold-launch the app at a time.
-    //
-    // The cache is the single source of truth for dedup between the
-    // `onPushNotification` stream (flushed on `onListen`) and the
-    // `getInitialNotification` pull handler — whichever runs first drains it.
+    // Cached push-opened payload for the cold-start race where a Klaviyo push tap
+    // launches the activity before Flutter has subscribed to the EventChannel.
+    // Previously this event was silently dropped on Android
+    // (klaviyo/klaviyo-flutter-sdk#86); it is now flushed to the
+    // `onPushNotification` stream on the next `onListen`, mirroring how iOS
+    // already delivers cold-start opens. Single-slot because only one
+    // notification can cold-launch the app at a time. @Volatile because it is
+    // written on the main thread (handleIntent) and read/cleared on the platform
+    // thread (onListen).
     @Volatile
     private var cachedPushOpened: Map<String, Any?>? = null
 
@@ -71,8 +71,7 @@ class KlaviyoFlutterSdkPlugin :
     // the same launch intent when onAttachedToActivity fires more than once for
     // it — e.g. a retained/cached FlutterEngine re-attaching to the activity.
     // Without this guard, a second pass over the original launch intent would
-    // re-emit (or, if the cache was already drained by getInitialNotification,
-    // re-populate) the push-opened event and double-deliver it (#86).
+    // re-emit (or re-cache) the push-opened event and double-deliver it (#86).
     //
     // Referential equality is the right test: Activity.getIntent() returns the
     // same object across attaches until setIntent() replaces it on a new tap.
@@ -113,13 +112,12 @@ class KlaviyoFlutterSdkPlugin :
                     // Replay any cached silent pushes that arrived before Flutter subscribed.
                     cachedSilentPushes.forEach { events?.success(it) }
                     cachedSilentPushes.clear()
-                    // Replay the cached push-opened cold-start payload, if any.
-                    // Drains the cache so `getInitialNotification()` (one-shot pull)
-                    // won't double-deliver the same event to a caller that uses both
-                    // entry points (klaviyo/klaviyo-flutter-sdk#86).
+                    // Replay the cold-start push-opened payload, if any, then clear it.
+                    // This delivers a terminated-state open that arrived before Flutter
+                    // subscribed, matching how iOS flushes its cached open on onListen.
+                    // (klaviyo/klaviyo-flutter-sdk#86)
                     cachedPushOpened?.let { payload ->
                         cachedPushOpened = null
-                        PushOpenedCache.consume(applicationContext) // clear persistence
                         events?.success(payload)
                     }
                 }
@@ -142,13 +140,12 @@ class KlaviyoFlutterSdkPlugin :
             )
         }
 
-        // Rehydrate the push-opened cold-start payload persisted across a process
-        // boundary (e.g. config-change restart after a cold-launch tap). The
-        // common case is captured in-memory by `handleIntent` at cold start; this
-        // covers the rarer restart path.
-        PushOpenedCache.consume(applicationContext)?.let { data ->
-            cachedPushOpened = mapOf("type" to "push_notification_opened", "data" to data)
-        }
+        // NOTE: the push-opened cold-start payload is NOT persisted across process
+        // boundaries. The launch Intent that cold-starts the app is re-delivered
+        // to `handleIntent` via `onAttachedToActivity` on every (re)launch, so the
+        // in-memory `cachedPushOpened` is sufficient. Persisting it caused stale
+        // opens to replay on later, unrelated launches (a normal launcher start
+        // would surface a push the user never re-tapped).
     }
 
     override fun onMethodCall(
@@ -583,19 +580,6 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
-            // One-shot pull of the push-opened payload that launched the app
-            // from a terminated state. Returns null when the app wasn't cold-
-            // started via a Klaviyo push, or when the `onPushNotification`
-            // stream listener already flushed the cached event (no double-
-            // delivery). Mirrors `FirebaseMessaging.getInitialMessage()`.
-            // See klaviyo/klaviyo-flutter-sdk#86.
-            "getInitialNotification" -> {
-                val payload = cachedPushOpened
-                cachedPushOpened = null
-                PushOpenedCache.consume(applicationContext) // clear persistence
-                result.success(payload)
-            }
-
             else -> {
                 result.notImplemented()
             }
@@ -650,10 +634,10 @@ class KlaviyoFlutterSdkPlugin :
 
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
-        // Handle the intent that launched this activity (cold start), but only
-        // once per intent: if onAttachedToActivity fires again for the same
-        // launch intent (e.g. a retained FlutterEngine re-attaching), skip it so
-        // we don't re-emit or re-cache the push-opened event (#86).
+        // Handle the intent that launched this activity, but only once per
+        // intent: if onAttachedToActivity fires again for the same launch intent
+        // (e.g. a retained FlutterEngine re-attaching), skip it so we don't
+        // re-emit or re-cache the push-opened event (#86).
         binding.activity.intent?.let { intent ->
             if (intent !== handledLaunchIntent) {
                 handledLaunchIntent = intent
@@ -725,24 +709,17 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
-                // Cold start: the Dart side often hasn't subscribed to the
-                // EventChannel yet, so `eventSink` is null and the previous
-                // implementation silently dropped the event
-                // (klaviyo/klaviyo-flutter-sdk#86). Cache it in-memory
-                // (`cachedPushOpened`) and persist via `PushOpenedCache`
-                // (mirrors the upstream `SilentPushCache` cold-start pattern),
-                // then flush on `onListen` or hand back via
-                // `getInitialNotification`. Whichever consumes the cache first
-                // drains it, so listeners using either entry point stay in sync
-                // and we never double-deliver.
+                // If Flutter is already subscribed, emit immediately (warm open:
+                // foreground/background tap). Otherwise the app is cold-starting
+                // from a terminated state and the EventChannel isn't ready yet, so
+                // cache the payload and flush it on the next onListen — the same
+                // way iOS handles its cold-start open. Previously this event was
+                // silently dropped on Android (klaviyo/klaviyo-flutter-sdk#86).
                 val sink = eventSink
                 if (sink != null) {
-                    cachedPushOpened = null
-                    PushOpenedCache.consume(applicationContext)
                     sink.success(eventData)
                 } else {
                     cachedPushOpened = eventData
-                    PushOpenedCache.persist(applicationContext, notificationData)
                 }
             }
         } catch (e: Exception) {

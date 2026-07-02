@@ -64,6 +64,9 @@ class _PushTabState extends State<PushTab> {
           break;
 
         case 'push_notification_opened':
+          // Notification taps arrive here for all app states — foreground,
+          // background, and cold start (the tap that launched the app from a
+          // terminated state).
           final data = event['data'] as Map<String, dynamic>?;
           setState(() {
             _status =

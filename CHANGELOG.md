@@ -2,14 +2,9 @@
 
 ## 0.2.1 - 2026-06-26
 
-### New Features
-
-- **`getInitialNotification()` API** — New `KlaviyoSDK().getInitialNotification()` method (and matching `KlaviyoNativeWrapper.getInitialNotification()`) provides a one-shot, pull-based way to retrieve the push payload that launched the app from a terminated state — the Klaviyo equivalent of `FirebaseMessaging.instance.getInitialMessage()`. Available on both iOS and Android. The stream (`onPushNotification`) and pull (`getInitialNotification()`) entry points race on the native side, and whichever runs first drains the cached event, guaranteeing no double-delivery. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
-- **Android cold-start push delivery** — Push notifications that launch the Android app from a terminated state are no longer silently dropped. The Android plugin now caches the `push_notification_opened` event in-memory (`cachedPushOpened`) and persists it across process boundaries via a new `PushOpenedCache` (SharedPreferences-backed, mirroring the existing `SilentPushCache` cold-start pattern), flushing it through the `klaviyo_events` EventChannel as soon as a Dart listener subscribes via `onPushNotification`. iOS already handled this via its existing `cachedOpenedNotification` `onListen` flush.
-
 ### Bug Fixes
 
-- Android cold-start `push_notification_opened` events reaching Flutter. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
+- **Android cold-start push opens** — Push notifications that launch the Android app from a terminated state are no longer silently dropped. The Android plugin now caches the `push_notification_opened` event when it arrives before Flutter has subscribed and flushes it to the `onPushNotification` stream on the next `onListen`, matching how iOS already delivers cold-start opens. Foreground and background opens are unchanged. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
 
 [Full Changelog](https://github.com/klaviyo/klaviyo-flutter-sdk/compare/0.2.0...0.2.1)
 
