@@ -477,7 +477,9 @@ extension KlaviyoFlutterSdkPlugin {
             "data": userInfo
         ]
 
-        // 2. Send to Flutter (or Cache if Flutter is asleep)
+        // 2. Send to Flutter (or cache if Flutter is asleep). On a cold start the
+        // EventChannel isn't subscribed yet, so cache and flush on the next
+        // onListen. See klaviyo/klaviyo-flutter-sdk#86.
         if let eventSink = eventSink {
             eventSink(eventPayload)
         } else {

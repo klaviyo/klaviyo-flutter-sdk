@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 - 2026-06-26
+
+### Bug Fixes
+
+- **Android cold-start push opens** — Push notifications that launch the Android app from a terminated state are no longer silently dropped. The Android plugin now caches the `push_notification_opened` event when it arrives before Flutter has subscribed and flushes it to the `onPushNotification` stream on the next `onListen`, matching how iOS already delivers cold-start opens. Foreground and background opens are unchanged. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
+
+[Full Changelog](https://github.com/klaviyo/klaviyo-flutter-sdk/compare/0.2.0...0.2.1)
+
+
 ## 0.2.0 - 2026-05-04
 
 ### What's New

@@ -387,6 +387,10 @@ KlaviyoSDK().onPushNotification.listen((event) {
 
 ### Handling Push Notification Opens
 
+Subscribe to `onPushNotification` to handle notification taps. Opens are
+delivered here for **all** app states — foreground, background, and cold start
+(the tap that launched the app from a terminated state):
+
 ```dart
 KlaviyoSDK().onPushNotification.listen((event) {
   if (event['type'] == 'push_notification_opened') {
