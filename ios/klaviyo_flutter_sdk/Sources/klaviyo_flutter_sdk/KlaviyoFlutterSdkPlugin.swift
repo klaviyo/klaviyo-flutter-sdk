@@ -522,8 +522,10 @@ extension KlaviyoFlutterSdkPlugin {
 
         if actionIdentifier == UNNotificationDefaultActionIdentifier {
             // Body tap. A deep-link `url` takes precedence over `web_url` in the
-            // native SDK, so only treat this as open_url when no deep link is set.
-            if userInfo["url"] == nil,
+            // native SDK, but only when it parses as a URL (mirrors
+            // `klaviyoDeepLinkURL`); otherwise the SDK dispatches `web_url`.
+            let deepLinkUrl = (userInfo["url"] as? String).flatMap(URL.init(string:))
+            if deepLinkUrl == nil,
                let webUrl = userInfo["web_url"] as? String, !webUrl.isEmpty {
                 eventPayload = [
                     "type": "push_open_web_url",
