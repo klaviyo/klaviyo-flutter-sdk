@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -123,14 +124,9 @@ void main() {
         KlaviyoSDK().setLoggingEnabled(false),
         throwsA(isA<KlaviyoException>()),
       );
-      // Restore Dart-side state for other tests (singleton SDK). The mock
-      // still throws, but the Dart logger level is reset before the native
-      // call is made.
-      try {
-        await KlaviyoSDK().setLoggingEnabled(true);
-      } on KlaviyoException {
-        // expected — mock handler throws for every method
-      }
+      // Dart-side logging must stay untouched when the native call fails,
+      // so Dart and native logging state can't disagree.
+      expect(Logger('KlaviyoSDK').level, isNot(Level.OFF));
     });
   });
 }
