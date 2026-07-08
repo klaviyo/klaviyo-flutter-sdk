@@ -627,16 +627,18 @@ class KlaviyoFlutterSdkPlugin :
         // the raw token shared with iOS and the Dart layer. "Open URL" is
         // intentionally absent: the SDK dispatches open_url buttons externally,
         // so they never launch the host app and never reach this code path.
-        val action = when (notificationData["Button Action"] as? String) {
-            "Open App" -> "open_app"
-            "Deep Link" -> "deep_link"
-            else -> return
-        }
+        val action =
+            when (notificationData["Button Action"] as? String) {
+                "Open App" -> "open_app"
+                "Deep Link" -> "deep_link"
+                else -> return
+            }
 
-        val data = mutableMapOf<String, Any?>(
-            "id" to buttonId,
-            "action" to action,
-        )
+        val data =
+            mutableMapOf<String, Any?>(
+                "id" to buttonId,
+                "action" to action,
+            )
         (notificationData["Button Label"] as? String)?.let { data["label"] = it }
         (notificationData["Button Link"] as? String)?.let { data["url"] = it }
 
