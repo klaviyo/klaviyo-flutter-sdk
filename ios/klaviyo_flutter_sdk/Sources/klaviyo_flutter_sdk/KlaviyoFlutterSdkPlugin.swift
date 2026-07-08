@@ -321,6 +321,23 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             ))
             #endif
 
+        case "setLoggingEnabled":
+            guard let args = call.arguments as? [String: Any],
+                  let enabled = args["enabled"] as? Bool
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Invalid arguments for setLoggingEnabled",
+                    details: nil
+                ))
+                return
+            }
+            KlaviyoSDK().setLoggingEnabled(enabled)
+            result(nil)
+
+        case "isLoggingEnabled":
+            result(KlaviyoSDK().isLoggingEnabled)
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
             result(nil)

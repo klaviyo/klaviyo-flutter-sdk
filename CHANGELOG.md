@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### What's New
+
+- **SDK logging toggle** — New `setLoggingEnabled(bool)` / `isLoggingEnabled()` APIs silence or resume all Klaviyo SDK logging (native and Dart-side) at runtime. `setLoggingEnabled` can be called before `initialize()` to suppress startup logs. On iOS this bridges to the native `KlaviyoSDK().setLoggingEnabled(_:)` (does not affect `KlaviyoSwiftExtension`); on Android it maps to the native SDK log level (`None` when disabled, restoring the prior level when re-enabled).
+- **Native SDK upgrade** — Now consuming `KlaviyoSwift ~> 5.4.0` (adds the native logging toggle) and `klaviyo-android-sdk 4.4.1`.
+
 ## 0.2.0 - 2026-05-04
 
 ### What's New

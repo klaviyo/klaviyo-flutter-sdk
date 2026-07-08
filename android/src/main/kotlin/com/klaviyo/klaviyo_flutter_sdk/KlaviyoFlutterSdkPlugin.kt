@@ -3,6 +3,7 @@ package com.klaviyo.klaviyo_flutter_sdk
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
@@ -17,6 +18,7 @@ import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
+import com.klaviyo.core.config.Log
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
@@ -48,6 +50,11 @@ class KlaviyoFlutterSdkPlugin :
     private var eventSink: EventChannel.EventSink? = null
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
+
+    // The Android SDK has no boolean logging toggle, only a log level, so the
+    // cross-platform setLoggingEnabled maps to Level.None. Remember the level
+    // in effect before disabling so re-enabling can restore it.
+    private var logLevelBeforeDisabled: Log.Level? = null
 
     companion object {
         private const val TAG = "KlaviyoFlutter"
@@ -479,6 +486,29 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "setLoggingEnabled" -> {
+                val enabled = call.argument<Boolean>("enabled")
+                if (enabled == null) {
+                    result.error("INVALID_ARGUMENTS", "Invalid arguments for setLoggingEnabled", null)
+                    return
+                }
+                if (enabled) {
+                    if (Registry.log.logLevel == Log.Level.None) {
+                        Registry.log.logLevel = logLevelBeforeDisabled ?: defaultEnabledLogLevel()
+                    }
+                } else {
+                    if (Registry.log.logLevel != Log.Level.None) {
+                        logLevelBeforeDisabled = Registry.log.logLevel
+                    }
+                    Registry.log.logLevel = Log.Level.None
+                }
+                result.success(null)
+            }
+
+            "isLoggingEnabled" -> {
+                result.success(Registry.log.logLevel != Log.Level.None)
+            }
+
             "resetProfile" -> {
                 try {
                     Klaviyo.resetProfile()
@@ -568,6 +598,16 @@ class KlaviyoFlutterSdkPlugin :
     override fun onDetachedFromActivity() {
         activity = null
     }
+
+    // Fallback when logging is enabled but no prior level was captured (e.g. it
+    // was disabled via the manifest meta-data tag). Mirrors the native SDK's
+    // defaults: Warning for debuggable builds, Error in release.
+    private fun defaultEnabledLogLevel(): Log.Level =
+        if (applicationContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            Log.Level.Warning
+        } else {
+            Log.Level.Error
+        }
 
     private fun handleIntent(intent: Intent) {
         try {

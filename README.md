@@ -29,6 +29,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Enabling Geofencing](#enabling-geofencing)
   - [Disabling In-App Forms](#disabling-in-app-forms)
 - [Profile Reset (Logout)](#profile-reset-logout)
+- [SDK Logging](#sdk-logging)
 - [API Reference](#api-reference)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -741,6 +742,28 @@ Without the forms module, forms methods will log an error and no-op gracefully (
 await KlaviyoSDK().resetProfile();
 ```
 
+## SDK Logging
+
+SDK logging is enabled by default. To silence all Klaviyo SDK logging (native and Dart-side) at runtime:
+
+```dart
+await KlaviyoSDK().setLoggingEnabled(false); // silence all SDK logging
+final enabled = await KlaviyoSDK().isLoggingEnabled(); // read current state
+```
+
+`setLoggingEnabled` can be called before `initialize()`, which is useful for suppressing logs emitted during SDK startup.
+
+Platform notes:
+
+- **iOS**: The toggle does not affect `KlaviyoSwiftExtension` (used for rich push), which runs in a separate app-extension process.
+- **Android**: The native SDK uses log levels rather than a boolean toggle. Disabling sets the level to `None`; re-enabling restores the level that was in effect before it was disabled (or the SDK default if it was never enabled at runtime). For finer-grained control of native log verbosity, use the [`com.klaviyo.core.log_level` manifest tag](#android).
+
+To adjust the verbosity of the plugin's Dart-side logs (native logs are unaffected):
+
+```dart
+KlaviyoSDK().setLogLevel(KlaviyoLogLevel.debug);
+```
+
 ## API Reference
 
 ### KlaviyoSDK
@@ -807,6 +830,8 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 
 | Method | Description |
 |--------|-------------|
+| `setLoggingEnabled(bool enabled)` | Enable/disable all SDK logging (native + Dart), callable before `initialize()` |
+| `isLoggingEnabled()` | Whether native SDK logging is enabled, returns `Future<bool>` |
 | `setLogLevel(KlaviyoLogLevel logLevel)` | Set logging level (Flutter-side only) |
 | `dispose()` | Clean up resources |
 
@@ -962,6 +987,7 @@ All SDK exceptions extend `KlaviyoException`:
 ```xml
 <meta-data android:name="com.klaviyo.core.log_level" android:value="1" />
 ```
+Logging can also be toggled off entirely at runtime with `setLoggingEnabled(false)` — see [SDK Logging](#sdk-logging).
 
 ### iOS
 
