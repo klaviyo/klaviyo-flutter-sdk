@@ -544,8 +544,8 @@ extension KlaviyoFlutterSdkPlugin {
                 if let action = button["action"] as? String {
                     data["action"] = action
                 }
-                if let url = button["url"] as? String {
-                    data["url"] = url
+                if let buttonUrl = button["url"] as? String {
+                    data["url"] = buttonUrl
                 }
                 eventPayload = [
                     "type": "push_action_button_tapped",
