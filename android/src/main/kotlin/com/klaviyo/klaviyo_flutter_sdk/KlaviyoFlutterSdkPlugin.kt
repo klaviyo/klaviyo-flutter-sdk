@@ -51,14 +51,16 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
-    // The Android SDK has no boolean logging toggle, only a log level, so the
-    // cross-platform setLoggingEnabled maps to Level.None. Remember the level
-    // in effect before disabling so re-enabling can restore it.
-    private var logLevelBeforeDisabled: Log.Level? = null
-
     companion object {
         private const val TAG = "KlaviyoFlutter"
         private const val INFINITE_TIMEOUT_SENTINEL = -1
+
+        // The Android SDK has no boolean logging toggle, only a log level, so
+        // the cross-platform setLoggingEnabled maps to Level.None. Remember the
+        // level in effect before disabling so re-enabling can restore it.
+        // Process-wide (companion) to match Registry.log.logLevel's lifetime —
+        // an engine re-attach recreates the plugin instance but not the process.
+        private var logLevelBeforeDisabled: Log.Level? = null
     }
 
     override fun onAttachedToEngine(
