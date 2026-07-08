@@ -11,9 +11,11 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
+        // TEMPORARY (MAGE-876): track the unreleased 5.4.0 release branch until
+        // it ships; restore .upToNextMinor(from: "5.4.0") once tagged.
         .package(
             url: "https://github.com/klaviyo/klaviyo-swift-sdk",
-            .upToNextMinor(from: "5.4.0")
+            branch: "rel/5.4.0"
         ),
     ],
     targets: [

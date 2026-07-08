@@ -34,6 +34,18 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+  # TEMPORARY (MAGE-876): consume the unreleased KlaviyoSwift 5.4.0 from its
+  # release branch until it ships to CocoaPods. All Klaviyo pods must be
+  # overridden together — a git override only covers the named pod, and the
+  # rest would still resolve against trunk. Remove these overrides (and
+  # tighten the plugin podspec back to '~> 5.4.0') once 5.4.0 is released.
+  klaviyo_swift_repo = 'https://github.com/klaviyo/klaviyo-swift-sdk.git'
+  klaviyo_swift_branch = 'rel/5.4.0'
+  pod 'KlaviyoCore', :git => klaviyo_swift_repo, :branch => klaviyo_swift_branch
+  pod 'KlaviyoSwift', :git => klaviyo_swift_repo, :branch => klaviyo_swift_branch
+  pod 'KlaviyoForms', :git => klaviyo_swift_repo, :branch => klaviyo_swift_branch
+  pod 'KlaviyoLocation', :git => klaviyo_swift_repo, :branch => klaviyo_swift_branch
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
