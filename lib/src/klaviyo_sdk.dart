@@ -431,11 +431,12 @@ class KlaviyoSDK {
   /// ([ActionButtonTapped]). Filters for the `push_open_web_url` and
   /// `push_action_button_tapped` event types and parses the native map.
   /// Malformed events are logged and dropped rather than crashing the stream.
-  Stream<KlaviyoPushAction> get onPushAction =>
-      _nativeWrapper.onPushActionEvent
-          .where((event) =>
-              event['type'] == 'push_open_web_url' ||
-              event['type'] == 'push_action_button_tapped')
+  Stream<KlaviyoPushAction> get onPushAction => _nativeWrapper.onPushActionEvent
+          .where(
+        (event) =>
+            event['type'] == 'push_open_web_url' ||
+            event['type'] == 'push_action_button_tapped',
+      )
           .expand((event) {
         try {
           return [KlaviyoPushAction.fromMap(event)];
