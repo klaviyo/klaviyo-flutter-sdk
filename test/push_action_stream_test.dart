@@ -22,9 +22,11 @@ void main() {
 
     // Mirror the pipeline from KlaviyoSDK.onPushAction
     pipeline = sourceController.stream
-        .where((event) =>
-            event['type'] == 'push_open_web_url' ||
-            event['type'] == 'push_action_button_tapped')
+        .where(
+      (event) =>
+          event['type'] == 'push_open_web_url' ||
+          event['type'] == 'push_action_button_tapped',
+    )
         .expand((event) {
       try {
         return [KlaviyoPushAction.fromMap(event)];
