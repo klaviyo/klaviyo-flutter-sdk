@@ -394,7 +394,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedSilentPush)
             self.cachedSilentPush = nil
         }
-        if let cachedPushAction = cachedPushAction {
+        if let cachedPushAction {
             events(cachedPushAction)
             self.cachedPushAction = nil
         }
@@ -535,38 +535,49 @@ extension KlaviyoFlutterSdkPlugin {
         } else if actionIdentifier != UNNotificationDismissActionIdentifier {
             // Action-button tap: the identifier is the tapped button's id. Look
             // it up in body.action_buttons to recover its label/action/url.
-            if let body = userInfo["body"] as? [String: Any],
-               let buttons = body["action_buttons"] as? [[String: Any]],
-               let button = buttons.first(where: {
-                   $0["id"] as? String == actionIdentifier
-               }) {
-                var data: [String: Any] = ["id": actionIdentifier]
-                if let label = button["label"] as? String {
-                    data["label"] = label
+            guard let body = userInfo["body"] as? [String: Any],
+                  let buttons = body["action_buttons"] as? [[String: Any]],
+                  let button = buttons.first(where: {
+                      $0["id"] as? String == actionIdentifier
+                  }) else {
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.warning(
+                        "No action button matches identifier '\(actionIdentifier)'; dropping tap."
+                    )
                 }
-                if let action = button["action"] as? String {
-                    data["action"] = action
-                }
-                if let buttonUrl = button["url"] as? String {
-                    data["url"] = buttonUrl
-                }
-                eventPayload = [
-                    "type": "push_action_button_tapped",
-                    "data": data
-                ]
+                return
             }
+            // Dart's KlaviyoPushAction.fromMap requires `action`, so drop
+            // incomplete taps here with a log rather than silently downstream.
+            guard let action = button["action"] as? String else {
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.warning(
+                        "Action button '\(actionIdentifier)' has no action type; dropping tap."
+                    )
+                }
+                return
+            }
+            var data: [String: Any] = ["id": actionIdentifier, "action": action]
+            if let label = button["label"] as? String {
+                data["label"] = label
+            }
+            if let buttonUrl = button["url"] as? String {
+                data["url"] = buttonUrl
+            }
+            eventPayload = [
+                "type": "push_action_button_tapped",
+                "data": data
+            ]
         }
 
-        guard let eventPayload = eventPayload else { return }
+        guard let eventPayload else { return }
 
-        if let eventSink = eventSink {
+        if let eventSink {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
                 Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push action event.")
             }
-            // Single-slot cache is sufficient: a cold-start tap corresponds to
-            // exactly one notification interaction, mirroring cachedOpenedNotification.
             cachedPushAction = eventPayload
         }
     }
