@@ -321,6 +321,17 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             ))
             #endif
 
+        case "registerAuthTokenProvider":
+            registerAuthTokenProvider()
+            result(nil)
+
+        case "unregisterAuthTokenProvider":
+            unregisterAuthTokenProvider()
+            result(nil)
+
+        case "respondToAuthTokenRequest":
+            handleRespondToAuthTokenRequest(call: call, result: result)
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
             result(nil)
@@ -516,6 +527,167 @@ extension KlaviyoFlutterSdkPlugin {
                 Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching silent push event.")
             }
             cachedSilentPush = eventPayload
+        }
+    }
+}
+
+// MARK: - Auth Token Bridging
+
+extension KlaviyoFlutterSdkPlugin {
+    /// Pending auth token requests keyed by correlation ID. The native SDK's
+    /// async provider closure suspends on a continuation stored here until the
+    /// Dart side responds (or the request is cancelled by the SDK's timeout).
+    ///
+    /// A `CheckedContinuation` must be resumed exactly once. All access is
+    /// serialized through `authTokenLock`, and every resume path first removes
+    /// the entry — whichever path removes it wins and resumes; any later path
+    /// finds nothing and is a no-op. Stored statically (like the shared
+    /// instance) so the `@Sendable` provider closure never captures `self`.
+    private static var pendingAuthTokenRequests: [String: CheckedContinuation<String, Error>] = [:]
+    private static let authTokenLock = NSLock()
+
+    /// Registers a wrapper-owned provider with the native SDK. When the SDK
+    /// invokes it, generates a correlation id, suspends on a continuation, and
+    /// emits an `auth_token_requested` event to Dart; the SDK's timeout cancels
+    /// the task, which evicts and fails the continuation.
+    private func registerAuthTokenProvider() {
+        KlaviyoSDK().registerAuthTokenProvider { () async throws -> String in
+            let id = UUID().uuidString
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    KlaviyoFlutterSdkPlugin.storeAuthTokenContinuation(continuation, for: id)
+                    // Emit on the shared instance so the closure never captures
+                    // `self`. If the event sink is unavailable the emit path
+                    // fails and evicts the continuation.
+                    KlaviyoFlutterSdkPlugin.shared.emitAuthTokenRequest(id: id)
+                }
+            } onCancel: {
+                KlaviyoFlutterSdkPlugin.removeAuthTokenContinuation(for: id)?
+                    .resume(throwing: CancellationError())
+            }
+        }
+    }
+
+    /// Detaches the provider from the native SDK and, for defense-in-depth +
+    /// parity with Android, proactively fails any pending requests. The
+    /// lock-guarded remove keeps resolution exactly-once.
+    private func unregisterAuthTokenProvider() {
+        KlaviyoSDK().unregisterAuthTokenProvider()
+        KlaviyoFlutterSdkPlugin.failAllPendingAuthTokenRequests(
+            reason: "Auth token provider was unregistered"
+        )
+    }
+
+    /// Parses a `respondToAuthTokenRequest` method call and resolves the
+    /// corresponding pending request.
+    private func handleRespondToAuthTokenRequest(
+        call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any],
+              let id = args["id"] as? String
+        else {
+            result(FlutterError(
+                code: "INVALID_ARGUMENTS",
+                message: "Invalid auth token response",
+                details: nil
+            ))
+            return
+        }
+        respondToAuthTokenRequest(
+            id: id,
+            token: args["jwt"] as? String,
+            error: args["error"] as? String,
+            isConnectivityError: args["isConnectivityError"] as? Bool ?? false
+        )
+        result(nil)
+    }
+
+    /// Stores a pending continuation under the lock.
+    fileprivate static func storeAuthTokenContinuation(
+        _ continuation: CheckedContinuation<String, Error>,
+        for id: String
+    ) {
+        authTokenLock.lock()
+        pendingAuthTokenRequests[id] = continuation
+        authTokenLock.unlock()
+    }
+
+    /// Claims and removes a pending continuation under the lock. Whichever path
+    /// removes it first wins; later paths get `nil` and are no-ops.
+    fileprivate static func removeAuthTokenContinuation(
+        for id: String
+    ) -> CheckedContinuation<String, Error>? {
+        authTokenLock.lock()
+        defer { authTokenLock.unlock() }
+        return pendingAuthTokenRequests.removeValue(forKey: id)
+    }
+
+    /// Fails and evicts every pending request (used on unregister).
+    fileprivate static func failAllPendingAuthTokenRequests(reason: String) {
+        authTokenLock.lock()
+        let pending = pendingAuthTokenRequests
+        pendingAuthTokenRequests.removeAll()
+        authTokenLock.unlock()
+        for (_, continuation) in pending {
+            continuation.resume(throwing: authTokenError(reason))
+        }
+    }
+
+    fileprivate static func authTokenError(_ message: String) -> NSError {
+        NSError(
+            domain: "KlaviyoFlutterSdk",
+            code: -1,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        )
+    }
+
+    /// Emits an `auth_token_requested` event to Dart on the main thread. If the
+    /// event sink is unavailable (Flutter not listening), the pending request
+    /// is failed and evicted immediately rather than hung until the SDK timeout.
+    /// The payload carries only the correlation id — never a token.
+    private func emitAuthTokenRequest(id: String) {
+        DispatchQueue.main.async {
+            guard let eventSink = self.eventSink else {
+                KlaviyoFlutterSdkPlugin.removeAuthTokenContinuation(for: id)?
+                    .resume(throwing: KlaviyoFlutterSdkPlugin.authTokenError(
+                        "Unable to reach the Dart auth token provider (event sink unavailable)"
+                    ))
+                return
+            }
+            eventSink([
+                "type": "auth_token_requested",
+                "data": ["id": id]
+            ])
+        }
+    }
+
+    /// Resolves a pending auth token request. Called from the method channel
+    /// once the Dart provider has produced a token (`jwt`) or failed (`error`).
+    /// Unknown or already-resolved IDs are ignored. When `isConnectivityError`
+    /// is `true`, the failure is surfaced as a `URLError` with a connectivity
+    /// code so the SDK's connectivity-driven refresh retry recognizes it.
+    private func respondToAuthTokenRequest(
+        id: String,
+        token: String?,
+        error: String?,
+        isConnectivityError: Bool
+    ) {
+        guard let continuation = KlaviyoFlutterSdkPlugin.removeAuthTokenContinuation(for: id) else {
+            return
+        }
+        if let token {
+            continuation.resume(returning: token)
+        } else {
+            let message = error ?? "Auth token provider returned no token"
+            if isConnectivityError {
+                continuation.resume(throwing: URLError(
+                    .notConnectedToInternet,
+                    userInfo: [NSLocalizedDescriptionKey: message]
+                ))
+            } else {
+                continuation.resume(throwing: KlaviyoFlutterSdkPlugin.authTokenError(message))
+            }
         }
     }
 }
