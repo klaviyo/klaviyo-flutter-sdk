@@ -124,29 +124,43 @@ class _AuthTabState extends State<AuthTab> {
     final isCurrent = authController.currentCallId == response.id;
     final repeats = authController.isRepeatingLast(index);
     final callLabel = 'Call ${index + 1}${repeats ? '+' : ''}';
+    final secondary = Theme.of(context).colorScheme.onSurfaceVariant;
+    final secondaryStyle =
+        Theme.of(context).textTheme.bodySmall?.copyWith(color: secondary);
+    final details = _tokenDetails(response, secondaryStyle);
 
     return Opacity(
       key: ValueKey(response.id),
       opacity: locked ? 0.5 : 1.0,
       child: ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: Icon(
-          isCurrent ? Icons.play_arrow : Icons.circle_outlined,
-          color: isCurrent ? Theme.of(context).colorScheme.primary : null,
-        ),
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(callLabel),
-            const SizedBox(width: 8),
-            if (repeats)
-              const Chip(
-                label: Text('repeats'),
-                visualDensity: VisualDensity.compact,
-              ),
+            // Call number (secondary), preceded by a dot marking the most
+            // recently served response; its label is blue when current.
+            Row(
+              children: [
+                if (isCurrent) ...[
+                  const Icon(Icons.circle, size: 8, color: Colors.blue),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  callLabel,
+                  style: secondaryStyle?.copyWith(
+                    color: isCurrent ? Colors.blue : secondary,
+                  ),
+                ),
+              ],
+            ),
+            // Response type (primary).
+            Text(
+              response.outcome.label,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            if (details != null) details,
           ],
         ),
-        subtitle: Text('${response.outcome.label} · delay '
-            '${(response.delay.inMilliseconds / 1000).toStringAsFixed(2)}s'),
         onTap: locked
             ? null
             : () => context.push('/configure-auth-response/${response.id}'),
@@ -181,6 +195,85 @@ class _AuthTabState extends State<AuthTab> {
         ),
       ),
     );
+  }
+
+  /// Secondary-style token summary shown beneath the response type:
+  /// `(Well-formed|Malformed) | exp: <expiration>[ | delay: <n.nn>s]`.
+  /// Returns `null` for the throw outcomes (no token, so no details line).
+  Widget? _tokenDetails(AuthResponse response, TextStyle? secondaryStyle) {
+    if (response.outcome == AuthOutcome.throwNetworkError ||
+        response.outcome == AuthOutcome.throwOtherError) {
+      return null;
+    }
+
+    // Resolve well-formedness + the expiration display for this response.
+    bool wellFormed;
+    String expText;
+    var expRed = false;
+    switch (response.outcome) {
+      case AuthOutcome.customToken:
+        final claims = inspectJwt(response.customToken);
+        wellFormed = claims?.exp != null;
+        if (claims?.exp != null) {
+          final dt = DateTime.fromMillisecondsSinceEpoch(claims!.exp! * 1000);
+          expText = _formatExpiryDate(dt.toLocal());
+          expRed = dt.isBefore(DateTime.now());
+        } else {
+          expText = '--';
+        }
+      case AuthOutcome.mockToken:
+        if (response.mockKind == MockTokenKind.malformed) {
+          wellFormed = false;
+          expText = '--';
+        } else {
+          wellFormed = true;
+          if (response.mockExpirationMode == MockExpirationMode.duration) {
+            final secs = response.mockDuration.inSeconds;
+            expText = '${secs}s';
+            expRed = secs < 0;
+          } else if (response.mockExpiryDate != null) {
+            final dt = response.mockExpiryDate!;
+            expText = _formatExpiryDate(dt.toLocal());
+            expRed = dt.isBefore(DateTime.now());
+          } else {
+            expText = '--';
+          }
+        }
+      case AuthOutcome.throwNetworkError:
+      case AuthOutcome.throwOtherError:
+        return null; // handled above
+    }
+
+    final delay = response.delay.inMilliseconds / 1000;
+    return Text.rich(
+      TextSpan(
+        style: secondaryStyle,
+        children: [
+          TextSpan(
+            text: wellFormed ? 'Well-formed' : 'Malformed',
+            style: TextStyle(color: wellFormed ? Colors.green : Colors.red),
+          ),
+          const TextSpan(text: ' | exp: '),
+          TextSpan(
+            text: expText,
+            style: expRed ? const TextStyle(color: Colors.red) : null,
+          ),
+          if (response.delay > Duration.zero)
+            TextSpan(text: ' | delay: ${delay.toStringAsFixed(2)}s'),
+        ],
+      ),
+    );
+  }
+
+  /// Formats an absolute expiry as `MMM d, yyyy 'at' HH:mm:ss`.
+  String _formatExpiryDate(DateTime dt) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    String pad(int n) => n.toString().padLeft(2, '0');
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} at '
+        '${pad(dt.hour)}:${pad(dt.minute)}:${pad(dt.second)}';
   }
 
   // ---- Section 3: current token ------------------------------------------
