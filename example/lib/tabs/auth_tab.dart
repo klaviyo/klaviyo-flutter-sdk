@@ -80,8 +80,8 @@ class _AuthTabState extends State<AuthTab> {
         ),
         Text(
           enabled
-              ? 'Registered. Turning off calls unregisterAuthTokenProvider().'
-              : 'Not registered. Turning on calls registerAuthTokenProvider().',
+              ? 'Registered. Enabling calls unregisterAuthTokenProvider().'
+              : 'Disabling calls registerAuthTokenProvider().',
           style: const TextStyle(fontStyle: FontStyle.italic),
         ),
       ],
@@ -253,11 +253,14 @@ class _AuthTabState extends State<AuthTab> {
             text: wellFormed ? 'Well-formed' : 'Malformed',
             style: TextStyle(color: wellFormed ? Colors.green : Colors.red),
           ),
-          const TextSpan(text: ' | exp: '),
-          TextSpan(
-            text: expText,
-            style: expRed ? const TextStyle(color: Colors.red) : null,
-          ),
+          // A malformed token has no meaningful expiration — omit the exp part.
+          if (wellFormed) ...[
+            const TextSpan(text: ' | exp: '),
+            TextSpan(
+              text: expText,
+              style: expRed ? const TextStyle(color: Colors.red) : null,
+            ),
+          ],
           if (response.delay > Duration.zero)
             TextSpan(text: ' | delay: ${delay.toStringAsFixed(2)}s'),
         ],
