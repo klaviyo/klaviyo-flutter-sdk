@@ -55,7 +55,7 @@ class AuthResponse {
     this.customToken = '',
     this.mockKind = MockTokenKind.valid,
     this.mockExpirationMode = MockExpirationMode.duration,
-    this.mockDuration = const Duration(seconds: 90),
+    this.mockDuration = const Duration(seconds: 45),
     this.mockExpiryDate,
     this.delay = Duration.zero,
   }) : id = id ?? 'resp-${_nextId++}';

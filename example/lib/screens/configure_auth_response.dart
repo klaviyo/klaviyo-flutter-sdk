@@ -40,7 +40,7 @@ class _ConfigureAuthResponseScreenState
     _tokenController = TextEditingController(text: m?.customToken ?? '');
     _mockKind = m?.mockKind ?? MockTokenKind.valid;
     _expirationMode = m?.mockExpirationMode ?? MockExpirationMode.duration;
-    _duration = m?.mockDuration ?? const Duration(seconds: 90);
+    _duration = m?.mockDuration ?? const Duration(seconds: 45);
     _expiryDate = m?.mockExpiryDate;
     _delaySeconds = (m?.delay ?? Duration.zero).inMilliseconds / 1000.0;
   }
