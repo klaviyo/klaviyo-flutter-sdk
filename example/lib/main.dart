@@ -14,6 +14,8 @@ import 'tabs/events_tab.dart';
 import 'tabs/forms_tab.dart';
 import 'tabs/push_tab.dart';
 import 'tabs/geofencing_tab.dart';
+import 'tabs/auth_tab.dart';
+import 'screens/configure_auth_response.dart';
 
 final _logger = Logger('KlaviyoExample');
 
@@ -212,7 +214,21 @@ final GoRouter _router = GoRouter(
             child: GeofencingTab(),
           ),
         ),
+        GoRoute(
+          path: '/auth',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: AuthTab(),
+          ),
+        ),
       ],
+    ),
+    // Pushed detail screen — sibling of the ShellRoute so it uses the root
+    // navigator and covers the bottom nav bar.
+    GoRoute(
+      path: '/configure-auth-response/:id',
+      builder: (context, state) => ConfigureAuthResponseScreen(
+        responseId: state.pathParameters['id']!,
+      ),
     ),
   ],
   redirect: (context, state) async {
@@ -334,6 +350,10 @@ class ScaffoldWithNavBar extends StatelessWidget {
             icon: Icon(Icons.location_on),
             label: 'Geofencing',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.vpn_key),
+            label: 'Auth',
+          ),
         ],
       ),
     );
@@ -356,6 +376,9 @@ class ScaffoldWithNavBar extends StatelessWidget {
     if (location.startsWith('/geofencing')) {
       return 4;
     }
+    if (location.startsWith('/auth')) {
+      return 5;
+    }
     return 0;
   }
 
@@ -375,6 +398,9 @@ class ScaffoldWithNavBar extends StatelessWidget {
         break;
       case 4:
         context.go('/geofencing');
+        break;
+      case 5:
+        context.go('/auth');
         break;
     }
   }
