@@ -80,8 +80,8 @@ class _AuthTabState extends State<AuthTab> {
         ),
         Text(
           enabled
-              ? 'Registered. Enabling calls unregisterAuthTokenProvider().'
-              : 'Disabling calls registerAuthTokenProvider().',
+              ? 'Registered. Turning it off calls unregisterAuthTokenProvider().'
+              : 'Not registered. Turning it on calls registerAuthTokenProvider().',
           style: const TextStyle(fontStyle: FontStyle.italic),
         ),
       ],

@@ -257,14 +257,16 @@ class _ConfigureAuthResponseScreenState
       context: context,
       initialTime: TimeOfDay.fromDateTime(_expiryDate ?? now),
     );
-    if (!mounted) return;
+    // Cancelling the time picker aborts the change rather than silently
+    // committing a midnight expiry the user never confirmed.
+    if (time == null || !mounted) return;
     setState(() {
       _expiryDate = DateTime(
         date.year,
         date.month,
         date.day,
-        time?.hour ?? 0,
-        time?.minute ?? 0,
+        time.hour,
+        time.minute,
       );
     });
   }
