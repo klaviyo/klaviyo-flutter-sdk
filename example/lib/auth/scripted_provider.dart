@@ -72,11 +72,22 @@ class AuthController extends ChangeNotifier {
   // ---- Provider registration ---------------------------------------------
 
   /// Enable the provider: reset scripted state and register with the SDK.
+  ///
+  /// `_enabled` flips to true only after registration succeeds. If it throws
+  /// (e.g. the SDK isn't initialized yet), the toggle stays off rather than
+  /// showing ON with no provider registered, and the error is caught here so it
+  /// doesn't surface as an unhandled future from the (non-awaited) UI handler.
   Future<void> enable() async {
     _resetServedState();
-    _enabled = true;
+    try {
+      await KlaviyoSDK().registerAuthTokenProvider(_provide);
+      _enabled = true;
+    } catch (e) {
+      _enabled = false;
+      Logger('KlaviyoSDK')
+          .warning('Failed to register auth token provider: $e');
+    }
     notifyListeners();
-    await KlaviyoSDK().registerAuthTokenProvider(_provide);
   }
 
   /// Disable the provider: unregister and bump the generation so any in-flight
@@ -85,7 +96,12 @@ class AuthController extends ChangeNotifier {
     _enabled = false;
     _generation++;
     notifyListeners();
-    await KlaviyoSDK().unregisterAuthTokenProvider();
+    try {
+      await KlaviyoSDK().unregisterAuthTokenProvider();
+    } catch (e) {
+      Logger('KlaviyoSDK')
+          .warning('Failed to unregister auth token provider: $e');
+    }
   }
 
   void _resetServedState() {
