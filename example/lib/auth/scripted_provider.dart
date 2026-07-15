@@ -52,7 +52,9 @@ class AuthController extends ChangeNotifier {
   String? get currentCallId => _currentCallId;
   String? get lastReturnedToken => _lastReturnedToken;
 
-  bool isServed(String id) => _servedIds.contains(id);
+  /// Served state only applies while the provider is registered — when it's
+  /// off, no row is considered served (so nothing is locked/undeletable).
+  bool isServed(String id) => _enabled && _servedIds.contains(id);
   bool isRepeatingLast(int index) => index == _responses.length - 1;
 
   /// A row is locked (non-editable) once served, except the repeating last row.

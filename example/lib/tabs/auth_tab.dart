@@ -121,7 +121,8 @@ class _AuthTabState extends State<AuthTab> {
 
   Widget _responseRow(AuthResponse response, int index) {
     final locked = authController.isLocked(index);
-    final isCurrent = authController.currentCallId == response.id;
+    final isCurrent =
+        authController.enabled && authController.currentCallId == response.id;
     final repeats = authController.isRepeatingLast(index);
     final callLabel = 'Call ${index + 1}${repeats ? '+' : ''}';
     final secondary = Theme.of(context).colorScheme.onSurfaceVariant;
