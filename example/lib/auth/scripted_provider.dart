@@ -78,11 +78,18 @@ class AuthController extends ChangeNotifier {
   /// showing ON with no provider registered, and the error is caught here so it
   /// doesn't surface as an unhandled future from the (non-awaited) UI handler.
   Future<void> enable() async {
-    _resetServedState();
+    _resetServedState(); // bumps _generation
+    // Capture this operation's generation. `disable()` (and a fresh `enable()`)
+    // bump `_generation`, so if the user toggles off while this registration is
+    // still in flight, the guard below prevents this stale completion from
+    // re-enabling after they've turned it off.
+    final generation = _generation;
     try {
       await KlaviyoSDK().registerAuthTokenProvider(_provide);
+      if (generation != _generation) return; // superseded — leave state as-is
       _enabled = true;
     } catch (e) {
+      if (generation != _generation) return;
       _enabled = false;
       Logger('KlaviyoSDK')
           .warning('Failed to register auth token provider: $e');
