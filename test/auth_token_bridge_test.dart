@@ -167,10 +167,18 @@ void main() {
     inFlight.complete('jwt-after-logout');
     await pumpEventQueue();
 
-    final inflightResponse = log.lastWhere(
-      (c) => c.arguments is Map && c.arguments['id'] == 'req-inflight',
-    );
-    expect(inflightResponse.arguments['jwt'], isNull);
+    // Exactly one response for this id — never a duplicate dispatch (native
+    // continuations are single-use; a second resolve would be dropped or worse).
+    final inflightResponses = log
+        .where(
+          (c) =>
+              c.method == 'respondToAuthTokenRequest' &&
+              c.arguments is Map &&
+              c.arguments['id'] == 'req-inflight',
+        )
+        .toList();
+    expect(inflightResponses, hasLength(1));
+    expect(inflightResponses.single.arguments['jwt'], isNull);
     expect(
       logMessages.every((m) => !m.contains('jwt-after-logout')),
       isTrue,

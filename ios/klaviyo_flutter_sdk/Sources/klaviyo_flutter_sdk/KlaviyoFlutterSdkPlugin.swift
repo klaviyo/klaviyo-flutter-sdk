@@ -412,10 +412,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         // engine teardown. Give parity with Android's onDetachedFromEngine:
         // unregister the auth-token provider and fail any in-flight requests
         // immediately rather than leaving them suspended until the SDK timeout.
-        KlaviyoSDK().unregisterAuthTokenProvider()
-        KlaviyoFlutterSdkPlugin.failAllPendingAuthTokenRequests(
-            reason: "Flutter engine detached"
-        )
+        unregisterAuthTokenProvider(reason: "Flutter engine detached")
         return nil
     }
 }
@@ -588,13 +585,13 @@ extension KlaviyoFlutterSdkPlugin {
     }
 
     /// Detaches the provider from the native SDK and, for defense-in-depth +
-    /// parity with Android, proactively fails any pending requests. The
-    /// lock-guarded remove keeps resolution exactly-once.
-    private func unregisterAuthTokenProvider() {
+    /// parity with Android, proactively fails any pending requests with
+    /// [reason]. The lock-guarded remove keeps resolution exactly-once.
+    private func unregisterAuthTokenProvider(
+        reason: String = "Auth token provider was unregistered"
+    ) {
         KlaviyoSDK().unregisterAuthTokenProvider()
-        KlaviyoFlutterSdkPlugin.failAllPendingAuthTokenRequests(
-            reason: "Auth token provider was unregistered"
-        )
+        KlaviyoFlutterSdkPlugin.failAllPendingAuthTokenRequests(reason: reason)
     }
 
     /// Parses a `respondToAuthTokenRequest` method call and resolves the
