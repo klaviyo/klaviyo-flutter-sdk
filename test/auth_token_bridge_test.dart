@@ -101,7 +101,7 @@ void main() {
       reason: 'token contents must never be logged',
     );
 
-    // --- Unregister cancels the subscription + forwards to native -----------
+    // --- Unregister forwards to native --------------------------------------
     final unregisterCountBefore =
         log.where((c) => c.method == 'unregisterAuthTokenProvider').length;
     await sdk.unregisterAuthTokenProvider();
@@ -110,17 +110,42 @@ void main() {
       unregisterCountBefore + 1,
     );
 
-    // Events arriving after unregister must not trigger further responses.
-    final respondCountAfterUnregister =
-        log.where((c) => c.method == 'respondToAuthTokenRequest').length;
+    // --- Stale event after unregister is NOT replayed into a new provider ---
+    // A request that races the unregister is answered with a failure (so native
+    // resolves immediately) and must never be handed to a later-registered
+    // provider. Regression test for the buffering-controller replay bug.
     capturedSink!.success({
       'type': 'auth_token_requested',
-      'data': {'id': 'req-3'},
+      'data': {'id': 'req-stale'},
     });
     await pumpEventQueue();
-    expect(
-      log.where((c) => c.method == 'respondToAuthTokenRequest').length,
-      respondCountAfterUnregister,
+
+    // It was answered as a failure by the no-provider path, not invoked.
+    final orphan = log.lastWhere(
+      (c) => c.arguments is Map && c.arguments['id'] == 'req-stale',
     );
+    expect(orphan.method, 'respondToAuthTokenRequest');
+    expect(orphan.arguments['jwt'], isNull);
+
+    var newProviderCalls = 0;
+    await sdk.registerAuthTokenProvider(() async {
+      newProviderCalls++;
+      return 'jwt-new';
+    });
+    await pumpEventQueue();
+
+    // Re-registering must not replay the stale req-stale event into the new
+    // provider — it stays uninvoked until a genuinely new request arrives.
+    expect(newProviderCalls, 0);
+
+    capturedSink!.success({
+      'type': 'auth_token_requested',
+      'data': {'id': 'req-4'},
+    });
+    await pumpEventQueue();
+    expect(newProviderCalls, 1);
+    expect(lastRespond().arguments['id'], 'req-4');
+
+    await sdk.unregisterAuthTokenProvider();
   });
 }

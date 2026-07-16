@@ -497,24 +497,7 @@ class KlaviyoFlutterSdkPlugin :
                     Klaviyo.registerAuthTokenProvider { callback ->
                         val id = UUID.randomUUID().toString()
                         pendingAuthCallbacks[id] = callback
-                        val emitted =
-                            emitEvent(
-                                mapOf(
-                                    "type" to "auth_token_requested",
-                                    "data" to mapOf("id" to id),
-                                ),
-                            )
-                        if (!emitted) {
-                            // The Dart bridge is unavailable (no event sink), so no
-                            // response will arrive. Fail fast instead of leaving the
-                            // callback pending until the native SDK's timeout, and
-                            // don't leak the map entry.
-                            pendingAuthCallbacks.remove(id)?.onFailure(
-                                IllegalStateException(
-                                    "Unable to reach the Dart auth token provider (event sink unavailable)",
-                                ),
-                            )
-                        }
+                        emitAuthTokenRequest(id)
                     }
                     result.success(null)
                 } catch (e: Exception) {
@@ -611,21 +594,40 @@ class KlaviyoFlutterSdkPlugin :
     }
 
     /**
-     * Emits an event to Dart on the main thread. Returns whether an event sink
-     * was available to deliver it, so callers that must guarantee delivery
-     * (auth token requests awaiting a Dart response) can fail fast when the
-     * bridge is unavailable rather than hang.
+     * Emits an `auth_token_requested` event to Dart, resolving the event sink
+     * and handling delivery failure *inside* the main-thread runnable.
+     *
+     * The sink is read at execution time (not when scheduling) because it can be
+     * cancelled between `post()` and the runnable actually running; and
+     * `EventSink.success` can throw. In either case the pending callback for
+     * [id] is removed and failed here, so a request never dangles until the
+     * native SDK timeout and the map never leaks. The token itself is never
+     * logged — only the correlation id crosses this event.
      */
-    private fun emitEvent(event: Map<String, Any?>): Boolean {
-        val sink = eventSink ?: return false
-        return try {
-            Handler(Looper.getMainLooper()).post {
-                sink.success(event)
+    private fun emitAuthTokenRequest(id: String) {
+        Handler(Looper.getMainLooper()).post {
+            val sink = eventSink
+            if (sink == null) {
+                pendingAuthCallbacks.remove(id)?.onFailure(
+                    IllegalStateException(
+                        "Unable to reach the Dart auth token provider (event sink unavailable)",
+                    ),
+                )
+                return@post
             }
-            true
-        } catch (e: Exception) {
-            Registry.log.error("Failed to emit event", e)
-            false
+            try {
+                sink.success(
+                    mapOf(
+                        "type" to "auth_token_requested",
+                        "data" to mapOf("id" to id),
+                    ),
+                )
+            } catch (e: Exception) {
+                Registry.log.error("Failed to emit auth token request", e)
+                pendingAuthCallbacks.remove(id)?.onFailure(
+                    IllegalStateException("Failed to deliver auth token request to Dart", e),
+                )
+            }
         }
     }
 

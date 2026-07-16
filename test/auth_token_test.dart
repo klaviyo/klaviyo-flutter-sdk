@@ -14,19 +14,43 @@ class _MarkedError implements Exception {
   String toString() => 'marked error';
 }
 
+/// A [SocketException] subtype that also carries an explicit marker, used to
+/// prove an explicit `false` overrides the `is SocketException` auto-detection.
+class _MarkedSocketException extends SocketException {
+  _MarkedSocketException(this.isConnectivityError) : super('marked socket');
+
+  final bool isConnectivityError;
+}
+
+/// An error whose text embeds a secret, to prove the classifier never surfaces
+/// host-controlled exception text (which could contain the JWT).
+class _SecretLeakingError implements Exception {
+  @override
+  String toString() => 'failed with token=eyJhbGciOiJIUzI1NiJ9.secret.sig';
+}
+
 void main() {
   group('classifyAuthTokenProviderError', () {
-    test('extracts message from an Exception, non-connectivity by default', () {
+    test('reports the error type, non-connectivity by default', () {
       final result = classifyAuthTokenProviderError(Exception('boom'));
 
-      expect(result.message, contains('boom'));
+      // Type is surfaced for diagnosis; the host-controlled text is not.
+      expect(result.message, contains('_Exception'));
+      expect(result.message, isNot(contains('boom')));
       expect(result.isConnectivityError, isFalse);
     });
 
-    test('stringifies a non-Error rejection', () {
+    test('never surfaces host-controlled exception text', () {
+      final result = classifyAuthTokenProviderError(_SecretLeakingError());
+
+      expect(result.message, isNot(contains('secret')));
+      expect(result.message, isNot(contains('eyJ')));
+      expect(result.message, contains('_SecretLeakingError'));
+    });
+
+    test('classifies a non-Error rejection as non-connectivity', () {
       final result = classifyAuthTokenProviderError('plain string');
 
-      expect(result.message, 'plain string');
       expect(result.isConnectivityError, isFalse);
     });
 
@@ -45,9 +69,17 @@ void main() {
     });
 
     test('explicit marker set to false opts out of auto-detection', () {
-      // A SocketException would auto-detect as connectivity, but an explicit
-      // false marker must win.
       final result = classifyAuthTokenProviderError(_MarkedError(false));
+
+      expect(result.isConnectivityError, isFalse);
+    });
+
+    test('explicit false marker overrides SocketException auto-detection', () {
+      // Even though this IS a SocketException (which would auto-detect as
+      // connectivity), the explicit false marker must win.
+      final result = classifyAuthTokenProviderError(
+        _MarkedSocketException(false),
+      );
 
       expect(result.isConnectivityError, isFalse);
     });

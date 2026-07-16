@@ -55,20 +55,18 @@ class ClassifiedProviderError {
 ///
 /// Token contents are never part of a failure and are never logged.
 ClassifiedProviderError classifyAuthTokenProviderError(Object error) {
-  final message = error.toString();
+  // NEVER surface the host-controlled exception text: `error.toString()` may
+  // contain the JWT or other credentials, and this message is both logged and
+  // forwarded across the bridge to native. Report only the exception's runtime
+  // type, which is safe and still useful for diagnosis. Classification below is
+  // purely type/property-based, so it does not need the message.
+  final message = 'Auth token provider threw ${error.runtimeType}';
 
   // An explicit boolean marker wins over the auto-detect heuristic.
   final marker = _readConnectivityMarker(error);
-  if (marker != null) {
-    return ClassifiedProviderError(
-      message: message,
-      isConnectivityError: marker,
-    );
-  }
-
   return ClassifiedProviderError(
     message: message,
-    isConnectivityError: error is SocketException,
+    isConnectivityError: marker ?? error is SocketException,
   );
 }
 

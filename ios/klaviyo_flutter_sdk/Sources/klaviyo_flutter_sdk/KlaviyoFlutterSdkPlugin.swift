@@ -556,6 +556,17 @@ extension KlaviyoFlutterSdkPlugin {
             return try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { continuation in
                     KlaviyoFlutterSdkPlugin.storeAuthTokenContinuation(continuation, for: id)
+                    // Close the cancellation-before-store race: if the task was
+                    // already cancelled, `onCancel` ran before the continuation
+                    // existed and its removal was a no-op. Re-check here (after
+                    // storing) and resume immediately so the request can't hang
+                    // until the SDK timeout. The lock-guarded remove keeps this
+                    // exactly-once vs. onCancel / a response.
+                    if Task.isCancelled {
+                        KlaviyoFlutterSdkPlugin.removeAuthTokenContinuation(for: id)?
+                            .resume(throwing: CancellationError())
+                        return
+                    }
                     // Emit on the shared instance so the closure never captures
                     // `self`. If the event sink is unavailable the emit path
                     // fails and evicts the continuation.

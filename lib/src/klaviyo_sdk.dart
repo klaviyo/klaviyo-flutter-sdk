@@ -38,9 +38,16 @@ class KlaviyoSDK {
   bool _isInitialized = false;
   String? _apiKey;
 
-  // Active subscription to native `auth_token_requested` events. Tracked so it
-  // can be cancelled on unregister/re-register to avoid a dangling listener.
+  // A single, permanent subscription to native `auth_token_requested` events,
+  // attached lazily on first registration and never cancelled. The events flow
+  // through a BufferedBroadcastStreamController, which queues events while it
+  // has no listener; cancelling and re-subscribing would let a racing event
+  // buffer during the gap and then replay a stale request id into a replacement
+  // provider. Keeping one listener alive and gating on [_authTokenProvider]
+  // avoids that — the handler consumes every event immediately and ignores any
+  // that arrive while no provider is registered.
   StreamSubscription<Map<String, dynamic>>? _authTokenSubscription;
+  AuthTokenProvider? _authTokenProvider;
 
   // Getters
   bool get isInitialized => _isInitialized;
@@ -286,12 +293,14 @@ class KlaviyoSDK {
   Future<void> registerAuthTokenProvider(AuthTokenProvider provider) async {
     _ensureInitialized();
 
-    // Re-register: tear down the existing subscription AND the native provider
-    // first, so a prior provider's in-flight handler can't resolve a stale
-    // request. Mirrors the form-lifecycle re-registration convention.
-    if (_authTokenSubscription != null) {
-      await _authTokenSubscription!.cancel();
-      _authTokenSubscription = null;
+    // Attach the single permanent listener once (see [_authTokenSubscription]).
+    _authTokenSubscription ??=
+        _nativeWrapper.onAuthTokenRequested.listen(_handleAuthTokenRequest);
+
+    // Re-register: tear down the native provider first so it drains any pending
+    // requests before the replacement takes over. The Dart listener stays put;
+    // swapping [_authTokenProvider] is what redirects future requests.
+    if (_authTokenProvider != null) {
       try {
         await _nativeWrapper.unregisterAuthTokenProvider();
       } catch (e) {
@@ -299,28 +308,28 @@ class KlaviyoSDK {
       }
     }
 
-    _authTokenSubscription = _nativeWrapper.onAuthTokenRequested.listen(
-      (event) => _handleAuthTokenRequest(event, provider),
-    );
+    _authTokenProvider = provider;
 
     try {
       await _nativeWrapper.registerAuthTokenProvider();
       _logger.info('Auth token provider registered');
     } catch (e) {
+      _authTokenProvider = null;
       throw KlaviyoException('Failed to register auth token provider: $e');
     }
   }
 
   /// Detaches a previously-registered auth token provider — e.g. on logout.
   ///
-  /// Cancels the Dart-side event subscription and forwards to the native SDK's
-  /// `unregisterAuthTokenProvider()`, which clears the provider and tears down
-  /// its token state. Re-registering afterward works normally.
+  /// Clears the active provider (so any further native request is ignored) and
+  /// forwards to the native SDK's `unregisterAuthTokenProvider()`, which clears
+  /// the provider and tears down its token state. Re-registering afterward
+  /// works normally. The permanent event listener is intentionally left
+  /// attached (see [_authTokenSubscription]).
   Future<void> unregisterAuthTokenProvider() async {
     _ensureInitialized();
 
-    await _authTokenSubscription?.cancel();
-    _authTokenSubscription = null;
+    _authTokenProvider = null;
 
     try {
       await _nativeWrapper.unregisterAuthTokenProvider();
@@ -330,15 +339,26 @@ class KlaviyoSDK {
     }
   }
 
-  /// Handles a single native `auth_token_requested` event: invokes the host
-  /// [provider] and relays the outcome back to native. Never logs the token.
-  Future<void> _handleAuthTokenRequest(
-    Map<String, dynamic> event,
-    AuthTokenProvider provider,
-  ) async {
+  /// Handles a single native `auth_token_requested` event: invokes the active
+  /// host provider and relays the outcome back to native. Never logs the token.
+  Future<void> _handleAuthTokenRequest(Map<String, dynamic> event) async {
     final id = parseAuthTokenRequestedEventId(event);
     if (id == null) {
       _logger.warning('Ignoring auth token request with invalid id');
+      return;
+    }
+
+    // Gate on the currently-registered provider. An event that races an
+    // unregister (or otherwise arrives with no provider) is answered with a
+    // failure so the native side resolves immediately instead of waiting for
+    // its timeout — and is never replayed into a later provider.
+    final provider = _authTokenProvider;
+    if (provider == null) {
+      _logger.info('Auth token request received with no active provider');
+      await _nativeWrapper.respondToAuthTokenRequest(
+        id,
+        error: 'No auth token provider registered',
+      );
       return;
     }
     _logger.info('Auth token provider event received');
