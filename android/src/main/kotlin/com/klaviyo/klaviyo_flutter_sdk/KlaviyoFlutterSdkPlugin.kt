@@ -495,6 +495,14 @@ class KlaviyoFlutterSdkPlugin :
             "registerAuthTokenProvider" -> {
                 try {
                     Klaviyo.registerAuthTokenProvider { callback ->
+                        // The native SDK keeps at most one token fetch in flight, so any
+                        // entries still pending when a NEW request arrives belong to a
+                        // previous fetch it has already abandoned (e.g. timed out). Android's
+                        // callback API gives no per-request timeout hook (unlike iOS's
+                        // withTaskCancellationHandler onCancel), so this is where stale ids
+                        // are reclaimed — bounding the map and honoring the "timed-out ids
+                        // don't resolve" contract.
+                        failAllPendingAuthCallbacks("Superseded by a newer auth token request")
                         val id = UUID.randomUUID().toString()
                         pendingAuthCallbacks[id] = callback
                         emitAuthTokenRequest(id)
