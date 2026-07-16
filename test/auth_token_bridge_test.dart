@@ -184,5 +184,20 @@ void main() {
       isTrue,
       reason: 'a token fetched after logout must never be delivered or logged',
     );
+
+    // --- dispose() tears down a registered native auth provider ------------
+    // Kept last: dispose closes the wrapper's event controllers, so nothing
+    // should run against them afterward. With a provider registered, dispose
+    // must unregister it natively rather than leave the bridge active.
+    await sdk.registerAuthTokenProvider(() async => 'jwt-dispose');
+    final unregisterBeforeDispose =
+        log.where((c) => c.method == 'unregisterAuthTokenProvider').length;
+    sdk.dispose();
+    await pumpEventQueue();
+    expect(
+      log.where((c) => c.method == 'unregisterAuthTokenProvider').length,
+      unregisterBeforeDispose + 1,
+      reason: 'dispose must unregister the native auth provider',
+    );
   });
 }

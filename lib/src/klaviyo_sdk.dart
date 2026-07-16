@@ -577,6 +577,22 @@ class KlaviyoSDK {
 
   /// Dispose resources
   void dispose() {
+    // Tear down the auth bridge before the wrapper closes its event
+    // controllers. Otherwise a still-registered native provider keeps emitting
+    // `auth_token_requested` events into a closed stream — the add() throws and
+    // is swallowed, so the native request is never answered and stalls until the
+    // SDK timeout. Only act if a provider is registered (which implies the SDK
+    // was initialized, so the native call is safe).
+    if (_authTokenProvider != null) {
+      _authTokenSubscription?.cancel();
+      _authTokenSubscription = null;
+      _authTokenProvider = null;
+      // dispose() is synchronous; fire-and-forget the native unregister.
+      _nativeWrapper.unregisterAuthTokenProvider().catchError((Object e) {
+        _logger
+            .warning('Failed to unregister auth token provider on dispose: $e');
+      });
+    }
     _nativeWrapper.dispose();
   }
 }
