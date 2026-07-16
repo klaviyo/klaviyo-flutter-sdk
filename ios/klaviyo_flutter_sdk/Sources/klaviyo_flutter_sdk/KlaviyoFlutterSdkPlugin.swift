@@ -408,6 +408,14 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
 
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
         eventSink = nil
+        // The Dart side keeps a permanent auth-event listener, so this fires at
+        // engine teardown. Give parity with Android's onDetachedFromEngine:
+        // unregister the auth-token provider and fail any in-flight requests
+        // immediately rather than leaving them suspended until the SDK timeout.
+        KlaviyoSDK().unregisterAuthTokenProvider()
+        KlaviyoFlutterSdkPlugin.failAllPendingAuthTokenRequests(
+            reason: "Flutter engine detached"
+        )
         return nil
     }
 }
