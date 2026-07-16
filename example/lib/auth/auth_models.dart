@@ -90,9 +90,14 @@ class AuthResponse {
       case AuthOutcome.mockToken:
         if (mockKind == MockTokenKind.malformed) return malformedMockToken;
         final now = DateTime.now();
+        // Date mode always carries a concrete date (the Configure Response
+        // screen defaults one when the mode is selected). The `?? mockDuration`
+        // is a defensive fallback tied to the visible duration default rather
+        // than a hidden magic value, so the served token can't silently
+        // disagree with what the UI shows.
         final expiresAt = mockExpirationMode == MockExpirationMode.duration
             ? now.add(mockDuration)
-            : (mockExpiryDate ?? now.add(const Duration(seconds: 90)));
+            : (mockExpiryDate ?? now.add(mockDuration));
         return generateMockToken(issuedAt: now, expiresAt: expiresAt);
       case AuthOutcome.throwNetworkError:
       case AuthOutcome.throwOtherError:

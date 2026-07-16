@@ -198,7 +198,16 @@ class _ConfigureAuthResponseScreenState
           ButtonSegment(value: MockExpirationMode.date, label: Text('Date')),
         ],
         selected: {_expirationMode},
-        onSelectionChanged: (s) => setState(() => _expirationMode = s.first),
+        onSelectionChanged: (s) => setState(() {
+          _expirationMode = s.first;
+          // Give Date mode a concrete default so the preview and the served
+          // token agree — otherwise a null date reads as "-- / no expiry" in
+          // the UI while the engine would still mint a token with an expiry.
+          if (_expirationMode == MockExpirationMode.date &&
+              _expiryDate == null) {
+            _expiryDate = DateTime.now().add(const Duration(seconds: 45));
+          }
+        }),
       ),
       const SizedBox(height: 12),
       if (_expirationMode == MockExpirationMode.duration)
