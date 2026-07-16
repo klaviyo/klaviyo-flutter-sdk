@@ -643,9 +643,17 @@ class KlaviyoFlutterSdkPlugin :
     ) {
         channel.setMethodCallHandler(null)
         eventSink = null
-        // Fail any requests still awaiting a Dart response; the engine is gone
-        // so no response can arrive.
-        failAllPendingAuthCallbacks("Flutter engine detached")
+        // Unregister the auth token provider so the Klaviyo singleton stops
+        // retaining (and invoking) this now-detached plugin instance's bridge
+        // lambda after the engine is gone. Fail pending callbacks in a finally
+        // so they're always drained even if unregister throws.
+        try {
+            Klaviyo.unregisterAuthTokenProvider()
+        } catch (e: Exception) {
+            Registry.log.warning("Failed to unregister auth token provider on detach: ${e.message}")
+        } finally {
+            failAllPendingAuthCallbacks("Flutter engine detached")
+        }
         try {
             Klaviyo.unregisterFormLifecycleHandler()
         } catch (_: MissingKlaviyoModule) {

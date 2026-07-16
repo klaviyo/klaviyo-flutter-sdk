@@ -365,6 +365,21 @@ class KlaviyoSDK {
 
     try {
       final jwt = await provider();
+      // The host fetch can take a while; if the provider was unregistered or
+      // replaced while it was in flight (e.g. logout), do NOT deliver a token
+      // acquired for a now-inactive provider — that could hand the previous
+      // user's token to the native SDK after logout. Answer with a failure so
+      // native resolves instead of hanging.
+      if (!identical(_authTokenProvider, provider)) {
+        _logger.info(
+          'Auth token provider changed during fetch; discarding result for $id',
+        );
+        await _nativeWrapper.respondToAuthTokenRequest(
+          id,
+          error: 'Auth token provider changed during fetch',
+        );
+        return;
+      }
       if (jwt.isEmpty) {
         // Route an empty resolution through the failure path so native gets a
         // clear signal rather than a bogus "success".

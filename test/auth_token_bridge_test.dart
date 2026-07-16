@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -147,5 +148,33 @@ void main() {
     expect(lastRespond().arguments['id'], 'req-4');
 
     await sdk.unregisterAuthTokenProvider();
+
+    // --- Token acquired after an in-flight unregister is NOT delivered ------
+    // A slow provider that resolves after the user has logged out (unregister)
+    // must not hand the (now stale) token to native. Its request is answered
+    // with a failure, never a jwt.
+    final inFlight = Completer<String>();
+    await sdk.registerAuthTokenProvider(() => inFlight.future);
+
+    capturedSink!.success({
+      'type': 'auth_token_requested',
+      'data': {'id': 'req-inflight'},
+    });
+    await pumpEventQueue();
+
+    // Unregister while the provider future is still pending, then let it resolve.
+    await sdk.unregisterAuthTokenProvider();
+    inFlight.complete('jwt-after-logout');
+    await pumpEventQueue();
+
+    final inflightResponse = log.lastWhere(
+      (c) => c.arguments is Map && c.arguments['id'] == 'req-inflight',
+    );
+    expect(inflightResponse.arguments['jwt'], isNull);
+    expect(
+      logMessages.every((m) => !m.contains('jwt-after-logout')),
+      isTrue,
+      reason: 'a token fetched after logout must never be delivered or logged',
+    );
   });
 }
