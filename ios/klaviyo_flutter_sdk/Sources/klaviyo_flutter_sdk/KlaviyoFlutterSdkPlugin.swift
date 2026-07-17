@@ -548,19 +548,58 @@ extension KlaviyoFlutterSdkPlugin {
     /// the entry — whichever path removes it wins and resumes; any later path
     /// finds nothing and is a no-op. Stored statically (like the shared
     /// instance) so the `@Sendable` provider closure never captures `self`.
-    private static var pendingAuthTokenRequests: [String: CheckedContinuation<String, Error>] = [:]
+    private static var pendingAuthTokenRequests: [String: PendingAuthTokenRequest] = [:]
     private static let authTokenLock = NSLock()
+
+    /// Monotonic registration generation, bumped on every register and
+    /// unregister (guarded by `authTokenLock`). A pending request carries the
+    /// generation captured when its provider was registered; if that no longer
+    /// matches the current generation at response time, the provider was torn
+    /// down or replaced while the request was in flight, so it is failed rather
+    /// than answered with a different registration's token. The lock (per-op
+    /// atomicity) does not by itself prevent a store-after-drain during
+    /// re-registration, and the SDK's unregister cancellation is asynchronous —
+    /// so the generation is what deterministically closes that race.
+    private static var authTokenGeneration = 0
+
+    fileprivate struct PendingAuthTokenRequest {
+        let continuation: CheckedContinuation<String, Error>
+        let generation: Int
+    }
+
+    /// Bumps and returns the next generation under the lock.
+    fileprivate static func nextAuthTokenGeneration() -> Int {
+        authTokenLock.lock()
+        defer { authTokenLock.unlock() }
+        authTokenGeneration += 1
+        return authTokenGeneration
+    }
+
+    /// Reads the current generation under the lock.
+    fileprivate static func currentAuthTokenGeneration() -> Int {
+        authTokenLock.lock()
+        defer { authTokenLock.unlock() }
+        return authTokenGeneration
+    }
 
     /// Registers a wrapper-owned provider with the native SDK. When the SDK
     /// invokes it, generates a correlation id, suspends on a continuation, and
     /// emits an `auth_token_requested` event to Dart; the SDK's timeout cancels
     /// the task, which evicts and fails the continuation.
     private func registerAuthTokenProvider() {
+        // Capture this registration's generation now; the closure holds it by
+        // value, so a request stored by an in-flight callback that races a
+        // teardown is recognized as stale at response time.
+        let generation = KlaviyoFlutterSdkPlugin.nextAuthTokenGeneration()
         KlaviyoSDK().registerAuthTokenProvider { () async throws -> String in
             let id = UUID().uuidString
             return try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { continuation in
-                    KlaviyoFlutterSdkPlugin.storeAuthTokenContinuation(continuation, for: id)
+                    KlaviyoFlutterSdkPlugin.storeAuthTokenContinuation(
+                        continuation,
+                        for: id,
+                        generation: generation
+                    )
                     // Close the cancellation-before-store race: if the task was
                     // already cancelled, `onCancel` ran before the continuation
                     // existed and its removal was a no-op. Re-check here (after
@@ -569,7 +608,7 @@ extension KlaviyoFlutterSdkPlugin {
                     // exactly-once vs. onCancel / a response.
                     if Task.isCancelled {
                         KlaviyoFlutterSdkPlugin.removeAuthTokenContinuation(for: id)?
-                            .resume(throwing: CancellationError())
+                            .continuation.resume(throwing: CancellationError())
                         return
                     }
                     // Emit on the shared instance so the closure never captures
@@ -579,7 +618,7 @@ extension KlaviyoFlutterSdkPlugin {
                 }
             } onCancel: {
                 KlaviyoFlutterSdkPlugin.removeAuthTokenContinuation(for: id)?
-                    .resume(throwing: CancellationError())
+                    .continuation.resume(throwing: CancellationError())
             }
         }
     }
@@ -591,6 +630,10 @@ extension KlaviyoFlutterSdkPlugin {
         reason: String = "Auth token provider was unregistered"
     ) {
         KlaviyoSDK().unregisterAuthTokenProvider()
+        // Bump the generation so any request stored by an in-flight callback
+        // that races this teardown is treated as stale at response time, then
+        // fail and evict the requests present now.
+        _ = KlaviyoFlutterSdkPlugin.nextAuthTokenGeneration()
         KlaviyoFlutterSdkPlugin.failAllPendingAuthTokenRequests(reason: reason)
     }
 
@@ -619,21 +662,26 @@ extension KlaviyoFlutterSdkPlugin {
         result(nil)
     }
 
-    /// Stores a pending continuation under the lock.
+    /// Stores a pending request (continuation + its registration generation)
+    /// under the lock.
     fileprivate static func storeAuthTokenContinuation(
         _ continuation: CheckedContinuation<String, Error>,
-        for id: String
+        for id: String,
+        generation: Int
     ) {
         authTokenLock.lock()
-        pendingAuthTokenRequests[id] = continuation
+        pendingAuthTokenRequests[id] = PendingAuthTokenRequest(
+            continuation: continuation,
+            generation: generation
+        )
         authTokenLock.unlock()
     }
 
-    /// Claims and removes a pending continuation under the lock. Whichever path
+    /// Claims and removes a pending request under the lock. Whichever path
     /// removes it first wins; later paths get `nil` and are no-ops.
     fileprivate static func removeAuthTokenContinuation(
         for id: String
-    ) -> CheckedContinuation<String, Error>? {
+    ) -> PendingAuthTokenRequest? {
         authTokenLock.lock()
         defer { authTokenLock.unlock() }
         return pendingAuthTokenRequests.removeValue(forKey: id)
@@ -645,8 +693,8 @@ extension KlaviyoFlutterSdkPlugin {
         let pending = pendingAuthTokenRequests
         pendingAuthTokenRequests.removeAll()
         authTokenLock.unlock()
-        for (_, continuation) in pending {
-            continuation.resume(throwing: authTokenError(reason))
+        for (_, request) in pending {
+            request.continuation.resume(throwing: authTokenError(reason))
         }
     }
 
@@ -666,7 +714,7 @@ extension KlaviyoFlutterSdkPlugin {
         DispatchQueue.main.async {
             guard let eventSink = self.eventSink else {
                 KlaviyoFlutterSdkPlugin.removeAuthTokenContinuation(for: id)?
-                    .resume(throwing: KlaviyoFlutterSdkPlugin.authTokenError(
+                    .continuation.resume(throwing: KlaviyoFlutterSdkPlugin.authTokenError(
                         "Unable to reach the Dart auth token provider (event sink unavailable)"
                     ))
                 return
@@ -689,9 +737,21 @@ extension KlaviyoFlutterSdkPlugin {
         error: String?,
         isConnectivityError: Bool
     ) {
-        guard let continuation = KlaviyoFlutterSdkPlugin.removeAuthTokenContinuation(for: id) else {
+        guard let pending = KlaviyoFlutterSdkPlugin.removeAuthTokenContinuation(for: id) else {
             return
         }
+        if pending.generation != KlaviyoFlutterSdkPlugin.currentAuthTokenGeneration() {
+            // The provider was unregistered/replaced while this request was in
+            // flight, so it belongs to a superseded registration. Fail it rather
+            // than answer it with a different registration's token.
+            pending.continuation.resume(
+                throwing: KlaviyoFlutterSdkPlugin.authTokenError(
+                    "Auth token request superseded by re-registration"
+                )
+            )
+            return
+        }
+        let continuation = pending.continuation
         if let token {
             continuation.resume(returning: token)
         } else {
