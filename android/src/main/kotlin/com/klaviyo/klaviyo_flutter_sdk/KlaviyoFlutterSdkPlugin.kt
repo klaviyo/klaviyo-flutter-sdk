@@ -102,6 +102,11 @@ class KlaviyoFlutterSdkPlugin :
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
+                    // The Dart side keeps a permanent auth-event listener, so this
+                    // fires at engine teardown. Tear the auth bridge down here too
+                    // (parity with iOS onCancel) so in-flight requests fail promptly
+                    // instead of waiting for onDetachedFromEngine or the SDK timeout.
+                    tearDownAuthTokenProvider("Flutter event stream cancelled")
                 }
             },
         )
@@ -680,6 +685,25 @@ class KlaviyoFlutterSdkPlugin :
         }
     }
 
+    /**
+     * Tears down the auth token bridge on engine teardown: unregisters the
+     * provider (so the Klaviyo singleton stops invoking this plugin instance's
+     * lambda), bumps the generation so any late store is treated as stale, and
+     * fails any pending callbacks. Invoked from both the EventChannel [onCancel]
+     * and [onDetachedFromEngine] (idempotent) so an in-flight request can't
+     * dangle until the SDK timeout — parity with iOS's onCancel teardown.
+     */
+    private fun tearDownAuthTokenProvider(reason: String) {
+        try {
+            Klaviyo.unregisterAuthTokenProvider()
+        } catch (e: Exception) {
+            Registry.log.warning("Failed to unregister auth token provider: ${e.message}")
+        } finally {
+            ++authTokenGeneration
+            failAllPendingAuthCallbacks(reason)
+        }
+    }
+
     override fun onDetachedFromEngine(
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
@@ -687,15 +711,8 @@ class KlaviyoFlutterSdkPlugin :
         eventSink = null
         // Unregister the auth token provider so the Klaviyo singleton stops
         // retaining (and invoking) this now-detached plugin instance's bridge
-        // lambda after the engine is gone. Fail pending callbacks in a finally
-        // so they're always drained even if unregister throws.
-        try {
-            Klaviyo.unregisterAuthTokenProvider()
-        } catch (e: Exception) {
-            Registry.log.warning("Failed to unregister auth token provider on detach: ${e.message}")
-        } finally {
-            failAllPendingAuthCallbacks("Flutter engine detached")
-        }
+        // lambda after the engine is gone, and drain pending callbacks.
+        tearDownAuthTokenProvider("Flutter engine detached")
         try {
             Klaviyo.unregisterFormLifecycleHandler()
         } catch (_: MissingKlaviyoModule) {
