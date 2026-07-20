@@ -70,13 +70,17 @@ class _AuthTabState extends State<AuthTab> {
           contentPadding: EdgeInsets.zero,
           title: const Text('Auth token provider'),
           value: enabled,
-          onChanged: (on) {
-            if (on) {
-              authController.enable();
-            } else {
-              authController.disable();
-            }
-          },
+          // Disable the control while a register/unregister is in flight so the
+          // switch can't snap back and accept a re-entrant toggle mid-transition.
+          onChanged: authController.isTransitioning
+              ? null
+              : (on) {
+                  if (on) {
+                    authController.enable();
+                  } else {
+                    authController.disable();
+                  }
+                },
         ),
         Text(
           enabled

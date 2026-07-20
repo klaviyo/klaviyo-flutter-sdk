@@ -39,6 +39,11 @@ class AuthController extends ChangeNotifier {
   final List<AuthLogEntry> _logs = [];
 
   bool _enabled = false;
+  // Non-null while an enable()/disable() is in flight, holding the target
+  // state. The UI reflects this (so the switch shows the intended position
+  // instead of snapping back to the confirmed state) and disables the control
+  // to block re-entrant toggles mid-transition.
+  bool? _pendingEnable;
   int _cursor = 0;
   int _generation = 0;
   String? _currentCallId;
@@ -48,7 +53,13 @@ class AuthController extends ChangeNotifier {
   // ---- Read-only views for the UI ----------------------------------------
 
   List<AuthResponse> get responses => List.unmodifiable(_responses);
-  bool get enabled => _enabled;
+
+  /// The switch position: the in-flight target while transitioning, otherwise
+  /// the confirmed state.
+  bool get enabled => _pendingEnable ?? _enabled;
+
+  /// Whether an enable/disable transition is in flight (control is disabled).
+  bool get isTransitioning => _pendingEnable != null;
   String? get currentCallId => _currentCallId;
   String? get lastReturnedToken => _lastReturnedToken;
 
@@ -78,36 +89,53 @@ class AuthController extends ChangeNotifier {
   /// showing ON with no provider registered, and the error is caught here so it
   /// doesn't surface as an unhandled future from the (non-awaited) UI handler.
   Future<void> enable() async {
+    // Ignore re-entrant toggles while a transition is in flight (the UI also
+    // disables the control, but guard here too). This prevents a second tap
+    // from calling _resetServedState() and wiping the cursor/served rows while
+    // registration is still running.
+    if (_pendingEnable != null) return;
+    _pendingEnable = true;
+    notifyListeners();
+
     _resetServedState(); // bumps _generation
-    // Capture this operation's generation. `disable()` (and a fresh `enable()`)
-    // bump `_generation`, so if the user toggles off while this registration is
-    // still in flight, the guard below prevents this stale completion from
-    // re-enabling after they've turned it off.
+    // Capture this operation's generation so a stale in-flight completion can't
+    // re-enable after a later toggle.
     final generation = _generation;
     try {
       await KlaviyoSDK().registerAuthTokenProvider(_provide);
-      if (generation != _generation) return; // superseded — leave state as-is
-      _enabled = true;
+      if (generation == _generation) _enabled = true;
     } catch (e) {
-      if (generation != _generation) return;
-      _enabled = false;
+      if (generation == _generation) _enabled = false;
       Logger('KlaviyoSDK')
           .warning('Failed to register auth token provider: $e');
+    } finally {
+      // Only clear the pending flag if this op is still current; a superseding
+      // op owns the transition state otherwise.
+      if (generation == _generation) _pendingEnable = null;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   /// Disable the provider: unregister and bump the generation so any in-flight
   /// delayed call is discarded.
   Future<void> disable() async {
-    _enabled = false;
+    if (_pendingEnable != null) return;
+    _pendingEnable = false;
     _generation++;
     notifyListeners();
+
+    final generation = _generation;
     try {
       await KlaviyoSDK().unregisterAuthTokenProvider();
     } catch (e) {
       Logger('KlaviyoSDK')
           .warning('Failed to unregister auth token provider: $e');
+    } finally {
+      if (generation == _generation) {
+        _enabled = false;
+        _pendingEnable = null;
+      }
+      notifyListeners();
     }
   }
 
