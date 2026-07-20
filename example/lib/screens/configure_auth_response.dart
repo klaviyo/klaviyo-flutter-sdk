@@ -64,7 +64,11 @@ class _ConfigureAuthResponseScreenState
 
   void _commit() {
     final m = _model;
-    if (m != null) {
+    // Also re-checked in build()'s locked guard below — kept here too since
+    // that guard only prevents *reaching* this button, not a stale in-flight
+    // callback from firing after the response served while this screen was
+    // still open.
+    if (m != null && !authController.isLockedById(m.id)) {
       m.outcome = _outcome;
       m.customToken = _tokenController.text;
       m.mockKind = _mockKind;
@@ -79,10 +83,28 @@ class _ConfigureAuthResponseScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (_model == null) {
+    final model = _model;
+    if (model == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Configure Response')),
         body: const Center(child: Text('Response no longer exists.')),
+      );
+    }
+
+    // The list blocks navigating into an already-served row, but this screen
+    // can still be open when the SDK serves the row it's editing — without
+    // this check, Done would silently mutate a response that should be
+    // frozen until the next re-register (see AuthController.isLocked).
+    if (authController.isLockedById(model.id)) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Configure Response')),
+        body: const Center(
+          child: Text(
+            'This response has already been served and is now locked. '
+            'Go back — it can be edited again after the provider is '
+            're-registered.',
+          ),
+        ),
       );
     }
 

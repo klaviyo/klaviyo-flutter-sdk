@@ -70,13 +70,24 @@ class AuthController extends ChangeNotifier {
   String? get lastReturnedToken => _lastReturnedToken;
 
   /// Served state only applies while the provider is registered — when it's
-  /// off, no row is considered served (so nothing is locked/undeletable).
-  bool isServed(String id) => _enabled && _servedIds.contains(id);
+  /// off, `_servedIds` has been cleared (see `enable`/`disable`) so no row is
+  /// considered served (nothing locked/undeletable). Checking `_servedIds`
+  /// directly, rather than gating on `_enabled`, matters because the native
+  /// side can invoke `_provide` before `_enabled` flips true (registration is
+  /// live as soon as the register call is issued, not once it resolves).
+  bool isServed(String id) => _servedIds.contains(id);
   bool isRepeatingLast(int index) => index == _responses.length - 1;
 
   /// A row is locked (non-editable) once served, except the repeating last row.
   bool isLocked(int index) =>
       isServed(_responses[index].id) && !isRepeatingLast(index);
+
+  /// [isLocked] keyed by id instead of index — for callers (like the Configure
+  /// Response screen) that only have the response id, not its current index.
+  bool isLockedById(String id) {
+    final index = _responses.indexWhere((r) => r.id == id);
+    return index >= 0 && isLocked(index);
+  }
 
   /// A row can be deleted only if there's more than one and it hasn't served.
   bool canDelete(int index) =>
@@ -136,7 +147,10 @@ class AuthController extends ChangeNotifier {
       // Mirror enable(): only report disabled once unregistration actually
       // succeeds, so a failure leaves the switch on and retryable instead of
       // claiming "disabled" while the SDK may still hold the old provider.
-      if (generation == _generation) _enabled = false;
+      if (generation == _generation) {
+        _enabled = false;
+        _clearServedTracking();
+      }
     } catch (e) {
       Logger('KlaviyoSDK')
           .warning('Failed to unregister auth token provider: $e');
@@ -148,6 +162,10 @@ class AuthController extends ChangeNotifier {
 
   void _resetServedState() {
     _generation++;
+    _clearServedTracking();
+  }
+
+  void _clearServedTracking() {
     _servedIds.clear();
     _currentCallId = null;
     _lastReturnedToken = null;
