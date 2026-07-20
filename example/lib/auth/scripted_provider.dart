@@ -24,10 +24,17 @@ class AuthLogEntry {
 /// Config is **transient** — it lives only in memory and resets on relaunch,
 /// matching the native test apps which deliberately do not persist Auth state.
 class AuthController extends ChangeNotifier {
+  // Caps in-memory growth for long manual test sessions — clearLogs() only
+  // moves a display cutoff, so without a cap this list would grow unbounded.
+  static const int _maxLogEntries = 500;
+
   AuthController() {
     // Buffer the wrapper's bridge diagnostics for the Auth-logs section.
     _logSubscription = Logger('KlaviyoSDK').onRecord.listen((record) {
       _logs.add(AuthLogEntry(record.time, record.level, record.message));
+      if (_logs.length > _maxLogEntries) {
+        _logs.removeRange(0, _logs.length - _maxLogEntries);
+      }
       notifyListeners();
     });
   }
@@ -126,14 +133,15 @@ class AuthController extends ChangeNotifier {
     final generation = _generation;
     try {
       await KlaviyoSDK().unregisterAuthTokenProvider();
+      // Mirror enable(): only report disabled once unregistration actually
+      // succeeds, so a failure leaves the switch on and retryable instead of
+      // claiming "disabled" while the SDK may still hold the old provider.
+      if (generation == _generation) _enabled = false;
     } catch (e) {
       Logger('KlaviyoSDK')
           .warning('Failed to unregister auth token provider: $e');
     } finally {
-      if (generation == _generation) {
-        _enabled = false;
-        _pendingEnable = null;
-      }
+      if (generation == _generation) _pendingEnable = null;
       notifyListeners();
     }
   }

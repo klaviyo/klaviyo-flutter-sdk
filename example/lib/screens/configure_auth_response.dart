@@ -266,10 +266,16 @@ class _ConfigureAuthResponseScreenState
 
   Future<void> _pickExpiryDate() async {
     final now = DateTime.now();
+    final firstDate = now.subtract(const Duration(days: 1));
+    // A previously-picked expiry (expired-token testing is an explicit
+    // feature here) can end up before firstDate by the time the picker is
+    // reopened, which violates showDatePicker's initialDate >= firstDate
+    // precondition and crashes — clamp it forward instead.
+    final initialDate = _expiryDate ?? now.add(const Duration(minutes: 5));
     final date = await showDatePicker(
       context: context,
-      initialDate: _expiryDate ?? now.add(const Duration(minutes: 5)),
-      firstDate: now.subtract(const Duration(days: 1)),
+      initialDate: initialDate.isBefore(firstDate) ? firstDate : initialDate,
+      firstDate: firstDate,
       lastDate: now.add(const Duration(days: 365)),
     );
     if (date == null || !mounted) return;
