@@ -52,6 +52,11 @@ class AuthController extends ChangeNotifier {
   // to block re-entrant toggles mid-transition.
   bool? _pendingEnable;
   int _generation = 0;
+  // Completed and replaced every time the generation bumps, so an in-flight
+  // delayed _provide() call can race it instead of blocking a native caller
+  // for the full delay after a lifecycle change (disable/re-register/failed
+  // register) has already made the call stale.
+  Completer<void> _cancelSignal = Completer<void>();
   String? _currentCallId;
   String? _lastReturnedToken;
   DateTime? _logCutoff;
@@ -118,25 +123,35 @@ class AuthController extends ChangeNotifier {
     // Capture this operation's generation so a stale in-flight completion can't
     // re-enable after a later toggle.
     final generation = _generation;
+    // Captured once, before this op might bump the generation itself (in the
+    // catch below) — so the finally block's "am I still current" check isn't
+    // fooled by our own bump into thinking a newer op has superseded us.
+    var stillCurrent = true;
     try {
       await KlaviyoSDK().registerAuthTokenProvider(_provide);
-      if (generation == _generation) _enabled = true;
+      stillCurrent = generation == _generation;
+      if (stillCurrent) _enabled = true;
     } catch (e) {
+      stillCurrent = generation == _generation;
       // A failed registration can still have served a row first (the native
       // side may invoke _provide before registration resolves — see
       // isServed's doc comment); clear that tracking too so "off = nothing
       // locked" holds instead of leaving rows served/locked with no way to
-      // unlock them short of enabling again.
-      if (generation == _generation) {
+      // unlock them short of enabling again. Bump the generation too (not
+      // just clear served state) so an in-flight delayed _provide() call from
+      // this failed attempt discards itself instead of completing as if it
+      // were still live.
+      if (stillCurrent) {
         _enabled = false;
         _clearServedTracking();
+        _bumpGeneration();
       }
       Logger('KlaviyoSDK')
           .warning('Failed to register auth token provider: $e');
     } finally {
       // Only clear the pending flag if this op is still current; a superseding
       // op owns the transition state otherwise.
-      if (generation == _generation) _pendingEnable = null;
+      if (stillCurrent) _pendingEnable = null;
       notifyListeners();
     }
   }
@@ -146,30 +161,33 @@ class AuthController extends ChangeNotifier {
   Future<void> disable() async {
     if (_pendingEnable != null) return;
     _pendingEnable = false;
-    _generation++;
+    _bumpGeneration();
     notifyListeners();
 
     final generation = _generation;
     try {
       await KlaviyoSDK().unregisterAuthTokenProvider();
-      // Mirror enable(): only report disabled once unregistration actually
-      // succeeds, so a failure leaves the switch on and retryable instead of
-      // claiming "disabled" while the SDK may still hold the old provider.
-      if (generation == _generation) {
-        _enabled = false;
-        _clearServedTracking();
-      }
     } catch (e) {
       Logger('KlaviyoSDK')
           .warning('Failed to unregister auth token provider: $e');
     } finally {
-      if (generation == _generation) _pendingEnable = null;
+      // Unconditional, regardless of success/failure: KlaviyoSDK's
+      // unregisterAuthTokenProvider() clears its provider reference before
+      // attempting the native call either way, so no further request will
+      // route to _provide whether or not the native call itself succeeded —
+      // gating "disabled" on success would show "registered" while the
+      // bridge silently never invokes us again.
+      if (generation == _generation) {
+        _enabled = false;
+        _clearServedTracking();
+        _pendingEnable = null;
+      }
       notifyListeners();
     }
   }
 
   void _resetServedState() {
-    _generation++;
+    _bumpGeneration();
     _clearServedTracking();
   }
 
@@ -177,6 +195,16 @@ class AuthController extends ChangeNotifier {
     _servedIds.clear();
     _currentCallId = null;
     _lastReturnedToken = null;
+  }
+
+  /// Bumps the generation and wakes any call waiting on [_cancelSignal] (an
+  /// in-flight delayed _provide() — see there) so it can discard itself
+  /// immediately instead of blocking the native caller for the rest of its
+  /// configured delay.
+  void _bumpGeneration() {
+    _generation++;
+    if (!_cancelSignal.isCompleted) _cancelSignal.complete();
+    _cancelSignal = Completer<void>();
   }
 
   /// The scripted [AuthTokenProvider] handed to the SDK.
@@ -197,7 +225,14 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     if (response.delay > Duration.zero) {
-      await Future<void>.delayed(response.delay);
+      // Race the configured delay against the cancel signal so a lifecycle
+      // change mid-delay (disable, re-register, or a failed register) makes
+      // this call discard itself immediately below — rather than leaving the
+      // native caller blocked for the rest of the delay before finding out.
+      await Future.any<void>([
+        Future<void>.delayed(response.delay),
+        _cancelSignal.future,
+      ]);
     }
 
     // Generation guard: if (un)register happened during the delay, discard.
