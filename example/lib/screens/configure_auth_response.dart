@@ -20,8 +20,9 @@ class ConfigureAuthResponseScreen extends StatefulWidget {
 
 class _ConfigureAuthResponseScreenState
     extends State<ConfigureAuthResponseScreen> {
-  late final AuthResponse? _model =
-      authController.responseById(widget.responseId);
+  // Looked up live (not cached) so a deletion elsewhere while this screen is
+  // open is reflected immediately — see _onControllerChanged.
+  AuthResponse? get _model => authController.responseById(widget.responseId);
 
   late AuthOutcome _outcome;
   late TextEditingController _tokenController;
@@ -35,6 +36,11 @@ class _ConfigureAuthResponseScreenState
   @override
   void initState() {
     super.initState();
+    // The response may be deleted from the live list while this screen is
+    // open (e.g. via the list's popup menu); rebuild so the stale-model
+    // guard in build() picks that up rather than continuing to edit a
+    // detached response that Done would silently no-op on.
+    authController.addListener(_onControllerChanged);
     final m = _model;
     _outcome = m?.outcome ?? AuthOutcome.mockToken;
     _tokenController = TextEditingController(text: m?.customToken ?? '');
@@ -45,8 +51,13 @@ class _ConfigureAuthResponseScreenState
     _delaySeconds = (m?.delay ?? Duration.zero).inMilliseconds / 1000.0;
   }
 
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    authController.removeListener(_onControllerChanged);
     _tokenController.dispose();
     super.dispose();
   }

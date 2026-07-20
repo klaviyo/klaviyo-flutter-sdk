@@ -44,7 +44,6 @@ class AuthController extends ChangeNotifier {
   // instead of snapping back to the confirmed state) and disables the control
   // to block re-entrant toggles mid-transition.
   bool? _pendingEnable;
-  int _cursor = 0;
   int _generation = 0;
   String? _currentCallId;
   String? _lastReturnedToken;
@@ -140,7 +139,6 @@ class AuthController extends ChangeNotifier {
   }
 
   void _resetServedState() {
-    _cursor = 0;
     _generation++;
     _servedIds.clear();
     _currentCallId = null;
@@ -151,10 +149,14 @@ class AuthController extends ChangeNotifier {
   Future<String> _provide() async {
     final generation = _generation;
 
-    // Consume the next response, clamping to the last (which repeats).
-    final index = _cursor < _responses.length ? _cursor : _responses.length - 1;
+    // Consume the next not-yet-served response in current list order,
+    // clamping to the last (which repeats). Recomputed by id on every call —
+    // rather than advancing a positional cursor — so reordering or
+    // duplicating rows can't desync the serve order from what's shown in the
+    // UI (see AuthResponse's stable id doc comment).
+    var index = _responses.indexWhere((r) => !_servedIds.contains(r.id));
+    if (index < 0) index = _responses.length - 1;
     final response = _responses[index];
-    if (_cursor < _responses.length - 1) _cursor++;
 
     _currentCallId = response.id;
     _servedIds.add(response.id);
