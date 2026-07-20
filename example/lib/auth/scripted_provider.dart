@@ -122,7 +122,15 @@ class AuthController extends ChangeNotifier {
       await KlaviyoSDK().registerAuthTokenProvider(_provide);
       if (generation == _generation) _enabled = true;
     } catch (e) {
-      if (generation == _generation) _enabled = false;
+      // A failed registration can still have served a row first (the native
+      // side may invoke _provide before registration resolves — see
+      // isServed's doc comment); clear that tracking too so "off = nothing
+      // locked" holds instead of leaving rows served/locked with no way to
+      // unlock them short of enabling again.
+      if (generation == _generation) {
+        _enabled = false;
+        _clearServedTracking();
+      }
       Logger('KlaviyoSDK')
           .warning('Failed to register auth token provider: $e');
     } finally {
