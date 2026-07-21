@@ -17,6 +17,7 @@ import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
+import com.klaviyo.core.auth.AuthTokenProvider
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
@@ -35,6 +36,9 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.io.IOException
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.INFINITE
 import kotlin.time.Duration.Companion.seconds
@@ -48,6 +52,31 @@ class KlaviyoFlutterSdkPlugin :
     private var eventSink: EventChannel.EventSink? = null
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
+
+    /**
+     * Pending auth token requests keyed by correlation ID. The native SDK
+     * invokes the provider on a background dispatcher and hands us an
+     * [AuthTokenProvider.Callback] to complete once the Dart side responds via
+     * `respondToAuthTokenRequest`. Each entry is tagged with the registration
+     * [PendingAuthRequest.generation] it belongs to. The token itself is never
+     * logged here; all token logging happens in the native SDK.
+     */
+    private val pendingAuthCallbacks = ConcurrentHashMap<String, PendingAuthRequest>()
+
+    /**
+     * Monotonic registration generation, bumped on every register and
+     * unregister (both on the main/method-channel thread). A pending request
+     * carries the generation captured when its provider was registered; if that
+     * no longer matches [authTokenGeneration] at response time, the provider was
+     * torn down or replaced while the request was in flight, and the request is
+     * failed rather than answered with a different registration's token.
+     */
+    private var authTokenGeneration = 0
+
+    private data class PendingAuthRequest(
+        val callback: AuthTokenProvider.Callback,
+        val generation: Int,
+    )
 
     companion object {
         private const val TAG = "KlaviyoFlutter"
@@ -73,6 +102,11 @@ class KlaviyoFlutterSdkPlugin :
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
+                    // The Dart side keeps a permanent auth-event listener, so this
+                    // fires at engine teardown. Tear the auth bridge down here too
+                    // (parity with iOS onCancel) so in-flight requests fail promptly
+                    // instead of waiting for onDetachedFromEngine or the SDK timeout.
+                    tearDownAuthTokenProvider("Flutter event stream cancelled")
                 }
             },
         )
@@ -479,6 +513,96 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "registerAuthTokenProvider" -> {
+                try {
+                    // Capture this registration's generation now (main thread). The
+                    // lambda closes over it by value, so even though the SDK invokes
+                    // the lambda on a background dispatcher, it never races on shared
+                    // generation state.
+                    val generation = ++authTokenGeneration
+                    Klaviyo.registerAuthTokenProvider { callback ->
+                        // The native SDK keeps at most one token fetch in flight, so any
+                        // entries still pending when a NEW request arrives belong to a
+                        // previous fetch it has already abandoned (e.g. timed out). Android's
+                        // callback API gives no per-request timeout hook (unlike iOS's
+                        // withTaskCancellationHandler onCancel), so this is where stale ids
+                        // are reclaimed — bounding the map and honoring the "timed-out ids
+                        // don't resolve" contract.
+                        failAllPendingAuthCallbacks("Superseded by a newer auth token request")
+                        val id = UUID.randomUUID().toString()
+                        pendingAuthCallbacks[id] = PendingAuthRequest(callback, generation)
+                        emitAuthTokenRequest(id)
+                    }
+                    result.success(null)
+                } catch (e: Exception) {
+                    Registry.log.error("Failed to register auth token provider", e)
+                    result.error("AUTH_TOKEN_ERROR", "Failed to register auth token provider", e.message)
+                }
+            }
+
+            "unregisterAuthTokenProvider" -> {
+                try {
+                    Klaviyo.unregisterAuthTokenProvider()
+                    result.success(null)
+                } catch (e: Exception) {
+                    Registry.log.error("Failed to unregister auth token provider", e)
+                    result.error("AUTH_TOKEN_ERROR", "Failed to unregister auth token provider", e.message)
+                } finally {
+                    // Bump the generation so any request stored by an in-flight
+                    // provider callback that races this teardown is treated as stale
+                    // at response time. Then fail and drop any requests still
+                    // awaiting a Dart response so no callbacks dangle.
+                    ++authTokenGeneration
+                    failAllPendingAuthCallbacks("Auth token provider was unregistered")
+                }
+            }
+
+            "respondToAuthTokenRequest" -> {
+                val id = call.argument<String>("id")
+                if (id == null) {
+                    result.error("INVALID_ARGUMENTS", "Missing auth token request id", null)
+                    return
+                }
+
+                val pending = pendingAuthCallbacks.remove(id)
+                if (pending == null) {
+                    // Unknown, already-resolved, or timed-out request. Nothing to do.
+                    Registry.log.verbose("No pending auth token request for id $id")
+                    result.success(null)
+                    return
+                }
+
+                if (pending.generation != authTokenGeneration) {
+                    // The provider was unregistered/replaced while this request was in
+                    // flight, so it belongs to a superseded registration. Fail it
+                    // rather than answer it with a different registration's token.
+                    pending.callback.onFailure(
+                        IllegalStateException("Auth token request superseded by re-registration"),
+                    )
+                    result.success(null)
+                    return
+                }
+
+                val callback = pending.callback
+                val jwt = call.argument<String>("jwt")
+                if (jwt != null) {
+                    callback.onSuccess(jwt)
+                } else {
+                    val message = call.argument<String>("error") ?: "Auth token provider returned no token"
+                    val isConnectivityError = call.argument<Boolean>("isConnectivityError") ?: false
+                    // Surface connectivity failures as an IOException so the SDK's
+                    // connectivity-driven retry classifier recognizes them; other
+                    // failures use a generic Throwable, which the SDK treats as
+                    // non-retryable.
+                    if (isConnectivityError) {
+                        callback.onFailure(IOException(message))
+                    } else {
+                        callback.onFailure(Throwable(message))
+                    }
+                }
+                result.success(null)
+            }
+
             "resetProfile" -> {
                 try {
                     Klaviyo.resetProfile()
@@ -516,11 +640,79 @@ class KlaviyoFlutterSdkPlugin :
         }
     }
 
+    /**
+     * Emits an `auth_token_requested` event to Dart, resolving the event sink
+     * and handling delivery failure *inside* the main-thread runnable.
+     *
+     * The sink is read at execution time (not when scheduling) because it can be
+     * cancelled between `post()` and the runnable actually running; and
+     * `EventSink.success` can throw. In either case the pending callback for
+     * [id] is removed and failed here, so a request never dangles until the
+     * native SDK timeout and the map never leaks. The token itself is never
+     * logged — only the correlation id crosses this event.
+     */
+    private fun emitAuthTokenRequest(id: String) {
+        Handler(Looper.getMainLooper()).post {
+            val sink = eventSink
+            if (sink == null) {
+                pendingAuthCallbacks.remove(id)?.callback?.onFailure(
+                    IllegalStateException(
+                        "Unable to reach the Dart auth token provider (event sink unavailable)",
+                    ),
+                )
+                return@post
+            }
+            try {
+                sink.success(
+                    mapOf(
+                        "type" to "auth_token_requested",
+                        "data" to mapOf("id" to id),
+                    ),
+                )
+            } catch (e: Exception) {
+                Registry.log.error("Failed to emit auth token request", e)
+                pendingAuthCallbacks.remove(id)?.callback?.onFailure(
+                    IllegalStateException("Failed to deliver auth token request to Dart", e),
+                )
+            }
+        }
+    }
+
+    /** Fails and drops every pending auth token callback. */
+    private fun failAllPendingAuthCallbacks(reason: String) {
+        pendingAuthCallbacks.keys.toList().forEach { id ->
+            pendingAuthCallbacks.remove(id)?.callback?.onFailure(IllegalStateException(reason))
+        }
+    }
+
+    /**
+     * Tears down the auth token bridge on engine teardown: unregisters the
+     * provider (so the Klaviyo singleton stops invoking this plugin instance's
+     * lambda), bumps the generation so any late store is treated as stale, and
+     * fails any pending callbacks. Invoked from both the EventChannel [onCancel]
+     * and [onDetachedFromEngine] (idempotent) so an in-flight request can't
+     * dangle until the SDK timeout — parity with iOS's onCancel teardown.
+     */
+    private fun tearDownAuthTokenProvider(reason: String) {
+        try {
+            Klaviyo.unregisterAuthTokenProvider()
+        } catch (e: Exception) {
+            Registry.log.warning("Failed to unregister auth token provider: ${e.message}")
+        } finally {
+            ++authTokenGeneration
+            failAllPendingAuthCallbacks(reason)
+        }
+    }
+
     override fun onDetachedFromEngine(
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
         eventSink = null
+        // Unregister the auth token provider so the Klaviyo singleton stops
+        // retaining (and invoking) this now-detached plugin instance's bridge
+        // lambda after the engine is gone, and drain pending callbacks.
+        tearDownAuthTokenProvider("Flutter engine detached")
         try {
             Klaviyo.unregisterFormLifecycleHandler()
         } catch (_: MissingKlaviyoModule) {
