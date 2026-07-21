@@ -327,6 +327,44 @@ Permission can be managed from Flutter code or platform-specific native code. Ei
 
 The Klaviyo SDK needs to register the device's push token. Choose one of the following approaches:
 
+#### Automatic Token Forwarding (Platform Defaults)
+
+Before choosing an approach, note that the underlying native SDKs handle automatic push-token
+forwarding differently by default:
+
+- **Android — on by default.** The native Android SDK auto-registers its `KlaviyoPushService`
+  (a `FirebaseMessagingService`) via manifest merge, so it forwards the FCM token to Klaviyo
+  automatically. You do not have to collect the token yourself on Android.
+- **iOS — opt-in (off by default).** iOS token forwarding relies on app-delegate method swizzling,
+  which is more invasive, so the native iOS SDK does not enable it implicitly. By default you set the
+  token manually. Automatic forwarding on iOS is opt-in via `Info.plist` — see the native
+  [iOS README](https://github.com/klaviyo/klaviyo-swift-sdk#push-notifications).
+
+The flag's semantics are identical on both platforms (`false` = no automatic collection); only the
+default differs, for these platform-specific reasons. Manual token management (Option A) remains the
+recommended baseline and works on both platforms — automatic forwarding is additive, not a
+replacement.
+
+**Double collection is harmless.** Because Android forwards automatically by default, calling
+`registerForPushNotifications()` (Option B) — or setting the token manually via Option A — on Android
+registers the token through two paths. This is safe: duplicate tokens are deduplicated and cause no
+extra network request.
+
+To **opt out** of automatic forwarding on Android, add the following `meta-data` to the
+`<application>` element of your app's `AndroidManifest.xml` (which your app owns), then register the
+token yourself via `setPushToken(...)` or `registerForPushNotifications()`:
+
+```xml
+<meta-data
+    android:name="com.klaviyo.push.automatic_push_token_forwarding"
+    android:value="false" />
+```
+
+On iOS there is nothing to opt out of; automatic forwarding is off unless you opt in via `Info.plist`.
+For full details, see the native
+[Android](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) and
+[iOS](https://github.com/klaviyo/klaviyo-swift-sdk#push-notifications) push documentation.
+
 #### Option A: Manual Token Management with Firebase Messaging (Recommended)
 
 Best if you already use `firebase_messaging`, or if you need more control over token handling (such as to send the token to multiple push providers).
