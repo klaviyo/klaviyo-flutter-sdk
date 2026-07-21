@@ -5,6 +5,7 @@
 ### What's New
 
 - **Push action events** — New `onPushAction` stream emits typed `KlaviyoPushAction` events (`OpenWebUrl`, `ActionButtonTapped`) when a user taps a Klaviyo push carrying an Open External URL (`open_url`) action or an action button. URLs are forwarded verbatim, including special schemes such as `mailto:`, `tel:`, and `sms:`. On iOS both body `open_url` taps and action-button taps surface; on Android `open_url` is handled externally by the native SDK, so only `deep_link` / `open_app` action-button taps surface.
+- **Native SDK upgrade** — Now consuming `KlaviyoSwift ~> 5.4.0` and `klaviyo-android-sdk 4.5.0`, which adds the non-web `open_url` scheme allowlist (`mailto:`, `tel:`, `sms:`) on Android.
 
 ## 0.3.0 - 2026-07-28
 
