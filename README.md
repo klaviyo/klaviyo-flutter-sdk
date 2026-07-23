@@ -224,6 +224,8 @@ class MainActivity : FlutterActivity() {
 }
 ```
 
+> **Note on automatic tracking:** The native iOS and Android SDKs also offer an opt-in automatic push-open tracking mode — if you are using the manual `AppDelegate`/`MainActivity` setup above, no action is needed. If you consume the Dart `push_notification_opened` stream, keep this native wiring in place regardless of any native-side configuration. See the [iOS SDK](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) and [Android SDK](https://github.com/klaviyo/klaviyo-android-sdk#Tracking-Open-Events) documentation if you want to explore alternative approaches.
+
 **2. KlaviyoPushService Declaration**
 
 Declare `KlaviyoPushService` in your `android/app/src/main/AndroidManifest.xml` inside the `<application>` tag. This ensures Klaviyo processes FCM messages before Flutter's default `FirebaseMessagingService`, enabling open tracking and rich push features.
