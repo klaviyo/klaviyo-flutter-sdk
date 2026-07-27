@@ -5,6 +5,7 @@ import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
+import 'models/klaviyo_subscription.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
@@ -184,6 +185,43 @@ class KlaviyoSDK {
       _logger.info('Event tracked: ${event.name.name}');
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
+    }
+  }
+
+  /// Subscribe the current profile to a Klaviyo list.
+  ///
+  /// Set the profile's email and/or phone number **before** calling this — the
+  /// native SDKs validate the request against the current profile's identifiers
+  /// and drop it with a warning if a requested channel has no identifier.
+  ///
+  /// Push subscriptions are not created through this API.
+  ///
+  /// Example:
+  /// ```dart
+  /// // Request specific consent per channel
+  /// await klaviyo.createSubscription(
+  ///   KlaviyoSubscription(
+  ///     listId: 'ABC123',
+  ///     channels: const KlaviyoSubscriptionChannels(
+  ///       email: {EmailConsent.marketing},
+  ///       sms: {MessagingConsent.marketing},
+  ///     ),
+  ///   ),
+  /// );
+  ///
+  /// // Request marketing consent on every identified channel
+  /// await klaviyo.createSubscription(
+  ///   KlaviyoSubscription.allAvailableMarketing(listId: 'ABC123'),
+  /// );
+  /// ```
+  Future<void> createSubscription(KlaviyoSubscription subscription) async {
+    _ensureInitialized();
+
+    try {
+      await _nativeWrapper.createSubscription(subscription);
+      _logger.info('Subscription requested for list: ${subscription.listId}');
+    } catch (e) {
+      throw KlaviyoException('Failed to create subscription: $e');
     }
   }
 
