@@ -576,6 +576,8 @@ subscription.cancel();
 
 Subscribe to `onPushAction` to observe taps on Klaviyo pushes that carry an **Open External URL** (`open_url`) action or **action buttons**. Events are typed via the sealed `KlaviyoPushAction` class, so Dart pattern matching is exhaustive.
 
+This stream is **observation-only**: the native SDK still performs all navigation (opening the URL, launching the app, or routing the deep link) with no integration changes required — as described in [Action Buttons](#action-buttons). `onPushAction` simply lets your app react in parallel (analytics, in-app routing, UI updates).
+
 ```dart
 import 'dart:async';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';

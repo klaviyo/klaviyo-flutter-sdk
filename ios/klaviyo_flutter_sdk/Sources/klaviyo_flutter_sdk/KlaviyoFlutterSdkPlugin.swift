@@ -516,6 +516,13 @@ extension KlaviyoFlutterSdkPlugin {
         for response: UNNotificationResponse,
         userInfo: [AnyHashable: Any]
     ) {
+        // Each notification interaction supersedes any push action still cached
+        // for a not-yet-ready Flutter listener. Clear it up front so that an
+        // earlier, superseded event can't be delivered on `onListen` when this
+        // interaction produces no push-action payload (e.g. a deep-link body tap
+        // or a notification dismiss, both of which return without caching below).
+        cachedPushAction = nil
+
         let actionIdentifier = response.actionIdentifier
 
         var eventPayload: [String: Any]?

@@ -353,7 +353,9 @@ class KlaviyoNativeWrapper {
           break;
         case 'push_open_web_url':
         case 'push_action_button_tapped':
-          _logger.info('Native push action event: $eventData');
+          // Log the type only; the payload carries CTA URLs (possible PII), so
+          // keep the full payload out of INFO logs.
+          _logger.info('Native push action event: $eventType');
           _pushActionController.add(eventData);
           break;
         default:
