@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
+import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
@@ -164,6 +165,19 @@ class KlaviyoNativeWrapper {
       await _channel.invokeMethod('trackEvent', {'event': event.toJson()});
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
+    }
+  }
+
+  /// Create a subscription using native SDK
+  Future<void> createSubscription(KlaviyoSubscription subscription) async {
+    _ensureInitialized();
+
+    try {
+      await _channel.invokeMethod('createSubscription', {
+        'subscription': subscription.toJson(),
+      });
+    } catch (e) {
+      throw KlaviyoException('Failed to create subscription: $e');
     }
   }
 

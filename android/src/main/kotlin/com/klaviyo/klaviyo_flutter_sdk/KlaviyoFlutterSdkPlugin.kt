@@ -14,6 +14,7 @@ import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
+import com.klaviyo.analytics.model.Subscription
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
@@ -240,6 +241,40 @@ class KlaviyoFlutterSdkPlugin :
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("TRACK_ERROR", "Failed to track event", e.message)
+                }
+            }
+
+            "createSubscription" -> {
+                val subscriptionJson = call.argument<Map<String, Any>>("subscription")
+                val listId = subscriptionJson?.get("listId") as? String
+
+                if (listId.isNullOrBlank()) {
+                    Registry.log.warning("Attempted to create subscription without a list ID")
+                    result.error(
+                        "SUBSCRIPTION_ERROR",
+                        "Subscription listId cannot be null or empty",
+                        null,
+                    )
+                    return
+                }
+
+                try {
+                    val customSource = subscriptionJson["customSource"] as? String
+                    val channelsJson = subscriptionJson["channels"] as? Map<*, *>
+
+                    // An absent channels key means "all available marketing" - the broad grant is
+                    // only reachable through the named factory on both this SDK and Dart.
+                    val subscription =
+                        if (channelsJson == null) {
+                            Subscription.allAvailableMarketing(listId, customSource)
+                        } else {
+                            Subscription(listId, parseSubscriptionChannels(channelsJson), customSource)
+                        }
+
+                    Klaviyo.createSubscription(subscription)
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("SUBSCRIPTION_ERROR", "Failed to create subscription", e.message)
                 }
             }
 
@@ -568,6 +603,33 @@ class KlaviyoFlutterSdkPlugin :
     override fun onDetachedFromActivity() {
         activity = null
     }
+
+    /**
+     * Maps the Dart channels payload onto [Subscription.Channels]. An absent channel stays null
+     * (leave it untouched); an empty list stays empty, so the native SDK's own validation reports
+     * it rather than this bridge silently dropping the channel.
+     *
+     * The Dart wire values are the lowercased enum names, so valueOf covers the mapping and throws
+     * IllegalArgumentException on an unknown value, which the caller reports as SUBSCRIPTION_ERROR.
+     */
+    private fun parseSubscriptionChannels(json: Map<*, *>): Subscription.Channels =
+        Subscription.Channels(
+            email =
+                (json["email"] as? List<*>)
+                    ?.map {
+                        Subscription.Channels.Email.valueOf((it as String).uppercase())
+                    }?.toSet(),
+            sms =
+                (json["sms"] as? List<*>)
+                    ?.map {
+                        Subscription.Channels.Messaging.valueOf((it as String).uppercase())
+                    }?.toSet(),
+            whatsapp =
+                (json["whatsapp"] as? List<*>)
+                    ?.map {
+                        Subscription.Channels.Messaging.valueOf((it as String).uppercase())
+                    }?.toSet(),
+        )
 
     private fun handleIntent(intent: Intent) {
         try {

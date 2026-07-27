@@ -175,6 +175,9 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             KlaviyoSDK().create(event: event)
             result(nil)
 
+        case "createSubscription":
+            handleCreateSubscription(call, result: result)
+
         case "registerForPushNotifications":
             // iOS requires manual APNs registration trigger
             DispatchQueue.main.async {
@@ -523,6 +526,94 @@ extension KlaviyoFlutterSdkPlugin {
 // MARK: - Helpers
 
 extension KlaviyoFlutterSdkPlugin {
+    enum SubscriptionParsingError: Error {
+        case unknownConsentType(String)
+    }
+
+    func handleCreateSubscription(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let subscriptionData = args["subscription"] as? [String: Any],
+              let listId = subscriptionData["listId"] as? String,
+              !listId.isEmpty
+        else {
+            result(
+                FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Invalid subscription data",
+                    details: nil
+                )
+            )
+            return
+        }
+
+        let customSource = subscriptionData["customSource"] as? String
+        let subscription: Subscription
+
+        if let channelsData = subscriptionData["channels"] as? [String: Any] {
+            do {
+                subscription = try Subscription(
+                    listId: listId,
+                    channels: parseSubscriptionChannels(from: channelsData),
+                    customSource: customSource
+                )
+            } catch {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARGUMENTS",
+                        message: "Invalid subscription consent type",
+                        details: "\(error)"
+                    )
+                )
+                return
+            }
+        } else {
+            // An absent channels key means "all available marketing" - the broad grant is only
+            // reachable through the named factory on both this SDK and Dart.
+            subscription = Subscription.allAvailableMarketing(listId: listId, customSource: customSource)
+        }
+
+        KlaviyoSDK().create(subscription: subscription)
+        result(nil)
+    }
+
+    /// Maps the Dart channels payload onto `Subscription.Channels`. An absent channel stays nil
+    /// (leave it untouched); an empty array becomes an empty option set, so the iOS SDK's own
+    /// validation reports it rather than this bridge silently dropping the channel.
+    private func parseSubscriptionChannels(
+        from channelsData: [String: Any]
+    ) throws -> Subscription.Channels {
+        try Subscription.Channels(
+            email: (channelsData["email"] as? [Any]).map { try parseEmailConsent($0) },
+            sms: (channelsData["sms"] as? [Any]).map { try parseMessagingConsent($0) },
+            whatsapp: (channelsData["whatsapp"] as? [Any]).map { try parseMessagingConsent($0) }
+        )
+    }
+
+    // Consent types are mapped explicitly rather than by raw value so the wire format stays
+    // decoupled from the native option-set bit positions. These are OptionSets, not enums, so
+    // sub-types are folded together rather than collected into a set.
+    private func parseEmailConsent(_ rawConsents: [Any]) throws -> Subscription.Channels.Email {
+        try rawConsents.reduce(into: Subscription.Channels.Email()) { consent, value in
+            switch value as? String {
+            case "marketing": consent.insert(.marketing)
+            case "open_tracking": consent.insert(.openTracking)
+            default:
+                throw SubscriptionParsingError.unknownConsentType(String(describing: value))
+            }
+        }
+    }
+
+    private func parseMessagingConsent(_ rawConsents: [Any]) throws -> Subscription.Channels.Messaging {
+        try rawConsents.reduce(into: Subscription.Channels.Messaging()) { consent, value in
+            switch value as? String {
+            case "marketing": consent.insert(.marketing)
+            case "transactional": consent.insert(.transactional)
+            default:
+                throw SubscriptionParsingError.unknownConsentType(String(describing: value))
+            }
+        }
+    }
+
     private func parseLocation(from profileData: [String: Any]) -> Profile.Location? {
         guard let locationData = profileData["location"] as? [String: Any] else { return nil }
         return Profile.Location(

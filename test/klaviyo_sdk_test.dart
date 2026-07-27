@@ -81,4 +81,61 @@ void main() {
       expect(sdk.apiKey, 'KEY_1');
     });
   });
+
+  group('KlaviyoSDK.createSubscription', () {
+    test('forwards the subscription payload to the native layer', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.createSubscription(
+        const KlaviyoSubscription(
+          listId: 'ABC123',
+          channels: KlaviyoSubscriptionChannels(
+            email: {EmailConsent.marketing},
+            sms: {MessagingConsent.marketing},
+          ),
+          customSource: 'Checkout screen',
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'createSubscription');
+      expect(call.arguments['subscription'], {
+        'listId': 'ABC123',
+        'channels': {
+          'email': ['marketing'],
+          'sms': ['marketing'],
+        },
+        'customSource': 'Checkout screen',
+      });
+    });
+
+    test('omits channels for allAvailableMarketing', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.createSubscription(
+        const KlaviyoSubscription.allAvailableMarketing(listId: 'ABC123'),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'createSubscription');
+      expect(call.arguments['subscription'], {'listId': 'ABC123'});
+    });
+
+    test('wraps native failures in KlaviyoException', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        throw PlatformException(code: 'SUBSCRIPTION_ERROR', message: 'nope');
+      });
+
+      await expectLater(
+        sdk.createSubscription(
+          const KlaviyoSubscription.allAvailableMarketing(listId: 'ABC123'),
+        ),
+        throwsA(isA<KlaviyoException>()),
+      );
+    });
+  });
 }
