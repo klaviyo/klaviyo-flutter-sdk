@@ -1,5 +1,9 @@
 # Changelog
 
+### What's New
+
+- **Subscriptions** — New `createSubscription` method subscribes the current profile to a Klaviyo list and records its consent, with per-channel consent types for email, SMS, and WhatsApp. Use `KlaviyoSubscription.allAvailableMarketing` to request marketing consent on every channel the profile has an identifier for.
+
 ## 0.2.0 - 2026-05-04
 
 ### What's New

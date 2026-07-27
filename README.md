@@ -13,6 +13,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Android](#android-setup)
 - [Profile Management](#profile-management)
 - [Event Tracking](#event-tracking)
+- [Subscriptions](#subscriptions)
 - [Push Notifications](#push-notifications)
   - [Prerequisites](#prerequisites)
   - [Requesting Permissions](#requesting-notification-permissions)
@@ -305,6 +306,52 @@ final purchaseEvent = KlaviyoEvent.custom(
 );
 await KlaviyoSDK().createEvent(purchaseEvent);
 ```
+
+## Subscriptions
+
+Subscribe the current profile to a Klaviyo list and record its consent. Set the profile's email
+and/or phone number **before** subscribing — a request whose channel has no matching identifier on
+the profile is dropped with a warning from the native SDK.
+
+Push subscriptions are not created through this API. See [Push Notifications](#push-notifications).
+
+```dart
+// Request specific consent per channel
+await KlaviyoSDK().createSubscription(
+  KlaviyoSubscription(
+    listId: 'ABC123',
+    channels: const KlaviyoSubscriptionChannels(
+      email: {EmailConsent.marketing, EmailConsent.openTracking},
+      sms: {MessagingConsent.marketing},
+    ),
+  ),
+);
+```
+
+```dart
+// Attach a signup source label, stored as the consent record's $source
+await KlaviyoSDK().createSubscription(
+  KlaviyoSubscription(
+    listId: 'ABC123',
+    channels: const KlaviyoSubscriptionChannels(
+      sms: {MessagingConsent.marketing},
+      whatsapp: {MessagingConsent.transactional},
+    ),
+    customSource: 'Checkout screen',
+  ),
+);
+```
+
+```dart
+// Request marketing consent on every channel the profile has an identifier for
+await KlaviyoSDK().createSubscription(
+  KlaviyoSubscription.allAvailableMarketing(listId: 'ABC123'),
+);
+```
+
+Each channel accepts only the consent types the API supports for it: email takes `marketing` and
+`openTracking`, while SMS and WhatsApp take `marketing` and `transactional`. Omitting a channel
+leaves it untouched.
 
 ## Push Notifications
 
@@ -774,6 +821,12 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 |--------|-------------|
 | `createEvent(KlaviyoEvent event)` | Track a profile activity event |
 
+#### Subscriptions
+
+| Method | Description |
+|--------|-------------|
+| `createSubscription(KlaviyoSubscription subscription)` | Subscribe the current profile to a list and record its consent |
+
 #### Push Notifications
 
 | Method | Description |
@@ -857,6 +910,32 @@ KlaviyoEvent.custom({
 })
 ```
 
+#### KlaviyoSubscription
+
+```dart
+KlaviyoSubscription({
+  required String listId,
+  required KlaviyoSubscriptionChannels channels,
+  String? customSource,
+})
+
+// Requests marketing consent on every identified channel
+KlaviyoSubscription.allAvailableMarketing({
+  required String listId,
+  String? customSource,
+})
+```
+
+#### KlaviyoSubscriptionChannels
+
+```dart
+KlaviyoSubscriptionChannels({
+  Set<EmailConsent>? email,
+  Set<MessagingConsent>? sms,
+  Set<MessagingConsent>? whatsapp,
+})
+```
+
 #### KlaviyoLocation
 
 ```dart
@@ -919,6 +998,16 @@ Predefined metrics:
 
 Custom metrics:
 - `EventMetric.custom(String name)`
+
+#### EmailConsent
+
+`marketing` | `openTracking`
+
+#### MessagingConsent
+
+Applies to the SMS and WhatsApp channels.
+
+`marketing` | `transactional`
 
 ### Extensions
 
