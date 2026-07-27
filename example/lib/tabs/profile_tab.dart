@@ -25,6 +25,13 @@ class _ProfileTabState extends State<ProfileTab> {
   final TextEditingController _externalIdController = TextEditingController();
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _listIdController = TextEditingController();
+  final TextEditingController _customSourceController = TextEditingController();
+
+  final Set<EmailConsent> _emailConsent = {};
+  final Set<MessagingConsent> _smsConsent = {};
+  final Set<MessagingConsent> _whatsappConsent = {};
+  bool _allAvailableMarketing = false;
 
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
@@ -239,6 +246,47 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
+  Future<void> _createSubscription() async {
+    if (!_isInitialized) return;
+
+    final listId = _listIdController.text.trim();
+    if (listId.isEmpty) {
+      setState(() {
+        _status = 'Please enter a list ID';
+      });
+      return;
+    }
+
+    final customSource = _customSourceController.text.trim();
+
+    try {
+      await _klaviyo.createSubscription(
+        _allAvailableMarketing
+            ? KlaviyoSubscription.allAvailableMarketing(
+                listId: listId,
+                customSource: customSource.isNotEmpty ? customSource : null,
+              )
+            : KlaviyoSubscription(
+                listId: listId,
+                channels: KlaviyoSubscriptionChannels(
+                  email: _emailConsent.isNotEmpty ? _emailConsent : null,
+                  sms: _smsConsent.isNotEmpty ? _smsConsent : null,
+                  whatsapp:
+                      _whatsappConsent.isNotEmpty ? _whatsappConsent : null,
+                ),
+                customSource: customSource.isNotEmpty ? customSource : null,
+              ),
+      );
+      setState(() {
+        _status = 'Subscription requested for list $listId';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Failed to create subscription: $e';
+      });
+    }
+  }
+
   Future<void> _resetSDK() async {
     try {
       // Reset profile first if initialized
@@ -257,6 +305,12 @@ class _ProfileTabState extends State<ProfileTab> {
       _externalIdController.clear();
       _firstNameController.clear();
       _lastNameController.clear();
+      _listIdController.clear();
+      _customSourceController.clear();
+      _emailConsent.clear();
+      _smsConsent.clear();
+      _whatsappConsent.clear();
+      _allAvailableMarketing = false;
 
       // Reset static state in other tabs
       FormsTab.resetState();
@@ -279,6 +333,33 @@ class _ProfileTabState extends State<ProfileTab> {
   //#endregion
 
   //#region View
+
+  /// Checkbox that toggles [value] in [consentSet].
+  Widget _buildConsentCheckbox<T>(
+    String label,
+    T value,
+    Set<T> consentSet,
+  ) {
+    return CheckboxListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      title: Text(label),
+      value: consentSet.contains(value),
+      // Channel selection is meaningless once the broad grant is requested.
+      onChanged: _allAvailableMarketing
+          ? null
+          : (checked) {
+              setState(() {
+                if (checked ?? false) {
+                  consentSet.add(value);
+                } else {
+                  consentSet.remove(value);
+                }
+              });
+            },
+    );
+  }
 
   Widget _buildProfileValueRow(String label, String? value) {
     return Padding(
@@ -471,6 +552,92 @@ class _ProfileTabState extends State<ProfileTab> {
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 10),
+
+              // Subscription Section
+              // Lives beside the profile identifiers because consent is validated
+              // natively against the email/phone already set on the profile.
+              ExpansionTile(
+                title: const Text(
+                  'Subscription',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                tilePadding: const EdgeInsets.all(2),
+                shape: const Border(),
+                childrenPadding: const EdgeInsets.symmetric(vertical: 8),
+                expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _listIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'List ID',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _customSourceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Custom Source (optional)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('All available marketing'),
+                    subtitle: const Text(
+                      'Marketing consent on every identified channel',
+                    ),
+                    value: _allAvailableMarketing,
+                    onChanged: (value) {
+                      setState(() {
+                        _allAvailableMarketing = value;
+                      });
+                    },
+                  ),
+                  const Text('Email'),
+                  _buildConsentCheckbox(
+                    'Marketing',
+                    EmailConsent.marketing,
+                    _emailConsent,
+                  ),
+                  _buildConsentCheckbox(
+                    'Open tracking',
+                    EmailConsent.openTracking,
+                    _emailConsent,
+                  ),
+                  const Text('SMS'),
+                  _buildConsentCheckbox(
+                    'Marketing',
+                    MessagingConsent.marketing,
+                    _smsConsent,
+                  ),
+                  _buildConsentCheckbox(
+                    'Transactional',
+                    MessagingConsent.transactional,
+                    _smsConsent,
+                  ),
+                  const Text('WhatsApp'),
+                  _buildConsentCheckbox(
+                    'Marketing',
+                    MessagingConsent.marketing,
+                    _whatsappConsent,
+                  ),
+                  _buildConsentCheckbox(
+                    'Transactional',
+                    MessagingConsent.transactional,
+                    _whatsappConsent,
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: _createSubscription,
+                    child: const Text('Create Subscription'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: _resetSDK,
                 style: ElevatedButton.styleFrom(
@@ -496,6 +663,8 @@ class _ProfileTabState extends State<ProfileTab> {
     _externalIdController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _listIdController.dispose();
+    _customSourceController.dispose();
     super.dispose();
   }
 }
