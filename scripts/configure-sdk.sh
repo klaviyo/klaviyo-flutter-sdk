@@ -248,8 +248,19 @@ update_package_swift_version() {
 configure_ios_version() {
     local version="$1"
     info "Configuring iOS SDK: published version ${BOLD}$version${NC}"
-    # Preflight the SPM pin before mutating any file, so a missing pin cannot
-    # leave the podspec and Package.swift out of sync.
+    # Preflight version format and every target pin before mutating any file, so
+    # a bad version or missing pin cannot leave the manifests out of sync.
+    if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$ ]]; then
+        error "Invalid iOS SDK version: $version (expected semver, e.g. 5.4.0)"
+        return 1
+    fi
+    local dep
+    for dep in KlaviyoSwift KlaviyoForms KlaviyoLocation; do
+        if ! grep -qE "s\.dependency '$dep'" "$PODSPEC"; then
+            error "Expected podspec dependency '$dep' not found in $PODSPEC"
+            return 1
+        fi
+    done
     if ! grep -qE '\.upToNextMinor\(from: "[^"]+"' "$PACKAGE_SWIFT"; then
         error "Expected SPM version pin not found in $PACKAGE_SWIFT"
         return 1
