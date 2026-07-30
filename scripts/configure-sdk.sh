@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 PODSPEC="$ROOT_DIR/ios/klaviyo_flutter_sdk.podspec"
+PACKAGE_SWIFT="$ROOT_DIR/ios/klaviyo_flutter_sdk/Package.swift"
 BUILD_GRADLE="$ROOT_DIR/android/build.gradle"
 PODFILE="$ROOT_DIR/example/ios/Podfile"
 SETTINGS_GRADLE="$ROOT_DIR/example/android/settings.gradle"
@@ -238,11 +239,18 @@ resolve_path() {
     (cd "$path" && pwd)
 }
 
+# Update the klaviyo-swift-sdk pin in Package.swift to .upToNextMinor(from: "<version>").
+update_package_swift_version() {
+    local version="$1"
+    sedi -E "s|(\.upToNextMinor\(from: )\"[^\"]+\"|\1\"$version\"|" "$PACKAGE_SWIFT"
+}
+
 configure_ios_version() {
     local version="$1"
     info "Configuring iOS SDK: published version ${BOLD}$version${NC}"
     remove_ios_override
     update_podspec_versions "~> $version"
+    update_package_swift_version "$version"
     update_podfile_extension "'KlaviyoSwiftExtension', '~> $version'"
     success "iOS SDK → published version $version"
 }
