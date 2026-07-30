@@ -13,8 +13,8 @@ let package = Package(
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
         .package(
             url: "https://github.com/klaviyo/klaviyo-swift-sdk",
-            .upToNextMinor(from: "5.3.1")
-        ),
+            .upToNextMinor(from: "5.4.0")
+        )
     ],
     targets: [
         .target(
@@ -22,10 +22,10 @@ let package = Package(
             dependencies: [
                 .product(name: "FlutterFramework", package: "FlutterFramework"),
                 .product(name: "KlaviyoSwift", package: "klaviyo-swift-sdk"),
-                .product(name: "KlaviyoForms", package: "klaviyo-swift-sdk"),
+                .product(name: "KlaviyoForms", package: "klaviyo-swift-sdk")
             ],
             resources: [
-                .process("klaviyo-sdk-configuration.plist"),
+                .process("klaviyo-sdk-configuration.plist")
             ]
         )
     ]
