@@ -51,6 +51,11 @@ class KlaviyoSubscriptionChannels {
 
   /// Creates the set of channels to request consent for.
   ///
+  /// At least one channel must be given. Leaving all three `null` serializes to
+  /// an empty object, which the natives read as "touch nothing" rather than as
+  /// the broad grant — a silent no-op that is never what the caller meant. Use
+  /// [KlaviyoSubscription.allAvailableMarketing] to request the broad grant.
+  ///
   /// Example:
   /// ```dart
   /// const channels = KlaviyoSubscriptionChannels(
@@ -62,7 +67,11 @@ class KlaviyoSubscriptionChannels {
     this.email,
     this.sms,
     this.whatsapp,
-  });
+  }) : assert(
+          email != null || sms != null || whatsapp != null,
+          'Specify at least one channel; use '
+          'KlaviyoSubscription.allAvailableMarketing for the broad grant.',
+        );
 
   /// Convert to JSON for the platform channel
   ///

@@ -79,6 +79,27 @@ void main() {
     });
   });
 
+  group('KlaviyoSubscriptionChannels validation', () {
+    // Built through a helper so the assert is evaluated at runtime. A direct
+    // `const KlaviyoSubscriptionChannels()` fails to compile rather than
+    // throwing, which the matcher below could not observe.
+    KlaviyoSubscriptionChannels build({
+      Set<EmailConsent>? email,
+      Set<MessagingConsent>? sms,
+    }) =>
+        KlaviyoSubscriptionChannels(email: email, sms: sms);
+
+    test('rejects a channels object with every channel null', () {
+      expect(() => build(), throwsA(isA<AssertionError>()));
+    });
+
+    test('accepts an explicitly empty set on a single channel', () {
+      // Empty is a deliberate request the natives report on; only all-null is a
+      // silent no-op, so this must still be constructible.
+      expect(build(email: {}).email, isEmpty);
+    });
+  });
+
   group('KlaviyoSubscriptionChannels equality', () {
     test('is insensitive to consent ordering', () {
       const a = KlaviyoSubscriptionChannels(
@@ -93,10 +114,17 @@ void main() {
     });
 
     test('distinguishes an omitted channel from an empty one', () {
-      const omitted = KlaviyoSubscriptionChannels();
-      const empty = KlaviyoSubscriptionChannels(email: {});
+      // Both carry sms so neither is the now-rejected all-null object; the
+      // distinction under test is a null email versus an empty email.
+      const omittedEmail = KlaviyoSubscriptionChannels(
+        sms: {MessagingConsent.marketing},
+      );
+      const emptyEmail = KlaviyoSubscriptionChannels(
+        email: {},
+        sms: {MessagingConsent.marketing},
+      );
 
-      expect(omitted, isNot(empty));
+      expect(omittedEmail, isNot(emptyEmail));
     });
   });
 }
