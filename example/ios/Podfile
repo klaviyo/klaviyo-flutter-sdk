@@ -35,6 +35,16 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # TEMPORARY - REMOVE ONCE KlaviyoSwift 5.4.0 PUBLISHES (MAGE-857)
+  # create(subscription:) ships in 5.4.0, which is cut on rel/5.4.0 but not yet on release.
+  # Declared here rather than in the plugin podspec so the override can never ship to integrators.
+  klaviyo_swift_sdk = { :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :branch => 'rel/5.4.0' }
+  pod 'KlaviyoCore', **klaviyo_swift_sdk
+  pod 'KlaviyoSwift', **klaviyo_swift_sdk
+  pod 'KlaviyoForms', **klaviyo_swift_sdk
+  pod 'KlaviyoLocation', **klaviyo_swift_sdk
+
   target 'RunnerTests' do
     inherit! :search_paths
   end
