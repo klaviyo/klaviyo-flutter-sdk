@@ -242,6 +242,11 @@ resolve_path() {
 # Update the klaviyo-swift-sdk pin in Package.swift to .upToNextMinor(from: "<version>").
 update_package_swift_version() {
     local version="$1"
+    # Fail loudly if the pin is missing so a stale Package.swift is not reported as success.
+    if ! grep -qE '\.upToNextMinor\(from: "[^"]+"' "$PACKAGE_SWIFT"; then
+        error "Expected SPM version pin not found in $PACKAGE_SWIFT"
+        return 1
+    fi
     sedi -E "s|(\.upToNextMinor\(from: )\"[^\"]+\"|\1\"$version\"|" "$PACKAGE_SWIFT"
 }
 
@@ -250,7 +255,7 @@ configure_ios_version() {
     info "Configuring iOS SDK: published version ${BOLD}$version${NC}"
     remove_ios_override
     update_podspec_versions "~> $version"
-    update_package_swift_version "$version"
+    update_package_swift_version "$version" || return 1
     update_podfile_extension "'KlaviyoSwiftExtension', '~> $version'"
     success "iOS SDK → published version $version"
 }
