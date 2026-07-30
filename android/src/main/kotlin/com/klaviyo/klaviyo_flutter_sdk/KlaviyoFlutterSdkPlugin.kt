@@ -614,22 +614,19 @@ class KlaviyoFlutterSdkPlugin :
      */
     private fun parseSubscriptionChannels(json: Map<*, *>): Subscription.Channels =
         Subscription.Channels(
-            email =
-                (json["email"] as? List<*>)
-                    ?.map {
-                        Subscription.Channels.Email.valueOf((it as String).uppercase())
-                    }?.toSet(),
-            sms =
-                (json["sms"] as? List<*>)
-                    ?.map {
-                        Subscription.Channels.Messaging.valueOf((it as String).uppercase())
-                    }?.toSet(),
-            whatsapp =
-                (json["whatsapp"] as? List<*>)
-                    ?.map {
-                        Subscription.Channels.Messaging.valueOf((it as String).uppercase())
-                    }?.toSet(),
+            email = parseConsentSet(json, "email", Subscription.Channels.Email::valueOf),
+            sms = parseConsentSet(json, "sms", Subscription.Channels.Messaging::valueOf),
+            whatsapp = parseConsentSet(json, "whatsapp", Subscription.Channels.Messaging::valueOf),
         )
+
+    /**
+     * Reads one channel's consent list off the Dart payload, or null when the key is absent.
+     */
+    private fun <T : Enum<T>> parseConsentSet(
+        json: Map<*, *>,
+        key: String,
+        valueOf: (String) -> T,
+    ): Set<T>? = (json[key] as? List<*>)?.map { valueOf((it as String).uppercase()) }?.toSet()
 
     private fun handleIntent(intent: Intent) {
         try {
