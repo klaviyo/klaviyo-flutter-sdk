@@ -248,7 +248,7 @@ class KlaviyoFlutterSdkPlugin :
                 val subscriptionJson = call.argument<Map<String, Any>>("subscription")
                 val listId = subscriptionJson?.get("listId") as? String
 
-                if (listId.isNullOrBlank()) {
+                if (subscriptionJson == null || listId.isNullOrBlank()) {
                     Registry.log.warning("Attempted to create subscription without a list ID")
                     result.error(
                         "SUBSCRIPTION_ERROR",
