@@ -1,5 +1,8 @@
 // swiftlint:disable file_length
 import Flutter
+
+// Event lives in KlaviyoCore as of 5.4.0 and KlaviyoSwift no longer re-exports it.
+import KlaviyoCore
 #if canImport(KlaviyoForms)
 import KlaviyoForms
 #endif
