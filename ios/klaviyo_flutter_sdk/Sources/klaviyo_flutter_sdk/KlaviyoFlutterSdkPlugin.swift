@@ -534,12 +534,14 @@ extension KlaviyoFlutterSdkPlugin {
         guard let args = call.arguments as? [String: Any],
               let subscriptionData = args["subscription"] as? [String: Any],
               let listId = subscriptionData["listId"] as? String,
-              !listId.isEmpty
+              // Trimmed to match Android's isNullOrBlank(), so a whitespace-only listId is
+              // rejected on both platforms rather than reaching one native SDK and not the other.
+              !listId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else {
             result(
                 FlutterError(
-                    code: "INVALID_ARGUMENTS",
-                    message: "Invalid subscription data",
+                    code: "SUBSCRIPTION_ERROR",
+                    message: "Subscription listId cannot be null or empty",
                     details: nil
                 )
             )
@@ -559,7 +561,7 @@ extension KlaviyoFlutterSdkPlugin {
             } catch {
                 result(
                     FlutterError(
-                        code: "INVALID_ARGUMENTS",
+                        code: "SUBSCRIPTION_ERROR",
                         message: "Invalid subscription consent type",
                         details: "\(error)"
                     )
