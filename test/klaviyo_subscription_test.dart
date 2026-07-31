@@ -80,23 +80,20 @@ void main() {
   });
 
   group('KlaviyoSubscriptionChannels validation', () {
-    // Built through a helper so the assert is evaluated at runtime. A direct
-    // `const KlaviyoSubscriptionChannels()` fails to compile rather than
-    // throwing, which the matcher below could not observe.
-    KlaviyoSubscriptionChannels build({
-      Set<EmailConsent>? email,
-      Set<MessagingConsent>? sms,
-    }) =>
-        KlaviyoSubscriptionChannels(email: email, sms: sms);
-
     test('rejects a channels object with every channel null', () {
-      expect(() => build(), throwsA(isA<AssertionError>()));
+      expect(
+        () => const KlaviyoSubscriptionChannels().toJson(),
+        throwsStateError,
+      );
     });
 
-    test('accepts an explicitly empty set on a single channel', () {
+    test('serializes an explicitly empty set on a single channel', () {
       // Empty is a deliberate request the natives report on; only all-null is a
-      // silent no-op, so this must still be constructible.
-      expect(build(email: {}).email, isEmpty);
+      // silent no-op, so this must still serialize.
+      expect(
+        const KlaviyoSubscriptionChannels(email: {}).toJson(),
+        {'email': <String>[]},
+      );
     });
   });
 
