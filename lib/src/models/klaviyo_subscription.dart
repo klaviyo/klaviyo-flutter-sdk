@@ -51,10 +51,10 @@ class KlaviyoSubscriptionChannels {
 
   /// Creates the set of channels to request consent for.
   ///
-  /// At least one channel must be given — [toJson] throws otherwise. Leaving
-  /// all three `null` would serialize to an empty object, which the natives read
-  /// as "touch nothing" rather than as the broad grant — a silent no-op that is
-  /// never what the caller meant. Use
+  /// At least one channel must be given: leaving all three `null` throws a
+  /// [StateError] from [toJson] rather than serializing to an empty object,
+  /// which the natives read as "touch nothing" rather than as the broad grant —
+  /// a silent no-op that is never what the caller meant. Use
   /// [KlaviyoSubscription.allAvailableMarketing] to request the broad grant.
   ///
   /// Example:

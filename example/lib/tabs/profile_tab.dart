@@ -53,6 +53,7 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedApiKey = prefs.getString(_apiKeyPrefsKey);
+      if (!mounted) return;
 
       if (savedApiKey != null && savedApiKey.isNotEmpty) {
         setState(() {
@@ -73,6 +74,15 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
+  /// Updates the status line, dropping the update if the tab was disposed
+  /// while an awaited SDK call was in flight.
+  void _setStatus(String status) {
+    if (!mounted) return;
+    setState(() {
+      _status = status;
+    });
+  }
+
   //#endregion
 
   //#region Business Logic
@@ -81,9 +91,7 @@ class _ProfileTabState extends State<ProfileTab> {
     final apiKey = _apiKeyController.text.trim();
 
     if (apiKey.isEmpty) {
-      setState(() {
-        _status = 'Please enter an API key';
-      });
+      _setStatus('Please enter an API key');
       return;
     }
 
@@ -112,15 +120,14 @@ class _ProfileTabState extends State<ProfileTab> {
 
       // Sync current profile values
       await _syncCurrentProfile();
+      if (!mounted) return;
 
       setState(() {
         _isInitialized = true;
         _status = 'SDK initialized successfully!';
       });
     } catch (e) {
-      setState(() {
-        _status = 'Failed to initialize: $e';
-      });
+      _setStatus('Failed to initialize: $e');
     }
   }
 
@@ -129,6 +136,7 @@ class _ProfileTabState extends State<ProfileTab> {
       final email = await _klaviyo.getEmail();
       final phoneNumber = await _klaviyo.getPhoneNumber();
       final externalId = await _klaviyo.getExternalId();
+      if (!mounted) return;
 
       setState(() {
         _currentEmail = email;
@@ -136,9 +144,7 @@ class _ProfileTabState extends State<ProfileTab> {
         _currentExternalId = externalId;
       });
     } catch (e) {
-      setState(() {
-        _status = 'Failed to sync profile: $e';
-      });
+      _setStatus('Failed to sync profile: $e');
     }
   }
 
@@ -148,13 +154,9 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       await _klaviyo.setEmail(_emailController.text);
       await _syncCurrentProfile();
-      setState(() {
-        _status = 'Email set successfully';
-      });
+      _setStatus('Email set successfully');
     } catch (e) {
-      setState(() {
-        _status = 'Failed to set email: $e';
-      });
+      _setStatus('Failed to set email: $e');
     }
   }
 
@@ -164,13 +166,9 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       await _klaviyo.setPhoneNumber(_phoneController.text);
       await _syncCurrentProfile();
-      setState(() {
-        _status = 'Phone number set successfully';
-      });
+      _setStatus('Phone number set successfully');
     } catch (e) {
-      setState(() {
-        _status = 'Failed to set phone number: $e';
-      });
+      _setStatus('Failed to set phone number: $e');
     }
   }
 
@@ -180,13 +178,9 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       await _klaviyo.setExternalId(_externalIdController.text);
       await _syncCurrentProfile();
-      setState(() {
-        _status = 'External ID set successfully';
-      });
+      _setStatus('External ID set successfully');
     } catch (e) {
-      setState(() {
-        _status = 'Failed to set external ID: $e';
-      });
+      _setStatus('Failed to set external ID: $e');
     }
   }
 
@@ -212,13 +206,9 @@ class _ProfileTabState extends State<ProfileTab> {
         ),
       );
       await _syncCurrentProfile();
-      setState(() {
-        _status = 'Full profile set successfully';
-      });
+      _setStatus('Full profile set successfully');
     } catch (e) {
-      setState(() {
-        _status = 'Failed to set profile: $e';
-      });
+      _setStatus('Failed to set profile: $e');
     }
   }
 
@@ -228,6 +218,8 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       await _klaviyo.resetProfile();
       await _syncCurrentProfile();
+      if (!mounted) return;
+
       setState(() {
         _emailController.clear();
         _phoneController.clear();
@@ -237,9 +229,7 @@ class _ProfileTabState extends State<ProfileTab> {
         _status = 'Profile reset successfully';
       });
     } catch (e) {
-      setState(() {
-        _status = 'Failed to reset profile: $e';
-      });
+      _setStatus('Failed to reset profile: $e');
     }
   }
 
@@ -248,9 +238,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     final listId = _listIdController.text.trim();
     if (listId.isEmpty) {
-      setState(() {
-        _status = 'Please enter a list ID';
-      });
+      _setStatus('Please enter a list ID');
       return;
     }
 
@@ -274,13 +262,9 @@ class _ProfileTabState extends State<ProfileTab> {
                 customSource: customSource.isNotEmpty ? customSource : null,
               ),
       );
-      setState(() {
-        _status = 'Subscription requested for list $listId';
-      });
+      _setStatus('Subscription requested for list $listId');
     } catch (e) {
-      setState(() {
-        _status = 'Failed to create subscription: $e';
-      });
+      _setStatus('Failed to create subscription: $e');
     }
   }
 
@@ -312,6 +296,7 @@ class _ProfileTabState extends State<ProfileTab> {
       // Reset static state in other tabs
       FormsTab.resetState();
       GeofencingTab.resetState();
+      if (!mounted) return;
 
       setState(() {
         _isInitialized = false;
@@ -321,9 +306,7 @@ class _ProfileTabState extends State<ProfileTab> {
         _status = 'SDK reset. Enter API key to initialize';
       });
     } catch (e) {
-      setState(() {
-        _status = 'Failed to reset SDK: $e';
-      });
+      _setStatus('Failed to reset SDK: $e');
     }
   }
 
