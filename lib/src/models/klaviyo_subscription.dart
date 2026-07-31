@@ -51,9 +51,10 @@ class KlaviyoSubscriptionChannels {
 
   /// Creates the set of channels to request consent for.
   ///
-  /// At least one channel must be given. Leaving all three `null` serializes to
-  /// an empty object, which the natives read as "touch nothing" rather than as
-  /// the broad grant — a silent no-op that is never what the caller meant. Use
+  /// At least one channel must be given — [toJson] throws otherwise. Leaving
+  /// all three `null` would serialize to an empty object, which the natives read
+  /// as "touch nothing" rather than as the broad grant — a silent no-op that is
+  /// never what the caller meant. Use
   /// [KlaviyoSubscription.allAvailableMarketing] to request the broad grant.
   ///
   /// Example:
@@ -67,18 +68,23 @@ class KlaviyoSubscriptionChannels {
     this.email,
     this.sms,
     this.whatsapp,
-  }) : assert(
-          email != null || sms != null || whatsapp != null,
-          'Specify at least one channel; use '
-          'KlaviyoSubscription.allAvailableMarketing for the broad grant.',
-        );
+  });
 
   /// Convert to JSON for the platform channel
   ///
   /// Null channels are omitted. An explicitly empty set is preserved — the
   /// native SDKs warn and drop the request in that case, and hiding it here
   /// would mask a developer error.
+  ///
+  /// Throws a [StateError] if every channel is `null`.
   Map<String, dynamic> toJson() {
+    if (email == null && sms == null && whatsapp == null) {
+      throw StateError(
+        'KlaviyoSubscriptionChannels requires at least one channel; use '
+        'KlaviyoSubscription.allAvailableMarketing for the broad grant.',
+      );
+    }
+
     final Map<String, dynamic> data = {};
 
     if (email != null) {
