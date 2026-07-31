@@ -91,9 +91,14 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
+
                     // Replay any cached silent pushes that arrived before Flutter subscribed.
                     cachedSilentPushes.forEach { events?.success(it) }
                     cachedSilentPushes.clear()
+
+                    // Drain silent pushes persisted across a process boundary (e.g. FCM
+                    // delivered messages while the app was killed).
+                    drainPersistedSilentPushes()
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -101,18 +106,6 @@ class KlaviyoFlutterSdkPlugin :
                 }
             },
         )
-
-        // Rehydrate any silent pushes persisted across a process boundary (e.g. FCM
-        // delivered messages while the app was killed). Stash them in
-        // cachedSilentPushes so they replay when Flutter subscribes via onListen.
-        SilentPushCache.consume(applicationContext).forEach { data ->
-            cachedSilentPushes.add(
-                mapOf(
-                    "type" to "silent_push_received",
-                    "data" to data,
-                ),
-            )
-        }
     }
 
     override fun onMethodCall(
@@ -603,17 +596,40 @@ class KlaviyoFlutterSdkPlugin :
      * yet (cold start), the event is cached and replayed on the next `onListen`.
      */
     fun handleSilentPush(data: Map<String, Any?>) {
+        Handler(Looper.getMainLooper()).post {
+            emitOrCacheSilentPush(data)
+        }
+    }
+
+    /**
+     * Emits any silent pushes [SilentPushCache] holds from a previous process.
+     *
+     * Called on `onListen`, and again by [KlaviyoFlutterPushService] right after it
+     * persists — the service may have found [instance] null a moment before this
+     * plugin attached, which would otherwise strand that push until the next attach.
+     * [SilentPushCache.consume] removes-on-read under a lock, so whichever caller
+     * arrives second sees an empty list and nothing is emitted twice.
+     */
+    internal fun drainPersistedSilentPushes() {
+        // Posted rather than run inline: the FCM service calls this from a background
+        // thread, and it keeps `applicationContext` safe to touch (onAttachedToEngine
+        // assigns it on the main thread, so it is set before this runnable can execute).
+        Handler(Looper.getMainLooper()).post {
+            SilentPushCache.consume(applicationContext).forEach(::emitOrCacheSilentPush)
+        }
+    }
+
+    /** Main-thread only. Emits to Flutter, or caches for the next `onListen`. */
+    private fun emitOrCacheSilentPush(data: Map<String, Any?>) {
         val payload =
             mapOf(
                 "type" to "silent_push_received",
                 "data" to data,
             )
 
-        Handler(Looper.getMainLooper()).post {
-            eventSink?.let { it.success(payload) } ?: run {
-                Registry.log.verbose("Flutter not ready. Caching silent push event.")
-                cachedSilentPushes.add(payload)
-            }
+        eventSink?.let { it.success(payload) } ?: run {
+            Registry.log.verbose("Flutter not ready. Caching silent push event.")
+            cachedSilentPushes.add(payload)
         }
     }
 

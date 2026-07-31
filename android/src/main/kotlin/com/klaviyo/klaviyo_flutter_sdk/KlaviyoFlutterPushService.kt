@@ -40,6 +40,11 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
                 "KlaviyoFlutterSdkPlugin not attached; persisting silent push for replay.",
             )
             SilentPushCache.persist(applicationContext, message.data)
+
+            // The plugin may have attached between the null check above and this write,
+            // in which case it already drained the cache and would not see this entry.
+            // Re-check and hand it off so the push isn't stranded until the next attach.
+            KlaviyoFlutterSdkPlugin.instance?.drainPersistedSilentPushes()
         }
     }
 }
