@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0 - 2026-07-28
+
+### What's New
+
+- **Swift Package Manager support**: The iOS plugin can now be consumed via Swift Package Manager in addition to CocoaPods. ([#101](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/101))
+- **Native SDK upgrade**: Now consuming `KlaviyoSwift ~> 5.4.0` and `klaviyo-android-sdk 4.5.0`. See [klaviyo-swift-sdk 5.4.0](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.4.0) and [klaviyo-android-sdk 4.5.0](https://github.com/klaviyo/klaviyo-android-sdk/releases/tag/4.5.0) for full native release notes.
+
+### Platform Support
+
+- **iOS**: Minimum deployment target 13.0, wraps [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk) ~> 5.4.0
+- **Android**: Minimum SDK version 23, wraps [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk) 4.5.0
+- **Flutter**: Minimum Flutter 3.24.0, Dart 3.0.0+
+
+[Full Changelog](https://github.com/klaviyo/klaviyo-flutter-sdk/compare/0.2.0...0.3.0)
+
+
 ## 0.2.0 - 2026-05-04
 
 ### What's New
