@@ -751,7 +751,7 @@ await KlaviyoSDK().setLoggingEnabled(false); // silence all SDK logging
 final enabled = await KlaviyoSDK().isLoggingEnabled(); // read current state
 ```
 
-`setLoggingEnabled` can be called before `initialize()`, which is useful for suppressing logs emitted during SDK startup.
+Both methods can be called before `initialize()` — useful for suppressing logs emitted during SDK startup. `isLoggingEnabled()` reports the native SDK's current logging state, and both methods throw a `KlaviyoException` if the native call fails.
 
 Platform notes:
 
@@ -763,6 +763,8 @@ To adjust the verbosity of the plugin's Dart-side logs (native logs are unaffect
 ```dart
 KlaviyoSDK().setLogLevel(KlaviyoLogLevel.debug);
 ```
+
+While logging is disabled via `setLoggingEnabled(false)`, the level passed to `setLogLevel` is stored and takes effect once logging is re-enabled.
 
 ## API Reference
 
@@ -830,7 +832,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 
 | Method | Description |
 |--------|-------------|
-| `setLoggingEnabled(bool enabled)` | Enable/disable all SDK logging (native + Dart), callable before `initialize()` |
+| `setLoggingEnabled(bool enabled)` | Enable/disable SDK logging (native + Dart), callable before `initialize()`; does not affect iOS `KlaviyoSwiftExtension` — see [SDK Logging](#sdk-logging) |
 | `isLoggingEnabled()` | Whether native SDK logging is enabled, returns `Future<bool>` |
 | `setLogLevel(KlaviyoLogLevel logLevel)` | Set logging level (Flutter-side only) |
 | `dispose()` | Clean up resources |
