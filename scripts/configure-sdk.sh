@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 PODSPEC="$ROOT_DIR/ios/klaviyo_flutter_sdk.podspec"
+PACKAGE_SWIFT="$ROOT_DIR/ios/klaviyo_flutter_sdk/Package.swift"
 BUILD_GRADLE="$ROOT_DIR/android/build.gradle"
 PODFILE="$ROOT_DIR/example/ios/Podfile"
 SETTINGS_GRADLE="$ROOT_DIR/example/android/settings.gradle"
@@ -238,11 +239,35 @@ resolve_path() {
     (cd "$path" && pwd)
 }
 
+# Update the klaviyo-swift-sdk pin in Package.swift to .upToNextMinor(from: "<version>").
+update_package_swift_version() {
+    local version="$1"
+    sedi -E "s|(\.upToNextMinor\(from: )\"[^\"]+\"|\1\"$version\"|" "$PACKAGE_SWIFT"
+}
+
 configure_ios_version() {
     local version="$1"
     info "Configuring iOS SDK: published version ${BOLD}$version${NC}"
+    # Preflight version format and every target pin before mutating any file, so
+    # a bad version or missing pin cannot leave the manifests out of sync.
+    if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$ ]]; then
+        error "Invalid iOS SDK version: $version (expected semver, e.g. 5.4.0)"
+        return 1
+    fi
+    local dep
+    for dep in KlaviyoSwift KlaviyoForms KlaviyoLocation; do
+        if ! grep -qE "s\.dependency '$dep'" "$PODSPEC"; then
+            error "Expected podspec dependency '$dep' not found in $PODSPEC"
+            return 1
+        fi
+    done
+    if ! grep -qE '\.upToNextMinor\(from: "[^"]+"' "$PACKAGE_SWIFT"; then
+        error "Expected SPM version pin not found in $PACKAGE_SWIFT"
+        return 1
+    fi
     remove_ios_override
     update_podspec_versions "~> $version"
+    update_package_swift_version "$version"
     update_podfile_extension "'KlaviyoSwiftExtension', '~> $version'"
     success "iOS SDK → published version $version"
 }
