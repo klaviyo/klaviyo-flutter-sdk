@@ -1,5 +1,6 @@
 // swiftlint:disable file_length
 import Flutter
+import KlaviyoCore
 #if canImport(KlaviyoForms)
 import KlaviyoForms
 #endif

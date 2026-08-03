@@ -11,12 +11,10 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
-        // TEMPORARY (MAGE-876): track the unreleased 5.4.0 release branch until
-        // it ships; restore .upToNextMinor(from: "5.4.0") once tagged.
         .package(
             url: "https://github.com/klaviyo/klaviyo-swift-sdk",
-            branch: "rel/5.4.0"
-        ),
+            .upToNextMinor(from: "5.4.0")
+        )
     ],
     targets: [
         .target(
@@ -24,10 +22,10 @@ let package = Package(
             dependencies: [
                 .product(name: "FlutterFramework", package: "FlutterFramework"),
                 .product(name: "KlaviyoSwift", package: "klaviyo-swift-sdk"),
-                .product(name: "KlaviyoForms", package: "klaviyo-swift-sdk"),
+                .product(name: "KlaviyoForms", package: "klaviyo-swift-sdk")
             ],
             resources: [
-                .process("klaviyo-sdk-configuration.plist"),
+                .process("klaviyo-sdk-configuration.plist")
             ]
         )
     ]
