@@ -2,7 +2,7 @@ name: klaviyo_flutter_sdk_example
 description: Example app for Klaviyo Flutter SDK
 publish_to: 'none'
 
-version: 0.2.0
+version: 0.3.0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
