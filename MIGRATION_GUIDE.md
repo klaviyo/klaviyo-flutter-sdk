@@ -22,13 +22,9 @@ does not depend on any native-SDK setting, so there is nothing to migrate on iOS
 
 **No action is required** on either platform. As of v0.3.0, token forwarding is automatic everywhere,
 and manual token management via `setPushToken(...)` or `registerForPushNotifications()` continues to
-work alongside it — see the [README](https://pub.dev/packages/klaviyo_flutter_sdk) for full
-token-collection guidance.
-
-Calling `registerForPushNotifications()` or setting the token manually registers it through two paths.
-This is safe: repeated registrations with the same push request state are suppressed by the native SDK
-and cause no extra network request. A repeat call can still enqueue a request if other state changed
-alongside the token — for example, notification permission was just granted — which is intended.
+work alongside it at no cost — the native SDK only sends a request when the push state actually
+changes. See the [README](https://pub.dev/packages/klaviyo_flutter_sdk) for full token-collection
+guidance.
 
 ### Disabling automatic token forwarding
 
