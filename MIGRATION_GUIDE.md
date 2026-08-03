@@ -12,38 +12,36 @@ This guide outlines how developers can migrate from older versions of the
 
 As of v0.3.0 (which pins the native Android SDK to 4.5.0), the Klaviyo SDK forwards the Android FCM
 push token to Klaviyo **automatically by default**. This formalizes behavior the bundled
-`KlaviyoPushService` already performed, and is **non-breaking** — the default preserves existing
-behavior.
+`KlaviyoPushService` already performed — see the native
+[Android SDK README](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) for details —
+and is **non-breaking**, because the default preserves existing behavior.
 
-**iOS is unchanged:** automatic forwarding remains opt-in (off by default), because iOS token
-collection relies on the more invasive app-delegate method swizzling. The flag's semantics are
-identical across platforms (`false` = no automatic collection); only the per-platform default
-differs, for these platform-specific reasons.
+**iOS is unchanged, and was already automatic.** This plugin registers its own application delegate
+and forwards the APNs token to Klaviyo whenever iOS delivers one. That has always been the case and
+does not depend on any native-SDK setting, so there is nothing to migrate on iOS.
 
-**No action is required** to keep current behavior. If you prefer to own the push-token pipeline
-yourself:
+**No action is required** on either platform. As of v0.3.0, token forwarding is automatic everywhere,
+and manual token management via `setPushToken(...)` or `registerForPushNotifications()` continues to
+work alongside it — see the [README](https://pub.dev/packages/klaviyo_flutter_sdk) for full
+token-collection guidance.
 
-- **Android** — disable automatic forwarding by adding this `meta-data` to the `<application>`
-  element of your `AndroidManifest.xml`, then continue setting the token yourself via
-  `setPushToken(...)` or `registerForPushNotifications()`:
+Calling `registerForPushNotifications()` or setting the token manually registers it through two paths.
+This is safe: repeated registrations with the same push request state are suppressed by the native SDK
+and cause no extra network request. A repeat call can still enqueue a request if other state changed
+alongside the token — for example, notification permission was just granted — which is intended.
 
-  ```xml
-  <meta-data
-      android:name="com.klaviyo.push.automatic_push_token_forwarding"
-      android:value="false" />
-  ```
+### Disabling automatic token forwarding
 
-- **iOS** — nothing to do; automatic forwarding is off unless you opt in via `Info.plist` (see the
-  native [iOS README](https://github.com/klaviyo/klaviyo-swift-sdk#push-notifications)).
+There is currently **no cross-platform way** to disable automatic token forwarding from Dart, and no
+way to disable it on iOS at all. The native SDKs' own `automatic_push_token_forwarding` flags are
+native-level escape hatches rather than part of this plugin's API — on iOS the `Info.plist` key gates
+only the native SDK's app-delegate swizzling and does **not** stop this plugin from forwarding the
+token. See the **Advanced** note under
+[Automatic Token Forwarding](./README.md#automatic-token-forwarding) before reaching for either flag.
 
-Because Android forwards automatically by default, calling `registerForPushNotifications()` or
-setting the token manually on Android registers it through two paths — this is safe, as duplicate
-tokens are deduplicated and cause no extra network request. See the
-[README](https://pub.dev/packages/klaviyo_flutter_sdk) for full token-collection guidance.
-
-> **Looking ahead:** a future **major** release may enable **both** `automatic_push_open_tracking`
-> and `automatic_push_token_forwarding` by default on all platforms, bringing automatic push
-> integration to parity. If that happens, apps that prefer to manage push integration manually would
-> need to **opt out** of the enabled defaults (as described above for Android), rather than opt in.
-> This is a non-breaking, forward-looking heads-up — nothing changes until that release, and we will
-> document the exact opt-out steps in its migration guide.
+> **Looking ahead:** a future release may add a cross-platform way to control automatic push
+> integration from Dart, and may align `automatic_push_open_tracking` and
+> `automatic_push_token_forwarding` behavior across platforms. If that happens, apps that prefer to
+> manage push integration manually would opt out through that API rather than through native
+> platform-specific configuration. This is a forward-looking heads-up — nothing changes until that
+> release, and we will document the exact steps in its migration guide.

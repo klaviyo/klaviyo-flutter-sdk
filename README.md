@@ -224,7 +224,7 @@ class MainActivity : FlutterActivity() {
 }
 ```
 
-> **Note on automatic tracking:** The native iOS and Android SDKs also offer an opt-in automatic push-open tracking mode — if you are using the manual `AppDelegate`/`MainActivity` setup above, no action is needed. If you consume the Dart `push_notification_opened` stream, keep this native wiring in place regardless of any native-side configuration. See the [iOS SDK](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) and [Android SDK](https://github.com/klaviyo/klaviyo-android-sdk#Tracking-Open-Events) documentation if you want to explore alternative approaches.
+> **Note on automatic tracking:** The native iOS and Android SDKs also expose an opt-in automatic push-open tracking mode, configured natively. For Flutter apps, the manual `AppDelegate`/`MainActivity` wiring shown above is the supported path — keep it in place, as the Dart `push_notification_opened` stream depends on it. You should not need any native-side push-open configuration; this may change in a future version, and we will document it here if it does. The native [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) and [Android](https://github.com/klaviyo/klaviyo-android-sdk#Tracking-Open-Events) docs describe the underlying behavior.
 
 **2. KlaviyoPushService Declaration**
 
@@ -329,43 +329,65 @@ Permission can be managed from Flutter code or platform-specific native code. Ei
 
 The Klaviyo SDK needs to register the device's push token. Choose one of the following approaches:
 
-#### Automatic Token Forwarding (Platform Defaults)
+#### Automatic Token Forwarding
 
-Before choosing an approach, note that the underlying native SDKs handle automatic push-token
-forwarding differently by default:
+**This plugin forwards the push token to Klaviyo automatically on both platforms.** No native code is
+required in your app to make token registration work:
 
-- **Android — on by default.** The native Android SDK auto-registers its `KlaviyoPushService`
-  (a `FirebaseMessagingService`) via manifest merge, so it forwards the FCM token to Klaviyo
-  automatically. You do not have to collect the token yourself on Android.
-- **iOS — opt-in (off by default).** iOS token forwarding relies on app-delegate method swizzling,
-  which is more invasive, so the native iOS SDK does not enable it implicitly. By default you set the
-  token manually. Automatic forwarding on iOS is opt-in via `Info.plist` — see the native
-  [iOS README](https://github.com/klaviyo/klaviyo-swift-sdk#push-notifications).
+- **Android** — the native SDK auto-registers `KlaviyoPushService` (a `FirebaseMessagingService`) via
+  manifest merge, which forwards the FCM token to Klaviyo.
+- **iOS** — this plugin registers itself as an application delegate and forwards the APNs token to
+  Klaviyo whenever iOS delivers one. Nothing is needed in your `AppDelegate`.
 
-The flag's semantics are identical on both platforms (`false` = no automatic collection); only the
-default differs, for these platform-specific reasons. Manual token management (Option A) remains the
-recommended baseline and works on both platforms — automatic forwarding is additive, not a
-replacement.
+On iOS the token is only delivered once your app registers for remote notifications — via
+`registerForPushNotifications()` (Option B) or a package such as `firebase_messaging` (Option A).
 
-**Double collection is harmless.** Because Android forwards automatically by default, calling
-`registerForPushNotifications()` (Option B) — or setting the token manually via Option A — on Android
-registers the token through two paths. This is safe: duplicate tokens are deduplicated and cause no
-extra network request.
+Manual token management (Option A) remains the recommended baseline: it works identically on both
+platforms and gives you control over the token pipeline, such as forwarding the token to multiple push
+providers. It is additive, not a replacement — automatic forwarding stays active alongside it.
 
-To **opt out** of automatic forwarding on Android, add the following `meta-data` to the
-`<application>` element of your app's `AndroidManifest.xml` (which your app owns), then register the
-token yourself via `setPushToken(...)` or `registerForPushNotifications()`:
+**Double collection is safe.** Because both platforms forward automatically, calling
+`registerForPushNotifications()` (Option B) or setting the token manually (Option A) registers the
+token through two paths. Repeated registrations with the same push request state are suppressed by the
+native SDK and cause no extra network request. A repeat call can still enqueue a request if other
+state changed alongside the token — for example, notification permission was just granted — which is
+intended.
 
-```xml
-<meta-data
-    android:name="com.klaviyo.push.automatic_push_token_forwarding"
-    android:value="false" />
-```
+<details>
+<summary><strong>Advanced:</strong> native SDK configuration flags</summary>
 
-On iOS there is nothing to opt out of; automatic forwarding is off unless you opt in via `Info.plist`.
-For full details, see the native
+The native iOS and Android SDKs each expose their own `automatic_push_token_forwarding` flag. **Most
+Flutter apps should not set either one.** They are native-level controls that predate this plugin's
+token handling, and they behave differently from what the native documentation implies once the
+plugin is in play:
+
+- **iOS — do not use.** The native `klaviyo_automatic_push_token_forwarding` `Info.plist` key gates
+  the native SDK's own app-delegate *swizzling*. It does **not** disable this plugin's token
+  forwarding, so setting it to `false` will not stop tokens from reaching Klaviyo. Setting it to
+  `true` only adds a redundant second mechanism alongside the plugin's application delegate.
+- **Android — rarely needed.** The `com.klaviyo.push.automatic_push_token_forwarding` manifest
+  `meta-data` key (default `true`) does disable the native SDK's automatic forwarding. If you set it
+  to `false`, you must register the token yourself via `setPushToken(...)` or
+  `registerForPushNotifications()`, or Klaviyo will never receive a token and push will not be
+  delivered:
+
+  ```xml
+  <meta-data
+      android:name="com.klaviyo.push.automatic_push_token_forwarding"
+      android:value="false" />
+  ```
+
+> **This may change in a future version.** There is currently no cross-platform way to control
+> automatic token forwarding from Dart. A future release may add one and align the two platforms
+> behind it, at which point these native flags would no longer be the way to configure this behavior.
+> Treat them as an escape hatch rather than a stable part of this plugin's API, and prefer the Dart
+> token APIs so your integration is unaffected.
+
+For full details on the native behavior, see the native
 [Android](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) and
 [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#push-notifications) push documentation.
+
+</details>
 
 #### Option A: Manual Token Management with Firebase Messaging (Recommended)
 
