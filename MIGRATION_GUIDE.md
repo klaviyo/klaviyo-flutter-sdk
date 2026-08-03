@@ -32,12 +32,11 @@ alongside the token — for example, notification permission was just granted �
 
 ### Disabling automatic token forwarding
 
-There is currently **no cross-platform way** to disable automatic token forwarding from Dart, and no
-way to disable it on iOS at all. The native SDKs' own `automatic_push_token_forwarding` flags are
-native-level escape hatches rather than part of this plugin's API — on iOS the `Info.plist` key gates
-only the native SDK's app-delegate swizzling and does **not** stop this plugin from forwarding the
+There is currently no cross-platform way to disable automatic token forwarding from Dart. The native
+SDKs' own `automatic_push_token_forwarding` flags are native-level escape hatches rather than part of
+this plugin's API — notably, the iOS `Info.plist` key does **not** stop this plugin from forwarding the
 token. See the **Advanced** note under
-[Automatic Token Forwarding](./README.md#automatic-token-forwarding) before reaching for either flag.
+[Automatic Token Forwarding](./README.md#automatic-token-forwarding) before reaching for either.
 
 > **Looking ahead:** a future release may add a cross-platform way to control automatic push
 > integration from Dart, and may align `automatic_push_open_tracking` and
