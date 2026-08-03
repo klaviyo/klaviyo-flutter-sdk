@@ -224,7 +224,7 @@ class MainActivity : FlutterActivity() {
 }
 ```
 
-> **Note on automatic tracking:** Keep the manual `AppDelegate`/`MainActivity` wiring shown above — the Dart `push_notification_opened` stream depends on it. Unlike the push token, notification opens cannot be intercepted for you: `didRegisterForRemoteNotificationsWithDeviceToken` is a `UIApplicationDelegate` method, which Flutter forwards to every registered plugin, whereas `userNotificationCenter(_:didReceive:)` belongs to `UNUserNotificationCenterDelegate` — a single delegate slot your app owns. The native SDKs do expose an opt-in automatic push-open mode, but you should not need it here; see the native [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) and [Android](https://github.com/klaviyo/klaviyo-android-sdk#Tracking-Open-Events) docs for that behavior.
+> **Note on automatic tracking:** Keep the manual `AppDelegate`/`MainActivity` wiring shown above. The native SDKs offer an opt-in automatic push-open tracking mode, but it does **not** replace this wiring in a Flutter app: the Dart `push_notification_opened` stream is emitted by the plugin, which only learns about the tap through the code above. Enabling it is safe rather than harmful — both native SDKs deduplicate the open and forward the tap onward, so your handlers still run — but it is redundant here. See the native [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) and [Android](https://github.com/klaviyo/klaviyo-android-sdk#Tracking-Open-Events) docs for that behavior.
 
 **2. KlaviyoPushService Declaration**
 
@@ -345,12 +345,9 @@ On iOS the token is only delivered once your app registers for remote notificati
 
 Manual token management (Option A) remains the recommended baseline: it works identically on both
 platforms and gives you control over the token pipeline, such as forwarding the token to multiple push
-providers. It is additive, not a replacement.
-
-**Double collection is safe.** Calling `registerForPushNotifications()` (Option B) or setting the token
-manually (Option A) registers it through two paths. Repeated registrations with the same push request
-state are suppressed by the native SDK; a repeat call can still enqueue a request if other state
-changed alongside the token, such as notification permission having just been granted.
+providers. Setting the token yourself alongside automatic forwarding is expected and needs no
+coordination — the native SDK only sends a request when the push state actually changes, so a
+redundant registration costs nothing.
 
 <details>
 <summary><strong>Advanced:</strong> native SDK configuration flags</summary>
