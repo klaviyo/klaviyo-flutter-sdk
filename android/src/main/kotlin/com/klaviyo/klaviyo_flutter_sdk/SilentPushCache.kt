@@ -32,7 +32,7 @@ internal object SilentPushCache {
                     JSONArray(it)
                 } catch (e: JSONException) {
                     Registry.log.warning(
-                        "Failed to parse existing cached silent pushes; starting fresh: ${e.message} — payload: $it",
+                        "Failed to parse existing cached silent pushes; starting fresh: ${e.message} — length: ${it.length}",
                     )
                     JSONArray()
                 }
@@ -54,7 +54,7 @@ internal object SilentPushCache {
                 obj.keys().asSequence().associateWith { key: String -> obj.optString(key) }
             }
         } catch (e: JSONException) {
-            Registry.log.warning("Failed to deserialize cached silent pushes: ${e.message} — payload: $json")
+            Registry.log.warning("Failed to deserialize cached silent pushes: ${e.message} — length: ${json.length}")
             emptyList()
         }
     }
