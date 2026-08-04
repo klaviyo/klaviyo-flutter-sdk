@@ -46,7 +46,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
 
 | Platform | Minimum Version |
 |----------|----------------|
-| Flutter  | 3.x            |
+| Flutter  | 3.27.0+        |
 | Dart     | 3.x            |
 | iOS      | 15.0+          |
 | Android `minSdkVersion` | 23+ |
