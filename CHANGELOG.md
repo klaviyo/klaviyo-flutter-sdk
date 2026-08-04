@@ -5,6 +5,7 @@
 ### What's New
 
 - **Swift Package Manager support**: The iOS plugin can now be consumed via Swift Package Manager in addition to CocoaPods. ([#101](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/101))
+- **Automatic push token forwarding is now the default on Android**: The native Android SDK forwards the FCM push token to Klaviyo automatically, formalizing behavior the bundled `KlaviyoPushService` already performed. This is **non-breaking** — the default preserves existing behavior, and managing the token yourself via `setPushToken(...)` or `registerForPushNotifications()` continues to work alongside it. iOS is unchanged and was already automatic, since this plugin registers its own application delegate. See the [Migration Guide](MIGRATION_GUIDE.md#migrating-to-v030) for details and the native-level opt-outs. ([#115](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/115))
 - **Native SDK upgrade**: Now consuming `KlaviyoSwift ~> 5.4.0` and `klaviyo-android-sdk 4.5.0`. See [klaviyo-swift-sdk 5.4.0](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.4.0) and [klaviyo-android-sdk 4.5.0](https://github.com/klaviyo/klaviyo-android-sdk/releases/tag/4.5.0) for full native release notes.
 
 ### Platform Support
