@@ -6,7 +6,7 @@ homepage: https://github.com/klaviyo/klaviyo-flutter-sdk
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
-  flutter: ">=3.24.0"
+  flutter: ">=3.27.0"
 
 dependencies:
   flutter:
