@@ -107,12 +107,11 @@ void setupPushActionListener() {
   _pushActionSubscription = klaviyo.onPushAction.listen((action) {
     switch (action) {
       case OpenWebUrl():
-        _logger.info('Push open_url tapped: ${action.url}');
+        _logger.info('Push open_url tapped');
       case ActionButtonTapped():
         _logger.info(
           'Push action button tapped — id: ${action.buttonId}, '
-          'label: "${action.label}", action: ${action.action}, '
-          'url: ${action.url}',
+          'action: ${action.action}',
         );
     }
   });

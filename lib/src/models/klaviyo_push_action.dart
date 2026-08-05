@@ -9,12 +9,16 @@
 ///
 /// Example usage with exhaustive pattern matching:
 /// ```dart
+/// import 'package:logging/logging.dart';
+///
+/// final logger = Logger('MyApp');
+///
 /// klaviyo.onPushAction.listen((action) {
 ///   switch (action) {
 ///     case OpenWebUrl():
-///       print('Open web URL: ${action.url}');
+///       logger.info('Open web URL: ${action.url}');
 ///     case ActionButtonTapped():
-///       print('Action button ${action.buttonId} (${action.action}): '
+///       logger.info('Action button ${action.buttonId} (${action.action}): '
 ///           '${action.url}');
 ///   }
 /// });
