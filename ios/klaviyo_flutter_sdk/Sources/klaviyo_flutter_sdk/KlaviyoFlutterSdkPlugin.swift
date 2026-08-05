@@ -323,6 +323,12 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             ))
             #endif
 
+        case "setLoggingEnabled":
+            handleSetLoggingEnabled(call, result: result)
+
+        case "isLoggingEnabled":
+            result(KlaviyoSDK().isLoggingEnabled)
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
             result(nil)
@@ -613,6 +619,25 @@ extension KlaviyoFlutterSdkPlugin {
             }
             cachedSilentPush = eventPayload
         }
+    }
+}
+
+// MARK: - Logging Toggle
+
+extension KlaviyoFlutterSdkPlugin {
+    func handleSetLoggingEnabled(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let enabled = args["enabled"] as? Bool
+        else {
+            result(FlutterError(
+                code: "INVALID_ARGUMENTS",
+                message: "Invalid arguments for setLoggingEnabled",
+                details: nil
+            ))
+            return
+        }
+        KlaviyoSDK().setLoggingEnabled(enabled)
+        result(nil)
     }
 }
 

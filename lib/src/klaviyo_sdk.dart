@@ -27,7 +27,7 @@ class KlaviyoSDK {
     // share the root logger's level. Setting it to true is additive and is
     // the standard pattern for Dart libraries that manage their own log level.
     hierarchicalLoggingEnabled = true;
-    _logger.level = Level.INFO;
+    _logger.level = _dartLogLevel;
   }
 
   // Native wrapper service — singleton, safe to construct eagerly
@@ -37,6 +37,8 @@ class KlaviyoSDK {
   // State
   bool _isInitialized = false;
   String? _apiKey;
+  bool _loggingEnabled = true;
+  Level _dartLogLevel = Level.INFO;
 
   // Getters
   bool get isInitialized => _isInitialized;
@@ -395,9 +397,49 @@ class KlaviyoSDK {
   }
 
   /// Set log level for Flutter-side logging only
-  /// Note: This only affects Flutter console logs, not native SDK logs
+  /// Note: This only affects Flutter console logs, not native SDK logs.
+  /// While logging is disabled via [setLoggingEnabled], the new level is
+  /// stored and takes effect once logging is re-enabled.
   void setLogLevel(KlaviyoLogLevel logLevel) {
-    _logger.level = logLevel.toLevel();
+    _dartLogLevel = logLevel.toLevel();
+    if (_loggingEnabled) {
+      _logger.level = _dartLogLevel;
+    }
+  }
+
+  /// Enable or disable all Klaviyo SDK logging.
+  ///
+  /// Controls both the native SDK loggers and this plugin's Dart-side logs.
+  /// Logging is enabled by default. Safe to call before [initialize] —
+  /// useful for silencing logs emitted during SDK startup.
+  ///
+  /// Platform notes:
+  /// - **iOS**: does not affect `KlaviyoSwiftExtension`, which runs in a
+  ///   separate app-extension process.
+  /// - **Android**: disabling sets the native SDK log level to `None`;
+  ///   re-enabling restores the level in effect before it was disabled.
+  Future<void> setLoggingEnabled(bool enabled) async {
+    try {
+      await _nativeWrapper.setLoggingEnabled(enabled);
+    } catch (e) {
+      throw KlaviyoException('Failed to set logging enabled: $e');
+    }
+
+    // Only mirror the state on the Dart side once the native call succeeds,
+    // so Dart and native logging can't disagree after a failure.
+    _loggingEnabled = enabled;
+    _logger.level = enabled ? _dartLogLevel : Level.OFF;
+  }
+
+  /// Whether native SDK logging is currently enabled.
+  ///
+  /// Safe to call before [initialize].
+  Future<bool> isLoggingEnabled() async {
+    try {
+      return await _nativeWrapper.isLoggingEnabled();
+    } catch (e) {
+      throw KlaviyoException('Failed to get logging state: $e');
+    }
   }
 
   /// Get push notification events stream

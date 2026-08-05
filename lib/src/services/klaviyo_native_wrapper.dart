@@ -315,6 +315,31 @@ class KlaviyoNativeWrapper {
     _channel.invokeMethod('setBadgeCount', {'count': count});
   }
 
+  /// Enable or disable native SDK logging.
+  ///
+  /// Intentionally not guarded by _ensureInitialized — logging is a config
+  /// toggle, not SDK state, and must be settable before initialize() to
+  /// silence startup logging.
+  Future<void> setLoggingEnabled(bool enabled) async {
+    try {
+      await _channel.invokeMethod('setLoggingEnabled', {'enabled': enabled});
+    } catch (e) {
+      throw KlaviyoException('Failed to set logging enabled: $e');
+    }
+  }
+
+  /// Whether native SDK logging is currently enabled.
+  ///
+  /// Like [setLoggingEnabled], callable before initialize().
+  Future<bool> isLoggingEnabled() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('isLoggingEnabled');
+      return result ?? true;
+    } catch (e) {
+      throw KlaviyoException('Failed to get logging state: $e');
+    }
+  }
+
   /// Handle a Klaviyo universal tracking link URL
   /// Returns true if the URL is a valid Klaviyo tracking link, false otherwise
   Future<bool> handleUniversalTrackingLink(String url) async {
