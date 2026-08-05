@@ -47,7 +47,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
 
 | Platform | Minimum Version |
 |----------|----------------|
-| Flutter  | 3.x            |
+| Flutter  | 3.27.0+        |
 | Dart     | 3.x            |
 | iOS      | 15.0+          |
 | Android `minSdkVersion` | 23+ |
@@ -225,6 +225,8 @@ class MainActivity : FlutterActivity() {
 }
 ```
 
+> **Note on automatic tracking:** Keep the manual `AppDelegate`/`MainActivity` wiring shown above. The native SDKs offer an opt-in automatic push-open tracking mode, but it does **not** replace this wiring in a Flutter app: the Dart `push_notification_opened` stream is emitted by the plugin, which only learns about the tap through the code above. Enabling it is safe rather than harmful — both native SDKs deduplicate the open and forward the tap onward, so your handlers still run — but it is redundant here. See the native [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) and [Android](https://github.com/klaviyo/klaviyo-android-sdk#Tracking-Open-Events) docs for that behavior.
+
 **2. KlaviyoPushService Declaration**
 
 Declare `KlaviyoPushService` in your `android/app/src/main/AndroidManifest.xml` inside the `<application>` tag. This ensures Klaviyo processes FCM messages before Flutter's default `FirebaseMessagingService`, enabling open tracking and rich push features.
@@ -327,6 +329,44 @@ Permission can be managed from Flutter code or platform-specific native code. Ei
 ### Token Collection
 
 The Klaviyo SDK needs to register the device's push token. Choose one of the following approaches:
+
+#### Automatic Token Forwarding
+
+**This plugin forwards the push token to Klaviyo automatically on both platforms.** No native code is
+required in your app to make token registration work:
+
+- **Android** — the native SDK auto-registers `KlaviyoPushService` (a `FirebaseMessagingService`) via
+  manifest merge, which forwards the FCM token to Klaviyo.
+- **iOS** — this plugin registers itself as an application delegate and intercepts
+  `didRegisterForRemoteNotificationsWithDeviceToken`. If you override that method in your
+  `AppDelegate`, call `super` or the token will not reach Klaviyo — see [iOS Setup](#ios-setup).
+
+On iOS the token is only delivered once your app registers for remote notifications — via
+`registerForPushNotifications()` (Option B) or a package such as `firebase_messaging` (Option A).
+
+Manual token management (Option A) remains the recommended baseline: it works identically on both
+platforms and gives you control over the token pipeline, such as forwarding the token to multiple push
+providers. Setting the token yourself alongside automatic forwarding is expected and needs no
+coordination — the native SDK only sends a request when the push state actually changes, so a
+redundant registration costs nothing.
+
+<details>
+<summary><strong>Advanced:</strong> native SDK configuration flags</summary>
+
+Both native SDKs expose an `automatic_push_token_forwarding` flag. Most Flutter apps should not set
+either one, and a future release may replace them with a cross-platform control.
+
+- **iOS** — the `klaviyo_automatic_push_token_forwarding` `Info.plist` key gates only the native SDK's
+  app-delegate swizzling. It does **not** disable this plugin's forwarding.
+- **Android** — the `com.klaviyo.push.automatic_push_token_forwarding` manifest `meta-data` key
+  (default `true`) does disable it. Set it to `false` only if you register the token yourself;
+  otherwise Klaviyo keeps whatever token it last stored, which goes stale once FCM rotates it.
+
+For the underlying native behavior, see the native
+[Android](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) and
+[iOS](https://github.com/klaviyo/klaviyo-swift-sdk#push-notifications) push documentation.
+
+</details>
 
 #### Option A: Manual Token Management with Firebase Messaging (Recommended)
 
@@ -532,6 +572,48 @@ subscription.cancel();
 | `formName` | `String` | All | Display name configured in Klaviyo dashboard |
 | `buttonLabel` | `String` | `FormCtaClicked` only | Label of the tapped CTA button |
 | `deepLinkUrl` | `String` | `FormCtaClicked` only | Deep link URL configured for the CTA |
+
+## Push Action Events
+
+Subscribe to `onPushAction` to observe taps on Klaviyo pushes that carry an **Open External URL** (`open_url`) action or **action buttons**. Events are typed via the sealed `KlaviyoPushAction` class, so Dart pattern matching is exhaustive.
+
+This stream is **observation-only**: the native SDK still performs all navigation (opening the URL, launching the app, or routing the deep link) with no integration changes required — as described in [Action Buttons](#action-buttons). `onPushAction` simply lets your app react in parallel (analytics, in-app routing, UI updates).
+
+```dart
+import 'dart:async';
+import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
+
+final _logger = Logger('MyApp');
+
+final StreamSubscription<KlaviyoPushAction> subscription =
+    KlaviyoSDK().onPushAction.listen((action) {
+  switch (action) {
+    case OpenWebUrl():
+      _logger.info('Open external URL: ${action.url}');
+    case ActionButtonTapped():
+      _logger.info(
+        'Action button "${action.label}" (${action.action}) — '
+        'id: ${action.buttonId}, url: ${action.url}',
+      );
+  }
+});
+
+// Cancel when no longer needed (e.g. in dispose())
+subscription.cancel();
+```
+
+**Field reference:**
+
+| Field | Type | Subtypes | Notes |
+|-------|------|----------|-------|
+| `url` | `String` | `OpenWebUrl` | The external URL. May be `http(s)` or a special scheme such as `mailto:`, `tel:`, `sms:` |
+| `buttonId` | `String` | `ActionButtonTapped` | Identifier of the tapped action button |
+| `label` | `String` | `ActionButtonTapped` | Display label of the tapped button |
+| `action` | `String` | `ActionButtonTapped` | One of `open_app`, `deep_link`, `open_url` |
+| `url` | `String?` | `ActionButtonTapped` | URL for `deep_link` / `open_url` buttons; `null` for `open_app` |
+
+> **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. On **iOS**, both body `open_url` taps and action-button taps surface. On **Android**, `open_url` is dispatched to an external handler by the native SDK and does **not** reach the app, so only `deep_link` / `open_app` action-button taps surface on Android.
 
 ## Deep Linking
 
@@ -845,6 +927,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `apiKey` | `String?` | Current API key |
 | `onPushNotification` | `Stream<Map<String, dynamic>>` | Push notification events |
 | `onFormLifecycleEvent` | `Stream<FormLifecycleEvent>` | Typed in-app form lifecycle events |
+| `onPushAction` | `Stream<KlaviyoPushAction>` | Typed `open_url` / action-button push tap events |
 
 ### Models
 
