@@ -602,9 +602,51 @@ class KlaviyoFlutterSdkPlugin :
                         "data" to notificationData,
                     ),
                 )
+
+                forwardActionButtonTap(notificationData)
             }
         } catch (e: Exception) {
             Registry.log.error("Error handling push: ${e.message}", e)
         }
+    }
+
+    /**
+     * Surfaces an action-button tap as a typed `push_action_button_tapped`
+     * event, in parallel with the `push_notification_opened` event.
+     *
+     * The native SDK only launches the host app (carrying these `Button *`
+     * extras) for `deep_link` / `open_app` buttons; `open_url` buttons are
+     * dispatched to an external handler by the SDK and never reach the app, so
+     * they are not bridged here. The button's URL (when present) is forwarded
+     * verbatim regardless of scheme — scheme handling stays in the native SDK.
+     */
+    private fun forwardActionButtonTap(notificationData: Map<String, Any?>) {
+        val buttonId = notificationData["Button ID"] as? String ?: return
+
+        // The native SDK serializes the action as a display name; map it back to
+        // the raw token shared with iOS and the Dart layer. "Open URL" is
+        // intentionally absent: the SDK dispatches open_url buttons externally,
+        // so they never launch the host app and never reach this code path.
+        val action =
+            when (notificationData["Button Action"] as? String) {
+                "Open App" -> "open_app"
+                "Deep Link" -> "deep_link"
+                else -> return
+            }
+
+        val data =
+            mutableMapOf<String, Any?>(
+                "id" to buttonId,
+                "action" to action,
+            )
+        (notificationData["Button Label"] as? String)?.let { data["label"] = it }
+        (notificationData["Button Link"] as? String)?.let { data["url"] = it }
+
+        eventSink?.success(
+            mapOf(
+                "type" to "push_action_button_tapped",
+                "data" to data,
+            ),
+        )
     }
 }

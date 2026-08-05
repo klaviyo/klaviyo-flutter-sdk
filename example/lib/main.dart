@@ -86,6 +86,37 @@ Future<void> _setupFCM() async {
 /// Tracked to prevent duplicate subscriptions on SDK re-initialization.
 StreamSubscription<Map<String, dynamic>>? _silentPushSubscription;
 
+/// Subscription for push action (open_url / action button) events.
+/// Tracked to prevent duplicate subscriptions on SDK re-initialization.
+StreamSubscription<KlaviyoPushAction>? _pushActionSubscription;
+
+/// Set up listener for push action events (open_url taps and action buttons).
+/// Called from ProfileTab after SDK initialization.
+void setupPushActionListener() {
+  final klaviyo = KlaviyoSDK();
+  if (!klaviyo.isInitialized) {
+    _logger.warning(
+      'Cannot set up push action listener: SDK not initialized',
+    );
+    return;
+  }
+
+  // Cancel any existing subscription to prevent duplicates
+  _pushActionSubscription?.cancel();
+
+  _pushActionSubscription = klaviyo.onPushAction.listen((action) {
+    switch (action) {
+      case OpenWebUrl():
+        _logger.info('Push open_url tapped');
+      case ActionButtonTapped():
+        _logger.info(
+          'Push action button tapped — id: ${action.buttonId}, '
+          'action: ${action.action}',
+        );
+    }
+  });
+}
+
 /// Set up listener for silent push notifications.
 /// Called from ProfileTab after SDK initialization.
 void setupSilentPushListener() {

@@ -36,6 +36,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedError: [String: Any]?
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
+    private var cachedPushAction: [String: Any]?
 
     // MARK: - Flutter Plugin Registration
 
@@ -393,6 +394,10 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedSilentPush)
             self.cachedSilentPush = nil
         }
+        if let cachedPushAction {
+            events(cachedPushAction)
+            self.cachedPushAction = nil
+        }
         return nil
     }
 
@@ -488,10 +493,100 @@ extension KlaviyoFlutterSdkPlugin {
             cachedOpenedNotification = eventPayload
         }
 
-        // 3. Pass to Native Klaviyo SDK
+        // 3. Surface the open_url action / action-button tap as a typed push action
+        // event, in parallel with the raw opened-notification event above.
+        forwardPushAction(for: response, userInfo: userInfo)
+
+        // 4. Pass to Native Klaviyo SDK
         // We pass a dummy completion handler because the Host App owns the real one.
         // No-op: We let the host app finish the system callback
         _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
+    }
+
+    /// Mirrors an `open_url` body tap or an action-button tap to Flutter as a
+    /// typed push-action event. The native SDK still performs the actual
+    /// dispatch (opening the URL / launching the app); this only forwards the
+    /// event so Flutter apps can react.
+    ///
+    /// Scheme handling is deliberately left to the native SDK: whatever URL the
+    /// payload carries is forwarded verbatim, including special schemes such as
+    /// `mailto:`/`tel:`/`sms:`. The plugin does not re-implement the SDK's
+    /// scheme allowlist.
+    private func forwardPushAction(
+        for response: UNNotificationResponse,
+        userInfo: [AnyHashable: Any]
+    ) {
+        // Each notification interaction supersedes any push action still cached
+        // for a not-yet-ready Flutter listener. Clear it up front so that an
+        // earlier, superseded event can't be delivered on `onListen` when this
+        // interaction produces no push-action payload (e.g. a deep-link body tap
+        // or a notification dismiss, both of which return without caching below).
+        cachedPushAction = nil
+
+        let actionIdentifier = response.actionIdentifier
+
+        var eventPayload: [String: Any]?
+
+        if actionIdentifier == UNNotificationDefaultActionIdentifier {
+            // Body tap. A deep-link `url` takes precedence over `web_url` in the
+            // native SDK, but only when it parses as a URL (mirrors
+            // `klaviyoDeepLinkURL`); otherwise the SDK dispatches `web_url`.
+            let deepLinkUrl = (userInfo["url"] as? String).flatMap(URL.init(string:))
+            if deepLinkUrl == nil,
+               let webUrl = userInfo["web_url"] as? String, !webUrl.isEmpty {
+                eventPayload = [
+                    "type": "push_open_web_url",
+                    "data": ["url": webUrl]
+                ]
+            }
+        } else if actionIdentifier != UNNotificationDismissActionIdentifier {
+            // Action-button tap: the identifier is the tapped button's id. Look
+            // it up in body.action_buttons to recover its label/action/url.
+            guard let body = userInfo["body"] as? [String: Any],
+                  let buttons = body["action_buttons"] as? [[String: Any]],
+                  let button = buttons.first(where: {
+                      $0["id"] as? String == actionIdentifier
+                  }) else {
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.warning(
+                        "No action button matches identifier '\(actionIdentifier)'; dropping tap."
+                    )
+                }
+                return
+            }
+            // Dart's KlaviyoPushAction.fromMap requires `action`, so drop
+            // incomplete taps here with a log rather than silently downstream.
+            guard let action = button["action"] as? String else {
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.warning(
+                        "Action button '\(actionIdentifier)' has no action type; dropping tap."
+                    )
+                }
+                return
+            }
+            var data: [String: Any] = ["id": actionIdentifier, "action": action]
+            if let label = button["label"] as? String {
+                data["label"] = label
+            }
+            if let buttonUrl = button["url"] as? String {
+                data["url"] = buttonUrl
+            }
+            eventPayload = [
+                "type": "push_action_button_tapped",
+                "data": data
+            ]
+        }
+
+        guard let eventPayload else { return }
+
+        if let eventSink {
+            eventSink(eventPayload)
+        } else {
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push action event.")
+            }
+            cachedPushAction = eventPayload
+        }
     }
 
     /// Manual Forwarding Helper - Silent Push
