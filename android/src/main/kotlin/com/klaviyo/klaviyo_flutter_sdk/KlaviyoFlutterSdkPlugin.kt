@@ -53,9 +53,9 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
-    // Cached silent push events for the cold-start race where Klaviyo silent pushes
-    // are delivered to the FCM service before Flutter has subscribed to the EventChannel.
-    // All pending events are replayed on the next onListen.
+    // Silent pushes that arrived while the app was running but before Flutter had
+    // subscribed to the EventChannel. Replayed on the next onListen. Not persisted —
+    // pushes delivered to a killed process are dropped, not resurrected on relaunch.
     private val cachedSilentPushes: MutableList<Map<String, Any?>> = mutableListOf()
 
     companion object {
@@ -102,18 +102,6 @@ class KlaviyoFlutterSdkPlugin :
                 }
             },
         )
-
-        // Rehydrate any silent pushes persisted across a process boundary (e.g. FCM
-        // delivered messages while the app was killed). Stash them in
-        // cachedSilentPushes so they replay when Flutter subscribes via onListen.
-        SilentPushCache.consume(applicationContext).forEach { data ->
-            cachedSilentPushes.add(
-                mapOf(
-                    "type" to "silent_push_received",
-                    "data" to data,
-                ),
-            )
-        }
     }
 
     override fun onMethodCall(
@@ -635,7 +623,7 @@ class KlaviyoFlutterSdkPlugin :
      * Called from [KlaviyoFlutterPushService] (or a host's subclass of it) on the
      * FCM background thread. Posts to the main thread before touching the EventChannel,
      * matching how the rest of the plugin emits events. If Flutter hasn't subscribed
-     * yet (cold start), the event is cached and replayed on the next `onListen`.
+     * yet, the event is held in memory and replayed on the next `onListen`.
      */
     fun handleSilentPush(data: Map<String, Any?>) {
         val payload =

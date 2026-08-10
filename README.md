@@ -509,6 +509,12 @@ iOS delivers silent pushes via `didReceiveRemoteNotification:fetchCompletionHand
 
 The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM service that forwards Klaviyo silent pushes to the Dart event stream. No host configuration is required — silent push events flow to your Dart listener automatically.
 
+#### Delivery Guarantees
+
+Your listener fires for every Klaviyo silent push, with the full payload and `key_value_pairs` decoded to a map on both platforms. Delivery needs a live Flutter engine: foreground **and backgrounded** apps both receive events, a terminated one does not. Nothing is cached or replayed on a later launch, matching both native SDKs — a missed push is gone.
+
+> **Known limitation (Android)**: swiping your app away usually kills the process. FCM will still start it to deliver a silent push, but with no Flutter engine to forward to, the push is dropped — a gap the native Android SDK doesn't have, and one we plan to close. Until then, either subclass `KlaviyoFlutterPushService` and handle it in Kotlin, or use [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage` — it runs its own engine and coexists with this plugin, since it receives messages via a broadcast receiver rather than the `MESSAGING_EVENT` service. Note that it also fires while your app is running, so guard against handling a push twice. iOS is unaffected: the system relaunches your app, so the `AppDelegate` path still runs.
+
 #### Dart-Side Listener
 
 Subscribe to `onPushNotification` to react to silent push events in Flutter:
