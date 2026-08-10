@@ -53,10 +53,12 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
-    // Silent pushes that arrived while the app was running but before Flutter had
-    // subscribed to the EventChannel. Replayed on the next onListen. Not persisted —
-    // pushes delivered to a killed process are dropped, not resurrected on relaunch.
-    private val cachedSilentPushes: MutableList<Map<String, Any?>> = mutableListOf()
+    // Most recent silent push that arrived while the app was running but before Flutter
+    // had subscribed to the EventChannel. Replayed on the next onListen. Holds one entry,
+    // matching iOS's cachedSilentPush — an unbounded list would grow without limit in an
+    // app that never attaches a listener. Not persisted: pushes delivered to a killed
+    // process are dropped, not resurrected on relaunch.
+    private var cachedSilentPush: Map<String, Any?>? = null
 
     companion object {
         private const val TAG = "KlaviyoFlutter"
@@ -92,9 +94,9 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
-                    // Replay any cached silent pushes that arrived before Flutter subscribed.
-                    cachedSilentPushes.forEach { events?.success(it) }
-                    cachedSilentPushes.clear()
+                    // Replay a silent push that arrived before Flutter subscribed.
+                    cachedSilentPush?.let { events?.success(it) }
+                    cachedSilentPush = null
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -623,7 +625,8 @@ class KlaviyoFlutterSdkPlugin :
      * Called from [KlaviyoFlutterPushService] (or a host's subclass of it) on the
      * FCM background thread. Posts to the main thread before touching the EventChannel,
      * matching how the rest of the plugin emits events. If Flutter hasn't subscribed
-     * yet, the event is held in memory and replayed on the next `onListen`.
+     * yet, the event is held in memory and replayed on the next `onListen`; only the
+     * most recent is kept, so a burst before subscription surfaces just the last one.
      */
     fun handleSilentPush(data: Map<String, Any?>) {
         val payload =
@@ -635,7 +638,7 @@ class KlaviyoFlutterSdkPlugin :
         Handler(Looper.getMainLooper()).post {
             eventSink?.let { it.success(payload) } ?: run {
                 Registry.log.verbose("Flutter not ready. Caching silent push event.")
-                cachedSilentPushes.add(payload)
+                cachedSilentPush = payload
             }
         }
     }
