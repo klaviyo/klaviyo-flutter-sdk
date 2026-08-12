@@ -52,7 +52,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
 | Dart     | 3.x            |
 | iOS      | 15.0+          |
 | Android `minSdkVersion` | 23+ |
-| Android `compileSdkVersion` | 34+ |
+| Android `compileSdkVersion` | 35+ (tracks `flutter.compileSdkVersion`) |
 | Kotlin   | 1.8.0+         |
 
 ## Installation
