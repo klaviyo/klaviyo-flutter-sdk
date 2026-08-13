@@ -232,7 +232,9 @@ class MainActivity : FlutterActivity() {
 
 The plugin auto-registers `KlaviyoFlutterPushService` (a subclass of `KlaviyoPushService`) for `com.google.firebase.MESSAGING_EVENT`. The subclass invokes `super.onMessageReceived(message)` so all standard Klaviyo push handling still runs, and additionally forwards Klaviyo silent pushes to the Dart event stream. **No host-app manifest changes are required.**
 
-> **Migrating from earlier versions**: if your app previously declared `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for `MESSAGING_EVENT`, **remove it**. Leaving both declarations in the merged manifest causes FCM to pick a service non-deterministically.
+Android delivers `MESSAGING_EVENT` to exactly one service, so the plugin also removes the native SDK's own `KlaviyoPushService` from the merged manifest via `tools:node="remove"`. Without that, the base class can win the intent and the subclass never runs — standard push keeps working, but silent pushes never reach Dart. Nothing is lost by removing it, since `KlaviyoFlutterPushService` extends it and calls `super`.
+
+> **Migrating from earlier versions**: if your app previously declared `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for `MESSAGING_EVENT`, **remove it**. A declaration in your own manifest takes priority over everything the plugin contributes, so it would win the intent and suppress silent push forwarding. If you need custom FCM handling, subclass `KlaviyoFlutterPushService` rather than registering a second service.
 
 ## Profile Management
 
@@ -372,8 +374,9 @@ The Klaviyo SDK needs to register the device's push token. Choose one of the fol
 **This plugin forwards the push token to Klaviyo automatically on both platforms.** No native code is
 required in your app to make token registration work:
 
-- **Android** — the native SDK auto-registers `KlaviyoPushService` (a `FirebaseMessagingService`) via
-  manifest merge, which forwards the FCM token to Klaviyo.
+- **Android** — the plugin auto-registers `KlaviyoFlutterPushService` (a `FirebaseMessagingService`,
+  subclassing the native SDK's `KlaviyoPushService`) via manifest merge, which forwards the FCM
+  token to Klaviyo.
 - **iOS** — this plugin registers itself as an application delegate and intercepts
   `didRegisterForRemoteNotificationsWithDeviceToken`. If you override that method in your
   `AppDelegate`, call `super` or the token will not reach Klaviyo — see [iOS Setup](#ios-setup).

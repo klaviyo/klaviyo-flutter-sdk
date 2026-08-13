@@ -16,15 +16,6 @@ import com.klaviyo.pushFcm.KlaviyoRemoteMessage.keyValuePairs
  *
  * Auto-registered for `com.google.firebase.MESSAGING_EVENT` via the plugin's
  * `AndroidManifest.xml`; host apps require no manifest changes.
- *
- * Deliberately a superset of the native SDK's `onKlaviyoCustomDataMessageReceived`
- * hook, which only fires when the payload carries `key_value_pairs` and hands back
- * just those pairs: this forwards every Klaviyo silent push along with the full data
- * map, with `key_value_pairs` decoded so Dart sees the same shape it does on iOS.
- * Like the native SDKs, nothing is persisted — a push delivered to a killed
- * process has no Flutter engine to reach and is dropped, not queued for next launch.
- * That gap is known and slated to be addressed; see the README "Parity with the
- * Native SDKs" section.
  */
 class KlaviyoFlutterPushService : KlaviyoPushService() {
     override fun onMessageReceived(message: RemoteMessage) {
@@ -39,26 +30,19 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
     }
 
     private fun forwardSilentPush(message: RemoteMessage) {
+        val plugin = KlaviyoFlutterSdkPlugin.instance
+        if (plugin == null) {
+            Registry.log.info("KlaviyoFlutterSdkPlugin not attached; dropping silent push.")
+            return
+        }
+
         Registry.log.info("Silent push received: forwarding to Flutter event stream.")
 
-        // Plugin not attached means FCM woke the app process while the user had the
-        // app killed. Silent pushes are only delivered while the app is running, so
-        // drop it rather than persisting it for a later launch.
-        KlaviyoFlutterSdkPlugin.instance?.handleSilentPush(buildPayload(message))
-            ?: Registry.log.info(
-                "KlaviyoFlutterSdkPlugin not attached; dropping silent push.",
-            )
+        // RemoteMessage.data is Map<String, String>, so decode key_value_pairs to match
+        // the shape iOS gets free from the APNs payload. Malformed JSON keeps the string.
+        val pairs = message.keyValuePairs
+        plugin.handleSilentPush(
+            pairs?.let { message.data + (Constants.KEY_VALUE_PAIRS to it) } ?: message.data,
+        )
     }
-
-    /**
-     * `RemoteMessage.data` is a `Map<String, String>`, so `key_value_pairs` arrives as a
-     * raw JSON string. iOS hands Dart a decoded map for the same key, straight out of the
-     * APNs payload, so parse it here to keep the Dart-side shape identical across platforms.
-     * A malformed value leaves the original string in place rather than dropping the entry —
-     * the native SDK already logs the parse failure.
-     */
-    private fun buildPayload(message: RemoteMessage): Map<String, Any?> =
-        message.keyValuePairs?.let { pairs ->
-            message.data + (Constants.KEY_VALUE_PAIRS to pairs)
-        } ?: message.data
 }

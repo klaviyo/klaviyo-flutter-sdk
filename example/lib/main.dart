@@ -9,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 
+import 'firebase_background_handler.dart';
 import 'tabs/profile_tab.dart';
 import 'tabs/events_tab.dart';
 import 'tabs/forms_tab.dart';
@@ -47,6 +48,10 @@ void main() async {
 /// Set up Firebase Cloud Messaging for Android
 Future<void> _setupFCM() async {
   try {
+    // Silent pushes delivered while the app is terminated never reach the plugin's
+    // event stream — this handles them. See firebase_background_handler.dart.
+    FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+
     // Note: Permission is requested from the Push tab via permission_handler when
     // the user taps "Enable Push Notifications" — not at launch. firebase_messaging's
     // requestPermission() targets the same Android POST_NOTIFICATIONS permission and

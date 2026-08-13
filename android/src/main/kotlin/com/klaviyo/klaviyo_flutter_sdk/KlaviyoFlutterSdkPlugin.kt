@@ -53,11 +53,8 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
-    // Most recent silent push that arrived while the app was running but before Flutter
-    // had subscribed to the EventChannel. Replayed on the next onListen. Holds one entry,
-    // matching iOS's cachedSilentPush — an unbounded list would grow without limit in an
-    // app that never attaches a listener. Not persisted: pushes delivered to a killed
-    // process are dropped, not resurrected on relaunch.
+    // Most recent silent push that arrived before Flutter subscribed; replayed on the
+    // next onListen. One entry, matching iOS. Not persisted across process death.
     private var cachedSilentPush: Map<String, Any?>? = null
 
     companion object {
