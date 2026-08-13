@@ -41,8 +41,7 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
         Registry.log.info("Silent push received: forwarding to Flutter event stream.")
 
         // RemoteMessage.data is Map<String, String>, so JSON object values arrive as raw
-        // strings. iOS gets them decoded free from the APNs payload, so decode here to
-        // keep the Dart-side shape identical. Malformed JSON keeps the original string.
+        // strings. Decode them so Dart sees the maps iOS gets free from the APNs payload.
         plugin.handleSilentPush(
             buildMap<String, Any?> {
                 putAll(message.data)
@@ -55,9 +54,8 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
     }
 
     /**
-     * Values are read with [JSONObject.getString], which coerces non-string primitives —
-     * matching how the native SDK parses `key_value_pairs`. Klaviyo sends both `_k` and
-     * `key_value_pairs` as flat string maps, so nothing is lost in practice.
+     * Reads values with [JSONObject.getString]; Klaviyo sends flat string maps, so the
+     * coercion loses nothing. Malformed JSON returns null, leaving the raw string in place.
      */
     private fun decodeJsonObject(raw: String?): Map<String, String>? =
         raw?.let {
