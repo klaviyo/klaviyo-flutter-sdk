@@ -81,7 +81,14 @@ class KlaviyoFlutterSdkPlugin :
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
-        instance = this
+        // Never take delivery away from an engine that already has a live Dart
+        // listener. A host using firebase_messaging's onBackgroundMessage gets a
+        // second FlutterEngine for the background isolate, which auto-registers
+        // this plugin; that instance never subscribes to the EventChannel, so
+        // letting it claim `instance` would strand every event.
+        if (instance?.eventSink == null) {
+            instance = this
+        }
         applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
@@ -94,6 +101,8 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
+                    // Whichever engine has a live Dart listener owns event delivery.
+                    instance = this@KlaviyoFlutterSdkPlugin
                     // Replay a silent push that arrived before Flutter subscribed.
                     cachedSilentPush?.let { events?.success(it) }
                     cachedSilentPush = null

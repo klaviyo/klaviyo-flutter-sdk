@@ -21,5 +21,14 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- The native SDK's push-fcm module registers KlaviyoPushService for the same
+             intent. Only one service wins MESSAGING_EVENT, and when the base class wins,
+             KlaviyoFlutterPushService never runs and silent pushes never reach Dart.
+             KlaviyoFlutterPushService extends it and calls super.onMessageReceived, so
+             removing the base loses no native behavior. -->
+        <service
+            android:name="com.klaviyo.pushFcm.KlaviyoPushService"
+            tools:node="remove" />
     </application>
 </manifest>
