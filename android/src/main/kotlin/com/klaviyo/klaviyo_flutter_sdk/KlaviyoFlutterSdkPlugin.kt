@@ -53,10 +53,6 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
-    // Most recent silent push that arrived before Flutter subscribed; replayed on the
-    // next onListen. One entry, matching iOS. Not persisted across process death.
-    private var cachedSilentPush: Map<String, Any?>? = null
-
     companion object {
         private const val TAG = "KlaviyoFlutter"
         private const val INFINITE_TIMEOUT_SENTINEL = -1
@@ -73,6 +69,12 @@ class KlaviyoFlutterSdkPlugin :
         // plugin instance. Mirrors iOS's KlaviyoFlutterSdkPlugin.shared pattern.
         @Volatile
         internal var instance: KlaviyoFlutterSdkPlugin? = null
+
+        // Most recent silent push that arrived before Flutter subscribed; replayed on
+        // the next onListen. One entry, matching iOS. Process-wide like `instance`, so a
+        // push cached by one engine's plugin isn't stranded when another claims delivery.
+        @Volatile
+        private var cachedSilentPush: Map<String, Any?>? = null
     }
 
     override fun onAttachedToEngine(
