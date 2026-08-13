@@ -38,6 +38,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import kotlin.concurrent.Volatile
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.INFINITE
 import kotlin.time.Duration.Companion.seconds
@@ -62,11 +63,31 @@ class KlaviyoFlutterSdkPlugin :
         // Process-wide (companion) to match Registry.log.logLevel's lifetime —
         // an engine re-attach recreates the plugin instance but not the process.
         private var logLevelBeforeDisabled: Log.Level? = null
+
+        // Static reference so KlaviyoFlutterPushService (which runs in a separate
+        // Android service lifecycle) can forward silent push data to the active
+        // plugin instance. Mirrors iOS's KlaviyoFlutterSdkPlugin.shared pattern.
+        @Volatile
+        internal var instance: KlaviyoFlutterSdkPlugin? = null
+
+        // Most recent silent push that arrived before Flutter subscribed; replayed on
+        // the next onListen. One entry, matching iOS. Process-wide like `instance`, so a
+        // push cached by one engine's plugin isn't stranded when another claims delivery.
+        @Volatile
+        private var cachedSilentPush: Map<String, Any?>? = null
     }
 
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
+        // Never take delivery away from an engine that already has a live Dart
+        // listener. A host using firebase_messaging's onBackgroundMessage gets a
+        // second FlutterEngine for the background isolate, which auto-registers
+        // this plugin; that instance never subscribes to the EventChannel, so
+        // letting it claim `instance` would strand every event.
+        if (instance?.eventSink == null) {
+            instance = this
+        }
         applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
@@ -79,6 +100,11 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
+                    // Whichever engine has a live Dart listener owns event delivery.
+                    instance = this@KlaviyoFlutterSdkPlugin
+                    // Replay a silent push that arrived before Flutter subscribed.
+                    cachedSilentPush?.let { events?.success(it) }
+                    cachedSilentPush = null
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -587,6 +613,9 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
+        if (instance === this) {
+            instance = null
+        }
         eventSink = null
         try {
             Klaviyo.unregisterFormLifecycleHandler()
@@ -594,6 +623,31 @@ class KlaviyoFlutterSdkPlugin :
             Registry.log.verbose("Forms lifecycle handler not available during cleanup: forms module not included")
         } catch (e: Exception) {
             Registry.log.warning("Unexpected error during cleanup: ${e.message}")
+        }
+    }
+
+    /**
+     * Forwards a Klaviyo silent push to the Flutter event stream as
+     * `{type: 'silent_push_received', data: <RemoteMessage.data>}`.
+     *
+     * Called from [KlaviyoFlutterPushService] (or a host's subclass of it) on the
+     * FCM background thread. Posts to the main thread before touching the EventChannel,
+     * matching how the rest of the plugin emits events. If Flutter hasn't subscribed
+     * yet, the event is held in memory and replayed on the next `onListen`; only the
+     * most recent is kept, so a burst before subscription surfaces just the last one.
+     */
+    fun handleSilentPush(data: Map<String, Any?>) {
+        val payload =
+            mapOf(
+                "type" to "silent_push_received",
+                "data" to data,
+            )
+
+        Handler(Looper.getMainLooper()).post {
+            eventSink?.let { it.success(payload) } ?: run {
+                Registry.log.verbose("Flutter not ready. Caching silent push event.")
+                cachedSilentPush = payload
+            }
         }
     }
 

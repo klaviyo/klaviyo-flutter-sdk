@@ -230,19 +230,11 @@ class MainActivity : FlutterActivity() {
 
 **2. KlaviyoPushService Declaration**
 
-Declare `KlaviyoPushService` in your `android/app/src/main/AndroidManifest.xml` inside the `<application>` tag. This ensures Klaviyo processes FCM messages before Flutter's default `FirebaseMessagingService`, enabling open tracking and rich push features.
+The plugin auto-registers `KlaviyoFlutterPushService` (a subclass of `KlaviyoPushService`) for `com.google.firebase.MESSAGING_EVENT`. The subclass invokes `super.onMessageReceived(message)` so all standard Klaviyo push handling still runs, and additionally forwards Klaviyo silent pushes to the Dart event stream. **No host-app manifest changes are required.**
 
-```xml
-<service
-    android:name="com.klaviyo.pushFcm.KlaviyoPushService"
-    android:exported="false">
-    <intent-filter>
-        <action android:name="com.google.firebase.MESSAGING_EVENT" />
-    </intent-filter>
-</service>
-```
+Android delivers `MESSAGING_EVENT` to exactly one service, so the plugin also removes the native SDK's own `KlaviyoPushService` from the merged manifest via `tools:node="remove"`. Without that, the base class can win the intent and the subclass never runs — standard push keeps working, but silent pushes never reach Dart. Nothing is lost by removing it, since `KlaviyoFlutterPushService` extends it and calls `super`.
 
-See the [example AndroidManifest.xml](example/android/app/src/main/AndroidManifest.xml#L72-L81) for a complete implementation.
+> **Migrating from earlier versions**: if your app previously declared `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for `MESSAGING_EVENT`, **remove it**. A declaration in your own manifest takes priority over everything the plugin contributes, so it would win the intent and suppress silent push forwarding. If you need custom FCM handling, subclass `KlaviyoFlutterPushService` rather than registering a second service.
 
 ## Profile Management
 
@@ -382,8 +374,9 @@ The Klaviyo SDK needs to register the device's push token. Choose one of the fol
 **This plugin forwards the push token to Klaviyo automatically on both platforms.** No native code is
 required in your app to make token registration work:
 
-- **Android** — the native SDK auto-registers `KlaviyoPushService` (a `FirebaseMessagingService`) via
-  manifest merge, which forwards the FCM token to Klaviyo.
+- **Android** — the plugin auto-registers `KlaviyoFlutterPushService` (a `FirebaseMessagingService`,
+  subclassing the native SDK's `KlaviyoPushService`) via manifest merge, which forwards the FCM
+  token to Klaviyo.
 - **iOS** — this plugin registers itself as an application delegate and intercepts
   `didRegisterForRemoteNotificationsWithDeviceToken`. If you override that method in your
   `AppDelegate`, call `super` or the token will not reach Klaviyo — see [iOS Setup](#ios-setup).
@@ -514,6 +507,16 @@ Silent push notifications (`content-available: 1`) deliver data to your app in t
 #### iOS
 
 iOS delivers silent pushes via `didReceiveRemoteNotification:fetchCompletionHandler:` in your `AppDelegate.swift`. The setup in [iOS Setup](#ios-setup) already handles this — it differentiates pure silent pushes from standard pushes that carry `content-available` and forwards only the former to the Klaviyo plugin.
+
+#### Android
+
+The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM service that forwards Klaviyo silent pushes to the Dart event stream. No host configuration is required — silent push events flow to your Dart listener automatically.
+
+#### Delivery Guarantees
+
+Your listener fires for every Klaviyo silent push, with the full payload and `key_value_pairs` decoded to a map on both platforms. Delivery needs a live Flutter engine: foreground **and backgrounded** apps both receive events, a terminated one does not. Nothing is cached or replayed on a later launch, matching both native SDKs — a missed push is gone.
+
+> **Known limitation (Android)**: while your app isn't running — swiped away, force-stopped, or evicted — there's no Flutter engine to receive silent pushes, and nothing is queued for the next launch. The native Android SDK has no such gap, and we plan to close it. Until then, either subclass `KlaviyoFlutterPushService` and handle it in Kotlin, or use [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage`, which runs its own engine and coexists with this plugin — it receives messages via a broadcast receiver rather than the `MESSAGING_EVENT` service. It also fires while your app is running, so guard against handling a push twice. iOS is unaffected: the system relaunches your app, so the `AppDelegate` path still runs.
 
 #### Dart-Side Listener
 
