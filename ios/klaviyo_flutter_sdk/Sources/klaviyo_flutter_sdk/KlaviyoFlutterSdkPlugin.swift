@@ -436,7 +436,8 @@ extension KlaviyoFlutterSdkPlugin {
         // true -> the native SDK's own app-delegate swizzler already installed itself via its
         //   pre-main `+load` hook and forwards the token itself; skip to avoid a duplicate call.
         // false -> explicit opt-out; forward nothing automatically.
-        let automaticForwardingFlag = Bundle.main.infoDictionary?["klaviyo_automatic_push_token_forwarding"] as? Bool
+        let forwardingKey = "klaviyo_automatic_push_token_forwarding"
+        let automaticForwardingFlag = Bundle.main.infoDictionary?[forwardingKey] as? Bool
         if automaticForwardingFlag == nil {
             KlaviyoSDK().set(pushToken: deviceToken)
         }
