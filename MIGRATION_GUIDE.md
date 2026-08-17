@@ -16,9 +16,11 @@ push token to Klaviyo **automatically by default**. This formalizes behavior the
 [Android SDK README](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) for details —
 and is **non-breaking**, because the default preserves existing behavior.
 
-**iOS is unchanged, and was already automatic.** This plugin registers its own application delegate
-and forwards the APNs token to Klaviyo whenever iOS delivers one. That has always been the case and
-does not depend on any native-SDK setting, so there is nothing to migrate on iOS.
+**iOS default behavior is unchanged, and was already automatic.** This plugin registers its own
+application delegate and forwards the APNs token to Klaviyo whenever iOS delivers one, unless you
+explicitly opt out — see [Disabling automatic token forwarding](#disabling-automatic-token-forwarding)
+below. If you haven't set `klaviyo_automatic_push_token_forwarding` in your `Info.plist`, there is
+nothing to migrate on iOS.
 
 **No action is required** on either platform. As of v0.3.0, token forwarding is automatic everywhere,
 and manual token management via `setPushToken(...)` or `registerForPushNotifications()` continues to
