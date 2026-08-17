@@ -431,8 +431,15 @@ extension KlaviyoFlutterSdkPlugin {
             Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString, privacy: .public)")
         }
 
-        // Pass to Klaviyo Swift SDK
-        KlaviyoSDK().set(pushToken: deviceToken)
+        // Respect `klaviyo_automatic_push_token_forwarding` in Info.plist when explicitly set:
+        // unset -> no other path is active, this plugin forwards (today's default, unchanged).
+        // true -> the native SDK's own app-delegate swizzler already installed itself via its
+        //   pre-main `+load` hook and forwards the token itself; skip to avoid a duplicate call.
+        // false -> explicit opt-out; forward nothing automatically.
+        let automaticForwardingFlag = Bundle.main.infoDictionary?["klaviyo_automatic_push_token_forwarding"] as? Bool
+        if automaticForwardingFlag == nil {
+            KlaviyoSDK().set(pushToken: deviceToken)
+        }
 
         // Create event payload
         let eventData: [String: Any] = [

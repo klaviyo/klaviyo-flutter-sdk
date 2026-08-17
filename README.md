@@ -396,10 +396,12 @@ redundant registration costs nothing.
 <summary><strong>Advanced:</strong> native SDK configuration flags</summary>
 
 Both native SDKs expose an `automatic_push_token_forwarding` flag. Most Flutter apps should not set
-either one, and a future release may replace them with a cross-platform control.
+either one.
 
-- **iOS** — the `klaviyo_automatic_push_token_forwarding` `Info.plist` key gates only the native SDK's
-  app-delegate swizzling. It does **not** disable this plugin's forwarding.
+- **iOS** — the `klaviyo_automatic_push_token_forwarding` `Info.plist` key now also gates this
+  plugin's own forwarding: leave it unset for today's default (this plugin forwards), set it to
+  `true` to let the native SDK's app-delegate swizzler own forwarding instead (this plugin steps
+  aside to avoid a duplicate call), or set it to `false` to disable forwarding entirely.
 - **Android** — the `com.klaviyo.push.automatic_push_token_forwarding` manifest `meta-data` key
   (default `true`) does disable it. Set it to `false` only if you register the token yourself;
   otherwise Klaviyo keeps whatever token it last stored, which goes stale once FCM rotates it.
