@@ -198,6 +198,8 @@ import klaviyo_flutter_sdk
 }
 ```
 
+> **Note on automatic tracking:** Keep the manual `AppDelegate` wiring shown above. The native iOS SDK offers an opt-in automatic push-open tracking mode (`klaviyo_automatic_push_open_tracking` in `Info.plist`), but it does **not** replace this wiring in a Flutter app: the Dart `push_notification_opened` stream is emitted by the plugin, which only learns about the tap through the `userNotificationCenter(_:didReceive:...)` code above. Enabling the flag is safe rather than harmful — the native SDK still tracks the "Opened Push" event and resolves the notification's deep link/web URL — but it is redundant here, since the plugin's own Dart-facing events still depend on the manual wiring. See the native [iOS docs](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) for that behavior.
+
 ### Android Setup
 
 **1. MainActivity Setup**
@@ -485,6 +487,8 @@ KlaviyoSDK().onPushNotification.listen((event) {
   }
 });
 ```
+
+> **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (automatic or via the manual `AppDelegate`/`MainActivity` wiring above) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently.
 
 #### Identifying Klaviyo Notifications
 
