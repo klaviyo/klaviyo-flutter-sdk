@@ -20,7 +20,7 @@ import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.config.Log
-import com.klaviyo.core.config.getManifestBoolean
+import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
@@ -727,14 +727,18 @@ class KlaviyoFlutterSdkPlugin :
 
     private fun handleIntent(intent: Intent) {
         try {
-            // com.klaviyo.push.automatic_push_open_tracking (default true) gates only this
-            // native-backend "Opened Push" tracking call, not the Dart event emission below,
-            // which stays unconditional since it never reaches Klaviyo's servers. Reads the
-            // manifest directly via Context rather than Registry.config: handlePush() is safe
-            // to call before KlaviyoSDK().initialize() (it buffers to a pre-init queue), and
-            // Registry.config throws MissingConfig until then, which would otherwise swallow
+            // com.klaviyo.push.automatic_push_open_tracking gates only this native-backend
+            // "Opened Push" tracking call, not the Dart event emission below, which stays
+            // unconditional since it never reaches Klaviyo's servers.
+            // unset -> no other path is active, this plugin calls it (today's default, unchanged).
+            // true -> the native SDK's own trampoline mechanism already handles it; skip here to
+            //   match iOS's pattern of deferring to native rather than duplicating the call.
+            // false -> explicit opt-out; skip entirely.
+            // Reads the manifest directly via Context rather than Registry.config: handlePush()
+            // is safe to call before KlaviyoSDK().initialize() (it buffers to a pre-init queue),
+            // but Registry.config throws MissingConfig until then, which would otherwise swallow
             // this whole handler via the catch below on a genuine cold start.
-            if (applicationContext.getManifestBoolean(Constants.AUTOMATIC_PUSH_OPEN_TRACKING, true)) {
+            if (!applicationContext.hasManifestKey(Constants.AUTOMATIC_PUSH_OPEN_TRACKING)) {
                 Klaviyo.handlePush(intent)
             }
 

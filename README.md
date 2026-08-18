@@ -211,12 +211,15 @@ Push" event to Klaviyo and emits the Dart `push_notification_opened` stream — 
 SDK had you add a manual `Klaviyo.handlePush(intent)` call in `MainActivity.kt`, you can remove it —
 the plugin's automatic handling already covers it.
 
-> **Opting out of native tracking:** Set the `com.klaviyo.push.automatic_push_open_tracking` manifest
-> `meta-data` key to `false` to stop the plugin from reporting "Opened Push" to Klaviyo (default
-> `true`) — useful if you need to withhold push data until a profile is identified. This has no
-> effect on the Dart stream above, which never reaches Klaviyo's backend. **A manual
-> `Klaviyo.handlePush()` call of your own bypasses this flag entirely** — remove any such call (per
-> the note above) if you rely on this opt-out.
+> **Native tracking and the `com.klaviyo.push.automatic_push_open_tracking` manifest `meta-data`
+> key:** leave it unset for today's default (this plugin reports "Opened Push" to Klaviyo itself).
+> Set it to `true` to hand that reporting to the native SDK's own trampoline mechanism instead —
+> this plugin steps aside to avoid a duplicate call, matching how the equivalent iOS token-forwarding
+> flag works. Set it to `false` to disable it entirely — useful if you need to withhold push data
+> until a profile is identified. None of this affects the Dart stream above, which never reaches
+> Klaviyo's backend. **A manual `Klaviyo.handlePush()` call of your own bypasses this flag
+> entirely** — remove any such call (per the note above) if you rely on either the `true` or `false`
+> behavior.
 >
 > **Note on automatic tracking (iOS):** the native iOS SDK offers a separate opt-in automatic
 > push-open tracking mode (`klaviyo_automatic_push_open_tracking` in `Info.plist`) that reports
