@@ -69,6 +69,14 @@
             android:name="com.klaviyo.core.log_level"
             android:value="1" />
 
+        <meta-data
+            android:name="com.klaviyo.push.automatic_push_open_tracking"
+            android:value="true" />
+
+        <meta-data
+            android:name="com.klaviyo.push.automatic_push_token_forwarding"
+            android:value="true" />
+
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
