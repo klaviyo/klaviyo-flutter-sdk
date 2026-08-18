@@ -20,6 +20,7 @@ import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.config.Log
+import com.klaviyo.core.config.getManifestBoolean
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
@@ -728,8 +729,12 @@ class KlaviyoFlutterSdkPlugin :
         try {
             // com.klaviyo.push.automatic_push_open_tracking (default true) gates only this
             // native-backend "Opened Push" tracking call, not the Dart event emission below,
-            // which stays unconditional since it never reaches Klaviyo's servers.
-            if (Registry.config.getManifestBoolean(Constants.AUTOMATIC_PUSH_OPEN_TRACKING, true)) {
+            // which stays unconditional since it never reaches Klaviyo's servers. Reads the
+            // manifest directly via Context rather than Registry.config: handlePush() is safe
+            // to call before KlaviyoSDK().initialize() (it buffers to a pre-init queue), and
+            // Registry.config throws MissingConfig until then, which would otherwise swallow
+            // this whole handler via the catch below on a genuine cold start.
+            if (applicationContext.getManifestBoolean(Constants.AUTOMATIC_PUSH_OPEN_TRACKING, true)) {
                 Klaviyo.handlePush(intent)
             }
 
