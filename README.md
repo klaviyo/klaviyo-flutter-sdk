@@ -217,7 +217,7 @@ the plugin's automatic handling already covers it.
 > effect on the Dart stream above, which never reaches Klaviyo's backend. **A manual
 > `Klaviyo.handlePush()` call of your own bypasses this flag entirely** — remove any such call (per
 > the note above) if you rely on this opt-out.
-
+>
 > **Note on automatic tracking (iOS):** the native iOS SDK offers a separate opt-in automatic
 > push-open tracking mode (`klaviyo_automatic_push_open_tracking` in `Info.plist`) that reports
 > "Opened Push" without any app code. It does **not** feed the Dart `push_notification_opened`
@@ -483,7 +483,7 @@ KlaviyoSDK().onPushNotification.listen((event) {
 });
 ```
 
-> **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (automatic or via the manual `AppDelegate`/`MainActivity` wiring above) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently.
+> **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (automatic on both platforms — via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
 
 #### Identifying Klaviyo Notifications
 
@@ -1149,7 +1149,7 @@ All SDK exceptions extend `KlaviyoException`:
 
 ### Android
 
-**Push opens not tracked** — Verify `Klaviyo.handlePush(intent)` is called in both `onCreate` and `onNewIntent`. Use `singleTop` or `singleTask` launch mode. See the [example MainActivity](example/android/app/src/main/kotlin/com/klaviyo/flutterexample/MainActivity.kt).
+**Push opens not tracked** — This is automatic; no `MainActivity.kt` changes should be needed. Check that `com.klaviyo.push.automatic_push_open_tracking` isn't set to `false` in your manifest (see [Android Setup](#android-setup)), and that you haven't left a manual `Klaviyo.handlePush()` call in your own code from an older SDK version, which bypasses that setting. Also use `singleTop` or `singleTask` launch mode so `onNewIntent` fires for warm starts.
 
 **Push notifications not displaying** — Check Firebase setup (`google-services.json`, plugin applied in `build.gradle`). On Android 13+, runtime notification permission is required. Test with Firebase Console first to rule out Klaviyo-specific issues.
 
