@@ -202,33 +202,28 @@ import klaviyo_flutter_sdk
 
 ### Android Setup
 
-**1. MainActivity Setup**
+**1. Push Notification Opens (automatic)**
 
-To track push notification opens, handle intents in your `MainActivity` (at `android/app/src/main/kotlin/.../MainActivity.kt`). See the [example MainActivity.kt](example/android/app/src/main/kotlin/com/klaviyo/flutterexample/MainActivity.kt) for reference.
+No `MainActivity.kt` changes are required. The plugin tracks push notification opens on its own via
+Flutter's Activity lifecycle hooks (cold start and warm start alike) and both reports the "Opened
+Push" event to Klaviyo and emits the Dart `push_notification_opened` stream — see
+[Handling Push Notification Opens](#handling-push-notification-opens). If an earlier version of this
+SDK had you add a manual `Klaviyo.handlePush(intent)` call in `MainActivity.kt`, you can remove it —
+the plugin's automatic handling already covers it.
 
-```kotlin
-import android.content.Intent
-import android.os.Bundle
-import com.klaviyo.analytics.Klaviyo
-import io.flutter.embedding.android.FlutterActivity
+> **Opting out of native tracking:** Set the `com.klaviyo.push.automatic_push_open_tracking` manifest
+> `meta-data` key to `false` to stop the plugin from reporting "Opened Push" to Klaviyo (default
+> `true`) — useful if you need to withhold push data until a profile is identified. This has no
+> effect on the Dart stream above, which never reaches Klaviyo's backend. **A manual
+> `Klaviyo.handlePush()` call of your own bypasses this flag entirely** — remove any such call (per
+> the note above) if you rely on this opt-out.
 
-class MainActivity : FlutterActivity() {
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // Handle notification intent on cold start
-        intent?.let { Klaviyo.handlePush(it) }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        // Handle notification intent on warm start
-        Klaviyo.handlePush(intent)
-    }
-}
-```
-
-> **Note on automatic tracking:** Keep the manual `AppDelegate`/`MainActivity` wiring shown above. The native SDKs offer an opt-in automatic push-open tracking mode, but it does **not** replace this wiring in a Flutter app: the Dart `push_notification_opened` stream is emitted by the plugin, which only learns about the tap through the code above. Enabling it is safe rather than harmful — both native SDKs deduplicate the open and forward the tap onward, so your handlers still run — but it is redundant here. See the native [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) and [Android](https://github.com/klaviyo/klaviyo-android-sdk#Tracking-Open-Events) docs for that behavior.
+> **Note on automatic tracking (iOS):** the native iOS SDK offers a separate opt-in automatic
+> push-open tracking mode (`klaviyo_automatic_push_open_tracking` in `Info.plist`) that reports
+> "Opened Push" without any app code. It does **not** feed the Dart `push_notification_opened`
+> stream on iOS, though — that still requires the manual `AppDelegate` wiring in
+> [iOS Setup](#ios-setup) regardless of this flag. See the native
+> [iOS docs](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) for that behavior.
 
 **2. KlaviyoPushService Declaration**
 

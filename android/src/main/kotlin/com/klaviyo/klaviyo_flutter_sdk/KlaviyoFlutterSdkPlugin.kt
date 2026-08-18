@@ -726,8 +726,12 @@ class KlaviyoFlutterSdkPlugin :
 
     private fun handleIntent(intent: Intent) {
         try {
-            // Let Klaviyo SDK handle push notification opens
-            Klaviyo.handlePush(intent)
+            // com.klaviyo.push.automatic_push_open_tracking (default true) gates only this
+            // native-backend "Opened Push" tracking call, not the Dart event emission below,
+            // which stays unconditional since it never reaches Klaviyo's servers.
+            if (Registry.config.getManifestBoolean(Constants.AUTOMATIC_PUSH_OPEN_TRACKING, true)) {
+                Klaviyo.handlePush(intent)
+            }
 
             val extras = intent.extras
             if (extras != null && intent.isKlaviyoNotificationIntent) {
