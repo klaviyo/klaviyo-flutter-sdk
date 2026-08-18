@@ -20,10 +20,6 @@
 	<string>group.com.klaviyo.FlutterExample</string>
 	<key>klaviyo_badge_autoclearing</key>
 	<true/>
-	<key>klaviyo_automatic_push_open_tracking</key>
-	<true/>
-	<key>klaviyo_automatic_push_token_forwarding</key>
-	<true/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
