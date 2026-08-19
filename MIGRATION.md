@@ -71,10 +71,10 @@ official SDK you will need to update your native setup:
 
 - **iOS:** Update `AppDelegate.swift` — see the
   [README](https://pub.dev/packages/klaviyo_flutter_sdk) for details.
-- **Android:** Update `MainActivity.kt` — see the
-  [README](https://pub.dev/packages/klaviyo_flutter_sdk) for details. The
-  plugin auto-registers its FCM service, so no `AndroidManifest.xml` changes
-  are required by default. If you previously declared
+- **Android:** No `MainActivity.kt` changes are needed — the official SDK tracks
+  push notification opens automatically. The plugin also auto-registers its FCM
+  service, so no `AndroidManifest.xml` changes are required by default. If you
+  previously declared
   `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for the
   community SDK, remove it — leaving it alongside the plugin's auto-registered
   service causes Android to deliver FCM messages to the wrong service, which
