@@ -221,12 +221,8 @@ the plugin's automatic handling already covers it.
 > entirely** — remove any such call (per the note above) if you rely on either the `true` or `false`
 > behavior.
 >
-> **Note on automatic tracking (iOS):** the native iOS SDK offers a separate opt-in automatic
-> push-open tracking mode (`klaviyo_automatic_push_open_tracking` in `Info.plist`) that reports
-> "Opened Push" without any app code. It does **not** feed the Dart `push_notification_opened`
-> stream on iOS, though — that still requires the manual `AppDelegate` wiring in
-> [iOS Setup](#ios-setup) regardless of this flag. See the native
-> [iOS docs](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) for that behavior.
+> iOS has a separate opt-in flag for the equivalent native behavior — see the
+> [Note on automatic tracking](#ios-setup) under iOS Setup.
 
 **2. KlaviyoPushService Declaration**
 
