@@ -374,15 +374,18 @@ The Klaviyo SDK needs to register the device's push token. Choose one of the fol
 
 #### Automatic Token Forwarding
 
-**This plugin forwards the push token to Klaviyo automatically on both platforms.** No native code is
-required in your app to make token registration work:
+**This plugin forwards the push token to Klaviyo automatically by default on both platforms.** No
+native code is required in your app to make token registration work:
 
 - **Android** — the plugin auto-registers `KlaviyoFlutterPushService` (a `FirebaseMessagingService`,
   subclassing the native SDK's `KlaviyoPushService`) via manifest merge, which forwards the FCM
   token to Klaviyo.
 - **iOS** — this plugin registers itself as an application delegate and intercepts
-  `didRegisterForRemoteNotificationsWithDeviceToken`. If you override that method in your
-  `AppDelegate`, call `super` or the token will not reach Klaviyo — see [iOS Setup](#ios-setup).
+  `didRegisterForRemoteNotificationsWithDeviceToken`. By default it forwards the token to Klaviyo
+  itself; see the **Advanced** note below for how `klaviyo_automatic_push_token_forwarding` changes
+  this. If you override that method in your own `AppDelegate`, call `super` — otherwise neither this
+  forwarding nor the Dart `push_token_received` event will fire, regardless of that flag's value,
+  since both live in the same delegate callback — see [iOS Setup](#ios-setup).
 
 On iOS the token is only delivered once your app registers for remote notifications — via
 `registerForPushNotifications()` (Option B) or a package such as `firebase_messaging` (Option A).
@@ -397,10 +400,12 @@ redundant registration costs nothing.
 <summary><strong>Advanced:</strong> native SDK configuration flags</summary>
 
 Both native SDKs expose an `automatic_push_token_forwarding` flag. Most Flutter apps should not set
-either one, and a future release may replace them with a cross-platform control.
+either one.
 
-- **iOS** — the `klaviyo_automatic_push_token_forwarding` `Info.plist` key gates only the native SDK's
-  app-delegate swizzling. It does **not** disable this plugin's forwarding.
+- **iOS** — the `klaviyo_automatic_push_token_forwarding` `Info.plist` key now also gates this
+  plugin's own forwarding: leave it unset for today's default (this plugin forwards), set it to
+  `true` to let the native SDK's app-delegate swizzler own forwarding instead (this plugin steps
+  aside to avoid a duplicate call), or set it to `false` to disable forwarding entirely.
 - **Android** — the `com.klaviyo.push.automatic_push_token_forwarding` manifest `meta-data` key
   (default `true`) does disable it. Set it to `false` only if you register the token yourself;
   otherwise Klaviyo keeps whatever token it last stored, which goes stale once FCM rotates it.
