@@ -16,18 +16,18 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
   s.resources        = ['klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist']
 
   s.dependency 'Flutter'
-  s.dependency 'KlaviyoSwift'
-  s.dependency 'KlaviyoCore'
+  s.dependency 'KlaviyoSwift', '~> 5.4.0'
+  s.dependency 'KlaviyoCore', '~> 5.4.0'
   # Forms: included by default, set to 'false' to exclude
   if ENV['KLAVIYO_INCLUDE_FORMS'] != 'false'
-    s.dependency 'KlaviyoForms'
+    s.dependency 'KlaviyoForms', '~> 5.4.0'
   end
 
   # Conditional location dependency based on environment variable
   # Default is FALSE (opt-in for geofencing)
   include_location = ENV['KLAVIYO_INCLUDE_LOCATION'] == 'true'
   if include_location
-    s.dependency 'KlaviyoLocation'
+    s.dependency 'KlaviyoLocation', '~> 5.4.0'
   end
 
   s.platform = :ios, '13.0'
