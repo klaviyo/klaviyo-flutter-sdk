@@ -732,7 +732,7 @@ class KlaviyoFlutterSdkPlugin :
             // unconditional since it never reaches Klaviyo's servers.
             // unset -> no other path is active, this plugin calls it (today's default, unchanged).
             // true -> the native SDK's own trampoline mechanism already handles it; skip here to
-            //   match iOS's pattern of deferring to native rather than duplicating the call.
+            //   avoid duplicating the call.
             // false -> explicit opt-out; skip entirely.
             // Reads the manifest directly via Context rather than Registry.config: handlePush()
             // is safe to call before KlaviyoSDK().initialize() (it buffers to a pre-init queue),

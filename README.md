@@ -214,12 +214,11 @@ the plugin's automatic handling already covers it.
 > **Native tracking and the `com.klaviyo.push.automatic_push_open_tracking` manifest `meta-data`
 > key:** leave it unset for today's default (this plugin reports "Opened Push" to Klaviyo itself).
 > Set it to `true` to hand that reporting to the native SDK's own trampoline mechanism instead —
-> this plugin steps aside to avoid a duplicate call, matching how the equivalent iOS token-forwarding
-> flag works. Set it to `false` to disable it entirely — useful if you need to withhold push data
-> until a profile is identified. None of this affects the Dart stream above, which never reaches
-> Klaviyo's backend. **A manual `Klaviyo.handlePush()` call of your own bypasses this flag
-> entirely** — remove any such call (per the note above) if you rely on either the `true` or `false`
-> behavior.
+> this plugin steps aside to avoid a duplicate call. Set it to `false` to disable it entirely —
+> useful if you need to withhold push data until a profile is identified. None of this affects the
+> Dart stream above, which never reaches Klaviyo's backend. **A manual `Klaviyo.handlePush()` call
+> of your own bypasses this flag entirely** — remove any such call (per the note above) if you rely
+> on either the `true` or `false` behavior.
 >
 > iOS has a separate opt-in flag for the equivalent native behavior — see the
 > [Note on automatic tracking](#ios-setup) under iOS Setup.
