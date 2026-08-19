@@ -6,8 +6,6 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
-// ponytail: key.properties is gitignored; absent it, release falls back to debug keys
-// so `flutter run --release` and CI keep working without a keystore.
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
