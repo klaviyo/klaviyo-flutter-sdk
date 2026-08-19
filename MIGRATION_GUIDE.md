@@ -8,30 +8,29 @@ This guide outlines how developers can migrate from older versions of the
 
 ## Migrating to v0.3.0
 
-### Automatic push token forwarding is now the default on Android
+### Android's `automatic_push_token_forwarding` flag is now three-valued
 
-As of v0.3.0 (which pins the native Android SDK to 4.5.0), the Klaviyo SDK forwards the Android FCM
-push token to Klaviyo **automatically by default**. This formalizes behavior the bundled
-`KlaviyoPushService` already performed — see the native
-[Android SDK README](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) for details —
-and is **non-breaking**, because the default preserves existing behavior.
+The native Android SDK's `com.klaviyo.push.automatic_push_token_forwarding` manifest flag has three
+states, because leaving it unset is different from setting it to `false`:
 
-**iOS is unchanged, and was already automatic.** This plugin registers its own application delegate
-and forwards the APNs token to Klaviyo whenever iOS delivers one. That has always been the case and
-does not depend on any native-SDK setting, so there is nothing to migrate on iOS.
+| Value | Behavior |
+|---|---|
+| **not set** (default) | `KlaviyoFlutterPushService` forwards a token whenever FCM delivers one — this plugin's existing automatic behavior, unchanged. |
+| **`true`** | Additionally fetches and registers the current token at `Klaviyo.initialize()` and on each foreground. |
+| **`false`** | Disables automatic forwarding entirely. |
 
-**No action is required** on either platform. As of v0.3.0, token forwarding is automatic everywhere,
-and manual token management via `setPushToken(...)` or `registerForPushNotifications()` continues to
-work alongside it at no cost — the native SDK only sends a request when the push state actually
-changes. See the [README](https://pub.dev/packages/klaviyo_flutter_sdk) for full token-collection
-guidance.
+**No action is required** — the unset default preserves this plugin's existing automatic-forwarding
+behavior on Android. Manual token management via `setPushToken(...)` continues to work alongside it
+at no cost — the native SDK only sends a request when the push state actually changes. See the
+[README](https://pub.dev/packages/klaviyo_flutter_sdk) for full token-collection guidance.
 
 ### Disabling automatic token forwarding
 
 There is currently no cross-platform way to disable automatic token forwarding from Dart. The native
 SDKs' own `automatic_push_token_forwarding` flags are native-level escape hatches rather than part of
-this plugin's API — notably, the iOS `Info.plist` key does **not** stop this plugin from forwarding the
-token. See the **Advanced** note under
+this plugin's API — notably, the iOS `Info.plist` key does **not** stop this plugin from forwarding
+the token, and on Android only an explicit `false` is a complete opt-out (`true` and unset both keep
+forwarding on). See the **Advanced** note under
 [Automatic Token Forwarding](./README.md#automatic-token-forwarding) before reaching for either.
 
 > **Looking ahead:** a future release may add a cross-platform way to control automatic push

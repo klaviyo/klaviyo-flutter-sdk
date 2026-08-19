@@ -400,9 +400,14 @@ either one, and a future release may replace them with a cross-platform control.
 
 - **iOS** — the `klaviyo_automatic_push_token_forwarding` `Info.plist` key gates only the native SDK's
   app-delegate swizzling. It does **not** disable this plugin's forwarding.
-- **Android** — the `com.klaviyo.push.automatic_push_token_forwarding` manifest `meta-data` key
-  (default `true`) does disable it. Set it to `false` only if you register the token yourself;
-  otherwise Klaviyo keeps whatever token it last stored, which goes stale once FCM rotates it.
+- **Android** — the `com.klaviyo.push.automatic_push_token_forwarding` manifest `meta-data` key is
+  three-valued, because leaving it unset is different from setting it to `false`:
+
+  | Value | Behavior |
+  |---|---|
+  | **not set** (default) | `KlaviyoFlutterPushService` forwards a token whenever FCM delivers one — this plugin's existing automatic behavior, unaffected. |
+  | **`true`** | Additionally fetches and registers the current token at `Klaviyo.initialize()` and on each foreground. |
+  | **`false`** | Disables forwarding entirely — set this only if you register the token yourself, since Klaviyo otherwise keeps whatever token it last stored, which goes stale once FCM rotates it. |
 
 For the underlying native behavior, see the native
 [Android](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) and
