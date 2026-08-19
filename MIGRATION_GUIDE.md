@@ -15,7 +15,7 @@ states, because leaving it unset is different from setting it to `false`:
 
 | Value | Behavior |
 |---|---|
-| **not set** (default) | `KlaviyoFlutterPushService` forwards a token whenever FCM delivers one — this plugin's existing automatic behavior, unchanged. |
+| **not set** (default) | `KlaviyoFlutterPushService` forwards a token whenever FCM delivers one — this plugin's existing automatic behavior, unchanged. This plugin initializes Klaviyo from Dart after `Application.onCreate`, so a token FCM delivers before that call is silently dropped. |
 | **`true`** | Additionally fetches and registers the current token at `Klaviyo.initialize()` and on each foreground. |
 | **`false`** | Disables automatic forwarding entirely. |
 
