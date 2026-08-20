@@ -406,9 +406,14 @@ either one.
   plugin's own forwarding: leave it unset for today's default (this plugin forwards), set it to
   `true` to let the native SDK's app-delegate swizzler own forwarding instead (this plugin steps
   aside to avoid a duplicate call), or set it to `false` to disable forwarding entirely.
-- **Android** — the `com.klaviyo.push.automatic_push_token_forwarding` manifest `meta-data` key
-  (default `true`) does disable it. Set it to `false` only if you register the token yourself;
-  otherwise Klaviyo keeps whatever token it last stored, which goes stale once FCM rotates it.
+- **Android** — the `com.klaviyo.push.automatic_push_token_forwarding` manifest `meta-data` key is
+  three-valued, because leaving it unset is different from setting it to `false`:
+
+  | Value | Behavior |
+  |---|---|
+  | **not set** (default) | `KlaviyoFlutterPushService` forwards a token whenever FCM delivers one — this plugin's existing automatic behavior, unaffected. This plugin initializes Klaviyo from Dart after `Application.onCreate`, so a token FCM delivers before that call is silently dropped. |
+  | **`true`** | Additionally fetches and registers the current token at `Klaviyo.initialize()` and on each foreground. |
+  | **`false`** | Disables forwarding entirely — set this only if you register the token yourself, since Klaviyo otherwise keeps whatever token it last stored, which goes stale once FCM rotates it. |
 
 For the underlying native behavior, see the native
 [Android](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) and
