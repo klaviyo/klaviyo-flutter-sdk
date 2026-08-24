@@ -1173,7 +1173,7 @@ All SDK exceptions extend `KlaviyoException`:
 - If nothing fires at all (neither "Opened Push" in Klaviyo nor the Dart `push_notification_opened` stream), use `singleTop` or `singleTask` launch mode so `onNewIntent` fires for warm starts, and check intent delivery/SDK initialization.
 - If "Opened Push" isn't showing up in Klaviyo specifically, check that `com.klaviyo.push.automatic_push_open_tracking` isn't set to `false` in your manifest (see [Android Setup](#android-setup)) — this only affects native backend tracking, not the Dart stream, which fires regardless.
 - If "Opened Push" shows up in Klaviyo despite setting that flag to `false`, check for a leftover manual `Klaviyo.handlePush()` call in your own code from an older SDK version — it bypasses the flag entirely, since it's a separate call site outside the plugin's own gate.
-- If it fires on a warm start (app backgrounded) but not on a cold start (app fully killed), this is a known limitation — see [Handling Push Notification Opens](#handling-push-notification-opens).
+- If the Dart `push_notification_opened` event fires on a warm start (app backgrounded) but not on a cold start (app fully killed), this is a known limitation — see [Handling Push Notification Opens](#handling-push-notification-opens).
 
 **Push notifications not displaying** — Check Firebase setup (`google-services.json`, plugin applied in `build.gradle`). On Android 13+, runtime notification permission is required. Test with Firebase Console first to rule out Klaviyo-specific issues.
 
