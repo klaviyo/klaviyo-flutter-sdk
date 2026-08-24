@@ -5,9 +5,11 @@ import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
+import 'models/klaviyo_subscription.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
+import 'models/klaviyo_push_action.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
@@ -26,7 +28,7 @@ class KlaviyoSDK {
     // share the root logger's level. Setting it to true is additive and is
     // the standard pattern for Dart libraries that manage their own log level.
     hierarchicalLoggingEnabled = true;
-    _logger.level = Level.INFO;
+    _logger.level = _dartLogLevel;
   }
 
   // Native wrapper service — singleton, safe to construct eagerly
@@ -36,6 +38,8 @@ class KlaviyoSDK {
   // State
   bool _isInitialized = false;
   String? _apiKey;
+  bool _loggingEnabled = true;
+  Level _dartLogLevel = Level.INFO;
 
   // Getters
   bool get isInitialized => _isInitialized;
@@ -181,6 +185,43 @@ class KlaviyoSDK {
       _logger.info('Event tracked: ${event.name.name}');
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
+    }
+  }
+
+  /// Subscribe the current profile to a Klaviyo list.
+  ///
+  /// Set the profile's email and/or phone number **before** calling this — the
+  /// native SDKs validate the request against the current profile's identifiers
+  /// and drop it with a warning if a requested channel has no identifier.
+  ///
+  /// Push subscriptions are not created through this API.
+  ///
+  /// Example:
+  /// ```dart
+  /// // Request specific consent per channel
+  /// await klaviyo.createSubscription(
+  ///   KlaviyoSubscription(
+  ///     listId: 'ABC123',
+  ///     channels: const KlaviyoSubscriptionChannels(
+  ///       email: {EmailConsent.marketing},
+  ///       sms: {MessagingConsent.marketing},
+  ///     ),
+  ///   ),
+  /// );
+  ///
+  /// // Request marketing consent on every identified channel
+  /// await klaviyo.createSubscription(
+  ///   KlaviyoSubscription.allAvailableMarketing(listId: 'ABC123'),
+  /// );
+  /// ```
+  Future<void> createSubscription(KlaviyoSubscription subscription) async {
+    _ensureInitialized();
+
+    try {
+      await _nativeWrapper.createSubscription(subscription);
+      _logger.info('Subscription requested for list: ${subscription.listId}');
+    } catch (e) {
+      throw KlaviyoException('Failed to create subscription: $e');
     }
   }
 
@@ -394,9 +435,49 @@ class KlaviyoSDK {
   }
 
   /// Set log level for Flutter-side logging only
-  /// Note: This only affects Flutter console logs, not native SDK logs
+  /// Note: This only affects Flutter console logs, not native SDK logs.
+  /// While logging is disabled via [setLoggingEnabled], the new level is
+  /// stored and takes effect once logging is re-enabled.
   void setLogLevel(KlaviyoLogLevel logLevel) {
-    _logger.level = logLevel.toLevel();
+    _dartLogLevel = logLevel.toLevel();
+    if (_loggingEnabled) {
+      _logger.level = _dartLogLevel;
+    }
+  }
+
+  /// Enable or disable all Klaviyo SDK logging.
+  ///
+  /// Controls both the native SDK loggers and this plugin's Dart-side logs.
+  /// Logging is enabled by default. Safe to call before [initialize] —
+  /// useful for silencing logs emitted during SDK startup.
+  ///
+  /// Platform notes:
+  /// - **iOS**: does not affect `KlaviyoSwiftExtension`, which runs in a
+  ///   separate app-extension process.
+  /// - **Android**: disabling sets the native SDK log level to `None`;
+  ///   re-enabling restores the level in effect before it was disabled.
+  Future<void> setLoggingEnabled(bool enabled) async {
+    try {
+      await _nativeWrapper.setLoggingEnabled(enabled);
+    } catch (e) {
+      throw KlaviyoException('Failed to set logging enabled: $e');
+    }
+
+    // Only mirror the state on the Dart side once the native call succeeds,
+    // so Dart and native logging can't disagree after a failure.
+    _loggingEnabled = enabled;
+    _logger.level = enabled ? _dartLogLevel : Level.OFF;
+  }
+
+  /// Whether native SDK logging is currently enabled.
+  ///
+  /// Safe to call before [initialize].
+  Future<bool> isLoggingEnabled() async {
+    try {
+      return await _nativeWrapper.isLoggingEnabled();
+    } catch (e) {
+      throw KlaviyoException('Failed to get logging state: $e');
+    }
   }
 
   /// Get push notification events stream
@@ -419,6 +500,28 @@ class KlaviyoSDK {
           return [FormLifecycleEvent.fromMap(event)];
         } catch (e) {
           _logger.warning('Dropping malformed form lifecycle event: $e');
+          return [];
+        }
+      });
+
+  /// Get typed push action events stream.
+  ///
+  /// Emits a [KlaviyoPushAction] when a user taps a push whose action opens an
+  /// external web URL ([OpenWebUrl]), or taps an action button on a push
+  /// ([ActionButtonTapped]). Filters for the `push_open_web_url` and
+  /// `push_action_button_tapped` event types and parses the native map.
+  /// Malformed events are logged and dropped rather than crashing the stream.
+  Stream<KlaviyoPushAction> get onPushAction => _nativeWrapper.onPushActionEvent
+          .where(
+        (event) =>
+            event['type'] == 'push_open_web_url' ||
+            event['type'] == 'push_action_button_tapped',
+      )
+          .expand((event) {
+        try {
+          return [KlaviyoPushAction.fromMap(event)];
+        } catch (e) {
+          _logger.warning('Dropping malformed push action event: $e');
           return [];
         }
       });

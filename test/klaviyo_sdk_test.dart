@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,56 @@ void main() {
         .setMockMethodCallHandler(methodChannel, null);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockStreamHandler(eventChannel, null);
+  });
+
+  // Declared before the initialize group: the singleton SDK must still be
+  // uninitialized when the pre-init test runs.
+  group('KlaviyoSDK logging toggle', () {
+    test('setLoggingEnabled works before initialize', () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+      // Must not throw KlaviyoNotInitializedException
+      await expectLater(KlaviyoSDK().setLoggingEnabled(false), completes);
+      await KlaviyoSDK().setLoggingEnabled(true);
+    });
+
+    test('setLoggingEnabled forwards flag to native layer', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.setLoggingEnabled(false);
+      await sdk.setLoggingEnabled(true);
+
+      final calls = log.where((c) => c.method == 'setLoggingEnabled').toList();
+      expect(calls.length, 2);
+      expect(calls[0].arguments['enabled'], isFalse);
+      expect(calls[1].arguments['enabled'], isTrue);
+    });
+
+    test('isLoggingEnabled returns native value', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        if (call.method == 'isLoggingEnabled') {
+          return false;
+        }
+        return null;
+      });
+
+      expect(await KlaviyoSDK().isLoggingEnabled(), isFalse);
+    });
+
+    test('setLoggingEnabled wraps native failures in KlaviyoException',
+        () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        throw PlatformException(code: 'ERROR', message: 'native failure');
+      });
+
+      await expectLater(
+        KlaviyoSDK().setLoggingEnabled(false),
+        throwsA(isA<KlaviyoException>()),
+      );
+      // Dart-side logging must stay untouched when the native call fails,
+      // so Dart and native logging state can't disagree.
+      expect(Logger('KlaviyoSDK').level, isNot(Level.OFF));
+    });
   });
 
   group('KlaviyoSDK.initialize', () {
@@ -79,6 +130,63 @@ void main() {
         throwsA(isA<KlaviyoException>()),
       );
       expect(sdk.apiKey, 'KEY_1');
+    });
+  });
+
+  group('KlaviyoSDK.createSubscription', () {
+    test('forwards the subscription payload to the native layer', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.createSubscription(
+        const KlaviyoSubscription(
+          listId: 'ABC123',
+          channels: KlaviyoSubscriptionChannels(
+            email: {EmailConsent.marketing},
+            sms: {MessagingConsent.marketing},
+          ),
+          customSource: 'Checkout screen',
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'createSubscription');
+      expect(call.arguments['subscription'], {
+        'listId': 'ABC123',
+        'channels': {
+          'email': ['marketing'],
+          'sms': ['marketing'],
+        },
+        'customSource': 'Checkout screen',
+      });
+    });
+
+    test('omits channels for allAvailableMarketing', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.createSubscription(
+        const KlaviyoSubscription.allAvailableMarketing(listId: 'ABC123'),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'createSubscription');
+      expect(call.arguments['subscription'], {'listId': 'ABC123'});
+    });
+
+    test('wraps native failures in KlaviyoException', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        throw PlatformException(code: 'SUBSCRIPTION_ERROR', message: 'nope');
+      });
+
+      await expectLater(
+        sdk.createSubscription(
+          const KlaviyoSubscription.allAvailableMarketing(listId: 'ABC123'),
+        ),
+        throwsA(isA<KlaviyoException>()),
+      );
     });
   });
 }

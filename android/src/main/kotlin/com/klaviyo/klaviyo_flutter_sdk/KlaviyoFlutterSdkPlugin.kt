@@ -3,6 +3,7 @@ package com.klaviyo.klaviyo_flutter_sdk
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
@@ -14,9 +15,12 @@ import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
+import com.klaviyo.analytics.model.Subscription
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
+import com.klaviyo.core.config.Log
+import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
@@ -35,6 +39,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import kotlin.concurrent.Volatile
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.INFINITE
 import kotlin.time.Duration.Companion.seconds
@@ -52,11 +57,38 @@ class KlaviyoFlutterSdkPlugin :
     companion object {
         private const val TAG = "KlaviyoFlutter"
         private const val INFINITE_TIMEOUT_SENTINEL = -1
+
+        // The Android SDK has no boolean logging toggle, only a log level, so
+        // the cross-platform setLoggingEnabled maps to Level.None. Remember the
+        // level in effect before disabling so re-enabling can restore it.
+        // Process-wide (companion) to match Registry.log.logLevel's lifetime —
+        // an engine re-attach recreates the plugin instance but not the process.
+        private var logLevelBeforeDisabled: Log.Level? = null
+
+        // Static reference so KlaviyoFlutterPushService (which runs in a separate
+        // Android service lifecycle) can forward silent push data to the active
+        // plugin instance. Mirrors iOS's KlaviyoFlutterSdkPlugin.shared pattern.
+        @Volatile
+        internal var instance: KlaviyoFlutterSdkPlugin? = null
+
+        // Most recent silent push that arrived before Flutter subscribed; replayed on
+        // the next onListen. One entry, matching iOS. Process-wide like `instance`, so a
+        // push cached by one engine's plugin isn't stranded when another claims delivery.
+        @Volatile
+        private var cachedSilentPush: Map<String, Any?>? = null
     }
 
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
+        // Never take delivery away from an engine that already has a live Dart
+        // listener. A host using firebase_messaging's onBackgroundMessage gets a
+        // second FlutterEngine for the background isolate, which auto-registers
+        // this plugin; that instance never subscribes to the EventChannel, so
+        // letting it claim `instance` would strand every event.
+        if (instance?.eventSink == null) {
+            instance = this
+        }
         applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
@@ -69,6 +101,11 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
+                    // Whichever engine has a live Dart listener owns event delivery.
+                    instance = this@KlaviyoFlutterSdkPlugin
+                    // Replay a silent push that arrived before Flutter subscribed.
+                    cachedSilentPush?.let { events?.success(it) }
+                    cachedSilentPush = null
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -240,6 +277,40 @@ class KlaviyoFlutterSdkPlugin :
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("TRACK_ERROR", "Failed to track event", e.message)
+                }
+            }
+
+            "createSubscription" -> {
+                val subscriptionJson = call.argument<Map<String, Any>>("subscription")
+                val listId = subscriptionJson?.get("listId") as? String
+
+                if (subscriptionJson == null || listId.isNullOrBlank()) {
+                    Registry.log.warning("Attempted to create subscription without a list ID")
+                    result.error(
+                        "SUBSCRIPTION_ERROR",
+                        "Subscription listId cannot be null or empty",
+                        null,
+                    )
+                    return
+                }
+
+                try {
+                    val customSource = subscriptionJson["customSource"] as? String
+                    val channelsJson = subscriptionJson["channels"] as? Map<*, *>
+
+                    // An absent channels key means "all available marketing" - the broad grant is
+                    // only reachable through the named factory on both this SDK and Dart.
+                    val subscription =
+                        if (channelsJson == null) {
+                            Subscription.allAvailableMarketing(listId, customSource)
+                        } else {
+                            Subscription(listId, parseSubscriptionChannels(channelsJson), customSource)
+                        }
+
+                    Klaviyo.createSubscription(subscription)
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("SUBSCRIPTION_ERROR", "Failed to create subscription", e.message)
                 }
             }
 
@@ -479,6 +550,29 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "setLoggingEnabled" -> {
+                val enabled = call.argument<Boolean>("enabled")
+                if (enabled == null) {
+                    result.error("INVALID_ARGUMENTS", "Invalid arguments for setLoggingEnabled", null)
+                    return
+                }
+                if (enabled) {
+                    if (Registry.log.logLevel == Log.Level.None) {
+                        Registry.log.logLevel = logLevelBeforeDisabled ?: defaultEnabledLogLevel()
+                    }
+                } else {
+                    if (Registry.log.logLevel != Log.Level.None) {
+                        logLevelBeforeDisabled = Registry.log.logLevel
+                    }
+                    Registry.log.logLevel = Log.Level.None
+                }
+                result.success(null)
+            }
+
+            "isLoggingEnabled" -> {
+                result.success(Registry.log.logLevel != Log.Level.None)
+            }
+
             "resetProfile" -> {
                 try {
                     Klaviyo.resetProfile()
@@ -520,6 +614,9 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
+        if (instance === this) {
+            instance = null
+        }
         eventSink = null
         try {
             Klaviyo.unregisterFormLifecycleHandler()
@@ -527,6 +624,31 @@ class KlaviyoFlutterSdkPlugin :
             Registry.log.verbose("Forms lifecycle handler not available during cleanup: forms module not included")
         } catch (e: Exception) {
             Registry.log.warning("Unexpected error during cleanup: ${e.message}")
+        }
+    }
+
+    /**
+     * Forwards a Klaviyo silent push to the Flutter event stream as
+     * `{type: 'silent_push_received', data: <RemoteMessage.data>}`.
+     *
+     * Called from [KlaviyoFlutterPushService] (or a host's subclass of it) on the
+     * FCM background thread. Posts to the main thread before touching the EventChannel,
+     * matching how the rest of the plugin emits events. If Flutter hasn't subscribed
+     * yet, the event is held in memory and replayed on the next `onListen`; only the
+     * most recent is kept, so a burst before subscription surfaces just the last one.
+     */
+    fun handleSilentPush(data: Map<String, Any?>) {
+        val payload =
+            mapOf(
+                "type" to "silent_push_received",
+                "data" to data,
+            )
+
+        Handler(Looper.getMainLooper()).post {
+            eventSink?.let { it.success(payload) } ?: run {
+                Registry.log.verbose("Flutter not ready. Caching silent push event.")
+                cachedSilentPush = payload
+            }
         }
     }
 
@@ -569,10 +691,56 @@ class KlaviyoFlutterSdkPlugin :
         activity = null
     }
 
+    // Fallback when logging is enabled but no prior level was captured (e.g. it
+    // was disabled via the manifest meta-data tag). Mirrors the native SDK's
+    // defaults: Warning for debuggable builds, Error in release.
+    private fun defaultEnabledLogLevel(): Log.Level =
+        if (applicationContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            Log.Level.Warning
+        } else {
+            Log.Level.Error
+        }
+
+    /**
+     * Maps the Dart channels payload onto [Subscription.Channels]. An absent channel stays null
+     * (leave it untouched); an empty list stays empty, so the native SDK's own validation reports
+     * it rather than this bridge silently dropping the channel.
+     *
+     * The Dart wire values are the lowercased enum names, so valueOf covers the mapping and throws
+     * IllegalArgumentException on an unknown value, which the caller reports as SUBSCRIPTION_ERROR.
+     */
+    private fun parseSubscriptionChannels(json: Map<*, *>): Subscription.Channels =
+        Subscription.Channels(
+            email = parseConsentSet(json, "email", Subscription.Channels.Email::valueOf),
+            sms = parseConsentSet(json, "sms", Subscription.Channels.Messaging::valueOf),
+            whatsapp = parseConsentSet(json, "whatsapp", Subscription.Channels.Messaging::valueOf),
+        )
+
+    /**
+     * Reads one channel's consent list off the Dart payload, or null when the key is absent.
+     */
+    private fun <T : Enum<T>> parseConsentSet(
+        json: Map<*, *>,
+        key: String,
+        valueOf: (String) -> T,
+    ): Set<T>? = (json[key] as? List<*>)?.map { valueOf((it as String).uppercase()) }?.toSet()
+
     private fun handleIntent(intent: Intent) {
         try {
-            // Let Klaviyo SDK handle push notification opens
-            Klaviyo.handlePush(intent)
+            // com.klaviyo.push.automatic_push_open_tracking gates only this native-backend
+            // "Opened Push" tracking call, not the Dart event emission below, which stays
+            // unconditional since it never reaches Klaviyo's servers.
+            // unset -> no other path is active, this plugin calls it (today's default, unchanged).
+            // true -> the native SDK's own trampoline mechanism already handles it; skip here to
+            //   avoid duplicating the call.
+            // false -> explicit opt-out; skip entirely.
+            // Reads the manifest directly via Context rather than Registry.config: handlePush()
+            // is safe to call before KlaviyoSDK().initialize() (it buffers to a pre-init queue),
+            // but Registry.config throws MissingConfig until then, which would otherwise swallow
+            // this whole handler via the catch below on a genuine cold start.
+            if (!applicationContext.hasManifestKey(Constants.AUTOMATIC_PUSH_OPEN_TRACKING)) {
+                Klaviyo.handlePush(intent)
+            }
 
             val extras = intent.extras
             if (extras != null && intent.isKlaviyoNotificationIntent) {
@@ -602,9 +770,51 @@ class KlaviyoFlutterSdkPlugin :
                         "data" to notificationData,
                     ),
                 )
+
+                forwardActionButtonTap(notificationData)
             }
         } catch (e: Exception) {
             Registry.log.error("Error handling push: ${e.message}", e)
         }
+    }
+
+    /**
+     * Surfaces an action-button tap as a typed `push_action_button_tapped`
+     * event, in parallel with the `push_notification_opened` event.
+     *
+     * The native SDK only launches the host app (carrying these `Button *`
+     * extras) for `deep_link` / `open_app` buttons; `open_url` buttons are
+     * dispatched to an external handler by the SDK and never reach the app, so
+     * they are not bridged here. The button's URL (when present) is forwarded
+     * verbatim regardless of scheme — scheme handling stays in the native SDK.
+     */
+    private fun forwardActionButtonTap(notificationData: Map<String, Any?>) {
+        val buttonId = notificationData["Button ID"] as? String ?: return
+
+        // The native SDK serializes the action as a display name; map it back to
+        // the raw token shared with iOS and the Dart layer. "Open URL" is
+        // intentionally absent: the SDK dispatches open_url buttons externally,
+        // so they never launch the host app and never reach this code path.
+        val action =
+            when (notificationData["Button Action"] as? String) {
+                "Open App" -> "open_app"
+                "Deep Link" -> "deep_link"
+                else -> return
+            }
+
+        val data =
+            mutableMapOf<String, Any?>(
+                "id" to buttonId,
+                "action" to action,
+            )
+        (notificationData["Button Label"] as? String)?.let { data["label"] = it }
+        (notificationData["Button Link"] as? String)?.let { data["url"] = it }
+
+        eventSink?.success(
+            mapOf(
+                "type" to "push_action_button_tapped",
+                "data" to data,
+            ),
+        )
     }
 }

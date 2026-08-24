@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
+import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
@@ -29,12 +30,21 @@ class KlaviyoNativeWrapper {
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _formEventController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
+  final _pushActionController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>();
 
   // Getters for streams
   Stream<Map<String, dynamic>> get onPushNotification =>
       _pushNotificationController.stream;
 
   Stream<Map<String, dynamic>> get onFormEvent => _formEventController.stream;
+
+  /// Raw push-action events (`push_open_web_url`,
+  /// `push_action_button_tapped`). Kept on a dedicated stream so they do not
+  /// surface on [onPushNotification]; see [KlaviyoSDK.onPushAction] for the
+  /// typed view.
+  Stream<Map<String, dynamic>> get onPushActionEvent =>
+      _pushActionController.stream;
 
   /// Initialize the native SDK wrapper
   Future<void> initialize({
@@ -164,6 +174,19 @@ class KlaviyoNativeWrapper {
       await _channel.invokeMethod('trackEvent', {'event': event.toJson()});
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
+    }
+  }
+
+  /// Create a subscription using native SDK
+  Future<void> createSubscription(KlaviyoSubscription subscription) async {
+    _ensureInitialized();
+
+    try {
+      await _channel.invokeMethod('createSubscription', {
+        'subscription': subscription.toJson(),
+      });
+    } catch (e) {
+      throw KlaviyoException('Failed to create subscription: $e');
     }
   }
 
@@ -306,6 +329,31 @@ class KlaviyoNativeWrapper {
     _channel.invokeMethod('setBadgeCount', {'count': count});
   }
 
+  /// Enable or disable native SDK logging.
+  ///
+  /// Intentionally not guarded by _ensureInitialized — logging is a config
+  /// toggle, not SDK state, and must be settable before initialize() to
+  /// silence startup logging.
+  Future<void> setLoggingEnabled(bool enabled) async {
+    try {
+      await _channel.invokeMethod('setLoggingEnabled', {'enabled': enabled});
+    } catch (e) {
+      throw KlaviyoException('Failed to set logging enabled: $e');
+    }
+  }
+
+  /// Whether native SDK logging is currently enabled.
+  ///
+  /// Like [setLoggingEnabled], callable before initialize().
+  Future<bool> isLoggingEnabled() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('isLoggingEnabled');
+      return result ?? true;
+    } catch (e) {
+      throw KlaviyoException('Failed to get logging state: $e');
+    }
+  }
+
   /// Handle a Klaviyo universal tracking link URL
   /// Returns true if the URL is a valid Klaviyo tracking link, false otherwise
   Future<bool> handleUniversalTrackingLink(String url) async {
@@ -341,6 +389,13 @@ class KlaviyoNativeWrapper {
         case 'form_lifecycle_event':
           _logger.info('Native form event: $eventData');
           _formEventController.add(eventData);
+          break;
+        case 'push_open_web_url':
+        case 'push_action_button_tapped':
+          // Log the type only; the payload carries CTA URLs (possible PII), so
+          // keep the full payload out of INFO logs.
+          _logger.info('Native push action event: $eventType');
+          _pushActionController.add(eventData);
           break;
         default:
           // Handle unknown event types
@@ -393,5 +448,6 @@ class KlaviyoNativeWrapper {
   void dispose() {
     _pushNotificationController.close();
     _formEventController.close();
+    _pushActionController.close();
   }
 }

@@ -9,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 
+import 'firebase_background_handler.dart';
 import 'tabs/profile_tab.dart';
 import 'tabs/events_tab.dart';
 import 'tabs/forms_tab.dart';
@@ -47,6 +48,10 @@ void main() async {
 /// Set up Firebase Cloud Messaging for Android
 Future<void> _setupFCM() async {
   try {
+    // Silent pushes delivered while the app is terminated never reach the plugin's
+    // event stream — this handles them. See firebase_background_handler.dart.
+    FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+
     // Note: Permission is requested from the Push tab via permission_handler when
     // the user taps "Enable Push Notifications" — not at launch. firebase_messaging's
     // requestPermission() targets the same Android POST_NOTIFICATIONS permission and
@@ -85,6 +90,37 @@ Future<void> _setupFCM() async {
 /// Subscription for silent push notifications.
 /// Tracked to prevent duplicate subscriptions on SDK re-initialization.
 StreamSubscription<Map<String, dynamic>>? _silentPushSubscription;
+
+/// Subscription for push action (open_url / action button) events.
+/// Tracked to prevent duplicate subscriptions on SDK re-initialization.
+StreamSubscription<KlaviyoPushAction>? _pushActionSubscription;
+
+/// Set up listener for push action events (open_url taps and action buttons).
+/// Called from ProfileTab after SDK initialization.
+void setupPushActionListener() {
+  final klaviyo = KlaviyoSDK();
+  if (!klaviyo.isInitialized) {
+    _logger.warning(
+      'Cannot set up push action listener: SDK not initialized',
+    );
+    return;
+  }
+
+  // Cancel any existing subscription to prevent duplicates
+  _pushActionSubscription?.cancel();
+
+  _pushActionSubscription = klaviyo.onPushAction.listen((action) {
+    switch (action) {
+      case OpenWebUrl():
+        _logger.info('Push open_url tapped');
+      case ActionButtonTapped():
+        _logger.info(
+          'Push action button tapped — id: ${action.buttonId}, '
+          'action: ${action.action}',
+        );
+    }
+  });
+}
 
 /// Set up listener for silent push notifications.
 /// Called from ProfileTab after SDK initialization.

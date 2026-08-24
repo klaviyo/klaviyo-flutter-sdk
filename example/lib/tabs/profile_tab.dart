@@ -4,7 +4,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import '../main.dart' show setupSilentPushListener;
+import '../main.dart' show setupSilentPushListener, setupPushActionListener;
 import 'forms_tab.dart';
 import 'geofencing_tab.dart';
 
@@ -25,6 +25,13 @@ class _ProfileTabState extends State<ProfileTab> {
   final TextEditingController _externalIdController = TextEditingController();
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _listIdController = TextEditingController();
+  final TextEditingController _customSourceController = TextEditingController();
+
+  final Set<EmailConsent> _emailConsent = {};
+  final Set<MessagingConsent> _smsConsent = {};
+  final Set<MessagingConsent> _whatsappConsent = {};
+  bool _allAvailableMarketing = false;
 
   bool _isInitialized = false;
   String _status = 'Enter your Klaviyo API key to initialize';
@@ -46,6 +53,7 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedApiKey = prefs.getString(_apiKeyPrefsKey);
+      if (!mounted) return;
 
       if (savedApiKey != null && savedApiKey.isNotEmpty) {
         setState(() {
@@ -66,6 +74,15 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
+  /// Updates the status line, dropping the update if the tab was disposed
+  /// while an awaited SDK call was in flight.
+  void _setStatus(String status) {
+    if (!mounted) return;
+    setState(() {
+      _status = status;
+    });
+  }
+
   //#endregion
 
   //#region Business Logic
@@ -74,9 +91,7 @@ class _ProfileTabState extends State<ProfileTab> {
     final apiKey = _apiKeyController.text.trim();
 
     if (apiKey.isEmpty) {
-      setState(() {
-        _status = 'Please enter an API key';
-      });
+      _setStatus('Please enter an API key');
       return;
     }
 
@@ -103,17 +118,19 @@ class _ProfileTabState extends State<ProfileTab> {
       // Set up silent push listener now that SDK is initialized
       setupSilentPushListener();
 
+      // Set up push action (open_url / action button) listener
+      setupPushActionListener();
+
       // Sync current profile values
       await _syncCurrentProfile();
+      if (!mounted) return;
 
       setState(() {
         _isInitialized = true;
         _status = 'SDK initialized successfully!';
       });
     } catch (e) {
-      setState(() {
-        _status = 'Failed to initialize: $e';
-      });
+      _setStatus('Failed to initialize: $e');
     }
   }
 
@@ -122,6 +139,7 @@ class _ProfileTabState extends State<ProfileTab> {
       final email = await _klaviyo.getEmail();
       final phoneNumber = await _klaviyo.getPhoneNumber();
       final externalId = await _klaviyo.getExternalId();
+      if (!mounted) return;
 
       setState(() {
         _currentEmail = email;
@@ -129,9 +147,7 @@ class _ProfileTabState extends State<ProfileTab> {
         _currentExternalId = externalId;
       });
     } catch (e) {
-      setState(() {
-        _status = 'Failed to sync profile: $e';
-      });
+      _setStatus('Failed to sync profile: $e');
     }
   }
 
@@ -141,13 +157,9 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       await _klaviyo.setEmail(_emailController.text);
       await _syncCurrentProfile();
-      setState(() {
-        _status = 'Email set successfully';
-      });
+      _setStatus('Email set successfully');
     } catch (e) {
-      setState(() {
-        _status = 'Failed to set email: $e';
-      });
+      _setStatus('Failed to set email: $e');
     }
   }
 
@@ -157,13 +169,9 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       await _klaviyo.setPhoneNumber(_phoneController.text);
       await _syncCurrentProfile();
-      setState(() {
-        _status = 'Phone number set successfully';
-      });
+      _setStatus('Phone number set successfully');
     } catch (e) {
-      setState(() {
-        _status = 'Failed to set phone number: $e';
-      });
+      _setStatus('Failed to set phone number: $e');
     }
   }
 
@@ -173,13 +181,9 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       await _klaviyo.setExternalId(_externalIdController.text);
       await _syncCurrentProfile();
-      setState(() {
-        _status = 'External ID set successfully';
-      });
+      _setStatus('External ID set successfully');
     } catch (e) {
-      setState(() {
-        _status = 'Failed to set external ID: $e';
-      });
+      _setStatus('Failed to set external ID: $e');
     }
   }
 
@@ -205,13 +209,9 @@ class _ProfileTabState extends State<ProfileTab> {
         ),
       );
       await _syncCurrentProfile();
-      setState(() {
-        _status = 'Full profile set successfully';
-      });
+      _setStatus('Full profile set successfully');
     } catch (e) {
-      setState(() {
-        _status = 'Failed to set profile: $e';
-      });
+      _setStatus('Failed to set profile: $e');
     }
   }
 
@@ -221,6 +221,8 @@ class _ProfileTabState extends State<ProfileTab> {
     try {
       await _klaviyo.resetProfile();
       await _syncCurrentProfile();
+      if (!mounted) return;
+
       setState(() {
         _emailController.clear();
         _phoneController.clear();
@@ -230,9 +232,42 @@ class _ProfileTabState extends State<ProfileTab> {
         _status = 'Profile reset successfully';
       });
     } catch (e) {
-      setState(() {
-        _status = 'Failed to reset profile: $e';
-      });
+      _setStatus('Failed to reset profile: $e');
+    }
+  }
+
+  Future<void> _createSubscription() async {
+    if (!_isInitialized) return;
+
+    final listId = _listIdController.text.trim();
+    if (listId.isEmpty) {
+      _setStatus('Please enter a list ID');
+      return;
+    }
+
+    final customSource = _customSourceController.text.trim();
+
+    try {
+      await _klaviyo.createSubscription(
+        _allAvailableMarketing
+            ? KlaviyoSubscription.allAvailableMarketing(
+                listId: listId,
+                customSource: customSource.isNotEmpty ? customSource : null,
+              )
+            : KlaviyoSubscription(
+                listId: listId,
+                channels: KlaviyoSubscriptionChannels(
+                  email: _emailConsent.isNotEmpty ? _emailConsent : null,
+                  sms: _smsConsent.isNotEmpty ? _smsConsent : null,
+                  whatsapp:
+                      _whatsappConsent.isNotEmpty ? _whatsappConsent : null,
+                ),
+                customSource: customSource.isNotEmpty ? customSource : null,
+              ),
+      );
+      _setStatus('Subscription requested for list $listId');
+    } catch (e) {
+      _setStatus('Failed to create subscription: $e');
     }
   }
 
@@ -254,10 +289,17 @@ class _ProfileTabState extends State<ProfileTab> {
       _externalIdController.clear();
       _firstNameController.clear();
       _lastNameController.clear();
+      _listIdController.clear();
+      _customSourceController.clear();
+      _emailConsent.clear();
+      _smsConsent.clear();
+      _whatsappConsent.clear();
+      _allAvailableMarketing = false;
 
       // Reset static state in other tabs
       FormsTab.resetState();
       GeofencingTab.resetState();
+      if (!mounted) return;
 
       setState(() {
         _isInitialized = false;
@@ -267,15 +309,40 @@ class _ProfileTabState extends State<ProfileTab> {
         _status = 'SDK reset. Enter API key to initialize';
       });
     } catch (e) {
-      setState(() {
-        _status = 'Failed to reset SDK: $e';
-      });
+      _setStatus('Failed to reset SDK: $e');
     }
   }
 
   //#endregion
 
   //#region View
+
+  /// Checkbox that toggles [value] in [consentSet].
+  Widget _buildConsentCheckbox<T>(
+    String label,
+    T value,
+    Set<T> consentSet,
+  ) {
+    return CheckboxListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      title: Text(label),
+      value: consentSet.contains(value),
+      // Channel selection is meaningless once the broad grant is requested.
+      onChanged: _allAvailableMarketing
+          ? null
+          : (checked) {
+              setState(() {
+                if (checked ?? false) {
+                  consentSet.add(value);
+                } else {
+                  consentSet.remove(value);
+                }
+              });
+            },
+    );
+  }
 
   Widget _buildProfileValueRow(String label, String? value) {
     return Padding(
@@ -468,6 +535,92 @@ class _ProfileTabState extends State<ProfileTab> {
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 10),
+
+              // Subscription Section
+              // Lives beside the profile identifiers because consent is validated
+              // natively against the email/phone already set on the profile.
+              ExpansionTile(
+                title: const Text(
+                  'Subscription',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                tilePadding: const EdgeInsets.all(2),
+                shape: const Border(),
+                childrenPadding: const EdgeInsets.symmetric(vertical: 8),
+                expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _listIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'List ID',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _customSourceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Custom Source (optional)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('All available marketing'),
+                    subtitle: const Text(
+                      'Marketing consent on every identified channel',
+                    ),
+                    value: _allAvailableMarketing,
+                    onChanged: (value) {
+                      setState(() {
+                        _allAvailableMarketing = value;
+                      });
+                    },
+                  ),
+                  const Text('Email'),
+                  _buildConsentCheckbox(
+                    'Marketing',
+                    EmailConsent.marketing,
+                    _emailConsent,
+                  ),
+                  _buildConsentCheckbox(
+                    'Open tracking',
+                    EmailConsent.openTracking,
+                    _emailConsent,
+                  ),
+                  const Text('SMS'),
+                  _buildConsentCheckbox(
+                    'Marketing',
+                    MessagingConsent.marketing,
+                    _smsConsent,
+                  ),
+                  _buildConsentCheckbox(
+                    'Transactional',
+                    MessagingConsent.transactional,
+                    _smsConsent,
+                  ),
+                  const Text('WhatsApp'),
+                  _buildConsentCheckbox(
+                    'Marketing',
+                    MessagingConsent.marketing,
+                    _whatsappConsent,
+                  ),
+                  _buildConsentCheckbox(
+                    'Transactional',
+                    MessagingConsent.transactional,
+                    _whatsappConsent,
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: _createSubscription,
+                    child: const Text('Create Subscription'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: _resetSDK,
                 style: ElevatedButton.styleFrom(
@@ -493,6 +646,8 @@ class _ProfileTabState extends State<ProfileTab> {
     _externalIdController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _listIdController.dispose();
+    _customSourceController.dispose();
     super.dispose();
   }
 }

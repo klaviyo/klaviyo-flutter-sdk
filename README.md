@@ -13,6 +13,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Android](#android-setup)
 - [Profile Management](#profile-management)
 - [Event Tracking](#event-tracking)
+- [Subscriptions](#subscriptions)
 - [Push Notifications](#push-notifications)
   - [Prerequisites](#prerequisites)
   - [Requesting Permissions](#requesting-notification-permissions)
@@ -29,6 +30,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Enabling Geofencing](#enabling-geofencing)
   - [Disabling In-App Forms](#disabling-in-app-forms)
 - [Profile Reset (Logout)](#profile-reset-logout)
+- [SDK Logging](#sdk-logging)
 - [API Reference](#api-reference)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -46,11 +48,11 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
 
 | Platform | Minimum Version |
 |----------|----------------|
-| Flutter  | 3.x            |
+| Flutter  | 3.27.0+        |
 | Dart     | 3.x            |
 | iOS      | 15.0+          |
 | Android `minSdkVersion` | 23+ |
-| Android `compileSdkVersion` | 34+ |
+| Android `compileSdkVersion` | 35+ (tracks `flutter.compileSdkVersion`) |
 | Kotlin   | 1.8.0+         |
 
 ## Installation
@@ -59,7 +61,7 @@ Add `klaviyo_flutter_sdk` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  klaviyo_flutter_sdk: ^0.2.0
+  klaviyo_flutter_sdk: ^0.3.0
 ```
 
 A complete working example is available in the [`example/`](example/) directory.
@@ -196,49 +198,46 @@ import klaviyo_flutter_sdk
 }
 ```
 
+> **Note on automatic tracking:** Keep the manual `AppDelegate` wiring shown above. The native iOS SDK offers an opt-in automatic push-open tracking mode (`klaviyo_automatic_push_open_tracking` in `Info.plist`), but it does **not** replace this wiring in a Flutter app: the Dart `push_notification_opened` stream is emitted by the plugin, which only learns about the tap through the `userNotificationCenter(_:didReceive:...)` code above. Enabling the flag is safe rather than harmful — the native SDK still tracks the "Opened Push" event and resolves the notification's deep link/web URL — but it is redundant here, since the plugin's own Dart-facing events still depend on the manual wiring. See the native [iOS docs](https://github.com/klaviyo/klaviyo-swift-sdk#tracking-open-events) for that behavior.
+
 ### Android Setup
 
-**1. MainActivity Setup**
+**1. Push Notification Opens (automatic)**
 
-To track push notification opens, handle intents in your `MainActivity` (at `android/app/src/main/kotlin/.../MainActivity.kt`). See the [example MainActivity.kt](example/android/app/src/main/kotlin/com/klaviyo/flutterexample/MainActivity.kt) for reference.
+No `MainActivity.kt` changes are required. The plugin tracks push notification opens on its own via
+Flutter's Activity lifecycle hooks (cold start and warm start alike) and both reports the "Opened
+Push" event to Klaviyo and emits the Dart `push_notification_opened` stream — see
+[Handling Push Notification Opens](#handling-push-notification-opens). If an earlier version of this
+SDK had you add a manual `Klaviyo.handlePush(intent)` call in `MainActivity.kt`, you can remove it —
+the plugin's automatic handling already covers it.
 
-```kotlin
-import android.content.Intent
-import android.os.Bundle
-import com.klaviyo.analytics.Klaviyo
-import io.flutter.embedding.android.FlutterActivity
-
-class MainActivity : FlutterActivity() {
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // Handle notification intent on cold start
-        intent?.let { Klaviyo.handlePush(it) }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        // Handle notification intent on warm start
-        Klaviyo.handlePush(intent)
-    }
-}
-```
+> **Native tracking and the `com.klaviyo.push.automatic_push_open_tracking` manifest `meta-data`
+> key:**
+>
+> | Value | Behavior |
+> | --- | --- |
+> | unset (default) | This plugin reports "Opened Push" to Klaviyo itself |
+> | `true` | The native SDK's own trampoline mechanism reports it instead — this plugin steps aside to avoid a duplicate call |
+> | `false` | Disabled entirely — no "Opened Push" reporting, useful if you need to withhold push data until a profile is identified |
+>
+> None of this affects the Dart stream above, which never reaches Klaviyo's backend. **A manual
+> `Klaviyo.handlePush()` call of your own bypasses this flag entirely** — remove any such call (per
+> the note above) if you rely on either the `true` or `false` behavior.
+>
+> **Looking ahead:** a future major version may remove this plugin's own native-tracking call
+> entirely and rely solely on the native SDK's trampoline mechanism, so `true` becomes the only
+> behavior — the Dart `push_notification_opened` stream above would be unaffected.
+>
+> iOS has a separate opt-in flag for the equivalent native behavior — see the
+> [Note on automatic tracking](#ios-setup) under iOS Setup.
 
 **2. KlaviyoPushService Declaration**
 
-Declare `KlaviyoPushService` in your `android/app/src/main/AndroidManifest.xml` inside the `<application>` tag. This ensures Klaviyo processes FCM messages before Flutter's default `FirebaseMessagingService`, enabling open tracking and rich push features.
+The plugin auto-registers `KlaviyoFlutterPushService` (a subclass of `KlaviyoPushService`) for `com.google.firebase.MESSAGING_EVENT`. The subclass invokes `super.onMessageReceived(message)` so all standard Klaviyo push handling still runs, and additionally forwards Klaviyo silent pushes to the Dart event stream. **No host-app manifest changes are required.**
 
-```xml
-<service
-    android:name="com.klaviyo.pushFcm.KlaviyoPushService"
-    android:exported="false">
-    <intent-filter>
-        <action android:name="com.google.firebase.MESSAGING_EVENT" />
-    </intent-filter>
-</service>
-```
+Android delivers `MESSAGING_EVENT` to exactly one service, so the plugin also removes the native SDK's own `KlaviyoPushService` from the merged manifest via `tools:node="remove"`. Without that, the base class can win the intent and the subclass never runs — standard push keeps working, but silent pushes never reach Dart. Nothing is lost by removing it, since `KlaviyoFlutterPushService` extends it and calls `super`.
 
-See the [example AndroidManifest.xml](example/android/app/src/main/AndroidManifest.xml#L72-L81) for a complete implementation.
+> **Migrating from earlier versions**: if your app previously declared `<service android:name="com.klaviyo.pushFcm.KlaviyoPushService">` for `MESSAGING_EVENT`, **remove it**. A declaration in your own manifest takes priority over everything the plugin contributes, so it would win the intent and suppress silent push forwarding. If you need custom FCM handling, subclass `KlaviyoFlutterPushService` rather than registering a second service.
 
 ## Profile Management
 
@@ -306,6 +305,52 @@ final purchaseEvent = KlaviyoEvent.custom(
 await KlaviyoSDK().createEvent(purchaseEvent);
 ```
 
+## Subscriptions
+
+Subscribe the current profile to a Klaviyo list and record its consent. Set the profile's email
+and/or phone number **before** subscribing — a request whose channel has no matching identifier on
+the profile is dropped with a warning from the native SDK.
+
+Push subscriptions are not created through this API. See [Push Notifications](#push-notifications).
+
+```dart
+// Request specific consent per channel
+await KlaviyoSDK().createSubscription(
+  KlaviyoSubscription(
+    listId: 'ABC123',
+    channels: const KlaviyoSubscriptionChannels(
+      email: {EmailConsent.marketing, EmailConsent.openTracking},
+      sms: {MessagingConsent.marketing},
+    ),
+  ),
+);
+```
+
+```dart
+// Attach a signup source label, stored as the consent record's $source
+await KlaviyoSDK().createSubscription(
+  KlaviyoSubscription(
+    listId: 'ABC123',
+    channels: const KlaviyoSubscriptionChannels(
+      sms: {MessagingConsent.marketing},
+      whatsapp: {MessagingConsent.transactional},
+    ),
+    customSource: 'Checkout screen',
+  ),
+);
+```
+
+```dart
+// Request marketing consent on every channel the profile has an identifier for
+await KlaviyoSDK().createSubscription(
+  KlaviyoSubscription.allAvailableMarketing(listId: 'ABC123'),
+);
+```
+
+Each channel accepts only the consent types the API supports for it: email takes `marketing` and
+`openTracking`, while SMS and WhatsApp take `marketing` and `transactional`. Omitting a channel
+leaves it untouched.
+
 ## Push Notifications
 
 ### Prerequisites
@@ -326,6 +371,55 @@ Permission can be managed from Flutter code or platform-specific native code. Ei
 ### Token Collection
 
 The Klaviyo SDK needs to register the device's push token. Choose one of the following approaches:
+
+#### Automatic Token Forwarding
+
+**This plugin forwards the push token to Klaviyo automatically by default on both platforms.** No
+native code is required in your app to make token registration work:
+
+- **Android** — the plugin auto-registers `KlaviyoFlutterPushService` (a `FirebaseMessagingService`,
+  subclassing the native SDK's `KlaviyoPushService`) via manifest merge, which forwards the FCM
+  token to Klaviyo.
+- **iOS** — this plugin registers itself as an application delegate and intercepts
+  `didRegisterForRemoteNotificationsWithDeviceToken`. By default it forwards the token to Klaviyo
+  itself; see the **Advanced** note below for how `klaviyo_automatic_push_token_forwarding` changes
+  this. If you override that method in your own `AppDelegate`, call `super` — otherwise neither this
+  forwarding nor the Dart `push_token_received` event will fire, regardless of that flag's value,
+  since both live in the same delegate callback — see [iOS Setup](#ios-setup).
+
+On iOS the token is only delivered once your app registers for remote notifications — via
+`registerForPushNotifications()` (Option B) or a package such as `firebase_messaging` (Option A).
+
+Manual token management (Option A) remains the recommended baseline: it works identically on both
+platforms and gives you control over the token pipeline, such as forwarding the token to multiple push
+providers. Setting the token yourself alongside automatic forwarding is expected and needs no
+coordination — the native SDK only sends a request when the push state actually changes, so a
+redundant registration costs nothing.
+
+<details>
+<summary><strong>Advanced:</strong> native SDK configuration flags</summary>
+
+Both native SDKs expose an `automatic_push_token_forwarding` flag. Most Flutter apps should not set
+either one.
+
+- **iOS** — the `klaviyo_automatic_push_token_forwarding` `Info.plist` key now also gates this
+  plugin's own forwarding: leave it unset for today's default (this plugin forwards), set it to
+  `true` to let the native SDK's app-delegate swizzler own forwarding instead (this plugin steps
+  aside to avoid a duplicate call), or set it to `false` to disable forwarding entirely.
+- **Android** — the `com.klaviyo.push.automatic_push_token_forwarding` manifest `meta-data` key is
+  three-valued, because leaving it unset is different from setting it to `false`:
+
+  | Value | Behavior |
+  |---|---|
+  | **not set** (default) | `KlaviyoFlutterPushService` forwards a token whenever FCM delivers one — this plugin's existing automatic behavior, unaffected. This plugin initializes Klaviyo from Dart after `Application.onCreate`, so a token FCM delivers before that call is silently dropped. |
+  | **`true`** | Additionally fetches and registers the current token at `Klaviyo.initialize()` and on each foreground. |
+  | **`false`** | Disables forwarding entirely — set this only if you register the token yourself, since Klaviyo otherwise keeps whatever token it last stored, which goes stale once FCM rotates it. |
+
+For the underlying native behavior, see the native
+[Android](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) and
+[iOS](https://github.com/klaviyo/klaviyo-swift-sdk#push-notifications) push documentation.
+
+</details>
 
 #### Option A: Manual Token Management with Firebase Messaging (Recommended)
 
@@ -405,6 +499,10 @@ KlaviyoSDK().onPushNotification.listen((event) {
 });
 ```
 
+> **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
+
+> **Known limitation (Android)**: on a cold start — app fully killed, then relaunched by tapping a notification — this event (and `ActionButtonTapped` under [Push Action Events](#push-action-events), which fires from the same code path) can be dropped if the tap is processed before your Dart listener subscribes. Native "Opened Push" backend tracking to Klaviyo is unaffected — this only affects the Dart-facing stream in your Flutter app. We plan to close this gap in a follow-up release. iOS is unaffected: its native caching mechanism replays the event once your listener attaches.
+
 #### Identifying Klaviyo Notifications
 
 Use the `isKlaviyoNotification` extension to check whether a push notification payload originated from Klaviyo:
@@ -426,6 +524,16 @@ Silent push notifications (`content-available: 1`) deliver data to your app in t
 #### iOS
 
 iOS delivers silent pushes via `didReceiveRemoteNotification:fetchCompletionHandler:` in your `AppDelegate.swift`. The setup in [iOS Setup](#ios-setup) already handles this — it differentiates pure silent pushes from standard pushes that carry `content-available` and forwards only the former to the Klaviyo plugin.
+
+#### Android
+
+The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM service that forwards Klaviyo silent pushes to the Dart event stream. No host configuration is required — silent push events flow to your Dart listener automatically.
+
+#### Delivery Guarantees
+
+Your listener fires for every Klaviyo silent push, with the full payload and its JSON object values decoded to maps on both platforms. Delivery needs a live Flutter engine: foreground **and backgrounded** apps both receive events, a terminated one does not. Nothing is cached or replayed on a later launch, matching both native SDKs — a missed push is gone.
+
+> **Known limitation (Android)**: while your app isn't running — swiped away, force-stopped, or evicted — there's no Flutter engine to receive silent pushes, and nothing is queued for the next launch. The native Android SDK has no such gap, and we plan to close it. Until then, either subclass `KlaviyoFlutterPushService` and handle it in Kotlin, or use [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage`, which runs its own engine and coexists with this plugin — it receives messages via a broadcast receiver rather than the `MESSAGING_EVENT` service. It also fires while your app is running, so guard against handling a push twice. iOS is unaffected: the system relaunches your app, so the `AppDelegate` path still runs.
 
 #### Dart-Side Listener
 
@@ -531,6 +639,50 @@ subscription.cancel();
 | `formName` | `String` | All | Display name configured in Klaviyo dashboard |
 | `buttonLabel` | `String` | `FormCtaClicked` only | Label of the tapped CTA button |
 | `deepLinkUrl` | `String` | `FormCtaClicked` only | Deep link URL configured for the CTA |
+
+## Push Action Events
+
+Subscribe to `onPushAction` to observe taps on Klaviyo pushes that carry an **Open External URL** (`open_url`) action or **action buttons**. Events are typed via the sealed `KlaviyoPushAction` class, so Dart pattern matching is exhaustive.
+
+This stream is **observation-only**: the native SDK still performs all navigation (opening the URL, launching the app, or routing the deep link) with no integration changes required — as described in [Action Buttons](#action-buttons). `onPushAction` simply lets your app react in parallel (analytics, in-app routing, UI updates).
+
+```dart
+import 'dart:async';
+import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:logging/logging.dart';
+
+final _logger = Logger('MyApp');
+
+final StreamSubscription<KlaviyoPushAction> subscription =
+    KlaviyoSDK().onPushAction.listen((action) {
+  switch (action) {
+    case OpenWebUrl():
+      _logger.info('Open external URL: ${action.url}');
+    case ActionButtonTapped():
+      _logger.info(
+        'Action button "${action.label}" (${action.action}) — '
+        'id: ${action.buttonId}, url: ${action.url}',
+      );
+  }
+});
+
+// Cancel when no longer needed (e.g. in dispose())
+subscription.cancel();
+```
+
+**Field reference:**
+
+| Field | Type | Subtypes | Notes |
+|-------|------|----------|-------|
+| `url` | `String` | `OpenWebUrl` | The external URL. May be `http(s)` or a special scheme such as `mailto:`, `tel:`, `sms:` |
+| `buttonId` | `String` | `ActionButtonTapped` | Identifier of the tapped action button |
+| `label` | `String` | `ActionButtonTapped` | Display label of the tapped button |
+| `action` | `String` | `ActionButtonTapped` | One of `open_app`, `deep_link`, `open_url` |
+| `url` | `String?` | `ActionButtonTapped` | URL for `deep_link` / `open_url` buttons; `null` for `open_app` |
+
+> **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. On **iOS**, both body `open_url` taps and action-button taps surface. On **Android**, `open_url` is dispatched to an external handler by the native SDK and does **not** reach the app, so only `deep_link` / `open_app` action-button taps surface on Android.
+
+> **Known limitation (Android)**: `ActionButtonTapped` has the same cold-start limitation as `push_notification_opened` — see the note under [Handling Push Notification Opens](#handling-push-notification-opens).
 
 ## Deep Linking
 
@@ -741,6 +893,30 @@ Without the forms module, forms methods will log an error and no-op gracefully (
 await KlaviyoSDK().resetProfile();
 ```
 
+## SDK Logging
+
+SDK logging is enabled by default. To silence all Klaviyo SDK logging (native and Dart-side) at runtime:
+
+```dart
+await KlaviyoSDK().setLoggingEnabled(false); // silence all SDK logging
+final enabled = await KlaviyoSDK().isLoggingEnabled(); // read current state
+```
+
+Both methods can be called before `initialize()` — useful for suppressing logs emitted during SDK startup. `isLoggingEnabled()` reports the native SDK's current logging state, and both methods throw a `KlaviyoException` if the native call fails.
+
+Platform notes:
+
+- **iOS**: The toggle does not affect `KlaviyoSwiftExtension` (used for rich push), which runs in a separate app-extension process.
+- **Android**: The native SDK uses log levels rather than a boolean toggle. Disabling sets the level to `None`; re-enabling restores the level that was in effect before it was disabled (or the SDK default if it was never enabled at runtime). For finer-grained control of native log verbosity, use the [`com.klaviyo.core.log_level` manifest tag](#android).
+
+To adjust the verbosity of the plugin's Dart-side logs (native logs are unaffected):
+
+```dart
+KlaviyoSDK().setLogLevel(KlaviyoLogLevel.debug);
+```
+
+While logging is disabled via `setLoggingEnabled(false)`, the level passed to `setLogLevel` is stored and takes effect once logging is re-enabled.
+
 ## API Reference
 
 ### KlaviyoSDK
@@ -773,6 +949,12 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | Method | Description |
 |--------|-------------|
 | `createEvent(KlaviyoEvent event)` | Track a profile activity event |
+
+#### Subscriptions
+
+| Method | Description |
+|--------|-------------|
+| `createSubscription(KlaviyoSubscription subscription)` | Subscribe the current profile to a list and record its consent |
 
 #### Push Notifications
 
@@ -807,6 +989,8 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 
 | Method | Description |
 |--------|-------------|
+| `setLoggingEnabled(bool enabled)` | Enable/disable SDK logging (native + Dart), callable before `initialize()`; does not affect iOS `KlaviyoSwiftExtension` — see [SDK Logging](#sdk-logging) |
+| `isLoggingEnabled()` | Whether native SDK logging is enabled, returns `Future<bool>` |
 | `setLogLevel(KlaviyoLogLevel logLevel)` | Set logging level (Flutter-side only) |
 | `dispose()` | Clean up resources |
 
@@ -818,6 +1002,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `apiKey` | `String?` | Current API key |
 | `onPushNotification` | `Stream<Map<String, dynamic>>` | Push notification events |
 | `onFormLifecycleEvent` | `Stream<FormLifecycleEvent>` | Typed in-app form lifecycle events |
+| `onPushAction` | `Stream<KlaviyoPushAction>` | Typed `open_url` / action-button push tap events |
 
 ### Models
 
@@ -854,6 +1039,32 @@ KlaviyoEvent.custom({
   Map<String, dynamic>? properties,
   double? value,
   String? uniqueId,
+})
+```
+
+#### KlaviyoSubscription
+
+```dart
+KlaviyoSubscription({
+  required String listId,
+  required KlaviyoSubscriptionChannels channels,
+  String? customSource,
+})
+
+// Requests marketing consent on every identified channel
+KlaviyoSubscription.allAvailableMarketing({
+  required String listId,
+  String? customSource,
+})
+```
+
+#### KlaviyoSubscriptionChannels
+
+```dart
+KlaviyoSubscriptionChannels({
+  Set<EmailConsent>? email,
+  Set<MessagingConsent>? sms,
+  Set<MessagingConsent>? whatsapp,
 })
 ```
 
@@ -920,6 +1131,16 @@ Predefined metrics:
 Custom metrics:
 - `EventMetric.custom(String name)`
 
+#### EmailConsent
+
+`marketing` | `openTracking`
+
+#### MessagingConsent
+
+Applies to the SMS and WhatsApp channels.
+
+`marketing` | `transactional`
+
 ### Extensions
 
 #### KlaviyoNotificationMap (on `Map<String, dynamic>`)
@@ -948,7 +1169,11 @@ All SDK exceptions extend `KlaviyoException`:
 
 ### Android
 
-**Push opens not tracked** — Verify `Klaviyo.handlePush(intent)` is called in both `onCreate` and `onNewIntent`. Use `singleTop` or `singleTask` launch mode. See the [example MainActivity](example/android/app/src/main/kotlin/com/klaviyo/flutterexample/MainActivity.kt).
+**Push opens not tracked** — This is automatic; no `MainActivity.kt` changes should be needed.
+- If nothing fires at all (neither "Opened Push" in Klaviyo nor the Dart `push_notification_opened` stream), use `singleTop` or `singleTask` launch mode so `onNewIntent` fires for warm starts, and check intent delivery/SDK initialization.
+- If "Opened Push" isn't showing up in Klaviyo specifically, check that `com.klaviyo.push.automatic_push_open_tracking` isn't set to `false` in your manifest (see [Android Setup](#android-setup)) — this only affects native backend tracking, not the Dart stream, which fires regardless.
+- If "Opened Push" shows up in Klaviyo despite setting that flag to `false`, check for a leftover manual `Klaviyo.handlePush()` call in your own code from an older SDK version — it bypasses the flag entirely, since it's a separate call site outside the plugin's own gate.
+- If the Dart `push_notification_opened` event fires on a warm start (app backgrounded) but not on a cold start (app fully killed), this is a known limitation — see [Handling Push Notification Opens](#handling-push-notification-opens).
 
 **Push notifications not displaying** — Check Firebase setup (`google-services.json`, plugin applied in `build.gradle`). On Android 13+, runtime notification permission is required. Test with Firebase Console first to rule out Klaviyo-specific issues.
 
@@ -962,6 +1187,7 @@ All SDK exceptions extend `KlaviyoException`:
 ```xml
 <meta-data android:name="com.klaviyo.core.log_level" android:value="1" />
 ```
+Logging can also be toggled off entirely at runtime with `setLoggingEnabled(false)` — see [SDK Logging](#sdk-logging).
 
 ### iOS
 

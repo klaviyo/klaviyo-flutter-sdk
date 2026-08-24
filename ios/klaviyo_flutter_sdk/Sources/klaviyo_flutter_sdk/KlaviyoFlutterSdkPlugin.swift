@@ -1,5 +1,6 @@
 // swiftlint:disable file_length
 import Flutter
+import KlaviyoCore
 #if canImport(KlaviyoForms)
 import KlaviyoForms
 #endif
@@ -35,6 +36,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedError: [String: Any]?
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
+    private var cachedPushAction: [String: Any]?
 
     // MARK: - Flutter Plugin Registration
 
@@ -174,6 +176,9 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             )
             KlaviyoSDK().create(event: event)
             result(nil)
+
+        case "createSubscription":
+            handleCreateSubscription(call, result: result)
 
         case "registerForPushNotifications":
             // iOS requires manual APNs registration trigger
@@ -321,6 +326,12 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             ))
             #endif
 
+        case "setLoggingEnabled":
+            handleSetLoggingEnabled(call, result: result)
+
+        case "isLoggingEnabled":
+            result(KlaviyoSDK().isLoggingEnabled)
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
             result(nil)
@@ -392,6 +403,10 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedSilentPush)
             self.cachedSilentPush = nil
         }
+        if let cachedPushAction {
+            events(cachedPushAction)
+            self.cachedPushAction = nil
+        }
         return nil
     }
 
@@ -416,8 +431,16 @@ extension KlaviyoFlutterSdkPlugin {
             Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString, privacy: .public)")
         }
 
-        // Pass to Klaviyo Swift SDK
-        KlaviyoSDK().set(pushToken: deviceToken)
+        // Respect `klaviyo_automatic_push_token_forwarding` in Info.plist when explicitly set:
+        // unset -> no other path is active, this plugin forwards (today's default, unchanged).
+        // true -> the native SDK's own app-delegate swizzler already installed itself via its
+        //   pre-main `+load` hook and forwards the token itself; skip to avoid a duplicate call.
+        // false -> explicit opt-out; forward nothing automatically.
+        let forwardingKey = "klaviyo_automatic_push_token_forwarding"
+        let automaticForwardingFlag = Bundle.main.infoDictionary?[forwardingKey] as? Bool
+        if automaticForwardingFlag == nil {
+            KlaviyoSDK().set(pushToken: deviceToken)
+        }
 
         // Create event payload
         let eventData: [String: Any] = [
@@ -487,10 +510,100 @@ extension KlaviyoFlutterSdkPlugin {
             cachedOpenedNotification = eventPayload
         }
 
-        // 3. Pass to Native Klaviyo SDK
+        // 3. Surface the open_url action / action-button tap as a typed push action
+        // event, in parallel with the raw opened-notification event above.
+        forwardPushAction(for: response, userInfo: userInfo)
+
+        // 4. Pass to Native Klaviyo SDK
         // We pass a dummy completion handler because the Host App owns the real one.
         // No-op: We let the host app finish the system callback
         _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
+    }
+
+    /// Mirrors an `open_url` body tap or an action-button tap to Flutter as a
+    /// typed push-action event. The native SDK still performs the actual
+    /// dispatch (opening the URL / launching the app); this only forwards the
+    /// event so Flutter apps can react.
+    ///
+    /// Scheme handling is deliberately left to the native SDK: whatever URL the
+    /// payload carries is forwarded verbatim, including special schemes such as
+    /// `mailto:`/`tel:`/`sms:`. The plugin does not re-implement the SDK's
+    /// scheme allowlist.
+    private func forwardPushAction(
+        for response: UNNotificationResponse,
+        userInfo: [AnyHashable: Any]
+    ) {
+        // Each notification interaction supersedes any push action still cached
+        // for a not-yet-ready Flutter listener. Clear it up front so that an
+        // earlier, superseded event can't be delivered on `onListen` when this
+        // interaction produces no push-action payload (e.g. a deep-link body tap
+        // or a notification dismiss, both of which return without caching below).
+        cachedPushAction = nil
+
+        let actionIdentifier = response.actionIdentifier
+
+        var eventPayload: [String: Any]?
+
+        if actionIdentifier == UNNotificationDefaultActionIdentifier {
+            // Body tap. A deep-link `url` takes precedence over `web_url` in the
+            // native SDK, but only when it parses as a URL (mirrors
+            // `klaviyoDeepLinkURL`); otherwise the SDK dispatches `web_url`.
+            let deepLinkUrl = (userInfo["url"] as? String).flatMap(URL.init(string:))
+            if deepLinkUrl == nil,
+               let webUrl = userInfo["web_url"] as? String, !webUrl.isEmpty {
+                eventPayload = [
+                    "type": "push_open_web_url",
+                    "data": ["url": webUrl]
+                ]
+            }
+        } else if actionIdentifier != UNNotificationDismissActionIdentifier {
+            // Action-button tap: the identifier is the tapped button's id. Look
+            // it up in body.action_buttons to recover its label/action/url.
+            guard let body = userInfo["body"] as? [String: Any],
+                  let buttons = body["action_buttons"] as? [[String: Any]],
+                  let button = buttons.first(where: {
+                      $0["id"] as? String == actionIdentifier
+                  }) else {
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.warning(
+                        "No action button matches identifier '\(actionIdentifier)'; dropping tap."
+                    )
+                }
+                return
+            }
+            // Dart's KlaviyoPushAction.fromMap requires `action`, so drop
+            // incomplete taps here with a log rather than silently downstream.
+            guard let action = button["action"] as? String else {
+                if #available(iOS 14.0, *) {
+                    Logger.klaviyoFlutterSDK.warning(
+                        "Action button '\(actionIdentifier)' has no action type; dropping tap."
+                    )
+                }
+                return
+            }
+            var data: [String: Any] = ["id": actionIdentifier, "action": action]
+            if let label = button["label"] as? String {
+                data["label"] = label
+            }
+            if let buttonUrl = button["url"] as? String {
+                data["url"] = buttonUrl
+            }
+            eventPayload = [
+                "type": "push_action_button_tapped",
+                "data": data
+            ]
+        }
+
+        guard let eventPayload else { return }
+
+        if let eventSink {
+            eventSink(eventPayload)
+        } else {
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push action event.")
+            }
+            cachedPushAction = eventPayload
+        }
     }
 
     /// Manual Forwarding Helper - Silent Push
@@ -520,9 +633,118 @@ extension KlaviyoFlutterSdkPlugin {
     }
 }
 
+// MARK: - Logging Toggle
+
+extension KlaviyoFlutterSdkPlugin {
+    func handleSetLoggingEnabled(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let enabled = args["enabled"] as? Bool
+        else {
+            result(FlutterError(
+                code: "INVALID_ARGUMENTS",
+                message: "Invalid arguments for setLoggingEnabled",
+                details: nil
+            ))
+            return
+        }
+        KlaviyoSDK().setLoggingEnabled(enabled)
+        result(nil)
+    }
+}
+
 // MARK: - Helpers
 
 extension KlaviyoFlutterSdkPlugin {
+    enum SubscriptionParsingError: Error {
+        case unknownConsentType(String)
+    }
+
+    func handleCreateSubscription(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let subscriptionData = args["subscription"] as? [String: Any],
+              let listId = subscriptionData["listId"] as? String,
+              // Trimmed to match Android's isNullOrBlank(), so a whitespace-only listId is
+              // rejected on both platforms rather than reaching one native SDK and not the other.
+              !listId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            result(
+                FlutterError(
+                    code: "SUBSCRIPTION_ERROR",
+                    message: "Subscription listId cannot be null or empty",
+                    details: nil
+                )
+            )
+            return
+        }
+
+        let customSource = subscriptionData["customSource"] as? String
+        let subscription: Subscription
+
+        if let channelsData = subscriptionData["channels"] as? [String: Any] {
+            do {
+                subscription = try Subscription(
+                    listId: listId,
+                    channels: parseSubscriptionChannels(from: channelsData),
+                    customSource: customSource
+                )
+            } catch {
+                result(
+                    FlutterError(
+                        code: "SUBSCRIPTION_ERROR",
+                        message: "Invalid subscription consent type",
+                        details: "\(error)"
+                    )
+                )
+                return
+            }
+        } else {
+            // An absent channels key means "all available marketing" - the broad grant is only
+            // reachable through the named factory on both this SDK and Dart.
+            subscription = Subscription.allAvailableMarketing(listId: listId, customSource: customSource)
+        }
+
+        KlaviyoSDK().create(subscription: subscription)
+        result(nil)
+    }
+
+    /// Maps the Dart channels payload onto `Subscription.Channels`. An absent channel stays nil
+    /// (leave it untouched); an empty array becomes an empty option set, so the iOS SDK's own
+    /// validation reports it rather than this bridge silently dropping the channel.
+    private func parseSubscriptionChannels(
+        from channelsData: [String: Any]
+    ) throws -> Subscription.Channels {
+        try Subscription.Channels(
+            email: (channelsData["email"] as? [Any]).map { try parseEmailConsent($0) },
+            sms: (channelsData["sms"] as? [Any]).map { try parseMessagingConsent($0) },
+            whatsapp: (channelsData["whatsapp"] as? [Any]).map { try parseMessagingConsent($0) }
+        )
+    }
+
+    // Consent types are mapped explicitly rather than by raw value so the wire format stays
+    // decoupled from the native option-set bit positions. These are OptionSets, not enums, so
+    // sub-types are folded together rather than collected into a set.
+    private func parseEmailConsent(_ rawConsents: [Any]) throws -> Subscription.Channels.Email {
+        try rawConsents.reduce(into: Subscription.Channels.Email()) { consent, value in
+            switch value as? String {
+            case "marketing": consent.insert(.marketing)
+            case "open_tracking": consent.insert(.openTracking)
+            default:
+                throw SubscriptionParsingError.unknownConsentType(String(describing: value))
+            }
+        }
+    }
+
+    private func parseMessagingConsent(_ rawConsents: [Any]) throws -> Subscription.Channels.Messaging {
+        try rawConsents.reduce(into: Subscription.Channels.Messaging()) { consent, value in
+            switch value as? String {
+            case "marketing": consent.insert(.marketing)
+            case "transactional": consent.insert(.transactional)
+            default:
+                throw SubscriptionParsingError.unknownConsentType(String(describing: value))
+            }
+        }
+    }
+
     private func parseLocation(from profileData: [String: Any]) -> Profile.Location? {
         guard let locationData = profileData["location"] as? [String: Any] else { return nil }
         return Profile.Location(
