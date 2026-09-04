@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.1 - 2026-09-04
+
+### Bug Fixes
+
+- **In-app forms stopped triggering after a session timeout (iOS)** — A gap in the forms webview teardown meant events fired on foreground no longer triggered forms once the session had expired. Fixed in [klaviyo-swift-sdk 5.4.1](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.4.1). ([#136](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/136))
+
+### Platform Support
+
+- **iOS**: Minimum deployment target 13.0, wraps [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk) ~> 5.4.1
+- **Android**: Minimum SDK version 23, wraps [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk) 4.5.1
+- **Flutter**: Minimum Flutter 3.27.0, Dart 3.0.0+
+
+[Full Changelog](https://github.com/klaviyo/klaviyo-flutter-sdk/compare/0.3.0...0.3.1)
+
 ## 0.3.0 - 2026-07-28
 
 ### What's New
