@@ -1,11 +1,10 @@
 # Changelog
 
-## 0.3.1 - YYYY-MM-DD
+## 0.3.1 - 2026-09-04
 
 ### Bug Fixes
 
-- **In-app forms stopped firing on trigger events after a session timeout (iOS)** — When the forms session expired (the app stayed in the background for longer than `InAppFormConfig.sessionTimeoutDuration`), the native SDK rebuilt the form webview but left the profile-event observer stale. The rebuilt webview never subscribed to the event bus again, so forms with an event trigger stopped showing until the app restarted. Two adjacent lifecycle gaps are fixed in the same change: an error while the SDK handles one lifecycle event no longer stops all later foreground and background handling, and a foreground without a real background (Notification Center, Control Center) is no longer read as an expired session. Android was already correct. Fixed in [klaviyo-swift-sdk 5.4.1](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.4.1). ([#136](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/136))
-- **The Android plugin reported the wrong SDK version** — `klaviyo_sdk_version_override` was left at `0.3.0` when the version was bumped, so requests from a 0.3.1 app were attributed to 0.3.0. It now tracks the plugin version. ([#136](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/136))
+- **In-app forms stopped triggering after a session timeout (iOS)** — A gap in the forms webview teardown meant events fired on foreground no longer triggered forms once the session had expired. Fixed in [klaviyo-swift-sdk 5.4.1](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.4.1). ([#136](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/136))
 
 ### Platform Support
 
