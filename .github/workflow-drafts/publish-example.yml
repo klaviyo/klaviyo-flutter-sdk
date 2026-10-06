@@ -1,0 +1,383 @@
+# Publishes the example app to the Play internal track and TestFlight.
+#
+# Triggers:
+#   - push to master / rel/**, release: published  -> both platforms, only when
+#     the repo variable EXAMPLE_APP_PUBLISH_ENABLED is 'true' (so the pipeline
+#     stays dormant until the store listings and secrets exist)
+#   - workflow_dispatch -> chosen platform(s), ignores the variable so the
+#     pipeline can be tried out before it is switched on
+#   - pull_request touching publish files -> dry run: script tests plus
+#     unsigned release builds, no store access and no secrets
+#
+# This repo is public and so are these logs. Secrets are only ever passed via
+# env and written to files; never echo them or enable `set -x` in these steps.
+# See .github/scripts/README.md for the required secrets and setup.
+
+name: publish-example
+
+on:
+  push:
+    branches:
+      - master
+      - 'rel/**'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which platform(s) to publish
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - android
+          - ios
+  pull_request:
+    paths:
+      - '.github/workflows/publish-example.yml'
+      - '.github/actions/notify-slack-publish/**'
+      - '.github/scripts/**'
+      - 'example/ios/fastlane/**'
+      - 'example/android/app/build.gradle'
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.38.7
+  ANDROID_PACKAGE: com.klaviyo.flutterexample
+  IOS_BUNDLE_ID: com.klaviyo.FlutterExample
+
+jobs:
+  dry-run-scripts:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Lint scripts
+        run: |
+          shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh
+          ruby -c .github/scripts/asc.rb
+          ruby -c example/ios/fastlane/Fastfile
+
+      - name: Test retry loops and release notes
+        run: .github/scripts/tests/test-publish-scripts.sh
+
+  dry-run-android:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # Placeholder config, as in build-android.yml; the real file comes from
+      # the GOOGLE_SERVICES_JSON secret at publish time.
+      - name: Create placeholder Firebase config
+        run: |
+          jq -n --arg pkg "$ANDROID_PACKAGE" '{
+            project_info: {project_number: "123456789000", project_id: "klaviyo-flutter-sdk-example-ci"},
+            client: [{
+              client_info: {mobilesdk_app_id: "1:123456789000:android:abc123def456ci", android_client_info: {package_name: $pkg}},
+              oauth_client: [],
+              api_key: [{current_key: "AIzaSyDummyKeyForCIBuildOnly1234567890123"}],
+              services: {appinvite_service: {other_platform_oauth_client: []}}
+            }],
+            configuration_version: "1"
+          }' > example/android/app/google-services.json
+
+      # Same command as the publish job, minus signing (falls back to the
+      # debug key when key.properties is absent).
+      - name: Build release App Bundle
+        working-directory: example
+        run: |
+          flutter pub get
+          flutter build appbundle --release --build-number=4242
+          test -f build/app/outputs/bundle/release/app-release.aab
+
+  dry-run-ios:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # Unsigned release archive: same Release configuration and build-number
+      # plumbing as the publish job, without match or App Store Connect.
+      - name: Build unsigned release archive
+        working-directory: example
+        run: |
+          flutter pub get
+          flutter build ipa --release --no-codesign --build-number=4242
+          PLIST=build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Info.plist
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")" = 4242
+
+  deploy-android:
+    name: Publish to Play internal track
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.platform != 'ios')
+      || ((github.event_name == 'push' || github.event_name == 'release') && vars.EXAMPLE_APP_PUBLISH_ENABLED == 'true')
+    runs-on: ubuntu-24.04
+    # Serialize deploys so two runs can't race for the same versionCode.
+    concurrency:
+      group: publish-example-android
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Read SDK version
+        run: echo "SDK_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')" >> "$GITHUB_ENV"
+
+      - name: Write Firebase config and signing keystore
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for name in GOOGLE_SERVICES_JSON SIGNING_KEY ALIAS KEY_STORE_PASSWORD KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is not set. See .github/scripts/README.md."
+              exit 1
+            fi
+          done
+          printf '%s' "$GOOGLE_SERVICES_JSON" > example/android/app/google-services.json
+          printf '%s' "$SIGNING_KEY" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          # Read by example/android/app/build.gradle's release signingConfig.
+          {
+            echo "storeFile=$RUNNER_TEMP/upload.jks"
+            echo "storePassword=$KEY_STORE_PASSWORD"
+            echo "keyAlias=$ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > example/android/key.properties
+
+      - name: Prepare release notes
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+          GIT_REF_NAME: ${{ github.ref_name }}
+        run: |
+          printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt"
+          # Play caps release notes at 500 characters per locale.
+          .github/scripts/release-notes.sh 500 "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/play-notes.txt"
+          cat "$RUNNER_TEMP/play-notes.txt"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and upload (retries on versionCode conflict)
+        working-directory: example
+        env:
+          PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
+          AAB_PATH: build/app/outputs/bundle/release/app-release.aab
+          NOTES_FILE: ${{ runner.temp }}/play-notes.txt
+          PLAY_TRACK: internal
+          # Set the repo variable to 'draft' until the first release has been
+          # rolled out by hand in the Play Console (Play rejects 'completed'
+          # releases for apps that have never been published).
+          PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+        run: |
+          flutter pub get
+          # Single quotes on purpose: play-publish.sh exports VERSION_CODE per attempt.
+          # shellcheck disable=SC2016
+          ../.github/scripts/play-publish.sh deploy -- \
+            bash -c 'flutter build appbundle --release --build-name="$SDK_VERSION" --build-number="$VERSION_CODE"'
+
+      - name: Clean up signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks" example/android/key.properties
+
+      - name: Notify Slack on success
+        if: success()
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: success
+          platform: Play Store internal track
+          version_label: ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }})
+          # Only resolves for Google accounts on the internal testers list.
+          access_url: https://play.google.com/apps/test/${{ env.ANDROID_PACKAGE }}/${{ env.VERSION_CODE }}
+          access_label: Install from Play (internal testers)
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: failure
+          platform: Play Store internal track
+          version_label: ${{ env.SDK_VERSION || '?' }} (${{ env.VERSION_CODE || '?' }})
+
+  deploy-ios:
+    name: Publish to TestFlight
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
+      || ((github.event_name == 'push' || github.event_name == 'release') && vars.EXAMPLE_APP_PUBLISH_ENABLED == 'true')
+    runs-on: macos-26
+    concurrency:
+      group: publish-example-ios
+      cancel-in-progress: false
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Read SDK version
+        run: echo "SDK_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')" >> "$GITHUB_ENV"
+
+      # Runs before setup-ruby so pod install uses the runner's own CocoaPods.
+      # The build number here is a placeholder; build_ipa passes the real one
+      # to xcodebuild on every attempt.
+      - name: Generate Flutter config and install pods
+        working-directory: example
+        run: |
+          flutter pub get
+          flutter build ios --release --config-only --no-codesign \
+            --build-name="$SDK_VERSION" --build-number=1
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Install fastlane
+        run: gem install fastlane -v 2.237.0 --no-document
+
+      # altool and asc.rb both find the key at this conventional path.
+      - name: Write App Store Connect API key
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          if [ -z "$APP_STORE_CONNECT_API_KEY_ID" ] || [ -z "$APP_STORE_CONNECT_API_KEY_BASE64" ]; then
+            echo "::error::App Store Connect API key secrets are not set. See .github/scripts/README.md."
+            exit 1
+          fi
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          printf '%s' "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          chmod 600 "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+
+      - name: Resolve next build number from App Store Connect
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
+        run: echo "INITIAL_BUILD_NUMBER=$(ruby .github/scripts/asc.rb next-build-number)" >> "$GITHUB_ENV"
+
+      # ssh-agent is started in the same step as match because its env can't
+      # cross steps.
+      - name: Install signing identity and build, upload (retries on build number conflict)
+        working-directory: example/ios
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
+          IPA_PATH: ${{ github.workspace }}/example/build/ios/ipa/Runner.ipa
+          NEXT_BUILD_NUMBER_CMD: ruby ${{ github.workspace }}/.github/scripts/asc.rb next-build-number
+        run: |
+          for name in MATCH_PASSWORD MATCH_DEPLOY_KEY BUILD_CERTIFICATE_BASE64 P12_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is not set. See .github/scripts/README.md."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          eval "$(ssh-agent -s)"
+          printf '%s\n' "$MATCH_DEPLOY_KEY" | ssh-add - 2>/dev/null
+          CERT_P12_PATH="$RUNNER_TEMP/dist.p12"
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 -d > "$CERT_P12_PATH"
+          export CERT_P12_PATH
+          fastlane ios install_signing
+          # Single quotes on purpose: testflight-publish.sh exports BUILD_NUMBER per attempt.
+          # shellcheck disable=SC2016
+          ../../.github/scripts/testflight-publish.sh "$INITIAL_BUILD_NUMBER" -- \
+            bash -c 'fastlane ios build_ipa build_number:"$BUILD_NUMBER"'
+
+      - name: Set TestFlight "What to Test"
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+          GIT_REF_NAME: ${{ github.ref_name }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
+        run: |
+          printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt"
+          # TestFlight allows 4000 characters.
+          .github/scripts/release-notes.sh 4000 "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/testflight-notes.txt"
+          cat "$RUNNER_TEMP/testflight-notes.txt"
+          ruby .github/scripts/asc.rb set-whats-new "$BUILD_NUMBER" "$RUNNER_TEMP/testflight-notes.txt"
+
+      - name: Clean up signing material
+        if: always()
+        run: rm -rf "$HOME/.appstoreconnect/private_keys" "$RUNNER_TEMP/dist.p12"
+
+      - name: Notify Slack on success
+        if: success()
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: success
+          platform: TestFlight
+          version_label: ${{ env.SDK_VERSION }} (${{ env.BUILD_NUMBER }})
+          # Requires an App Store Connect login; testers install via the TestFlight app.
+          access_url: https://appstoreconnect.apple.com/apps/${{ env.ASC_APP_ID }}/testflight/ios
+          access_label: TestFlight in App Store Connect
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: failure
+          platform: TestFlight
+          version_label: ${{ env.SDK_VERSION || '?' }} (${{ env.BUILD_NUMBER || env.INITIAL_BUILD_NUMBER || '?' }})
