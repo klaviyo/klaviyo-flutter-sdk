@@ -1,6 +1,6 @@
 default_platform(:ios)
 
-TEAM_ID = ENV.fetch("APPLE_TEAM_ID", "G3793W2RJ2")
+TEAM_ID = ENV["APPLE_TEAM_ID"].to_s.empty? ? "G3793W2RJ2" : ENV["APPLE_TEAM_ID"]
 APP_ID = "com.klaviyo.FlutterExample"
 EXT_ID = "com.klaviyo.FlutterExample.NotificationServiceExtension"
 PROJECT = File.expand_path("../Runner.xcodeproj", __dir__)
