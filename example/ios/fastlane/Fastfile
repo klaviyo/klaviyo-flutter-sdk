@@ -5,9 +5,8 @@ APP_ID = "com.klaviyo.FlutterExample"
 EXT_ID = "com.klaviyo.FlutterExample.NotificationServiceExtension"
 PROJECT = File.expand_path("../Runner.xcodeproj", __dir__)
 
-# Signing mirrors klaviyo-react-native-sdk's example app (example/fastlane/Fastfile):
-# match in read-only mode pulls the shared App Store distribution identity and
-# profiles from klaviyo/mobile-certificates, so CI can never mint a certificate.
+# match runs read-only against klaviyo/mobile-certificates (shared App Store
+# distribution identity + profiles); it never creates certificates.
 platform :ios do
   desc "Install the App Store distribution identity + profiles and pin each target to them"
   lane :install_signing do
@@ -39,9 +38,7 @@ platform :ios do
       )
     end
 
-    # The Flutter template pins CODE_SIGN_IDENTITY[sdk=iphoneos*] to
-    # "iPhone Developer" at the project level, which would make archive look
-    # for a development cert that match never installs.
+    # The Flutter template pins CODE_SIGN_IDENTITY[sdk=iphoneos*] to "iPhone Developer".
     pbxproj = File.join(PROJECT, "project.pbxproj")
     content = File.read(pbxproj)
     content.gsub!(/("CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = )"[^"]*"/, '\1"Apple Distribution"')

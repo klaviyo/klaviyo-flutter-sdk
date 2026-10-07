@@ -4,8 +4,6 @@
 # and `altool` (TestFlight) so the upload-conflict retry paths can be exercised
 # without store credentials.
 #
-# The build commands below are single-quoted on purpose: the scripts under
-# test export VERSION_CODE / BUILD_NUMBER into them.
 # shellcheck disable=SC2016
 set -euo pipefail
 
@@ -30,9 +28,6 @@ check() {
 mkdir -p "$WORK/bin"
 cat > "$WORK/bin/curl" <<'FAKE'
 #!/usr/bin/env bash
-# The build commands below are single-quoted on purpose: the scripts under
-# test export VERSION_CODE / BUILD_NUMBER into them.
-# shellcheck disable=SC2016
 set -euo pipefail
 method=GET out=/dev/null url="" data=""
 while [ "$#" -gt 0 ]; do
@@ -172,11 +167,11 @@ notes="$(SDK_VERSION=1.2.3 GIT_SHA=0123456789abcdef GIT_REF_NAME=master BUILD_DA
   "$SCRIPTS/release-notes.sh" 500 /dev/null)"
 check "notes: header synthesized from git metadata" \
   "Klaviyo Flutter SDK 1.2.3|Commit: 0123456 (master)|Built: 2026-10-06 12:00 UTC" \
-  "$(head -3 <<<"$notes" | paste -sd'|')"
+  "$(head -3 <<<"$notes" | paste -sd'|' -)"
 
 printf '## Fixes\n- Thing' > "$WORK/body.txt"
 notes="$(SDK_VERSION=1.2.3 GIT_SHA=0123456789abcdef BUILD_DATE=x "$SCRIPTS/release-notes.sh" 500 "$WORK/body.txt")"
-check "notes: human release body appended" "## Fixes|- Thing" "$(tail -2 <<<"$notes" | paste -sd'|')"
+check "notes: human release body appended" "## Fixes|- Thing" "$(tail -2 <<<"$notes" | paste -sd'|' -)"
 
 printf '   \n' > "$WORK/blank.txt"
 notes="$(SDK_VERSION=1.2.3 BUILD_DATE=x "$SCRIPTS/release-notes.sh" 500 "$WORK/blank.txt")"

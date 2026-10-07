@@ -74,7 +74,6 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     exit 1
   fi
 
-  # Never go backwards or retry the same number.
   if [ "$NEXT" -le "$BUILD_NUMBER" ]; then
     NEXT=$((BUILD_NUMBER + 1))
   fi

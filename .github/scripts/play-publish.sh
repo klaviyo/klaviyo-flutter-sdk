@@ -53,7 +53,6 @@ access_token() {
 }
 
 # api METHOD URL [curl args...]  -> sets API_STATUS, body in $RESPONSE_FILE.
-# Never uses -v / set -x so the bearer token is not written to the log.
 api() {
   local method="$1" url="$2"
   shift 2
@@ -180,8 +179,6 @@ deploy() {
     fi
     [ "$rc" -eq "$CONFLICT" ] || exit "$rc"
 
-    # Play rejected the code itself; re-read the floor rather than trusting
-    # the earlier preflight, and never go backwards.
     local resolved
     resolved="$(next_version_code)"
     echo "versionCode $version_code was rejected as already used; Play now reports next=$resolved" >&2

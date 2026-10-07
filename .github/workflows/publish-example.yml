@@ -2,15 +2,12 @@
 #
 # Triggers:
 #   - push to master / rel/**, release: published  -> both platforms, only when
-#     the repo variable EXAMPLE_APP_PUBLISH_ENABLED is 'true' (so the pipeline
-#     stays dormant until the store listings and secrets exist)
-#   - workflow_dispatch -> chosen platform(s), ignores the variable so the
-#     pipeline can be tried out before it is switched on
+#     the repo variable EXAMPLE_APP_PUBLISH_ENABLED is 'true'
+#   - workflow_dispatch -> chosen platform(s); ignores the variable
 #   - pull_request touching publish files -> dry run: script tests plus
 #     unsigned release builds, no store access and no secrets
 #
-# This repo is public and so are these logs. Secrets are only ever passed via
-# env and written to files; never echo them or enable `set -x` in these steps.
+# Logs are public: pass secrets via env only, never echo them or enable `set -x`.
 # See .github/scripts/README.md for the required secrets and setup.
 
 name: publish-example
@@ -140,7 +137,6 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.platform != 'ios')
       || ((github.event_name == 'push' || github.event_name == 'release') && vars.EXAMPLE_APP_PUBLISH_ENABLED == 'true')
     runs-on: ubuntu-24.04
-    # Serialize deploys so two runs can't race for the same versionCode.
     concurrency:
       group: publish-example-android
       cancel-in-progress: false
@@ -209,13 +205,10 @@ jobs:
           AAB_PATH: build/app/outputs/bundle/release/app-release.aab
           NOTES_FILE: ${{ runner.temp }}/play-notes.txt
           PLAY_TRACK: internal
-          # Set the repo variable to 'draft' until the first release has been
-          # rolled out by hand in the Play Console (Play rejects 'completed'
-          # releases for apps that have never been published).
+          # Play only accepts 'draft' releases until the app's first manual rollout.
           PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
         run: |
           flutter pub get
-          # Single quotes on purpose: play-publish.sh exports VERSION_CODE per attempt.
           # shellcheck disable=SC2016
           ../.github/scripts/play-publish.sh deploy -- \
             bash -c 'flutter build appbundle --release --build-name="$SDK_VERSION" --build-number="$VERSION_CODE"'
@@ -308,8 +301,6 @@ jobs:
           BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
         run: echo "INITIAL_BUILD_NUMBER=$(ruby .github/scripts/asc.rb next-build-number)" >> "$GITHUB_ENV"
 
-      # ssh-agent is started in the same step as match because its env can't
-      # cross steps.
       - name: Install signing identity and build, upload (retries on build number conflict)
         working-directory: example/ios
         env:
@@ -338,7 +329,6 @@ jobs:
           printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 -d > "$CERT_P12_PATH"
           export CERT_P12_PATH
           fastlane ios install_signing
-          # Single quotes on purpose: testflight-publish.sh exports BUILD_NUMBER per attempt.
           # shellcheck disable=SC2016
           ../../.github/scripts/testflight-publish.sh "$INITIAL_BUILD_NUMBER" -- \
             bash -c 'fastlane ios build_ipa build_number:"$BUILD_NUMBER"'

@@ -1,9 +1,5 @@
 # Example app publishing
 
-> The workflow currently lives at `.github/workflow-drafts/publish-example.yml`
-> because the automation that wrote it could not push to `.github/workflows/`.
-> Move it there with `git mv` (needs a token with the `workflow` scope) to enable it.
-
 `.github/workflows/publish-example.yml` builds the example app and ships it to the
 Play internal track and TestFlight on pushes to `master` and `rel/**` and on
 published GitHub releases. It does nothing on those triggers until the repo

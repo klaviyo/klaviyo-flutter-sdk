@@ -36,10 +36,7 @@ BODY=""
 if [ -n "$BODY_FILE" ] && [ -s "$BODY_FILE" ]; then
   BODY="$(cat "$BODY_FILE")"
 fi
-# Strip whitespace-only bodies so they fall back to the commit subject.
 if [ -z "${BODY//[[:space:]]/}" ]; then
-  # A shallow checkout may not have the commit object for an arbitrary SHA;
-  # fall back to an empty subject rather than failing the deploy.
   BODY="$(git log -1 --format=%s "$GIT_SHA" 2>/dev/null || true)"
 fi
 

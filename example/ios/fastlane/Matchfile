@@ -1,9 +1,7 @@
 git_url("git@github.com:klaviyo/mobile-certificates.git")
 storage_mode("git")
 
-# App Store distribution profiles for the example app and its notification
-# service extension. The distribution certificate is shared across the mobile
-# SDK repos via mobile-certificates; CI runs match read-only and never creates one.
+# App Store profiles for the example app and its notification service extension.
 type("appstore")
 
 app_identifier([
