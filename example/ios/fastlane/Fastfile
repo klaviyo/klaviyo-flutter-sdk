@@ -1,0 +1,77 @@
+default_platform(:ios)
+
+TEAM_ID = ENV["APPLE_TEAM_ID"].to_s.empty? ? "G3793W2RJ2" : ENV["APPLE_TEAM_ID"]
+APP_ID = "com.klaviyo.FlutterExample"
+EXT_ID = "com.klaviyo.FlutterExample.NotificationServiceExtension"
+PROJECT = File.expand_path("../Runner.xcodeproj", __dir__)
+
+# match runs read-only against klaviyo/mobile-certificates (shared App Store
+# distribution identity + profiles); it never creates certificates.
+platform :ios do
+  desc "Install the App Store distribution identity + profiles and pin each target to them"
+  lane :install_signing do
+    setup_ci
+
+    match(type: "appstore", readonly: true)
+
+    # macOS 26's `security import` rejects the empty-password .p12 that match
+    # imports, so bring the private key in from a password-protected .p12.
+    import_certificate(
+      certificate_path: ENV.fetch("CERT_P12_PATH"),
+      certificate_password: ENV.fetch("P12_PASSWORD"),
+      keychain_name: ENV.fetch("MATCH_KEYCHAIN_NAME", "fastlane_tmp_keychain"),
+      keychain_password: ENV.fetch("MATCH_KEYCHAIN_PASSWORD", "")
+    )
+
+    [
+      { targets: ["Runner"], profile: "match AppStore #{APP_ID}" },
+      { targets: ["NotificationServiceExtension"], profile: "match AppStore #{EXT_ID}" },
+    ].each do |cfg|
+      update_code_signing_settings(
+        path: PROJECT,
+        use_automatic_signing: false,
+        team_id: TEAM_ID,
+        code_sign_identity: "Apple Distribution",
+        targets: cfg[:targets],
+        profile_name: cfg[:profile],
+        build_configurations: ["Release"]
+      )
+    end
+
+    # The Flutter template pins CODE_SIGN_IDENTITY[sdk=iphoneos*] to "iPhone Developer".
+    pbxproj = File.join(PROJECT, "project.pbxproj")
+    content = File.read(pbxproj)
+    content.gsub!(/("CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = )"[^"]*"/, '\1"Apple Distribution"')
+    File.write(pbxproj, content)
+  end
+
+  # Expects `flutter build ios --release --config-only --build-number=N` to
+  # have run first so Generated.xcconfig and Pods are in place.
+  desc "Archive + export a signed IPA to example/build/ios/ipa/Runner.ipa"
+  lane :build_ipa do |options|
+    build_number = options.fetch(:build_number).to_s
+    UI.user_error!("build_number must be numeric") unless build_number.match?(/\A\d+\z/)
+
+    build_app(
+      workspace: File.expand_path("../Runner.xcworkspace", __dir__),
+      scheme: "Runner",
+      configuration: "Release",
+      destination: "generic/platform=iOS",
+      export_method: "app-store",
+      codesigning_identity: "Apple Distribution",
+      # The extension hardcodes CURRENT_PROJECT_VERSION = 1; App Store Connect
+      # wants it to match the host app's CFBundleVersion.
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} FLUTTER_BUILD_NUMBER=#{build_number}",
+      clean: false,
+      output_directory: File.expand_path("../../build/ios/ipa", __dir__),
+      output_name: "Runner.ipa",
+      export_options: {
+        signingStyle: "manual",
+        provisioningProfiles: {
+          APP_ID => "match AppStore #{APP_ID}",
+          EXT_ID => "match AppStore #{EXT_ID}",
+        },
+      }
+    )
+  end
+end
