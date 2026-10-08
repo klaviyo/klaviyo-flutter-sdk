@@ -446,15 +446,54 @@ class KlaviyoFlutterSdkPlugin :
                                 data["buttonLabel"] = event.buttonLabel
                                 data["deepLinkUrl"] = event.deepLinkUrl.toString()
                             }
+
+                            is FormLifecycleEvent.FormWillDisplay -> {
+                                // Use reverse method channel to get Dart's decision
+                                Handler(Looper.getMainLooper()).post {
+                                    channel.invokeMethod(
+                                        "formWillDisplay",
+                                        mapOf(
+                                            "formId" to event.formId,
+                                            "formName" to event.formName,
+                                            "formType" to event.formType,
+                                        ),
+                                        object : MethodChannel.Result {
+                                            override fun success(result: Any?) {
+                                                if (result as? Boolean == false) {
+                                                    event.reject()
+                                                } else {
+                                                    event.accept()
+                                                }
+                                            }
+
+                                            override fun error(
+                                                errorCode: String,
+                                                errorMessage: String?,
+                                                errorDetails: Any?,
+                                            ) {
+                                                // Fail-open on error
+                                                event.accept()
+                                            }
+
+                                            override fun notImplemented() {
+                                                // Fail-open if Dart side doesn't handle it
+                                                event.accept()
+                                            }
+                                        },
+                                    )
+                                }
+                            }
                         }
 
-                        Handler(Looper.getMainLooper()).post {
-                            eventSink?.success(
-                                mapOf(
-                                    "type" to "form_lifecycle_event",
-                                    "data" to data,
-                                ),
-                            )
+                        if (event !is FormLifecycleEvent.FormWillDisplay) {
+                            Handler(Looper.getMainLooper()).post {
+                                eventSink?.success(
+                                    mapOf(
+                                        "type" to "form_lifecycle_event",
+                                        "data" to data,
+                                    ),
+                                )
+                            }
                         }
                     }
 
