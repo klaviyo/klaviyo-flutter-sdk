@@ -47,7 +47,7 @@ android {
     }
 }
 
-def klaviyoSdkVersion = "165c637bbbec9d6ba0de94778ccc6c797e6efac8"
+def klaviyoSdkVersion = "feat~jwts-for-personalized-forms-SNAPSHOT"
 
 // Whether to include the full forms module (in-app forms rendering).
 // Set klaviyoIncludeForms=false in your host app's gradle.properties to exclude forms.
