@@ -16,6 +16,7 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
   s.resources        = ['klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist']
 
   s.dependency 'Flutter'
+  s.dependency 'KlaviyoCore'
   s.dependency 'KlaviyoSwift'
   # Forms: included by default, set to 'false' to exclude
   if ENV['KLAVIYO_INCLUDE_FORMS'] != 'false'

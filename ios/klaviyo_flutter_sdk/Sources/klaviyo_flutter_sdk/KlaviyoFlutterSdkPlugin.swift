@@ -3,6 +3,7 @@ import Flutter
 #if canImport(KlaviyoForms)
 import KlaviyoForms
 #endif
+import KlaviyoCore
 import KlaviyoSwift
 #if canImport(KlaviyoLocation)
 @_spi(KlaviyoPrivate) import KlaviyoLocation
