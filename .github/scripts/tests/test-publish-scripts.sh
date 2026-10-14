@@ -55,7 +55,18 @@ case "$method $path" in
       dec conflicts
       # A competing deploy took the code; the floor moves past it.
       echo $(( $(read_n highest) + 1 )) > "$FAKE_PLAY/highest"
-      code=403 body='{"error":{"code":403,"message":"APK specifies a version code that has already been used.","status":"PERMISSION_DENIED"}}'
+      case "$(cat "$FAKE_PLAY/conflict_shape" 2>/dev/null || echo classic)" in
+        http409)
+          code=409 body='{"error":{"code":409,"message":"Request conflicts with current state","status":"CONFLICT"}}' ;;
+        concurrent)
+          code=400 body='{"error":{"message":"Concurrent uploads for app com.example"}}' ;;
+        editDeleted)
+          code=400 body='{"error":{"message":"This edit has been deleted","reason":"editDeleted"}}' ;;
+        apkUpgrade)
+          code=400 body='{"error":{"message":"apkUpgradeVersionConflict"}}' ;;
+        *)
+          code=403 body='{"error":{"code":403,"message":"APK specifies a version code that has already been used.","status":"PERMISSION_DENIED"}}' ;;
+      esac
     else
       body="{\"versionCode\":$(cat "$FAKE_PLAY/built_code")}"
     fi ;;
@@ -107,6 +118,18 @@ reset_play 8; echo 1 > "$WORK/play/commit_conflicts"
 out="$(run_play 2>/dev/null)"
 check "play: retries after commit conflict" 10 "$out"
 
+# Play: alternate conflict shapes are retryable too.
+for shape in http409 concurrent editDeleted apkUpgrade; do
+  reset_play 41; echo 1 > "$WORK/play/conflicts"; echo "$shape" > "$WORK/play/conflict_shape"
+  out="$(run_play 2>/dev/null)"
+  check "play: retries after $shape conflict" 43 "$out"
+done
+
+# Play: RELEASE_NAME is sent as the release name.
+reset_play 41
+out="$(RELEASE_NAME='1.2.3 (42) 0123456' run_play 2>/dev/null)"
+check "play: release name sent" "1.2.3 (42) 0123456" "$(jq -r '.releases[0].name' "$WORK/play/track_body")"
+
 # Play: gives up after MAX_ATTEMPTS.
 reset_play 41; echo 5 > "$WORK/play/conflicts"
 if run_play >/dev/null 2>&1; then fail "play: stops after max attempts"; else pass "play: stops after max attempts"; fi
@@ -120,6 +143,10 @@ built="$(cat "$FAKE_TF/built")"
 if [ "$n" -gt 0 ]; then
   echo $((n - 1)) > "$FAKE_TF/rejections"
   mode="$(cat "$FAKE_TF/mode")"
+  if [ "$mode" = redundant ]; then
+    # ASC's next-number endpoint goes stale for a bit after a rejection.
+    echo "stale:15" > "$FAKE_TF/next_asc"
+  fi
   if [ "$mode" = previous ]; then
     echo "ERROR: [ContentDelivery.Uploader] The bundle version must be higher than the previously uploaded version. (previousBundleVersion = $((built + 4)))"
   elif [ "$mode" = redundant ]; then
@@ -133,18 +160,58 @@ echo "No errors uploading 'Runner.ipa'"
 FAKE
 chmod +x "$WORK/bin/altool"
 
+# Fake "next build number" command: prints the contents of $FAKE_TF/next_asc
+# (empty file = recheck reports nothing new), or fails when the file contains
+# "fail". A value wrapped as stale:N only answers numbers below N, modelling
+# ASC not yet showing the rejection the script already saw.
+cat > "$WORK/bin/next-asc" <<'FAKE'
+#!/usr/bin/env bash
+contents="$(cat "$FAKE_TF/next_asc" 2>/dev/null || true)"
+if [ "$contents" = "fail" ]; then
+  exit 1
+fi
+if [ "${contents#stale:}" != "$contents" ]; then
+  value="${contents#stale:}"
+  built="$(cat "$FAKE_TF/built" 2>/dev/null || echo 0)"
+  if [ "$value" -gt "$built" ]; then
+    echo "$value"
+  fi
+  exit 0
+fi
+if [ -n "$contents" ]; then
+  echo "$contents"
+fi
+FAKE
+chmod +x "$WORK/bin/next-asc"
+
 run_tf() {
   FAKE_TF="$WORK/tf" ALTOOL="$WORK/bin/altool" IPA_PATH="$WORK/tf/Runner.ipa" \
     APP_STORE_CONNECT_API_KEY_ID=k APP_STORE_CONNECT_API_KEY_ISSUER_ID=i \
-    GITHUB_ENV="$WORK/tf/github_env" NEXT_BUILD_NUMBER_CMD="echo 15" \
+    GITHUB_ENV="$WORK/tf/github_env" NEXT_BUILD_NUMBER_CMD="$WORK/bin/next-asc" \
     "$SCRIPTS/testflight-publish.sh" "$1" -- \
     bash -c 'echo "$BUILD_NUMBER" > "$FAKE_TF/built"; echo "$BUILD_NUMBER" >> "$FAKE_TF/builds"; touch "$IPA_PATH"'
 }
-reset_tf() { rm -rf "$WORK/tf"; mkdir -p "$WORK/tf"; echo "$1" > "$WORK/tf/rejections"; echo "${2:-}" > "$WORK/tf/mode"; }
+reset_tf() {
+  rm -rf "$WORK/tf"; mkdir -p "$WORK/tf"
+  echo "$1" > "$WORK/tf/rejections"
+  echo "${2:-}" > "$WORK/tf/mode"
+  : > "$WORK/tf/next_asc"
+}
 
 reset_tf 0
 run_tf 7 >/dev/null 2>&1
 check "testflight: clean upload keeps preflight number" "BUILD_NUMBER=7" "$(cat "$WORK/tf/github_env")"
+
+# Pre-upload recheck: ASC reports a higher number between build and upload.
+reset_tf 0; echo 20 > "$WORK/tf/next_asc"
+run_tf 7 >/dev/null 2>&1
+check "testflight: pre-upload recheck rebuilds with the fresh number" "7,20" "$(paste -sd, "$WORK/tf/builds")"
+check "testflight: exports the rechecked number" "BUILD_NUMBER=20" "$(cat "$WORK/tf/github_env")"
+
+# A failed recheck only warns; the upload still goes out.
+reset_tf 0; echo fail > "$WORK/tf/next_asc"
+run_tf 7 >/dev/null 2>&1
+check "testflight: failed recheck still uploads" "BUILD_NUMBER=7" "$(cat "$WORK/tf/github_env")"
 
 reset_tf 1 previous
 run_tf 7 >/dev/null 2>&1
@@ -163,11 +230,11 @@ reset_tf 5 previous
 if run_tf 7 >/dev/null 2>&1; then fail "testflight: stops after max attempts"; else pass "testflight: stops after max attempts"; fi
 
 # ---------------------------------------------------------------- release notes
-notes="$(SDK_VERSION=1.2.3 GIT_SHA=0123456789abcdef GIT_REF_NAME=master BUILD_DATE='2026-10-06 12:00 UTC' \
+notes="$(SDK_VERSION=1.2.3 GIT_SHA=0123456789abcdef GIT_REF_NAME=master EVENT_NAME=push BUILD_DATE='2026-10-06 12:00 UTC' \
   "$SCRIPTS/release-notes.sh" 500 /dev/null)"
 check "notes: header synthesized from git metadata" \
-  "Klaviyo Flutter SDK 1.2.3|Commit: 0123456 (master)|Built: 2026-10-06 12:00 UTC" \
-  "$(head -3 <<<"$notes" | paste -sd'|' -)"
+  "Klaviyo Flutter SDK 1.2.3|Ref: master (push)|Commit: 0123456|Built: 2026-10-06 12:00 UTC" \
+  "$(head -4 <<<"$notes" | paste -sd'|' -)"
 
 printf '## Fixes\n- Thing' > "$WORK/body.txt"
 notes="$(SDK_VERSION=1.2.3 GIT_SHA=0123456789abcdef BUILD_DATE=x "$SCRIPTS/release-notes.sh" 500 "$WORK/body.txt")"
@@ -177,10 +244,45 @@ printf '   \n' > "$WORK/blank.txt"
 notes="$(SDK_VERSION=1.2.3 BUILD_DATE=x "$SCRIPTS/release-notes.sh" 500 "$WORK/blank.txt")"
 check "notes: falls back to commit subject" "$(git log -1 --format=%s)" "$(tail -1 <<<"$notes")"
 
+notes="$(SDK_VERSION=1.2.3 GIT_SHA=0123456789abcdef GIT_REF_NAME=v1.2.3 EVENT_NAME=release \
+  RELEASE_NAME='Flutter SDK 1.2.3' BUILD_DATE=x "$SCRIPTS/release-notes.sh" 500 "$WORK/blank.txt")"
+check "notes: release name above the body on releases" \
+  "Ref: v1.2.3 (release)" "$(sed -n 2p <<<"$notes")"
+check "notes: release name line present" \
+  "Flutter SDK 1.2.3" "$(tail -1 <<<"$notes")"
+
+notes="$(SDK_VERSION=1.2.3 GIT_SHA=0123456789abcdef BUILD_DATE=x RUN_URL='https://example.com/run/1' \
+  "$SCRIPTS/release-notes.sh" 4000 "$WORK/blank.txt")"
+check "notes: CI run line appended" "CI run: https://example.com/run/1" "$(tail -1 <<<"$notes")"
+
 printf 'é%.0s' $(seq 1 2000) > "$WORK/long.txt"
 notes="$(SDK_VERSION=1.2.3 BUILD_DATE=x LC_ALL=C.UTF-8 "$SCRIPTS/release-notes.sh" 500 "$WORK/long.txt")"
 check "notes: truncated to the store limit" 500 "$(LC_ALL=C.UTF-8 bash -c 'n="$1"; echo ${#n}' _ "$notes")"
+check "notes: truncation ends with marker" "[truncated]" "$(tail -1 <<<"$notes")"
 if iconv -f UTF-8 -t UTF-8 <<<"$notes" >/dev/null 2>&1; then pass "notes: truncation keeps valid UTF-8"; else fail "notes: truncation keeps valid UTF-8"; fi
+
+# SDK refs come from build-info.json when present.
+cat > "$WORK/build-info.json" <<'EOF'
+{
+  "sdkVersion": "1.2.3",
+  "flutterSdkRef": "feat/thing@0123456",
+  "iosSdkRef": "5.4.1",
+  "androidSdkRef": "rel/4.6.0@0123456",
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "commitShort": "0123456",
+  "branch": "feat/thing",
+  "appVersion": "1.2.3",
+  "buildDate": "2026-10-06 12:00 UTC"
+}
+EOF
+notes="$(SDK_VERSION=1.2.3 GIT_SHA=0123456789abcdef BUILD_DATE=x BUILD_INFO="$WORK/build-info.json" \
+  "$SCRIPTS/release-notes.sh" 4000 "$WORK/blank.txt")"
+check "notes: SDK refs from build-info.json" \
+  "Flutter SDK: feat/thing@0123456|iOS SDK: 5.4.1|Android SDK: rel/4.6.0@0123456" \
+  "$(sed -n '5,7p' <<<"$notes" | paste -sd'|' -)"
+notes="$(SDK_VERSION=1.2.3 GIT_SHA=0123456789abcdef BUILD_DATE=x BUILD_INFO="$WORK/absent.json" \
+  "$SCRIPTS/release-notes.sh" 500 "$WORK/blank.txt")"
+check "notes: missing build-info.json adds no refs" "0" "$(grep -c 'SDK:' <<<"$notes" || true)"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then

@@ -21,6 +21,7 @@
 #   PLAY_TRACK          (default: internal)
 #   PLAY_RELEASE_STATUS (default: completed; must be "draft" until the app's
 #                        first release has been rolled out from the console)
+#   RELEASE_NAME        (deploy, optional) release name shown in Play Console
 #   MAX_ATTEMPTS        (default: 3)
 #   PLAY_ACCESS_TOKEN   (optional) OAuth token; otherwise minted with gcloud
 #                       from the active service-account credentials
@@ -72,7 +73,8 @@ fail() {
 }
 
 is_version_conflict() {
-  grep -qiE 'version ?code[^"]*(has )?already been used|versionCodeAlreadyUsed|UpgradeVersionConflict' "$RESPONSE_FILE"
+  [ "$API_STATUS" = "409" ] && return 0
+  grep -qiE 'version ?code[^"]*(has )?already been used|versionCodeAlreadyUsed|apkUpgradeVersionConflict|UpgradeVersionConflict|Concurrent uploads for app|editDeleted' "$RESPONSE_FILE"
 }
 
 open_edit() {
@@ -139,8 +141,10 @@ upload() {
     --arg code "$version_code" \
     --arg status "$PLAY_RELEASE_STATUS" \
     --arg notes "$notes" \
+    --arg name "${RELEASE_NAME:-}" \
     '{track: $track, releases: [{versionCodes: [$code], status: $status}
-      + (if $notes == "" then {} else {releaseNotes: [{language: "en-US", text: $notes}]} end)]}')"
+      + (if $notes == "" then {} else {releaseNotes: [{language: "en-US", text: $notes}]} end)
+      + (if $name == "" then {} else {name: $name} end)]}')"
   api PUT "$API/edits/$EDIT_ID/tracks/$PLAY_TRACK" \
     -H 'Content-Type: application/json' -d "$release"
   api_ok || fail "Could not assign versionCode $version_code to the $PLAY_TRACK track"

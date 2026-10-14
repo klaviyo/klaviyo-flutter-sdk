@@ -16,8 +16,9 @@
 #   APP_STORE_CONNECT_API_KEY_ISSUER_ID   (required)
 #   MAX_ATTEMPTS                          (default: 3)
 #   NEXT_BUILD_NUMBER_CMD                 (optional) command printing a fresh
-#                                         latest+1 when altool's error doesn't
-#                                         say which build number it already has
+#                                         latest+1; also consulted between the
+#                                         build and the upload so a competing
+#                                         run never reaches altool
 #   ALTOOL                                (optional) override, used by tests
 #
 set -euo pipefail
@@ -39,12 +40,30 @@ altool() {
   fi
 }
 
+# Prints a fresh latest+1 from App Store Connect, or nothing on failure.
+recheck_build_number() {
+  [ -n "${NEXT_BUILD_NUMBER_CMD:-}" ] || return 0
+  bash -c "$NEXT_BUILD_NUMBER_CMD" 2>/dev/null || true
+}
+
 BUILD_NUMBER="$INITIAL"
 for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   echo "=== Attempt $attempt/$MAX_ATTEMPTS: build number $BUILD_NUMBER ==="
   rm -f "$IPA_PATH"
   BUILD_NUMBER="$BUILD_NUMBER" "$@"
   [ -f "$IPA_PATH" ] || { echo "::error::Build did not produce $IPA_PATH" >&2; exit 1; }
+
+  # A competing run can take the number while we build; catch it before
+  # burning an upload.
+  FRESH="$(recheck_build_number)"
+  if [ -n "$FRESH" ] && [ "$FRESH" -gt "$BUILD_NUMBER" ] && [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+    echo "Build $BUILD_NUMBER was taken since preflight; rebuilding with $FRESH"
+    BUILD_NUMBER="$FRESH"
+    continue
+  fi
+  if [ -n "${NEXT_BUILD_NUMBER_CMD:-}" ] && [ -z "$FRESH" ]; then
+    echo "::warning::Pre-upload build number recheck failed; relying on upload conflict detection"
+  fi
 
   UPLOAD_OUTPUT="$(altool --upload-app --type ios --file "$IPA_PATH" \
     --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
