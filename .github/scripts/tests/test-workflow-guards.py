@@ -171,7 +171,19 @@ report(total_uses > 0 and not unpinned,
 # The lint step names its inputs as globs. A script added outside them would never be linted, so every
 # shell script under .github/ and the stamper must match a glob the step passes to shellcheck. The
 # scripts that predate this change are the only ones outside the globs.
-import fnmatch
+def shell_glob_match(path, pattern):
+    """Matches like the shell: * and ? never cross a /, so .github/scripts/*.sh reaches only one level.
+    (fnmatch lets * match /, which would call a nested script covered when the shell never expands to it.)"""
+    translated = ""
+    for char in pattern:
+        if char == "*":
+            translated += "[^/]*"
+        elif char == "?":
+            translated += "[^/]"
+        else:
+            translated += re.escape(char)
+    return re.fullmatch(translated, path) is not None
+
 
 checks_text = read(CHECKS_PATH)
 lint_step = re.search(r"(?ms)- name: Lint scripts\n.*?run: \|\n(.*?)(?=^      - |\Z)", checks_text)
@@ -188,14 +200,64 @@ for root, _dirs, names in os.walk(os.path.join(ROOT, ".github")):
         if name.endswith(".sh"):
             rel = os.path.relpath(os.path.join(root, name), ROOT)
             scripts_seen += 1
-            if not any(fnmatch.fnmatch(rel, pattern) for pattern in globs):
+            if not any(shell_glob_match(rel, pattern) for pattern in globs):
                 uncovered.append(rel)
 if os.path.exists(os.path.join(ROOT, "scripts", "sdk-ref.sh")) and not any(
-        fnmatch.fnmatch("scripts/sdk-ref.sh", pattern) for pattern in globs):
+        shell_glob_match("scripts/sdk-ref.sh", pattern) for pattern in globs):
     uncovered.append("scripts/sdk-ref.sh")
 report(bool(globs) and scripts_seen > 0 and not uncovered,
        f"the shellcheck step covers every script under .github and scripts/sdk-ref.sh ({scripts_seen} found)",
        ("uncovered: " + ", ".join(uncovered)) if uncovered else "no shellcheck line found in the Lint scripts step")
+
+# --- portability -------------------------------------------------------------
+
+# Scripts here run on macOS (a laptop, macos-26) and Linux (ubuntu runners). These flags exist on one
+# side only: mktemp -p, date -d, readlink -f, stat -c, sed -i with no suffix argument, grep -P. Use the
+# portable form instead (mktemp -d "${TMPDIR:-/tmp}/x.XXXXXX", python3 for dates and paths, sed to a
+# temp file, grep -E). Comment lines and this file are ignored.
+NON_PORTABLE = [
+    (r"\bmktemp\b[^\n|;&]*\s-[a-zA-Z]*p\b|\bmktemp\b[^\n|;&]*--tmpdir", "mktemp -p / --tmpdir"),
+    (r"\bdate\s+(-[a-zA-Z]*d\b|--date\b)", "date -d / --date"),
+    (r"\breadlink\s+-[a-zA-Z]*f\b", "readlink -f"),
+    (r"\bstat\s+(-c\b|--format\b)", "stat -c / --format"),
+    (r"""\bsed\s+-i(?![\w.])(?!\s*(?:\'\'|""))""", "sed -i with no suffix argument"),
+    (r"\bgrep\s+(-[a-zA-Z]*P[a-zA-Z]*\b|--perl-regexp\b)", "grep -P"),
+]
+script_files = []
+for base in (os.path.join(ROOT, ".github", "scripts"), os.path.join(ROOT, ".github", "actions")):
+    for root, _dirs, names in os.walk(base):
+        for name in names:
+            if name.endswith((".sh", ".yml")) and name != "test-workflow-guards-selftest.sh":
+                script_files.append(os.path.join(root, name))
+script_files += [os.path.join(ROOT, "scripts", "sdk-ref.sh"), DEPLOY_PATH, CHECKS_PATH]
+found = []
+for path in script_files:
+    if not os.path.exists(path):
+        continue
+    for number, line in enumerate(read(path).split("\n"), 1):
+        if line.lstrip().startswith("#"):
+            continue
+        for pattern, label in NON_PORTABLE:
+            if re.search(pattern, line):
+                found.append(f"{os.path.relpath(path, ROOT)}:{number}: {label}: {line.strip()[:90]}")
+report(not found, f"no scripts use flags that exist on only one of macOS and Linux ({len(script_files)} files scanned)",
+       "\n".join(found))
+
+# --- composite actions -------------------------------------------------------
+
+# actionlint does not read composite actions, so the shell in their run: steps is only checked by
+# lint-action-shell.py. The checks workflow must run it, and every local action any workflow in the call
+# tree uses must live where it looks (.github/actions/<name>/action.yml), so none can escape the lint.
+local_actions = set()
+for path in workflow_paths:
+    for ref in re.findall(r"uses:\s*\./\.github/actions/([A-Za-z0-9_.-]+)", read(path)):
+        local_actions.add(ref)
+missing_actions = sorted(a for a in local_actions if not os.path.exists(os.path.join(ACTIONS_DIR, a, "action.yml")))
+report(not missing_actions, f"every local action the workflows use is found under .github/actions ({len(local_actions)} used)",
+       "missing: " + ", ".join(missing_actions))
+report(re.search(r"(?m)^\s+run: python3 -B \.github/scripts/lint-action-shell\.py\s*$", read(CHECKS_PATH)) is not None
+       and os.path.exists(os.path.join(ROOT, ".github", "scripts", "lint-action-shell.py")),
+       "the checks workflow shellchecks the composite actions' run: blocks")
 
 # --- checkouts -------------------------------------------------------------
 

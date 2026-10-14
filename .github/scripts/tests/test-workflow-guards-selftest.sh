@@ -36,6 +36,7 @@ fresh_copy() {
   mkdir -p "$TMP/repo/scripts"
   cp "$ROOT/scripts/sdk-ref.sh" "$TMP/repo/scripts/"
   cp "$ROOT/.github/scripts/tests/test-workflow-guards.py" "$TMP/repo/.github/scripts/tests/"
+  cp "$ROOT/.github/scripts/lint-action-shell.py" "$TMP/repo/.github/scripts/"
 }
 
 run_guard() {
@@ -138,6 +139,49 @@ expect_fail "a script added outside the shellcheck globs is caught" "the shellch
 fresh_copy
 edit "$CHECKS" 's = s.replace("shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh scripts/sdk-ref.sh", "shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh", 1)'
 expect_fail "dropping scripts/sdk-ref.sh from the shellcheck step is caught" "the shellcheck step covers every script"
+
+# --- portability: each one-sided flag is caught, the portable forms are not
+
+portable_case() { # <label> <script line> <expect: fail|pass>
+  fresh_copy
+  printf '#!/usr/bin/env bash\n%s\n' "$2" > "$TMP/repo/.github/scripts/probe.sh"
+  if [ "$3" = fail ]; then
+    expect_fail "$1" "no scripts use flags that exist on only one of macOS and Linux"
+  else
+    expect_pass "$1"
+  fi
+}
+portable_case "mktemp -d -p is caught" 'D="$(mktemp -d -p /tmp)"' fail
+portable_case "date -d is caught" 'date -d yesterday' fail
+portable_case "readlink -f is caught" 'readlink -f "$0"' fail
+portable_case "stat -c is caught" 'stat -c %s "$f"' fail
+portable_case "sed -i with no suffix argument is caught" "sed -i 's/a/b/' \"\$f\"" fail
+portable_case "grep -P is caught" "grep -P '\\d+' \"\$f\"" fail
+portable_case "the portable mktemp template form is accepted" 'D="$(mktemp -d "${TMPDIR:-/tmp}/x.XXXXXX")"' pass
+portable_case "sed -i with an empty suffix is accepted" "sed -i '' 's/a/b/' \"\$f\"" pass
+portable_case "sed -i with a suffix is accepted" "sed -i.bak 's/a/b/' \"\$f\"" pass
+portable_case "a flag named only in a comment is accepted" '# do not use date -d here' pass
+
+# --- composite actions
+
+fresh_copy
+edit "$CHECKS" '
+i = s.index("      - name: Lint composite action shell")
+j = s.index("      # An Internal App Sharing path does not resolve", i)
+s = s[:i] + s[j:]
+'
+expect_fail "dropping the composite action shell lint is caught" "the checks workflow shellchecks the composite actions"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("uses: ./.github/actions/notify-slack-publish", "uses: ./.github/actions/notify-slack-renamed", 1)'
+expect_fail "a workflow using a local action that is not under .github/actions is caught" "every local action the workflows use is found"
+
+# A nested directory is not reached by .github/scripts/*.sh: the shell's * does not cross a /. A script in
+# .github/scripts/lib/ must fail the coverage check even though fnmatch would call it covered.
+fresh_copy
+mkdir -p "$TMP/repo/.github/scripts/lib"
+printf '#!/usr/bin/env bash\necho hi\n' > "$TMP/repo/.github/scripts/lib/helper.sh"
+expect_fail "a script one directory below a lint glob is caught, as the shell would not reach it" "the shellcheck step covers every script"
 
 # --- checkouts
 

@@ -64,6 +64,12 @@ jobs:
           shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh scripts/sdk-ref.sh
           ruby -c .github/scripts/asc.rb
           ruby -c example/ios/fastlane/Fastfile
+          python3 -B -m py_compile .github/scripts/lint-action-shell.py .github/scripts/tests/test-workflow-guards.py .github/scripts/tests/test-workflow-notes-env.py
+
+      # actionlint does not read composite actions, so the shell in their run: steps is extracted and
+      # shellchecked here. The step fails if it finds no run: block at all.
+      - name: Lint composite action shell
+        run: python3 -B .github/scripts/lint-action-shell.py
 
       - name: Lint workflow files
         run: |
