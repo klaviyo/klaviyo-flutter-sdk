@@ -10,3 +10,11 @@ updates:
       github-actions:
         patterns:
           - "*"
+  - package-ecosystem: bundler
+    directory: /example/ios
+    schedule:
+      interval: monthly
+    groups:
+      bundler:
+        patterns:
+          - "*"

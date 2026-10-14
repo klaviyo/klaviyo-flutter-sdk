@@ -119,3 +119,12 @@ This repo is public, so anyone can read the Actions logs. The scripts never echo
 secrets or run with `set -x`, and Slack only gets links that need a Play tester
 or App Store Connect login to open. Do not add steps that print environment
 variables, upload signed artifacts, or post public TestFlight links.
+
+## Pinned tools and updates
+
+fastlane is pinned in `example/ios/Gemfile` and `Gemfile.lock` and run with `bundle exec`, so Dependabot's
+`bundler` entry (monthly, grouped) updates it. Pins written inline in a workflow `run:` are invisible to
+Dependabot, and the guard rejects `gem install`, `pip install` and `npm install` there. shellcheck 0.9.0 and
+actionlint 1.7.7 stay pinned by hand on purpose: shellcheck must match the version on the Ubuntu runner, and
+both downloads are checked against a SHA-256. The `github-actions` entry covers the workflows and the composite
+action directory.

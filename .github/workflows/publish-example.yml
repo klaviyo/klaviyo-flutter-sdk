@@ -410,9 +410,8 @@ jobs:
       - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
         with:
           ruby-version: '3.3'
-
-      - name: Install fastlane
-        run: gem install fastlane -v 2.237.0 --no-document
+          bundler-cache: true
+          working-directory: example/ios
 
       # altool and asc.rb both find the key at this conventional path.
       - name: Write App Store Connect API key
@@ -475,10 +474,10 @@ jobs:
           CERT_P12_PATH="$RUNNER_TEMP/dist.p12"
           printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 -d > "$CERT_P12_PATH"
           export CERT_P12_PATH
-          fastlane ios install_signing
+          bundle exec fastlane ios install_signing
           # shellcheck disable=SC2016
           ../../.github/scripts/testflight-publish.sh "$INITIAL_BUILD_NUMBER" -- \
-            bash -c 'fastlane ios build_ipa build_number:"$BUILD_NUMBER"'
+            bash -c 'bundle exec fastlane ios build_ipa build_number:"$BUILD_NUMBER"'
 
       - name: Record deployed build
         id: result

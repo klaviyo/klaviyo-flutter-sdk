@@ -24,6 +24,10 @@ ACTIONS_DIR = sys.argv[1] if len(sys.argv) > 1 else os.path.join(".github", "act
 SHELLCHECK = os.environ.get("SHELLCHECK", "shellcheck")
 
 
+# A YAML block scalar header: | or >, then an indentation digit and a chomping sign in either order,
+# then optionally a comment (|, |-, |2, |2-, |-2, >-, | # note).
+BLOCK_HEADER = re.compile(r"^[|>](?:[1-9][+-]?|[+-][1-9]?)?[ \t]*(?:#.*)?$")
+
 def run_blocks(text):
     """Yields (line number, script) for each `run:` key in the file."""
     lines = text.split("\n")
@@ -32,7 +36,7 @@ def run_blocks(text):
         if not match:
             continue
         indent, rest = len(match.group(1)), match.group(2)
-        if rest.startswith(("|", ">")):
+        if BLOCK_HEADER.match(rest):
             body = []
             block_indent = None
             for following in lines[index + 1:]:

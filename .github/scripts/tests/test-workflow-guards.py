@@ -254,6 +254,10 @@ UNTRUSTED = re.compile(
     r"\benv\.", re.I)
 
 
+# A YAML block scalar header: | or >, then an indentation digit and a chomping sign in either order,
+# then optionally a comment (|, |-, |2, |2-, |-2, >-, | # note).
+BLOCK_HEADER = re.compile(r"^[|>](?:[1-9][+-]?|[+-][1-9]?)?[ \t]*(?:#.*)?$")
+
 def run_script_lines(text):
     """Yields (line number, line) for every line inside a run: script, one line or a block scalar."""
     lines = text.split("\n")
@@ -262,7 +266,7 @@ def run_script_lines(text):
         if not match:
             continue
         indent, rest = len(match.group(1)), match.group(2)
-        if rest.startswith(("|", ">")):
+        if BLOCK_HEADER.match(rest):
             block_indent = None
             for number, following in enumerate(lines[index + 1:], index + 2):
                 if not following.strip():
@@ -350,12 +354,28 @@ report(not unbounded, "every curl sets --connect-timeout and --max-time", "\n".j
 # action under .github/actions is not covered by `/`, so its pins would go stale unseen.
 DEPENDABOT_PATH = os.path.join(ROOT, ".github", "dependabot.yml")
 dependabot = read(DEPENDABOT_PATH) if os.path.exists(DEPENDABOT_PATH) else ""
-listed = re.findall(r"(?m)^\s*-?\s*directory:\s*['\"]?(/\S*?)['\"]?\s*$", dependabot)
-listed += re.findall(r"(?m)^\s+-\s+['\"]?(/\S*?)['\"]?\s*$", dependabot)
+entries = re.split(r"(?m)^\s*-\s+(?=package-ecosystem:)", dependabot)[1:]
+actions_entry = next((e for e in entries if re.match(r"package-ecosystem:\s*['\"]?github-actions", e)), "")
+listed = re.findall(r"(?m)^\s*-?\s*directory:\s*['\"]?(/\S*?)['\"]?\s*$", actions_entry)
+listed += re.findall(r"(?m)^\s+-\s+['\"]?(/\S*?)['\"]?\s*$", actions_entry)
 action_dirs = sorted("/" + os.path.relpath(os.path.dirname(a), ROOT) for a in action_paths)
 uncovered = [d for d in action_dirs if not any(fnmatch.fnmatchcase(d, pattern.rstrip("/") or "/") for pattern in listed)]
 report("/" in listed and not uncovered, "dependabot watches the workflows and every composite action directory",
        "not covered: " + ", ".join((["/"] if "/" not in listed else []) + uncovered))
+
+# Pinned gems that sign or upload (fastlane) live in a Gemfile Dependabot's bundler ecosystem watches,
+# never in an inline `gem install` in a workflow, where no updater can see the pin.
+inline_installs = []
+for path in all_paths:
+    for number, line in run_script_lines(read(path)):
+        if re.search(r"\b(gem install|pip3? install|npm (?:i|install)\b)", line):
+            inline_installs.append(f"{os.path.relpath(path, ROOT)}:{number}: {line.strip()[:90]}")
+bundler_entry = next((e for e in entries if re.match(r"package-ecosystem:\s*['\"]?bundler", e)), "")
+gemfile_dirs = [d for d in re.findall(r"(?m)^\s*directory:\s*['\"]?(/\S*?)['\"]?\s*$", bundler_entry)]
+gemfiles = [os.path.join(ROOT, d.lstrip("/"), "Gemfile.lock") for d in gemfile_dirs]
+report(not inline_installs and bool(gemfiles) and all(os.path.exists(g) for g in gemfiles),
+       "pinned gems come from a locked Gemfile that Dependabot's bundler entry watches, not an inline install",
+       "\n".join(inline_installs) or "no bundler entry in dependabot.yml, or its directory has no Gemfile.lock")
 
 # --- composite actions -------------------------------------------------------
 

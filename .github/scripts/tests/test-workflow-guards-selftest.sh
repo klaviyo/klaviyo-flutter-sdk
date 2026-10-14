@@ -33,6 +33,7 @@ fresh_copy() {
   cp "$ROOT"/.github/workflows/*.yml "$TMP/repo/.github/workflows/"
   cp -R "$ROOT"/.github/actions/. "$TMP/repo/.github/actions/"
   cp "$ROOT/.github/dependabot.yml" "$TMP/repo/.github/"
+  mkdir -p "$TMP/repo/example/ios" && cp "$ROOT/example/ios/Gemfile.lock" "$TMP/repo/example/ios/"
   cp "$ROOT/.github/scripts/check-secrets.sh" "$TMP/repo/.github/scripts/"
   mkdir -p "$TMP/repo/scripts"
   cp "$ROOT/scripts/sdk-ref.sh" "$TMP/repo/scripts/"
@@ -178,6 +179,39 @@ inject_case "the case-insensitive spelling of a context is caught" '${{ GitHub.H
 inject_case "the action path in a run script is allowed" '${{ github.action_path }}' pass
 inject_case "the runner temp directory in a run script is allowed" '${{ runner.temp }}' pass
 inject_case "the run id in a run script is allowed" '${{ github.run_id }}' pass
+
+# Every legal block-scalar header must still be scanned: a run: written as |2, |-, >-, or with a trailing
+# comment cannot escape the rules.
+header_case() { # <label> <run header>
+  fresh_copy
+  JUNK="$2" edit "$W/publish-example-checks.yml" '
+import os
+i = s.index("      - name: Lint composite action shell")
+s = s[:i] + "      - name: Probe\n        run: " + os.environ["JUNK"] + "\n            echo ${{ github.head_ref }}\n\n" + s[i:]
+'
+  expect_fail "$1" "no run script interpolates a branch, tag, release"
+}
+header_case "a run: | block is scanned" '|'
+header_case "a run: |- block is scanned" '|-'
+header_case "a run: |2 block is scanned" '|2'
+header_case "a run: |2- block is scanned" '|2-'
+header_case "a run: |-2 block is scanned" '|-2'
+header_case "a run: >- block is scanned" '>-'
+header_case "a run: | # comment block is scanned" '| # note'
+
+# an inline gem install hides its pin from Dependabot
+fresh_copy
+edit "$DEPLOY" 's = s.replace("          bundle exec fastlane ios install_signing", "          gem install fastlane -v 2.237.0\n          bundle exec fastlane ios install_signing", 1)'
+expect_fail "an inline gem install in a workflow is caught" "pinned gems come from a locked Gemfile"
+
+fresh_copy
+edit "$TMP/repo/.github/dependabot.yml" 's = s.replace("package-ecosystem: bundler", "package-ecosystem: pip", 1)'
+expect_fail "dropping the bundler entry from dependabot is caught" "pinned gems come from a locked Gemfile"
+
+# a bundler entry listing the actions directory must not count as covering it
+fresh_copy
+edit "$TMP/repo/.github/dependabot.yml" 's = s.replace("      - /.github/actions/*\n", "", 1) + "    # bundler below lists /.github/actions/notify-slack-publish\n"'
+expect_fail "directories outside the github-actions entry do not count" "dependabot watches the workflows and every composite action directory"
 
 # a secret in an env: block is the safe form and must not be flagged
 fresh_copy
