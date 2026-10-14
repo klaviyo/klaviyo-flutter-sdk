@@ -55,6 +55,20 @@ echo "$*" >> "$FAKE_BUILD/gradlew-calls"
 FAKE
 chmod +x "$WORK/android/gradlew"
 
+# expect_failure <name> <message regex> <command...>: must exit non-zero AND say why.
+expect_failure() {
+  local name="$1" pattern="$2"; shift 2
+  local out rc=0
+  out="$("$@" 2>&1)" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    fail "$name (exited 0)"
+  elif grep -qE -- "$pattern" <<<"$out"; then
+    pass "$name"
+  else
+    fail "$name (failed, but not with /$pattern/: $(head -c 160 <<<"$out" | tr '\n' ' '))"
+  fi
+}
+
 run_retry() {
   FAKE_BUILD="$WORK/build" PATH="$WORK/bin:$PATH" \
     EXAMPLE_ANDROID_DIR="$WORK/android" RETRY_DELAY_SECONDS=0 \
@@ -89,13 +103,13 @@ check "gradle-retry: read timeout retries" 0 "$rc"
 
 # Kotlin compile error: fails fast, no retry.
 reset_build 1 compile
-if run_retry >/dev/null 2>&1; then fail "gradle-retry: non-dependency error fails fast"; else pass "gradle-retry: non-dependency error fails fast"; fi
+expect_failure "gradle-retry: non-dependency error fails fast" "Build failed with a non-dependency error" run_retry
 check "gradle-retry: no retry on compile error" 1 "$(wc -l < "$WORK/build/builds" | tr -d ' ')"
 check "gradle-retry: no refresh on compile error" "" "$(cat "$WORK/build/gradlew-calls" 2>/dev/null)"
 
 # Persistent resolution failure: gives up after MAX_ATTEMPTS.
 reset_build 9 resolve
-if run_retry >/dev/null 2>&1; then fail "gradle-retry: gives up after max attempts"; else pass "gradle-retry: gives up after max attempts"; fi
+expect_failure "gradle-retry: gives up after max attempts" "Build failed after 3 attempts" run_retry
 check "gradle-retry: three builds attempted" 3 "$(wc -l < "$WORK/build/builds" | tr -d ' ')"
 
 echo

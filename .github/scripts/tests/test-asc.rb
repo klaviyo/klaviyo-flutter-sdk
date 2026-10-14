@@ -63,7 +63,8 @@ def run_asc(args, responses: [])
     out = IO.popen(env, ['ruby', '-r', File.join(dir, 'stub.rb'), File.join(SCRIPTS, 'asc.rb'), *args], err: File.join(dir, 'err.txt'), &:read)
     requests = File.exist?(log) ? JSON.parse(File.read(log)) : []
     github_env = File.exist?(env['GITHUB_ENV']) ? File.read(env['GITHUB_ENV']) : ''
-    yield key, out, $CHILD_STATUS.exitstatus, requests, github_env
+    err = File.exist?(File.join(dir, 'err.txt')) ? File.read(File.join(dir, 'err.txt')) : ''
+    yield key, out, $CHILD_STATUS.exitstatus, requests, github_env, err
   end
 end
 
@@ -201,8 +202,10 @@ describe 'asc.rb against a stateful App Store Connect' do
   end
 
   it 'requires a marketing version for next-build-number, with no fallback to the global highest' do
-    run_asc_stateful(['next-build-number'], builds: builds) do |out, rc, _requests|
+    run_asc_stateful(['next-build-number'], builds: builds) do |out, rc, requests, err|
       refute_equal 0, rc
+      assert_match(/requires a marketing version/, err)
+      assert_empty requests
       refute_match(/\A\d+\n\z/, out)
     end
   end
@@ -217,8 +220,9 @@ describe 'asc.rb against a stateful App Store Connect' do
           assert_match(/marketing version must be numeric/, err)
           assert_empty requests
         end
-        run_asc_stateful(['set-whats-new', bad, '9', notes], builds: builds) do |_out, rc, requests, _err|
+        run_asc_stateful(['set-whats-new', bad, '9', notes], builds: builds) do |_out, rc, requests, err|
           refute_equal 0, rc, "set-whats-new accepted #{bad.inspect}"
+          assert_match(/marketing version must be numeric/, err, "set-whats-new failed for another reason on #{bad.inspect}")
           assert_empty requests
         end
       end
@@ -236,8 +240,9 @@ describe 'asc.rb against a stateful App Store Connect' do
       notes = File.join(dir, 'notes.txt')
       File.write(notes, 'x')
       ['latest', '', '9a'].each do |bad|
-        run_asc_stateful(['set-whats-new', '0.3.2', bad, notes], builds: builds) do |_out, rc, requests, _err|
+        run_asc_stateful(['set-whats-new', '0.3.2', bad, notes], builds: builds) do |_out, rc, requests, err|
           refute_equal 0, rc, "set-whats-new accepted build #{bad.inspect}"
+          assert_match(/build number must be numeric|requires <marketing-version>/, err, "failed for another reason on build #{bad.inspect}")
           assert_empty requests
         end
       end
@@ -250,8 +255,9 @@ describe 'asc.rb against a stateful App Store Connect' do
       assert_match(/requires a marketing version/, err)
       assert_empty requests
     end
-    run_asc_stateful(['next-build-number', ''], builds: builds) do |_out, rc, requests|
+    run_asc_stateful(['next-build-number', ''], builds: builds) do |_out, rc, requests, err|
       refute_equal 0, rc
+      assert_match(/requires a marketing version/, err)
       assert_empty requests
     end
   end
@@ -319,10 +325,12 @@ describe 'asc.rb' do
       end
     end
 
-    it 'fails when no app matches the bundle id' do
+    it 'fails when no app matches the bundle id, and says so' do
       apps = { 'code' => 200, 'body' => { 'data' => [] } }
-      run_asc(['next-build-number', '0.3.1'], responses: [apps]) do |_key, _out, rc, _requests, _env|
+      run_asc(['next-build-number', '0.3.1'], responses: [apps]) do |_key, _out, rc, requests, _env, err|
         refute_equal 0, rc
+        assert_match(/No App Store Connect app for bundle id com\.klaviyo\.FlutterExample/, err)
+        assert_equal 1, requests.length, 'it must stop after the app lookup, before asking for builds'
       end
     end
   end
@@ -377,16 +385,6 @@ describe 'asc.rb' do
           assert_equal 0, rc
           lookup = requests.find { |r| r['path'].start_with?('/v1/builds?') }
           refute_includes lookup['path'], 'alpha'
-        end
-      end
-    end
-
-    it 'fails without a marketing version argument' do
-      Dir.mktmpdir do |dir|
-        notes = File.join(dir, 'notes.txt')
-        File.write(notes, 'x')
-        run_asc(['set-whats-new', '9', notes], responses: [apps, build]) do |_key, _out, rc, _requests, _env|
-          refute_equal 0, rc
         end
       end
     end

@@ -93,6 +93,11 @@ fi
 # Missing on a label deploy (pull_request) -> fail loudly too.
 result="$(run_secrets android pull_request)"
 check "secrets: label deploy with missing secrets fails" "rc=1" "$(head -1 <<<"$result")"
+if grep -q '::error::Missing android deploy secrets:' <<<"$result" && ! grep -q '::notice::' <<<"$result"; then
+  pass "secrets: label deploy error names the missing secrets and is not a skip notice"
+else
+  fail "secrets: label deploy error names the missing secrets and is not a skip notice"
+fi
 
 # Empty string counts as missing.
 out="$(env -i PATH="$PATH" GITHUB_OUTPUT="$WORK/ghout" EVENT_NAME=push \

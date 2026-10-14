@@ -13,6 +13,20 @@ trap 'rm -rf "$WORK"' EXIT
 FAILURES=0
 
 pass() { echo "ok   - $1"; }
+# expect_failure <name> <message regex> <command...>: the command must exit non-zero AND say why.
+# A bare "it failed" proves nothing: a missing tool or a crash would pass it.
+expect_failure() {
+  local name="$1" pattern="$2"; shift 2
+  local out rc=0
+  out="$("$@" 2>&1)" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    fail "$name (exited 0)"
+  elif grep -qE -- "$pattern" <<<"$out"; then
+    pass "$name"
+  else
+    fail "$name (failed, but not with /$pattern/: $(head -c 160 <<<"$out" | tr '\n' ' '))"
+  fi
+}
 fail() { echo "FAIL - $1"; FAILURES=$((FAILURES + 1)); }
 check() {
   local name="$1" expected="$2" actual="$3"
@@ -167,7 +181,7 @@ check "play: retried notes keep the release body" "1" "$(grep -c '^Fixed the thi
 
 # Play: gives up after MAX_ATTEMPTS.
 reset_play 41; echo 5 > "$WORK/play/conflicts"
-if run_play >/dev/null 2>&1; then fail "play: stops after max attempts"; else pass "play: stops after max attempts"; fi
+expect_failure "play: stops after max attempts" "Play upload still conflicted after 3 attempts" run_play
 check "play: three builds attempted" 3 "$(wc -l < "$WORK/play/builds" | tr -d ' ')"
 
 # Internal App Sharing posts to the exact endpoint. The download URL is masked
@@ -188,6 +202,7 @@ check "play: share posts to the upload endpoint" \
 # ---------------------------------------------------------------- fake altool
 cat > "$WORK/bin/altool" <<'FAKE'
 #!/usr/bin/env bash
+echo upload >> "$FAKE_TF/uploads"
 n="$(cat "$FAKE_TF/rejections" 2>/dev/null || echo 0)"
 built="$(cat "$FAKE_TF/built")"
 if [ "$n" -gt 0 ]; then
@@ -296,11 +311,11 @@ run_tf 7 >/dev/null 2>&1
 check "testflight: redundant upload re-resolves from ASC" "7,15" "$(paste -sd, "$WORK/tf/builds")"
 
 reset_tf 1 other
-if run_tf 7 >/dev/null 2>&1; then fail "testflight: non-conflict error fails fast"; else pass "testflight: non-conflict error fails fast"; fi
+expect_failure "testflight: non-conflict error fails fast" "TestFlight upload failed with a non-recoverable error" run_tf 7
 check "testflight: no retry on non-conflict error" 7 "$(paste -sd, "$WORK/tf/builds")"
 
 reset_tf 5 previous
-if run_tf 7 >/dev/null 2>&1; then fail "testflight: stops after max attempts"; else pass "testflight: stops after max attempts"; fi
+expect_failure "testflight: stops after max attempts" "TestFlight upload failed after 3 attempts" run_tf 7
 
 # IPA assertion: the real zip carries the retried number on every attempt.
 if command -v plutil >/dev/null 2>&1; then
@@ -322,14 +337,15 @@ rm -f "$IPA_PATH"
 (cd "$FAKE_TF" && zip -q "$IPA_PATH" Payload/Runner.app/Info.plist)
 FAKE
   chmod +x "$WORK/bin/fake-build-stale"
-  if FAKE_TF="$WORK/tf" ALTOOL="$WORK/bin/altool" IPA_PATH="$WORK/tf/Runner.ipa" \
-    APP_STORE_CONNECT_API_KEY_ID=k APP_STORE_CONNECT_API_KEY_ISSUER_ID=i \
-    GITHUB_ENV="$WORK/tf/github_env" SKIP_IPA_CHECK='' \
-    "$SCRIPTS/testflight-publish.sh" 9 -- "$WORK/bin/fake-build-stale" >/dev/null 2>&1; then
-    fail "testflight: stale IPA number fails loudly"
-  else
-    pass "testflight: stale IPA number fails loudly"
-  fi
+  stale_build() {
+    FAKE_TF="$WORK/tf" ALTOOL="$WORK/bin/altool" IPA_PATH="$WORK/tf/Runner.ipa" \
+      APP_STORE_CONNECT_API_KEY_ID=k APP_STORE_CONNECT_API_KEY_ISSUER_ID=i \
+      GITHUB_ENV="$WORK/tf/github_env" SKIP_IPA_CHECK='' \
+      "$SCRIPTS/testflight-publish.sh" 9 -- "$WORK/bin/fake-build-stale"
+  }
+  expect_failure "testflight: stale IPA number fails loudly, naming both numbers" \
+    "IPA carries CFBundleVersion 1, expected 9" stale_build
+  check "testflight: a stale IPA is never uploaded" "0" "$(cat "$WORK/tf/uploads" 2>/dev/null | wc -l | tr -d ' ')"
 fi
 
 # ---------------------------------------------------------------- release notes
