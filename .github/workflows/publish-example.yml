@@ -3,7 +3,9 @@
 # Triggers:
 #   - push to master / rel/**, release: published  -> both platforms, only when
 #     the repo variable EXAMPLE_APP_PUBLISH_ENABLED is 'true'
-#   - workflow_dispatch -> chosen platform(s); ignores the variable
+#   - workflow_dispatch -> chosen platform(s); ignores the variable. With
+#     check_credentials set, no builds: each platform job instead verifies its
+#     store credentials are usable (read-only) and reports.
 #   - pull_request touching publish files -> dry run: script tests plus
 #     unsigned release builds, no store access and no secrets
 #
@@ -30,6 +32,11 @@ on:
           - both
           - android
           - ios
+      check_credentials:
+        description: Only verify store credentials are usable; do not build or upload
+        required: false
+        default: false
+        type: boolean
   pull_request:
     paths:
       - '.github/workflows/publish-example.yml'
@@ -45,17 +52,19 @@ env:
   FLUTTER_VERSION: 3.38.7
   ANDROID_PACKAGE: com.klaviyo.flutterexample
   IOS_BUNDLE_ID: com.klaviyo.FlutterExample
+  GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
 
 jobs:
   dry-run-scripts:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 2
+          persist-credentials: false
 
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
         with:
           ruby-version: '3.3'
 
@@ -65,21 +74,38 @@ jobs:
           ruby -c .github/scripts/asc.rb
           ruby -c example/ios/fastlane/Fastfile
 
+      - name: Lint workflow files
+        run: |
+          curl -sSLo actionlint https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
+            && tar xzf actionlint actionlint
+          ./actionlint .github/workflows/publish-example.yml
+
       - name: Test retry loops and release notes
         run: .github/scripts/tests/test-publish-scripts.sh
+
+      - name: Test SDK ref resolution
+        run: .github/scripts/tests/test-sdk-ref.sh
+
+      - name: Test JitPack retry wrapper
+        run: .github/scripts/tests/test-gradle-retry.sh
+
+      - name: Test App Store Connect helper
+        run: ruby .github/scripts/tests/test-asc.rb
 
   dry-run-android:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
@@ -105,7 +131,8 @@ jobs:
         working-directory: example
         run: |
           flutter pub get
-          flutter build appbundle --release --build-number=4242
+          ../scripts/sdk-ref.sh
+          ../.github/scripts/gradle-retry.sh flutter build appbundle --release --build-number=4242 --dart-define-from-file=build-info.json
           test -f build/app/outputs/bundle/release/app-release.aab
 
   dry-run-ios:
@@ -114,9 +141,11 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
@@ -127,36 +156,85 @@ jobs:
         working-directory: example
         run: |
           flutter pub get
-          flutter build ipa --release --no-codesign --build-number=4242
+          ../scripts/sdk-ref.sh
+          flutter build ipa --release --no-codesign --build-number=4242 --dart-define-from-file=build-info.json
           PLIST=build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Info.plist
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")" = 4242
 
-  deploy-android:
-    name: Publish to Play internal track
-    if: |
-      (github.event_name == 'workflow_dispatch' && inputs.platform != 'ios')
-      || ((github.event_name == 'push' || github.event_name == 'release') && vars.EXAMPLE_APP_PUBLISH_ENABLED == 'true')
+  verify:
+    if: github.event_name != 'pull_request' && inputs.check_credentials != true
     runs-on: ubuntu-24.04
-    concurrency:
-      group: publish-example-android
-      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 2
+          persist-credentials: false
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - name: Read SDK version
-        run: echo "SDK_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')" >> "$GITHUB_ENV"
+      - name: Analyze and test the plugin
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+
+      - name: Analyze and test the example app
+        working-directory: example
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+
+  deploy-android:
+    name: Publish to Play internal track
+    needs: verify
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.platform != 'ios')
+      || ((github.event_name == 'push' || github.event_name == 'release') && vars.EXAMPLE_APP_PUBLISH_ENABLED == 'true')
+    runs-on: ubuntu-24.04
+    environment: android-internal-track
+    concurrency:
+      group: publish-example-android-${{ github.event_name == 'push' && github.ref || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'push' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set source label
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then
+            source_label="release $RELEASE_TAG"
+          else
+            source_label="$REF_NAME"
+          fi
+          echo "SOURCE_LABEL=$(printf '%s' "$source_label" | tr -cd 'A-Za-z0-9._/ +-')" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Generate build info
+        run: |
+          ./scripts/sdk-ref.sh
+          SDK_INFO="$(jq -r '"Flutter: \(.flutterSdkRef) · iOS: \(.iosSdkRef) · Android: \(.androidSdkRef)"' example/build-info.json)"
+          {
+            echo "SDK_INFO=$SDK_INFO"
+            echo "SDK_VERSION=$(jq -r .sdkVersion example/build-info.json)"
+            echo "SHORT_SHA=$(jq -r .commitShort example/build-info.json)"
+          } >> "$GITHUB_ENV"
 
       - name: Write Firebase config and signing keystore
         env:
@@ -182,23 +260,49 @@ jobs:
             echo "keyPassword=$KEY_PASSWORD"
           } > example/android/key.properties
 
-      - name: Prepare release notes
+      - name: Check credentials only
+        if: inputs.check_credentials == true
         env:
-          RELEASE_BODY: ${{ github.event.release.body }}
-          GIT_REF_NAME: ${{ github.ref_name }}
+          PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt"
-          # Play caps release notes at 500 characters per locale.
-          .github/scripts/release-notes.sh 500 "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/play-notes.txt"
-          cat "$RUNNER_TEMP/play-notes.txt"
+          keytool -list -keystore "$RUNNER_TEMP/upload.jks" -alias "$ALIAS" \
+            -storepass "$KEY_STORE_PASSWORD" -keypass "$KEY_PASSWORD" >/dev/null
+          echo "Keystore opens and contains the '$ALIAS' alias"
 
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           credentials_json: ${{ secrets.SERVICE_ACCOUNT_JSON }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      - name: Check Play API access only
+        if: inputs.check_credentials == true
+        env:
+          PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
+        run: |
+          next="$(.github/scripts/play-publish.sh next-version-code)"
+          echo "Play API is reachable; highest versionCode seen: $((next - 1))"
+
+      - name: Prepare release notes
+        if: inputs.check_credentials != true
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          GIT_REF_NAME: ${{ env.SOURCE_LABEL }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt"
+          # Play caps release notes at 500 characters per locale; the CI run
+          # link only fits TestFlight's 4000.
+          BUILD_INFO=example/build-info.json \
+            .github/scripts/release-notes.sh 500 "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/play-notes.txt"
+          cat "$RUNNER_TEMP/play-notes.txt"
 
       - name: Build and upload (retries on versionCode conflict)
+        if: inputs.check_credentials != true
         working-directory: example
         env:
           PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
@@ -207,27 +311,31 @@ jobs:
           PLAY_TRACK: internal
           # Play only accepts 'draft' releases until the app's first manual rollout.
           PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+          RELEASE_NAME: ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }}) ${{ env.SHORT_SHA }}
         run: |
           flutter pub get
           # shellcheck disable=SC2016
           ../.github/scripts/play-publish.sh deploy -- \
-            bash -c 'flutter build appbundle --release --build-name="$SDK_VERSION" --build-number="$VERSION_CODE"'
+            bash -c '../.github/scripts/gradle-retry.sh flutter build appbundle --release --build-name="$SDK_VERSION" --build-number="$VERSION_CODE" --dart-define-from-file=build-info.json'
 
       - name: Clean up signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks" example/android/key.properties
 
       - name: Notify Slack on success
-        if: success()
+        if: success() && inputs.check_credentials != true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: success
           platform: Play Store internal track
           version_label: ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }})
+          source_label: ${{ env.SOURCE_LABEL }}
+          sdk_info: ${{ env.SDK_INFO }}
           # Only resolves for Google accounts on the internal testers list.
           access_url: https://play.google.com/apps/test/${{ env.ANDROID_PACKAGE }}/${{ env.VERSION_CODE }}
           access_label: Install from Play (internal testers)
+          install_notes: Install ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }}) from the link with a Google account on the internal testers list.
 
       - name: Notify Slack on failure
         if: failure()
@@ -237,30 +345,57 @@ jobs:
           result: failure
           platform: Play Store internal track
           version_label: ${{ env.SDK_VERSION || '?' }} (${{ env.VERSION_CODE || '?' }})
+          source_label: ${{ env.SOURCE_LABEL }}
+          sdk_info: ${{ env.SDK_INFO }}
 
   deploy-ios:
     name: Publish to TestFlight
+    needs: verify
     if: |
       (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
       || ((github.event_name == 'push' || github.event_name == 'release') && vars.EXAMPLE_APP_PUBLISH_ENABLED == 'true')
     runs-on: macos-26
+    timeout-minutes: 45
+    environment: testflight
     concurrency:
-      group: publish-example-ios
-      cancel-in-progress: false
+      group: publish-example-ios-${{ github.event_name == 'push' && github.ref || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'push' }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    outputs:
+      build_number: ${{ env.BUILD_NUMBER }}
+      marketing_version: ${{ env.SDK_VERSION }}
+      sdk_info: ${{ env.SDK_INFO }}
+      source_label: ${{ env.SOURCE_LABEL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 2
+          persist-credentials: false
 
-      - uses: subosito/flutter-action@v2
+      - name: Set source label
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then
+            source_label="release $RELEASE_TAG"
+          else
+            source_label="$REF_NAME"
+          fi
+          echo "SOURCE_LABEL=$(printf '%s' "$source_label" | tr -cd 'A-Za-z0-9._/ +-')" >> "$GITHUB_ENV"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - name: Read SDK version
-        run: echo "SDK_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')" >> "$GITHUB_ENV"
+      - name: Generate build info
+        run: |
+          ./scripts/sdk-ref.sh
+          SDK_INFO="$(jq -r '"Flutter: \(.flutterSdkRef) · iOS: \(.iosSdkRef) · Android: \(.androidSdkRef)"' example/build-info.json)"
+          echo "SDK_INFO=$SDK_INFO" >> "$GITHUB_ENV"
+          echo "SDK_VERSION=$(jq -r .sdkVersion example/build-info.json)" >> "$GITHUB_ENV"
 
       # Runs before setup-ruby so pod install uses the runner's own CocoaPods.
       # The build number here is a placeholder; build_ipa passes the real one
@@ -270,9 +405,10 @@ jobs:
         run: |
           flutter pub get
           flutter build ios --release --config-only --no-codesign \
-            --build-name="$SDK_VERSION" --build-number=1
+            --build-name="$SDK_VERSION" --build-number=1 \
+            --dart-define-from-file=build-info.json
 
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
         with:
           ruby-version: '3.3'
 
@@ -301,7 +437,28 @@ jobs:
           BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
         run: echo "INITIAL_BUILD_NUMBER=$(ruby .github/scripts/asc.rb next-build-number)" >> "$GITHUB_ENV"
 
+      - name: Check credentials only
+        if: inputs.check_credentials == true
+        run: |
+          echo "ASC API key accepted; next build number would be $INITIAL_BUILD_NUMBER"
+
+      - name: Check match repo is readable
+        if: inputs.check_credentials == true
+        working-directory: example/ios
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
+          MATCH_READONLY: "true"
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          eval "$(ssh-agent -s)"
+          printf '%s\n' "$MATCH_DEPLOY_KEY" | ssh-add - 2>/dev/null
+          git ls-remote git@github.com:klaviyo/mobile-certificates.git HEAD >/dev/null
+          echo "match repository is readable with the deploy key"
+
       - name: Install signing identity and build, upload (retries on build number conflict)
+        if: inputs.check_credentials != true
         working-directory: example/ios
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
@@ -333,35 +490,24 @@ jobs:
           ../../.github/scripts/testflight-publish.sh "$INITIAL_BUILD_NUMBER" -- \
             bash -c 'fastlane ios build_ipa build_number:"$BUILD_NUMBER"'
 
-      - name: Set TestFlight "What to Test"
-        env:
-          RELEASE_BODY: ${{ github.event.release.body }}
-          GIT_REF_NAME: ${{ github.ref_name }}
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
-          BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
-        run: |
-          printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt"
-          # TestFlight allows 4000 characters.
-          .github/scripts/release-notes.sh 4000 "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/testflight-notes.txt"
-          cat "$RUNNER_TEMP/testflight-notes.txt"
-          ruby .github/scripts/asc.rb set-whats-new "$BUILD_NUMBER" "$RUNNER_TEMP/testflight-notes.txt"
-
       - name: Clean up signing material
         if: always()
         run: rm -rf "$HOME/.appstoreconnect/private_keys" "$RUNNER_TEMP/dist.p12"
 
       - name: Notify Slack on success
-        if: success()
+        if: success() && inputs.check_credentials != true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: success
           platform: TestFlight
           version_label: ${{ env.SDK_VERSION }} (${{ env.BUILD_NUMBER }})
+          source_label: ${{ env.SOURCE_LABEL }}
+          sdk_info: ${{ env.SDK_INFO }}
           # Requires an App Store Connect login; testers install via the TestFlight app.
           access_url: https://appstoreconnect.apple.com/apps/${{ env.ASC_APP_ID }}/testflight/ios
           access_label: TestFlight in App Store Connect
+          install_notes: Install ${{ env.SDK_VERSION }} (${{ env.BUILD_NUMBER }}) from the TestFlight app once Apple finishes processing it, usually in 5 to 30 minutes. Not a tester yet? Ask in #mobile-push-team to be added, and give them your Apple ID email.
 
       - name: Notify Slack on failure
         if: failure()
@@ -371,3 +517,67 @@ jobs:
           result: failure
           platform: TestFlight
           version_label: ${{ env.SDK_VERSION || '?' }} (${{ env.BUILD_NUMBER || env.INITIAL_BUILD_NUMBER || '?' }})
+          source_label: ${{ env.SOURCE_LABEL }}
+          sdk_info: ${{ env.SDK_INFO }}
+
+  what-to-test:
+    name: Set TestFlight "What to Test"
+    needs: deploy-ios
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+        with:
+          ruby-version: '3.3'
+
+      - name: Write App Store Connect API key
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          if [ -z "$APP_STORE_CONNECT_API_KEY_ID" ] || [ -z "$APP_STORE_CONNECT_API_KEY_BASE64" ]; then
+            echo "::error::App Store Connect API key secrets are not set. See .github/scripts/README.md."
+            exit 1
+          fi
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          printf '%s' "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          chmod 600 "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+
+      - name: Set TestFlight "What to Test"
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          GIT_REF_NAME: ${{ needs.deploy-ios.outputs.source_label }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
+          BUILD_NUMBER: ${{ needs.deploy-ios.outputs.build_number }}
+        run: |
+          printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt"
+          # TestFlight allows 4000 characters.
+          .github/scripts/release-notes.sh 4000 "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/testflight-notes.txt"
+          cat "$RUNNER_TEMP/testflight-notes.txt"
+          ruby .github/scripts/asc.rb set-whats-new "$BUILD_NUMBER" "$RUNNER_TEMP/testflight-notes.txt"
+
+      - name: Clean up signing material
+        if: always()
+        run: rm -rf "$HOME/.appstoreconnect/private_keys"
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: failure
+          platform: TestFlight "What to Test"
+          version_label: ${{ needs.deploy-ios.outputs.marketing_version }} (${{ needs.deploy-ios.outputs.build_number }})
+          source_label: ${{ needs.deploy-ios.outputs.source_label }}
+          sdk_info: ${{ needs.deploy-ios.outputs.sdk_info }}
+          install_notes: The build itself is on TestFlight; only the "What to Test" notes failed to save.

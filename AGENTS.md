@@ -70,6 +70,10 @@ To test against a local native SDK build:
 - **Example lockfiles are committed**: `example/pubspec.lock` and `example/ios/Podfile.lock` pin what the published example app ships with. Native SDK bumps and `scripts/configure-sdk.sh` overrides change `Podfile.lock` — regenerate it with `pod install` in `example/ios` and commit the result. Never commit a lock pointing at a feature branch or local checkout.
 - `BufferedBroadcastStreamController` (`lib/src/utils/buffered_broadcast_stream_controller.dart`) exists because native events (push tokens, notifications) can fire before Dart listeners are attached. Don't replace it with a plain `StreamController.broadcast`.
 
+## Example app deployment
+
+`.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**` and on published releases, gated by the repo variable `EXAMPLE_APP_PUBLISH_ENABLED`. `workflow_dispatch` ignores the gate; its `check_credentials` input runs a read-only verification of each platform's store credentials instead of a deploy. Deploy jobs run in the GitHub environments `android-internal-track` and `testflight`. Secrets and setup live in `.github/scripts/README.md`.
+
 ## Code Review
 
 CodeRabbit is active on this repo and auto-reviews PRs. It reads this file as a code guidelines

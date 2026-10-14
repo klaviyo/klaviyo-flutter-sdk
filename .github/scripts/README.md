@@ -22,9 +22,18 @@ platforms. Dry runs use no secrets.
   altool doesn't report the number.
 - `asc.rb`: App Store Connect API helper (next build number, TestFlight
   "What to Test"). Standard library only.
-- `release-notes.sh`: store release notes with the SDK version, commit and UTC
-  build date, followed by the GitHub release body or, failing that, the commit
-  subject.
+- `release-notes.sh`: store release notes with the SDK version, source ref,
+  commit, UTC build date and the three SDK refs (when a `build-info.json` from
+  `scripts/sdk-ref.sh` is passed as BUILD_INFO), followed by the GitHub
+  release body or, failing that, the commit subject. Truncation ends with a
+  `[truncated]` marker.
+- `gradle-retry.sh`: wraps the flutter build so a JitPack timeout or 404 while
+  resolving the Android SDK retries with `--refresh-dependencies`; any other
+  build failure exits immediately.
+- `scripts/sdk-ref.sh` (repo root): writes `example/build-info.json` with the
+  Flutter/iOS/Android SDK refs (plain version, or `branch@sha`) that the
+  builds embed via `--dart-define-from-file` and the app shows in the Profile
+  tab.
 
 ## One-time setup (humans)
 
@@ -73,8 +82,16 @@ Repository variables:
 - `EXAMPLE_APP_PUBLISH_ENABLED=true` to turn on automatic deploys
 - `PLAY_RELEASE_STATUS=draft` until the first Play release is rolled out
 
-Consider putting the store secrets in a GitHub environment with branch
-restrictions, so a workflow edited in a pull request can't read them.
+The deploy jobs run in GitHub environments — `android-internal-track` for
+Play, `testflight` for App Store Connect (same names as the native test apps).
+Move the store secrets above into those two environments and restrict their
+deployment branches to `master`, `rel/**` and release tags, so a workflow
+edited in a pull request can't read them. `workflow_dispatch` with
+`check_credentials` verifies both setups end to end without uploading:
+keystore + Play edit round-trip on Android, ASC key + match repo read on iOS.
+
+A push to `rel/**` followed by a published release from the same commit
+deploys twice with different build numbers; both deploys are valid.
 
 ## Public build logs
 
