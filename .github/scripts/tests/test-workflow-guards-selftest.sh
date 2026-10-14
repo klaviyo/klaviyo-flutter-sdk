@@ -96,6 +96,35 @@ fresh_copy
 edit "$DEPLOY" 's = s.replace("RELEASE_TAG: ${{ github.event.release.tag_name }}", "RELEASE_TAG: ${{ toLower(github.event.release.tag_name) }}", 1)'
 expect_fail "an unknown function inside an expression is caught" "expressions only call functions"
 
+# --- pinned actions
+
+LINT_WF="$W/lint.yml"
+VERSION_WF="$W/version-check.yml"
+
+fresh_copy
+edit "$TEST_WF" 's = s.replace("uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4", "uses: actions/checkout@v4", 1)'
+expect_fail "an unpinned action in a workflow the deploy calls is caught" "every action is pinned to a full commit SHA"
+
+fresh_copy
+edit "$TEST_WF" 's = s.replace("uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0", "uses: codecov/codecov-action@v4", 1)'
+expect_fail "an unpinned third-party action is caught" "every action is pinned to a full commit SHA"
+
+fresh_copy
+edit "$LINT_WF" 's = s.replace("uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2", "uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2", 1)'
+expect_fail "a pinned action with no version comment is caught" "every action is pinned to a full commit SHA"
+
+fresh_copy
+edit "$LINT_WF" 's = s.replace("uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2", "uses: subosito/flutter-action@1a44944 # v2", 1)'
+expect_fail "an abbreviated SHA is caught" "every action is pinned to a full commit SHA"
+
+fresh_copy
+edit "$VERSION_WF" 's = s.replace("uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4", "uses: actions/checkout@v4", 1)'
+expect_fail "an unpinned action in version-check.yml is caught" "every action is pinned to a full commit SHA"
+
+fresh_copy
+edit "$VERSION_WF" 's = s.replace("        with:\n          persist-credentials: false\n", "", 1)'
+expect_fail "version-check.yml checking out with credentials is caught" "every checkout sets persist-credentials"
+
 # --- checkouts
 
 fresh_copy

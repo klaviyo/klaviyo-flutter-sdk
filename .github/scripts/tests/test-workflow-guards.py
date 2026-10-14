@@ -109,6 +109,9 @@ workflow_paths = [DEPLOY_PATH, CHECKS_PATH]
 # Every workflow file the deploy workflow calls, because they run with the same trust.
 for called in re.findall(r"uses: \./\.github/workflows/([A-Za-z0-9_.-]+)", deploy):
     workflow_paths.append(os.path.join(WORKFLOW_DIR, called))
+VERSION_CHECK_PATH = os.path.join(WORKFLOW_DIR, "version-check.yml")
+if os.path.exists(VERSION_CHECK_PATH) and VERSION_CHECK_PATH not in workflow_paths:
+    workflow_paths.append(VERSION_CHECK_PATH)
 all_paths = workflow_paths + action_paths
 
 # --- expressions -----------------------------------------------------------
@@ -139,6 +142,29 @@ for path in all_paths:
                 unsupported.add(name)
 report(not unsupported, "expressions only call functions that GitHub Actions provides",
        "unsupported: " + ", ".join(sorted(unsupported)))
+
+# --- pinned actions ---------------------------------------------------------
+
+# Every third-party action runs with the repository's trust, so it is pinned to a full commit SHA with a
+# version comment. Local actions and reusable workflows (./) are exempt. This covers every workflow the
+# deploy calls, not only the files the deploy itself defines.
+PIN = re.compile(r"@[0-9a-f]{40}(\s+#\s*v?[0-9][\w.-]*)?\s*$")
+unpinned = []
+total_uses = 0
+for path in all_paths:
+    for number, line in enumerate(read(path).split("\n"), 1):
+        match = re.match(r"^\s*(?:- )?uses:\s*(\S+)(.*)$", line)
+        if not match or match.group(1).startswith("./"):
+            continue
+        total_uses += 1
+        ref = match.group(1) + match.group(2)
+        sha_ok = re.search(r"@[0-9a-f]{40}$", match.group(1))
+        comment_ok = re.search(r"#\s*v?[0-9]", match.group(2))
+        if not (sha_ok and comment_ok):
+            unpinned.append(f"{os.path.relpath(path, ROOT)}:{number}: {ref.strip()}")
+report(total_uses > 0 and not unpinned,
+       f"every action is pinned to a full commit SHA with a version comment ({total_uses} checked)",
+       "unpinned:\n" + "\n".join(unpinned))
 
 # --- checkouts -------------------------------------------------------------
 
