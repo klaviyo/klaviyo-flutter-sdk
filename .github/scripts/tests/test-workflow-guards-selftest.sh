@@ -33,6 +33,8 @@ fresh_copy() {
   cp "$ROOT"/.github/workflows/*.yml "$TMP/repo/.github/workflows/"
   cp -R "$ROOT"/.github/actions/. "$TMP/repo/.github/actions/"
   cp "$ROOT/.github/scripts/check-secrets.sh" "$TMP/repo/.github/scripts/"
+  mkdir -p "$TMP/repo/scripts"
+  cp "$ROOT/scripts/sdk-ref.sh" "$TMP/repo/scripts/"
   cp "$ROOT/.github/scripts/tests/test-workflow-guards.py" "$TMP/repo/.github/scripts/tests/"
 }
 
@@ -77,6 +79,7 @@ PY
 
 W="$TMP/repo/.github/workflows"
 DEPLOY="$W/publish-example.yml"
+CHECKS="$W/publish-example-checks.yml"
 TEST_WF="$W/test.yml"
 SLACK="$TMP/repo/.github/actions/notify-slack-publish/action.yml"
 SECRETS="$TMP/repo/.github/scripts/check-secrets.sh"
@@ -124,6 +127,17 @@ expect_fail "an unpinned action in version-check.yml is caught" "every action is
 fresh_copy
 edit "$VERSION_WF" 's = s.replace("        with:\n          persist-credentials: false\n", "", 1)'
 expect_fail "version-check.yml checking out with credentials is caught" "every checkout sets persist-credentials"
+
+# --- lint coverage
+
+fresh_copy
+mkdir -p "$TMP/repo/.github/tools"
+printf '#!/usr/bin/env bash\necho hi\n' > "$TMP/repo/.github/tools/new-helper.sh"
+expect_fail "a script added outside the shellcheck globs is caught" "the shellcheck step covers every script"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh scripts/sdk-ref.sh", "shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh", 1)'
+expect_fail "dropping scripts/sdk-ref.sh from the shellcheck step is caught" "the shellcheck step covers every script"
 
 # --- checkouts
 
@@ -236,8 +250,6 @@ expect_fail "building the merge commit is caught" "builds the pull request head,
 
 # --- every stamper call carries the event fields
 
-CHECKS="$W/publish-example-checks.yml"
-
 fresh_copy
 edit "$CHECKS" '
 i = s.index("      - name: Build release App Bundle")
@@ -262,6 +274,16 @@ j = s.index("      - uses: actions/setup-java@", i)
 s = s[:j] + "      - name: Seed versions\n        run: ./scripts/sdk-ref.sh\n\n" + s[j:]
 '
 expect_fail "a new seed step that calls the stamper bare is caught" "every step that runs sdk-ref.sh passes the shared event fields"
+
+# A step that only passes the stamper's path to another command (the lint step runs shellcheck on it) is
+# not a stamper call and must not be asked for the event fields.
+fresh_copy
+edit "$CHECKS" '
+i = s.index("      - name: Lint scripts")
+j = s.index("          shellcheck .github/scripts/", i)
+s = s[:j] + "          shellcheck scripts/sdk-ref.sh .github/scripts/*.sh\n" + s[j:]
+'
+expect_pass "passing sdk-ref.sh to shellcheck is not mistaken for running it"
 
 # --- notes inputs
 

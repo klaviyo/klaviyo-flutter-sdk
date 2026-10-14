@@ -166,6 +166,37 @@ report(total_uses > 0 and not unpinned,
        f"every action is pinned to a full commit SHA with a version comment ({total_uses} checked)",
        "unpinned:\n" + "\n".join(unpinned))
 
+# --- lint coverage ----------------------------------------------------------
+
+# The lint step names its inputs as globs. A script added outside them would never be linted, so every
+# shell script under .github/ and the stamper must match a glob the step passes to shellcheck. The
+# scripts that predate this change are the only ones outside the globs.
+import fnmatch
+
+checks_text = read(CHECKS_PATH)
+lint_step = re.search(r"(?ms)- name: Lint scripts\n.*?run: \|\n(.*?)(?=^      - |\Z)", checks_text)
+shellcheck_line = ""
+if lint_step:
+    for line in lint_step.group(1).splitlines():
+        if line.strip().startswith("shellcheck ") and "--version" not in line:
+            shellcheck_line = line.strip()
+globs = [tok for tok in shellcheck_line.split()[1:] if not tok.startswith("-")]
+uncovered = []
+scripts_seen = 0
+for root, _dirs, names in os.walk(os.path.join(ROOT, ".github")):
+    for name in names:
+        if name.endswith(".sh"):
+            rel = os.path.relpath(os.path.join(root, name), ROOT)
+            scripts_seen += 1
+            if not any(fnmatch.fnmatch(rel, pattern) for pattern in globs):
+                uncovered.append(rel)
+if os.path.exists(os.path.join(ROOT, "scripts", "sdk-ref.sh")) and not any(
+        fnmatch.fnmatch("scripts/sdk-ref.sh", pattern) for pattern in globs):
+    uncovered.append("scripts/sdk-ref.sh")
+report(bool(globs) and scripts_seen > 0 and not uncovered,
+       f"the shellcheck step covers every script under .github and scripts/sdk-ref.sh ({scripts_seen} found)",
+       ("uncovered: " + ", ".join(uncovered)) if uncovered else "no shellcheck line found in the Lint scripts step")
+
 # --- checkouts -------------------------------------------------------------
 
 total = 0
@@ -270,10 +301,12 @@ for path in workflow_paths:
     text = read(path)
     for job_id, body in split_jobs(text).items():
         for block in split_steps(body):
-            # Any step that invokes the script, in a multi-line run block or a one-line `run:`. Mentions in
-            # comments are ignored, and a step that only names the file (a path filter) is not a step.
+            # Any step that RUNS the script: the path is the command itself, at the start of a line or after
+            # a shell separator, in a multi-line run block or a one-line `run:`. It is not a run when the
+            # path is an argument to another command (shellcheck scripts/sdk-ref.sh), or in a comment.
             code = "\n".join(line for line in block.splitlines() if not line.lstrip().startswith("#"))
-            if re.search(r"(^|[\s;&|(]|\./|\.\./)scripts/sdk-ref\.sh(\s|$|;|&|\|)", code) and re.search(r"(?m)^\s+(run:|\S)", code):
+            command_position = r"(?:^|[;&|(]|\$\(|run:)\s*(?:\./|\.\./)?scripts/sdk-ref\.sh(?:\s|$|;|&|\|)"
+            if re.search(command_position, code, flags=re.M):
                 stamper_steps.append((os.path.relpath(path, ROOT), job_id, block))
 bare = []
 for rel, job_id, block in stamper_steps:
