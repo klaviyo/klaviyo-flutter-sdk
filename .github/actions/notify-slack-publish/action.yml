@@ -14,6 +14,16 @@ inputs:
     description: Version string to show in the message (e.g. 'X.Y.Z (build)')
     required: false
     default: '?'
+  source_label:
+    description: Sanitized branch or release tag the build came from
+    required: false
+    default: ''
+  sdk_info:
+    description: >-
+      Pre-formatted SDK refs line, e.g. "Flutter: a@b · iOS: 5.4.1 · Android:
+      4.5.1" (from scripts/sdk-ref.sh).
+    required: false
+    default: ''
   access_url:
     description: >-
       Where testers get the build. This repo is public, so only pass links that
@@ -25,6 +35,12 @@ inputs:
     description: Link text for access_url
     required: false
     default: Open build
+  install_notes:
+    description: >-
+      Extra install guidance appended to the access line (e.g. TestFlight
+      processing time, tester-list requirement).
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -35,7 +51,7 @@ runs:
       run: echo "::warning::SLACK_WEBHOOK_URL is not set; skipping Slack notification"
 
     - if: inputs.webhook != ''
-      uses: slackapi/slack-github-action@v2.1.1
+      uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
       with:
         webhook: ${{ inputs.webhook }}
         webhook-type: incoming-webhook
@@ -49,7 +65,7 @@ runs:
             - type: "section"
               text:
                 type: "mrkdwn"
-                text: "*Repository:* ${{ github.repository }}\n*Trigger:* ${{ github.event_name }} on `${{ github.ref_name }}`\n*Version:* `${{ inputs.version_label }}`\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>\n*Author:* ${{ github.actor }}${{ inputs.access_url != '' && format('\n*Get the build:* <{0}|{1}> (requires tester access)', inputs.access_url, inputs.access_label) || '' }}"
+                text: "*Repository:* ${{ github.repository }}\n*Trigger:* ${{ github.event_name }}${{ inputs.source_label != '' && format(' on `{0}`', inputs.source_label) || '' }}\n*Version:* `${{ inputs.version_label }}`${{ inputs.sdk_info != '' && format('\n*SDKs:* `{0}`', inputs.sdk_info) || '' }}\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>\n*Author:* ${{ github.actor }}${{ inputs.access_url != '' && format('\n*Get the build:* <{0}|{1}> (requires tester access)', inputs.access_url, inputs.access_label) || '' }}${{ inputs.install_notes != '' && format('\n{0}', inputs.install_notes) || '' }}"
             - type: "section"
               text:
                 type: "mrkdwn"
