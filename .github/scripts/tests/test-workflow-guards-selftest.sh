@@ -205,6 +205,35 @@ fresh_copy
 edit "$DEPLOY" 's = s.replace("          ref: ${{ github.event.pull_request.head.sha || github.sha }}", "          ref: ${{ github.sha }}", 1)'
 expect_fail "building the merge commit is caught" "builds the pull request head, not the merge commit"
 
+# --- every stamper call carries the event fields
+
+CHECKS="$W/publish-example-checks.yml"
+
+fresh_copy
+edit "$CHECKS" '
+i = s.index("      - name: Build release App Bundle")
+j = s.index("        env:\n", i)
+k = s.index("        run: |\n", j)
+s = s[:j] + s[k:]
+'
+expect_fail "a dry-run stamper call with no env is caught" "every step that runs sdk-ref.sh passes the shared event fields"
+
+fresh_copy
+edit "$CHECKS" '
+i = s.index("      - name: Build unsigned release archive")
+j = s.index("          PR_NUMBER: ${{ github.event.pull_request.number }}\n", i)
+s = s[:j] + s[j + len("          PR_NUMBER: ${{ github.event.pull_request.number }}\n"):]
+'
+expect_fail "a dry-run stamper call missing PR_NUMBER is caught" "every step that runs sdk-ref.sh passes the shared event fields"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("  deploy-android:")
+j = s.index("      - uses: actions/setup-java@", i)
+s = s[:j] + "      - name: Seed versions\n        run: ./scripts/sdk-ref.sh\n\n" + s[j:]
+'
+expect_fail "a new seed step that calls the stamper bare is caught" "every step that runs sdk-ref.sh passes the shared event fields"
+
 # --- notes inputs
 
 fresh_copy

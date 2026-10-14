@@ -235,6 +235,29 @@ result = next((b for b in split_steps(jobs.get("deploy-ios", "")) if "id: result
 report('echo "ios_marketing_version=$IOS_MARKETING_VERSION"' in result,
        "the deploy-ios result step exports the stripped marketing version separately from the display version")
 
+# Every step in every workflow that runs the build-info stamper carries the shared event fields. Runners
+# set CI=true on every step, so a call with no env fails the moment the stamper refuses to fall back,
+# including the dry-run builds and any seed or pre-build step added later.
+STAMP_ENV = ("EVENT_NAME", "RELEASE_TAG", "HEAD_REF", "PR_NUMBER", "REF_NAME")
+stamper_steps = []
+for path in workflow_paths:
+    text = read(path)
+    for job_id, body in split_jobs(text).items():
+        for block in split_steps(body):
+            # Any step that invokes the script, in a multi-line run block or a one-line `run:`. Mentions in
+            # comments are ignored, and a step that only names the file (a path filter) is not a step.
+            code = "\n".join(line for line in block.splitlines() if not line.lstrip().startswith("#"))
+            if re.search(r"(^|[\s;&|(]|\./|\.\./)scripts/sdk-ref\.sh(\s|$|;|&|\|)", code) and re.search(r"(?m)^\s+(run:|\S)", code):
+                stamper_steps.append((os.path.relpath(path, ROOT), job_id, block))
+bare = []
+for rel, job_id, block in stamper_steps:
+    missing = [v for v in STAMP_ENV if f"{v}:" not in block]
+    if missing:
+        bare.append(f"{rel} {job_id}: {block.splitlines()[0]} is missing {', '.join(missing)}")
+report(len(stamper_steps) >= 4 and not bare,
+       f"every step that runs sdk-ref.sh passes the shared event fields ({len(stamper_steps)} found)",
+       "\n".join(bare) or f"expected at least 4 stamper steps (2 deploy, 2 dry-run), found {len(stamper_steps)}")
+
 # --- gating ----------------------------------------------------------------
 
 for job in ("deploy-android", "deploy-ios"):

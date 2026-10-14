@@ -39,6 +39,27 @@ def report(ok, name, detail=""):
         print(f"  | {line}")
 
 
+def header_problems(out, platform, event, version="1.2.3", build="7"):
+    """Whole-line equality for every header line, in order. A substring check passes when the source label
+    is wrongly the SDK ref, because the ref is "<branch>@<sha7>" and starts with the branch name."""
+    native = "Android" if platform == "android" else "iOS"
+    native_version = "4.5.1" if platform == "android" else "5.4.1"
+    expected = [
+        f"Flutter Example {version} ({build})",
+        f"Klaviyo Flutter SDK {version}",
+        f"Klaviyo {native} SDK {native_version}",
+        f"Commit: 0123456 on {event['expect_source']}",
+        "Built: 2026-10-13 12:00 UTC",
+    ]
+    lines = out.split("\n")
+    problems = []
+    for index, want in enumerate(expected):
+        got = lines[index] if index < len(lines) else "<missing>"
+        if got != want:
+            problems.append(f"header line {index + 1}: expected {want!r}, got {got!r}")
+    return problems
+
+
 def jobs_of(text):
     body = text.split("\njobs:\n", 1)[1]
     parts = re.split(r"^  ([a-z][a-z0-9-]*):\n", body, flags=re.M)
@@ -164,8 +185,7 @@ for event in EVENTS:
             problems.append(f"exit {result.returncode}: {result.stderr.strip()[:200]}")
         if DECOY in out:
             problems.append("a decoy from build-info.json reached the notes, so the workflow does not set that env var")
-        if f"({event['name']})" not in out or event["expect_source"] not in out:
-            problems.append(f"expected '{event['expect_source']}' in the Commit line")
+        problems.extend(header_problems(out, "android", event))
         if "on — (" in out:
             problems.append("the source is the placeholder dash")
         if event["expect_body"] and event["expect_body"] not in out:
@@ -189,8 +209,7 @@ for event in EVENTS:
         problems.append(f"exit {code}: {err.strip()[:200]}")
     if DECOY in out:
         problems.append("a decoy from build-info.json reached the notes")
-    if event["expect_source"] not in out:
-        problems.append(f"expected '{event['expect_source']}' in the Commit line")
+    problems.extend(header_problems(out, "ios", event))
     if "on — (" in out:
         problems.append("the source is the placeholder dash")
     if event["expect_body"] and event["expect_body"] not in out:

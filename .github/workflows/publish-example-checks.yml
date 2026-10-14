@@ -158,6 +158,12 @@ jobs:
       # debug key when key.properties is absent).
       - name: Build release App Bundle
         working-directory: example
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           flutter pub get
           ../scripts/sdk-ref.sh
@@ -187,6 +193,12 @@ jobs:
       # plumbing as the publish job, without match or App Store Connect.
       - name: Build unsigned release archive
         working-directory: example
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           flutter pub get
           ../scripts/sdk-ref.sh
