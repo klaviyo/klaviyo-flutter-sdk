@@ -4,9 +4,10 @@
 # TestFlight) for an example app build: the shared header block (kept in sync
 # with the app's "Copy build info" text via tests/fixtures/build-info-cases.json)
 # followed by the GitHub release body (release events only). Header lines are
-# never cut; the CI run line is dropped before the body is cut. Truncation is
-# by character and any cut is marked "…[truncated]", which counts toward the
-# cap. All text handling is in Python: bash 3.2 command substitution corrupts
+# never cut. When the text is over the cap the release body is cut first, then
+# the CI run line. Truncation is by character and any cut is marked
+# "…[truncated]" on its own last line, which counts toward the cap. Only when
+# the header alone leaves no room for the marker is it left off. All text handling is in Python: bash 3.2 command substitution corrupts
 # multi-byte text at pipe-buffer boundaries.
 #
 # Usage: release-notes.sh <max-chars> <platform: ios|android> <build-info.json> <build-number> [body-file]
@@ -79,21 +80,25 @@ if os.environ.get("EVENT_NAME") == "release" and body_file:
         body = ""
 
 
-def render(with_run):
-    lines = list(header)
-    if with_run and run_url:
-        lines.append(f"CI run: {run_url}")
-    text = "\n".join(lines)
+def fit():
+    head = "\n".join(header)
+    with_ci = head + (f"\nCI run: {run_url}" if run_url else "")
+    full = with_ci + (f"\n\n{body}" if body else "")
+    if len(full) <= cap:
+        return full
+
+    marker_line = "\n" + MARKER
     if body:
-        text += "\n\n" + body
-    return text
+        room = cap - len(with_ci) - len("\n\n") - len(marker_line)
+        if room > 0:
+            return with_ci + "\n\n" + body[:room].rstrip() + marker_line
+    if len(with_ci + marker_line) <= cap:
+        return with_ci + marker_line
+    if len(head + marker_line) <= cap:
+        return head + marker_line
+    return head
 
 
-notes = render(with_run=True)
-if len(notes) > cap:
-    # Drop the CI run line first; the header itself is never cut.
-    notes = render(with_run=False)
-if len(notes) > cap:
-    notes = notes[: cap - len(MARKER)] + MARKER
+notes = fit()
 print(notes)
 PY

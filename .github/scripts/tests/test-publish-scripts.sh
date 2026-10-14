@@ -389,12 +389,46 @@ except UnicodeEncodeError:
     print(0)
 ')"
 
-# Play's 500-char cap drops the CI run line before cutting the body.
+# Play's 500-char cap cuts the body first and keeps the CI run line.
 notes="$(SOURCE_LABEL=x EVENT_NAME=release RUN_URL='https://example.com/run/1' \
   "$SCRIPTS/release-notes.sh" 500 ios "$WORK/bi.json" 42 "$WORK/long.txt")"
 check "notes: Play cap" 500 "$(S="$notes" python3 -I -c 'import os; print(len(os.environ["S"]))')"
-check "notes: CI run line dropped before the body is cut" "0" "$(grep -c 'CI run:' <<<"$notes" || true)"
+check "notes: body is cut before the CI run line" "1" "$(grep -c '^CI run: https://example.com/run/1$' <<<"$notes" || true)"
 check "notes: marker counts toward the cap" "1" "$(S="$notes" python3 -I -c 'import os; print(1 if os.environ["S"].endswith("…[truncated]") else 0)')"
+
+# Cap edge cases around the header. HEAD is the header block alone, WITH_CI adds
+# the CI run line, FULL adds a short release body.
+printf 'Short body' > "$WORK/short.txt"
+notes_cap() { # <cap> <body-file> <run-url>
+  SOURCE_LABEL=x EVENT_NAME=release RUN_URL="$3" "$SCRIPTS/release-notes.sh" "$1" ios "$WORK/bi.json" 42 "$2"
+}
+chars() { S="$1" python3 -I -c 'import os; print(len(os.environ["S"]))'; }
+MARKER_LINE=$'\n…[truncated]'
+HEAD="$(SOURCE_LABEL=x EVENT_NAME=release "$SCRIPTS/release-notes.sh" 4000 ios "$WORK/bi.json" 42)"
+RUN='https://example.com/run/1'
+WITH_CI="$HEAD"$'\n'"CI run: $RUN"
+FULL="$WITH_CI"$'\n\n'"Short body"
+HLEN="$(chars "$HEAD")"
+WLEN="$(chars "$WITH_CI")"
+MLEN="$(chars "$MARKER_LINE")"
+
+check "notes: a text that fits exactly has no marker" "$FULL" "$(notes_cap "$(chars "$FULL")" "$WORK/short.txt" "$RUN")"
+check "notes: cap just above the header keeps the marker" "$HEAD$MARKER_LINE" \
+  "$(notes_cap $((HLEN + MLEN + 3)) "$WORK/long.txt" "$RUN")"
+check "notes: cap exactly header plus marker" "$HEAD$MARKER_LINE" \
+  "$(notes_cap $((HLEN + MLEN)) "$WORK/long.txt" "$RUN")"
+check "notes: body gone, CI run line kept, marker present" "$WITH_CI$MARKER_LINE" \
+  "$(notes_cap $((WLEN + MLEN)) "$WORK/long.txt" "$RUN")"
+out="$(notes_cap $((WLEN + MLEN + 20)) "$WORK/long.txt" "$RUN")"
+check "notes: body cut, header and CI run line intact" "$WITH_CI" "$(head -n "$(grep -c '' <<<"$WITH_CI")" <<<"$out")"
+check "notes: partial body stays within the cap" "1" "$(S="$out" CAP=$((WLEN + MLEN + 20)) python3 -I -c 'import os; print(1 if len(os.environ["S"]) <= int(os.environ["CAP"]) else 0)')"
+check "notes: partial body ends with the marker" "1" "$(S="$out" python3 -I -c 'import os; print(1 if os.environ["S"].endswith("…[truncated]") else 0)')"
+check "notes: no CI line configured, body cut, marker present" "$HEAD$MARKER_LINE" \
+  "$(notes_cap $((HLEN + MLEN)) "$WORK/long.txt" "")"
+check "notes: cap equals the header, marker cannot fit" "$HEAD" "$(notes_cap "$HLEN" "$WORK/long.txt" "$RUN")"
+check "notes: cap one short of header plus marker" "$HEAD" "$(notes_cap $((HLEN + MLEN - 1)) "$WORK/long.txt" "$RUN")"
+SOURCE_LABEL=x EVENT_NAME=release RUN_URL="$RUN" "$SCRIPTS/release-notes.sh" "$HLEN" ios "$WORK/bi.json" 42 "$WORK/long.txt" >/dev/null
+check "notes: header-only cap exits 0" "0" "$?"
 
 echo
 if [ "$FAILURES" -gt 0 ]; then
