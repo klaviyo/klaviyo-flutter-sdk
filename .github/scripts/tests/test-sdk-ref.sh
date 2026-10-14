@@ -262,7 +262,7 @@ REPO_ROOT="$WORK/repo" PUBSPEC="$WORK/repo/pubspec.yaml" EXAMPLE_PUBSPEC="$WORK/
   GITHUB_REF_NAME=feat/thing BUILD_DATE='2026-10-13 12:00 UTC' bash "$SCRIPT" "$out" >/dev/null
 check "json: sdkVersion" "1.2.3" "$(python3 -I -c "import json; print(json.load(open('$out'))['sdkVersion'])")"
 check "json: commitShort" "aaaaaaa" "$(python3 -I -c "import json; print(json.load(open('$out'))['commitShort'])")"
-check "json: no buildNumber key" "false" "$(python3 -I -c "import json; print('buildNumber' in json.load(open('$out')))" | tr 'A-Z' 'a-z')"
+check "json: no buildNumber key" "false" "$(python3 -I -c "import json; print(str('buildNumber' in json.load(open('$out'))).lower())")"
 check "json: buildDate" "2026-10-13 12:00 UTC" "$(python3 -I -c "import json; print(json.load(open('$out'))['buildDate'])")"
 
 echo
