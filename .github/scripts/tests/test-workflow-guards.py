@@ -212,15 +212,17 @@ report(bool(globs) and scripts_seen > 0 and not uncovered,
 # --- portability -------------------------------------------------------------
 
 # Scripts here run on macOS (a laptop, macos-26) and Linux (ubuntu runners). These flags exist on one
-# side only: mktemp -p, date -d, readlink -f, stat -c, sed -i with no suffix argument, grep -P. Use the
-# portable form instead (mktemp -d "${TMPDIR:-/tmp}/x.XXXXXX", python3 for dates and paths, sed to a
-# temp file, grep -E). Comment lines and this file are ignored.
+# side only: mktemp -p, date -d, readlink -f, stat -c, sed -i, grep -P. For sed -i only an attached,
+# non-empty suffix is portable (-i.bak): a bare -i is GNU only, a separate empty suffix (-i '') is BSD only
+# because GNU reads it as the script, and an attached empty one (-i'') is GNU only. Use the portable form
+# instead (mktemp -d "${TMPDIR:-/tmp}/x.XXXXXX", python3 for dates and paths, sed -i.bak or sed to a temp
+# file, grep -E). Comment lines and this file are ignored.
 NON_PORTABLE = [
     (r"\bmktemp\b[^\n|;&]*\s-[a-zA-Z]*p\b|\bmktemp\b[^\n|;&]*--tmpdir", "mktemp -p / --tmpdir"),
     (r"\bdate\s+(-[a-zA-Z]*d\b|--date\b)", "date -d / --date"),
     (r"\breadlink\s+-[a-zA-Z]*f\b", "readlink -f"),
     (r"\bstat\s+(-c\b|--format\b)", "stat -c / --format"),
-    (r"""\bsed\s+-i(?![\w.])(?!\s*(?:\'\'|""))""", "sed -i with no suffix argument"),
+    (r"\bsed\s+-i(?![\w.])", "sed -i without an attached suffix (-i.bak)"),
     (r"\bgrep\s+(-[a-zA-Z]*P[a-zA-Z]*\b|--perl-regexp\b)", "grep -P"),
 ]
 script_files = []

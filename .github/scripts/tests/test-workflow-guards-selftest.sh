@@ -156,9 +156,10 @@ portable_case "date -d is caught" 'date -d yesterday' fail
 portable_case "readlink -f is caught" 'readlink -f "$0"' fail
 portable_case "stat -c is caught" 'stat -c %s "$f"' fail
 portable_case "sed -i with no suffix argument is caught" "sed -i 's/a/b/' \"\$f\"" fail
+portable_case "sed -i with a separate empty suffix is caught, GNU reads it as the script" "sed -i '' 's/a/b/' \"\$f\"" fail
+portable_case "sed -i with an attached empty suffix is caught, BSD reads it as a bare -i" "sed -i'' 's/a/b/' \"\$f\"" fail
 portable_case "grep -P is caught" "grep -P '\\d+' \"\$f\"" fail
 portable_case "the portable mktemp template form is accepted" 'D="$(mktemp -d "${TMPDIR:-/tmp}/x.XXXXXX")"' pass
-portable_case "sed -i with an empty suffix is accepted" "sed -i '' 's/a/b/' \"\$f\"" pass
 portable_case "sed -i with a suffix is accepted" "sed -i.bak 's/a/b/' \"\$f\"" pass
 portable_case "a flag named only in a comment is accepted" '# do not use date -d here' pass
 
