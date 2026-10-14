@@ -73,7 +73,7 @@ end
 # filter[app], filter[preReleaseVersion.version], filter[version] and limit
 # params it receives, so a lookup that drops a filter returns the wrong build
 # and the test fails on behavior, not on the query string.
-def run_asc_stateful(args, builds:, localizations: {})
+def run_asc_stateful(args, builds:, localizations: {}, hide_lookups: 0, extra_env: {}, timeout: 20)
   Dir.mktmpdir do |dir|
     key = OpenSSL::PKey::EC.generate('prime256v1')
     key_path = File.join(dir, 'AuthKey_test-key.p8')
@@ -84,6 +84,8 @@ def run_asc_stateful(args, builds:, localizations: {})
       require 'json'
       require 'uri'
       $builds = JSON.parse(ENV.fetch('STUB_BUILDS'))
+      $hide = ENV.fetch('STUB_HIDE', '0').to_i
+      $lookups = 0
       $locs = JSON.parse(ENV.fetch('STUB_LOCS'))
       $log = []
       def respond(code, body)
@@ -105,6 +107,10 @@ def run_asc_stateful(args, builds:, localizations: {})
           if path == '/v1/apps'
             respond(200, { 'data' => [{ 'id' => 'app1' }] })
           elsif path == '/v1/builds'
+            $lookups += 1
+            if q['filter[version]'] && $lookups <= $hide
+              next respond(200, { 'data' => [], 'links' => {} })
+            end
             rows = $builds.select do |b|
               (q['filter[app]'].nil? || b['app'] == q['filter[app]']) &&
                 (q['filter[preReleaseVersion.version]'].nil? || b['marketing'] == q['filter[preReleaseVersion.version]']) &&
@@ -131,12 +137,26 @@ def run_asc_stateful(args, builds:, localizations: {})
       'GITHUB_ENV' => File.join(dir, 'github_env'),
       'STUB_BUILDS' => builds.to_json,
       'STUB_LOCS' => localizations.to_json,
-      'STUB_LOG' => log
-    }
-    out = IO.popen(env, ['ruby', '-r', File.join(dir, 'stub.rb'), File.join(SCRIPTS, 'asc.rb'), *args], err: File.join(dir, 'err.txt'), &:read)
+      'STUB_LOG' => log,
+      'STUB_HIDE' => hide_lookups.to_s
+    }.merge(extra_env)
+    out = ''
+    status = nil
+    timed_out = false
+    IO.popen(env, ['ruby', '-r', File.join(dir, 'stub.rb'), File.join(SCRIPTS, 'asc.rb'), *args], err: File.join(dir, 'err.txt')) do |io|
+      reader = Thread.new { io.read }
+      unless reader.join(timeout)
+        timed_out = true
+        Process.kill('KILL', io.pid)
+        reader.join
+      end
+      out = reader.value.to_s
+    end
+    status = $CHILD_STATUS.exitstatus
+    flunk "asc.rb did not finish within #{timeout}s (a polling loop that never ends?)" if timed_out
     requests = File.exist?(log) ? JSON.parse(File.read(log)) : []
     err = File.exist?(File.join(dir, 'err.txt')) ? File.read(File.join(dir, 'err.txt')) : ''
-    yield out, $CHILD_STATUS.exitstatus, requests, err
+    yield out, status, requests, err
   end
 end
 
@@ -197,6 +217,48 @@ describe 'asc.rb against a stateful App Store Connect' do
       run_asc_stateful(['set-whats-new', '0.3.2', '9', notes], builds: other) do |_out, _rc, requests|
         post = requests.find { |r| r['method'] == 'POST' && r['path'] == '/v1/betaBuildLocalizations' }
         assert_equal 'new-9', JSON.parse(post['body']).dig('data', 'relationships', 'build', 'data', 'id')
+      end
+    end
+  end
+
+  it 'waits for the build to appear, then writes What to Test onto it' do
+    Dir.mktmpdir do |dir|
+      notes = File.join(dir, 'notes.txt')
+      File.write(notes, 'hello')
+      run_asc_stateful(['set-whats-new', '0.3.2', '9', notes], builds: builds, hide_lookups: 3,
+                       extra_env: { 'ASC_WAIT_ATTEMPTS' => '10', 'ASC_WAIT_SECONDS' => '0' }) do |_out, rc, requests, err|
+        assert_equal 0, rc, err
+        lookups = requests.select { |r| r['path'].start_with?('/v1/builds?') }
+        assert_equal 4, lookups.length, 'three empty lookups, then the build'
+        assert_match(/check 3 of 10/, err)
+        post = requests.find { |r| r['method'] == 'POST' && r['path'] == '/v1/betaBuildLocalizations' }
+        assert_equal 'new-9', JSON.parse(post['body']).dig('data', 'relationships', 'build', 'data', 'id')
+      end
+    end
+  end
+
+  it 'times out with a message naming the build when it never appears, and writes nothing' do
+    Dir.mktmpdir do |dir|
+      notes = File.join(dir, 'notes.txt')
+      File.write(notes, 'hello')
+      run_asc_stateful(['set-whats-new', '0.3.2', '9', notes], builds: builds, hide_lookups: 1_000_000,
+                       extra_env: { 'ASC_WAIT_ATTEMPTS' => '5', 'ASC_WAIT_SECONDS' => '0' }) do |_out, rc, requests, err|
+        refute_equal 0, rc
+        assert_match(/Timed out waiting for build 0\.3\.2 \(9\) to appear in App Store Connect after 5 checks/, err)
+        assert_equal 5, requests.count { |r| r['path'].start_with?('/v1/builds?') }
+        assert_empty(requests.select { |r| r['method'] != 'GET' }, 'no notes may be written without a build')
+      end
+    end
+  end
+
+  it 'fails one test, not the whole file, when a lookup regression makes the wait loop endless' do
+    # The deadline is the safety net the tests rely on; prove it trips.
+    Dir.mktmpdir do |dir|
+      notes = File.join(dir, 'notes.txt')
+      File.write(notes, 'x')
+      assert_raises(Minitest::Assertion) do
+        run_asc_stateful(['set-whats-new', '0.3.2', '9', notes], builds: builds, hide_lookups: 1_000_000, timeout: 1,
+                         extra_env: { 'ASC_WAIT_ATTEMPTS' => '1000000', 'ASC_WAIT_SECONDS' => '0.05' }) { |*| }
       end
     end
   end

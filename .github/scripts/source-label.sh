@@ -24,6 +24,12 @@ elif [ "${EVENT_NAME:-}" = "pull_request" ] && [ -n "${HEAD_REF:-}" ]; then
     label="$label (PR #$PR_NUMBER)"
   fi
 else
+  # On a pull_request event ref_name is "<n>/merge". In CI a pull request without a head ref must not
+  # fall through to it, or a label deploy reports the merge ref as its source.
+  if [ -n "${CI:-}" ] && [ "${EVENT_NAME:-}" = "pull_request" ]; then
+    echo "::error::source-label.sh: HEAD_REF is empty on a pull_request in CI. Refusing to use REF_NAME, which is \"<n>/merge\"." >&2
+    exit 1
+  fi
   label="${REF_NAME:-unknown}"
 fi
 

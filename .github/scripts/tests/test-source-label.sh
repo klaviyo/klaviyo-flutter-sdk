@@ -55,6 +55,21 @@ if "$MV" abc >/dev/null 2>&1; then fail "marketing: rejects non-numeric"; else p
 if "$MV" 1.2.3.4 >/dev/null 2>&1; then fail "marketing: rejects four components"; else pass "marketing: rejects four components"; fi
 
 echo
+# A pull request with no head ref must never report the merge ref. In CI it fails and says why; locally
+# it keeps the lenient fallback.
+result="$(env -i PATH="$PATH" CI=true EVENT_NAME=pull_request RELEASE_TAG='' HEAD_REF='' PR_NUMBER=138 REF_NAME=138/merge "$SCRIPTS/source-label.sh" 2>&1)" && rc=0 || rc=$?
+if [ "$rc" -ne 0 ] && grep -q "HEAD_REF is empty on a pull_request in CI" <<<"$result" && ! grep -q "138/merge$" <<<"$(head -1 <<<"$result")"; then
+  pass "source label: CI pull request without a head ref fails and names HEAD_REF"
+else
+  fail "source label: CI pull request without a head ref fails and names HEAD_REF (rc=$rc: $(head -c 160 <<<"$result"))"
+fi
+out="$(env -i PATH="$PATH" EVENT_NAME=pull_request RELEASE_TAG='' HEAD_REF='' PR_NUMBER=138 REF_NAME=138/merge "$SCRIPTS/source-label.sh")"
+check "source label: local pull request without a head ref keeps the fallback" "138/merge" "$out"
+out="$(env -i PATH="$PATH" CI=true EVENT_NAME=push RELEASE_TAG='' HEAD_REF='' PR_NUMBER='' REF_NAME=feat/x "$SCRIPTS/source-label.sh")"
+check "source label: a CI push is unaffected" "feat/x" "$out"
+out="$(env -i PATH="$PATH" CI=true EVENT_NAME=pull_request RELEASE_TAG='' HEAD_REF=feat/y PR_NUMBER=138 REF_NAME=138/merge "$SCRIPTS/source-label.sh")"
+check "source label: a CI pull request with a head ref is unaffected" "feat/y (PR #138)" "$out"
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES test(s) failed"
   exit 1

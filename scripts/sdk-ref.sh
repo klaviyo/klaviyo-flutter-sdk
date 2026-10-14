@@ -61,8 +61,7 @@ resolve_flutter_ref() {
   version="$(grep '^version:' "$PUBSPEC" 2>/dev/null | awk '{print $2}' | cut -d+ -f1)"
   [ -n "$version" ] || version="unknown"
 
-  local sha branch tag=""
-  sha="${GITHUB_SHA:-$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)}"
+  local sha="$COMMIT" branch="$BRANCH" tag=""
   if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
     tag="${GITHUB_REF_NAME:-}"
   elif [ -z "${GITHUB_SHA:-}" ]; then
@@ -74,18 +73,7 @@ resolve_flutter_ref() {
     return
   fi
 
-  # PR builds: report the head branch and head sha, not the merge commit.
-  if [ -n "${GITHUB_EVENT_NAME:-}" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-    branch="${GITHUB_HEAD_REF:-}"
-    if [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
-      local head_sha
-      head_sha="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["pull_request"]["head"]["sha"])' "$GITHUB_EVENT_PATH" 2>/dev/null)"
-      [ -n "$head_sha" ] && sha="$head_sha"
-    fi
-  else
-    branch="${GITHUB_REF_NAME:-$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)}"
-  fi
-  [ -n "$branch" ] || branch="detached"
+  [ -n "$branch" ] || branch="detached"   # local builds only: CI fails before this
   if [ -n "$sha" ]; then
     printf '%s@%s' "$branch" "$(printf '%s' "$sha" | cut -c1-$SHORT)"
   else
@@ -276,6 +264,35 @@ resolve_android_ref() {
 
 # ─── JSON output ──────────────────────────────────────────────────────
 
+# In CI the commit, branch and source must come from the event: GITHUB_SHA and GITHUB_REF_NAME are the
+# synthetic merge commit and "<n>/merge" on a label deploy, and git in a CI checkout reports the same
+# merge commit. A missing input fails the build and names the field. Local builds keep the git fallback.
+fail_stamp() {
+  echo "::error::sdk-ref.sh: $1 is empty in CI. Refusing to fall back to git or GITHUB_SHA/GITHUB_REF_NAME, which are the merge commit and \"<n>/merge\" on a label deploy." >&2
+  exit 1
+}
+
+if [ -n "${CI:-}" ]; then
+  if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
+    COMMIT=""
+    if [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+      COMMIT="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["pull_request"]["head"]["sha"])' "$GITHUB_EVENT_PATH" 2>/dev/null || true)"
+    fi
+    BRANCH="${GITHUB_HEAD_REF:-}"
+  else
+    COMMIT="${GITHUB_SHA:-}"
+    BRANCH="${GITHUB_REF_NAME:-}"
+  fi
+  [ -n "$COMMIT" ] || fail_stamp "the commit"
+  [ -n "$BRANCH" ] || fail_stamp "the branch"
+else
+  COMMIT="${GITHUB_SHA:-$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)}"
+  if [ -n "${GITHUB_EVENT_NAME:-}" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+    HEAD_SHA="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["pull_request"]["head"]["sha"])' "$GITHUB_EVENT_PATH" 2>/dev/null)"
+    [ -n "$HEAD_SHA" ] && COMMIT="$HEAD_SHA"
+  fi
+  BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)}}"
+fi
 FLUTTER_REF="$(resolve_flutter_ref)"
 IOS_REF="$(resolve_ios_ref)"
 ANDROID_REF="$(resolve_android_ref)"
@@ -286,15 +303,13 @@ APP_VERSION="$(grep '^version:' "$EXAMPLE_PUBSPEC" 2>/dev/null | awk '{print $2}
 # (dart-defines, release notes, Slack) reads them from the JSON so the
 # surfaces cannot diverge. On PR events both come from the PR head, never
 # the synthetic merge commit.
-COMMIT="${GITHUB_SHA:-$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)}"
-if [ -n "${GITHUB_EVENT_NAME:-}" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
-  HEAD_SHA="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["pull_request"]["head"]["sha"])' "$GITHUB_EVENT_PATH" 2>/dev/null)"
-  [ -n "$HEAD_SHA" ] && COMMIT="$HEAD_SHA"
-fi
-BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)}}"
 BUILD_DATE="${BUILD_DATE:-$(date -u '+%Y-%m-%d %H:%M UTC')}"
 
-SOURCE_LABEL="${SOURCE_LABEL:-$("$(cd "$(dirname "$0")" && pwd)/../.github/scripts/source-label.sh" 2>/dev/null || echo '—')}"
+SOURCE_LABEL="${SOURCE_LABEL:-$("$(cd "$(dirname "$0")" && pwd)/../.github/scripts/source-label.sh" || true)}"
+if [ -n "${CI:-}" ] && { [ -z "$SOURCE_LABEL" ] || [ "$SOURCE_LABEL" = "unknown" ]; }; then
+  fail_stamp "the source label"
+fi
+[ -n "$SOURCE_LABEL" ] || SOURCE_LABEL='—'
 EVENT_NAME_OUT="${GITHUB_EVENT_NAME:-—}"
 
 # The native SDK version is known only when the ref is a release pin.

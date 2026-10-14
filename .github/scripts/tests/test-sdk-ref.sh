@@ -170,7 +170,8 @@ run_ref() {
   rm -f "$out"
   # Re-set GITHUB_* explicitly from the caller's overrides so the runner's
   # own ambient values (real checkout on CI) never reach the script.
-  REPO_ROOT="$WORK/repo" \
+  env -u CI \
+    REPO_ROOT="$WORK/repo" \
     PUBSPEC="$WORK/repo/pubspec.yaml" \
     EXAMPLE_PUBSPEC="$WORK/repo/example-pubspec.yaml" \
     PODFILE_LOCK="${PODFILE_LOCK:-$WORK/repo/no-lock}" \
@@ -276,7 +277,7 @@ chmod +x "$WORK/bin/git"
 run_ref_default_remote() {
   local out="$WORK/out.json"
   rm -f "$out"
-  env -u GITHUB_REF_TYPE -u GITHUB_HEAD_REF -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH \
+  env -u CI -u GITHUB_REF_TYPE -u GITHUB_HEAD_REF -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH \
     PATH="$WORK/bin:$PATH" \
     REPO_ROOT="$WORK/repo" \
     PUBSPEC="$WORK/repo/pubspec.yaml" \
@@ -313,7 +314,7 @@ check "ls-remote hit both repo URLs" \
 # per event type and checks those three fields.
 run_stamp() {
   local out="$WORK/stamp.json"
-  env -u GITHUB_REF_TYPE -u GITHUB_EVENT_PATH \
+  env -u CI -u GITHUB_REF_TYPE -u GITHUB_EVENT_PATH \
     PATH="$PATH" \
     REPO_ROOT="$WORK/repo" \
     PUBSPEC="$WORK/repo/pubspec.yaml" \
@@ -340,10 +341,84 @@ check "stamp: PR label deploy uses the head sha, never the merge commit" "feat/y
 check "stamp: workflow_dispatch" "feat/thing|workflow_dispatch|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
   "$(run_stamp env GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME=feat/thing GITHUB_EVENT_NAME=workflow_dispatch GITHUB_HEAD_REF= EVENT_NAME=workflow_dispatch RELEASE_TAG= HEAD_REF= PR_NUMBER= REF_NAME=feat/thing)"
 
+# ---------------------------------------------------------------- CI strictness
+# In CI an empty commit, branch or source must fail the stamp and name the field. It must never fall
+# back to git, GITHUB_SHA or GITHUB_REF_NAME, which are the merge commit and "<n>/merge" on a label
+# deploy. Local builds (no CI variable) keep the fallback. A hostile git on PATH reports a merge-looking
+# commit and branch, so a fallback to git would show up in the stamp instead of failing.
+mkdir -p "$WORK/hostile-bin"
+cat > "$WORK/hostile-bin/git" <<'FAKE'
+#!/usr/bin/env bash
+case "$*" in
+  *"rev-parse HEAD"*) echo "cccccccccccccccccccccccccccccccccccccccc" ;;
+  *"--abbrev-ref HEAD"*) echo "999/merge" ;;
+esac
+FAKE
+chmod +x "$WORK/hostile-bin/git"
+
+# strict_stamp <env assignments...>: runs the stamper as CI would, printing "rc=<n>" then stderr.
+strict_stamp() {
+  local out="$WORK/strict.json" err rc=0
+  rm -f "$out"
+  err="$(env -i HOME="$WORK" PATH="$WORK/hostile-bin:$PATH" CI=true \
+    REPO_ROOT="$WORK/repo" PUBSPEC="$WORK/repo/pubspec.yaml" EXAMPLE_PUBSPEC="$WORK/repo/example-pubspec.yaml" \
+    PODFILE_LOCK="$WORK/repo/podlock-release" PODFILE=/dev/null PODSPEC="$WORK/repo/podspec" \
+    ANDROID_BUILD_GRADLE="$WORK/repo/build-gradle-release" ANDROID_SETTINGS_GRADLE="$WORK/repo/settings-plain.gradle" \
+    ANDROID_LS_REMOTE_CMD="$WORK/ls-remote" BUILD_DATE='2026-10-13 12:00 UTC' \
+    "$@" bash "$SCRIPT" "$out" 2>&1 >/dev/null)" || rc=$?
+  echo "rc=$rc"
+  printf '%s\n' "$err"
+}
+
+expect_stamp_failure() { # <name> <field named in the error> <env...>
+  local name="$1" field="$2"; shift 2
+  local result; result="$(strict_stamp "$@")"
+  if [ "$(head -1 <<<"$result")" = "rc=0" ]; then
+    fail "$name (exited 0; the stamp fell back instead of failing)"
+  elif grep -q "sdk-ref.sh: $field is empty in CI" <<<"$result"; then
+    pass "$name"
+  else
+    fail "$name (failed, but not on $field: $(tail -n +2 <<<"$result" | head -c 200 | tr '\n' ' '))"
+  fi
+}
+
+expect_stamp_failure "ci: empty commit on a push fails and names the commit" "the commit" \
+  GITHUB_SHA= GITHUB_REF_NAME=feat/thing GITHUB_EVENT_NAME=push EVENT_NAME=push REF_NAME=feat/thing
+expect_stamp_failure "ci: missing commit on a push fails (no fallback to git)" "the commit" \
+  GITHUB_REF_NAME=feat/thing GITHUB_EVENT_NAME=push EVENT_NAME=push REF_NAME=feat/thing
+expect_stamp_failure "ci: empty branch on a push fails and names the branch" "the branch" \
+  GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME= GITHUB_EVENT_NAME=push EVENT_NAME=push
+expect_stamp_failure "ci: label deploy without a readable event payload fails on the commit" "the commit" \
+  GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME=138/merge GITHUB_EVENT_NAME=pull_request \
+  GITHUB_HEAD_REF=feat/y GITHUB_EVENT_PATH="$WORK/does-not-exist.json" EVENT_NAME=pull_request HEAD_REF=feat/y PR_NUMBER=138 REF_NAME=138/merge
+expect_stamp_failure "ci: label deploy without a head ref fails on the branch, never using 138/merge" "the branch" \
+  GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME=138/merge GITHUB_EVENT_NAME=pull_request \
+  GITHUB_EVENT_PATH="$WORK/event.json" EVENT_NAME=pull_request PR_NUMBER=138 REF_NAME=138/merge
+expect_stamp_failure "ci: empty source label fails and names the source label" "the source label" \
+  GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME=feat/thing GITHUB_EVENT_NAME=push EVENT_NAME=push REF_NAME= SOURCE_LABEL=
+
+# A complete CI stamp succeeds and carries the event's values, never the hostile git's.
+result="$(strict_stamp GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME=feat/thing GITHUB_EVENT_NAME=push EVENT_NAME=push REF_NAME=feat/thing)"
+check "ci: a complete push stamp succeeds" "rc=0" "$(head -1 <<<"$result")"
+check "ci: the stamp carries the event commit, not git's" "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+  "$(python3 -I -c "import json; print(json.load(open('$WORK/strict.json'))['commit'])")"
+check "ci: the stamp carries the event branch, not git's merge ref" "feat/thing" \
+  "$(python3 -I -c "import json; print(json.load(open('$WORK/strict.json'))['branch'])")"
+
+# Local builds (no CI) keep the git fallback.
+out="$WORK/local.json"; rm -f "$out"
+env -u CI -u GITHUB_SHA -u GITHUB_REF_NAME -u GITHUB_HEAD_REF -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH -u GITHUB_REF_TYPE \
+  PATH="$WORK/hostile-bin:$PATH" REPO_ROOT="$WORK/repo" PUBSPEC="$WORK/repo/pubspec.yaml" EXAMPLE_PUBSPEC="$WORK/repo/example-pubspec.yaml" \
+  PODFILE_LOCK="$WORK/repo/podlock-release" PODFILE=/dev/null PODSPEC="$WORK/repo/podspec" \
+  ANDROID_BUILD_GRADLE="$WORK/repo/build-gradle-release" ANDROID_SETTINGS_GRADLE="$WORK/repo/settings-plain.gradle" \
+  ANDROID_LS_REMOTE_CMD="$WORK/ls-remote" BUILD_DATE='2026-10-13 12:00 UTC' bash "$SCRIPT" "$out" >/dev/null 2>&1
+check "local: without CI the stamp still falls back to git for the commit" "cccccccccccccccccccccccccccccccccccccccc" \
+  "$(python3 -I -c "import json; print(json.load(open('$out'))['commit'])")"
+
 # ---------------------------------------------------------------- misc
 
 out="$WORK/out.json"
-env -u GITHUB_REF_TYPE -u GITHUB_HEAD_REF -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH \
+env -u CI -u GITHUB_REF_TYPE -u GITHUB_HEAD_REF -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH \
   REPO_ROOT="$WORK/repo" PUBSPEC="$WORK/repo/pubspec.yaml" EXAMPLE_PUBSPEC="$WORK/repo/example-pubspec.yaml" \
   PODFILE_LOCK="$WORK/repo/podlock-release" PODFILE=/dev/null PODSPEC="$WORK/repo/podspec" \
   ANDROID_BUILD_GRADLE="$WORK/repo/build-gradle-release" ANDROID_SETTINGS_GRADLE="$WORK/repo/settings-plain.gradle" \

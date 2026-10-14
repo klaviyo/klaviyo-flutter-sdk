@@ -197,6 +197,72 @@ for event in EVENTS:
         problems.append("the release body is missing")
     report(not problems, label, "\n".join(problems) + "\n" + out)
 
+# --- the stamping step -----------------------------------------------------
+# The step that writes commit, branch and source into build-info.json runs sdk-ref.sh with the env the
+# workflow defines. On a label deploy GITHUB_SHA is the synthetic merge commit and GITHUB_REF_NAME is
+# "<n>/merge"; the stamp must carry the PR head SHA and head branch instead. The runner supplies the
+# GITHUB_* variables, so the test supplies them the way a runner would, with decoys where they are wrong.
+MERGE_SHA = "a" * 40
+HEAD_SHA = "b" * 40
+SDK_REF = os.path.join(ROOT, "scripts", "sdk-ref.sh")
+
+for job in ("deploy-android", "deploy-ios"):
+    stamp_env, stamp_block = step_env(jobs[job], "buildinfo")
+    report(bool(stamp_env), f"the {job} job has a stamping step with its own env")
+    for event in EVENTS:
+        label = f"{job} stamps the right commit and source on {event['name']}"
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.join(tmp, "repo")
+            os.makedirs(os.path.join(repo, "example"))
+            os.makedirs(os.path.join(repo, "scripts"))
+            os.makedirs(os.path.join(repo, ".github", "scripts"))
+            for rel in ("scripts/sdk-ref.sh", ".github/scripts/source-label.sh"):
+                with open(os.path.join(ROOT, rel)) as src, open(os.path.join(repo, rel), "w") as dst:
+                    dst.write(src.read())
+                os.chmod(os.path.join(repo, rel), 0o755)
+            with open(os.path.join(repo, "pubspec.yaml"), "w") as handle:
+                handle.write("name: x\nversion: 1.2.3\n")
+            with open(os.path.join(repo, "example", "pubspec.yaml"), "w") as handle:
+                handle.write("name: e\nversion: 1.2.3\n")
+            event_path = os.path.join(tmp, "event.json")
+            payload = {"pull_request": {"number": int(event["pr"] or 0), "head": {"sha": HEAD_SHA, "ref": event["head_ref"]}}}
+            with open(event_path, "w") as handle:
+                json.dump(payload, handle)
+            is_pr = event["name"] == "pull_request"
+            child = {
+                "PATH": os.environ["PATH"], "HOME": tmp,
+                # What the runner sets itself. CI=true makes the stamp strict, as it is on a real runner,
+                # so an input the workflow stops supplying fails here instead of falling back to git.
+                "CI": "true",
+                "GITHUB_SHA": MERGE_SHA if is_pr else HEAD_SHA,
+                "GITHUB_REF_NAME": event["ref_name"],
+                "GITHUB_HEAD_REF": event["head_ref"],
+                "GITHUB_EVENT_NAME": event["name"],
+                "GITHUB_EVENT_PATH": event_path,
+                "GITHUB_REF_TYPE": "tag" if event["name"] == "release" else "branch",
+                "BUILD_DATE": "2026-10-13 12:00 UTC",
+            }
+            # What the workflow's step defines for itself.
+            for key, raw in stamp_env.items():
+                child[key] = resolve(raw, event)
+            out_path = os.path.join(tmp, "build-info.json")
+            result = subprocess.run(["bash", os.path.join(repo, "scripts", "sdk-ref.sh"), out_path],
+                                    env=child, capture_output=True, text=True, cwd=repo)
+            problems = []
+            if result.returncode != 0 or not os.path.exists(out_path):
+                problems.append(f"sdk-ref.sh failed: {result.stderr.strip()[:200]}")
+            else:
+                info = json.load(open(out_path))
+                if info["commit"] != HEAD_SHA:
+                    problems.append(f"commit is {info['commit'][:7]}, expected the head {HEAD_SHA[:7]} (merge commit is {MERGE_SHA[:7]})")
+                if info["sourceLabel"] != event["source_label"]:
+                    problems.append(f"source label is {info['sourceLabel']!r}, expected {event['source_label']!r}")
+                if "/merge" in info["sourceLabel"] or "/merge" in info["branch"]:
+                    problems.append(f"a merge ref reached the stamp: label={info['sourceLabel']!r} branch={info['branch']!r}")
+                if info["event"] != event["name"]:
+                    problems.append(f"event is {info['event']!r}, expected {event['name']!r}")
+            report(not problems, label, "\n".join(problems))
+
 print()
 if failures:
     print(f"{failures} test(s) failed")

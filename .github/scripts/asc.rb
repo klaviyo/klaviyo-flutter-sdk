@@ -20,6 +20,7 @@
 #   BUNDLE_ID
 #   APP_STORE_CONNECT_API_KEY_PATH (default: ~/.appstoreconnect/private_keys/AuthKey_<id>.p8)
 #   ASC_API_ROOT (default: https://api.appstoreconnect.apple.com; tests stub it)
+#   ASC_WAIT_ATTEMPTS (default 60), ASC_WAIT_SECONDS (default 30): the What to Test wait
 
 require 'json'
 require 'net/http'
@@ -120,16 +121,23 @@ def set_whats_new(marketing_version, build_number, notes_file)
   # exist under an older version; the lookup must name both.
   filters = "filter[app]=#{id}&filter[preReleaseVersion.version]=#{URI.encode_www_form_component(marketing_version)}" \
             "&filter[version]=#{build_number}&limit=1"
-  # Builds usually appear within a few minutes of altool finishing.
-  60.times do
+  # Builds usually appear within a few minutes of altool finishing. The attempt
+  # count and delay are bounded and come from the environment so a test can
+  # exhaust them in milliseconds instead of waiting out the real 30 minutes.
+  attempts = Integer(ENV.fetch('ASC_WAIT_ATTEMPTS', '60'))
+  delay = Float(ENV.fetch('ASC_WAIT_SECONDS', '30'))
+  attempts.times do |i|
     page = get!("/v1/builds?#{filters}")
     build = page['data'].first
     break if build
 
-    warn "Build #{marketing_version} (#{build_number}) not visible in App Store Connect yet; waiting…"
-    sleep 30
+    warn "Build #{marketing_version} (#{build_number}) not visible in App Store Connect yet (check #{i + 1} of #{attempts}); waiting…"
+    sleep delay unless i == attempts - 1
   end
-  raise "Build #{marketing_version} (#{build_number}) never appeared in App Store Connect" unless build
+  unless build
+    raise "Timed out waiting for build #{marketing_version} (#{build_number}) to appear in App Store Connect " \
+          "after #{attempts} checks"
+  end
 
   existing = get!("/v1/builds/#{build['id']}/betaBuildLocalizations")['data']
                 .find { |l| l['attributes']['locale'] == 'en-US' }
