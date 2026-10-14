@@ -19,6 +19,7 @@ jobs:
           files=(
             ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist
             example/pubspec.yaml
+            example/pubspec.lock
             example/ios/Runner.xcodeproj/project.pbxproj
           )
           if ! git diff --exit-code "${files[@]}"; then

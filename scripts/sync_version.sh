@@ -49,6 +49,12 @@ if [ -f "$EXAMPLE_PUBSPEC" ]; then
   fi
 
   echo "Synced version $VERSION to $EXAMPLE_PUBSPEC"
+
+  # The example lockfile is committed and records the path dependency's version.
+  if [ -f "$REPO_ROOT/example/pubspec.lock" ] && command -v dart >/dev/null 2>&1; then
+    (cd "$REPO_ROOT/example" && dart pub get --offline >/dev/null 2>&1 || dart pub get >/dev/null)
+    echo "Synced version $VERSION to $REPO_ROOT/example/pubspec.lock"
+  fi
 fi
 
 # Update hardcoded MARKETING_VERSION in example app pbxproj (RunnerTests + NotificationServiceExtension targets).

@@ -66,7 +66,8 @@ To test against a local native SDK build:
 
 ### Gotchas
 
-- **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist, the example app's `pubspec.yaml`, and `MARKETING_VERSION` in the example app's Xcode project. Use `scripts/bump_version.sh` to update all version references at once.
+- **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist, the example app's `pubspec.yaml`, the example `pubspec.lock`, and `MARKETING_VERSION` in the example app's Xcode project. Use `scripts/bump_version.sh` to update all version references at once.
+- **Example lockfiles are committed**: `example/pubspec.lock` and `example/ios/Podfile.lock` pin what the published example app ships with. Native SDK bumps and `scripts/configure-sdk.sh` overrides change `Podfile.lock` — regenerate it with `pod install` in `example/ios` and commit the result. Never commit a lock pointing at a feature branch or local checkout.
 - `BufferedBroadcastStreamController` (`lib/src/utils/buffered_broadcast_stream_controller.dart`) exists because native events (push tokens, notifications) can fire before Dart listeners are attached. Don't replace it with a plain `StreamController.broadcast`.
 
 ## Code Review
