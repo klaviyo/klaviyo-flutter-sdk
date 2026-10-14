@@ -243,6 +243,3 @@ PLATFORMS
 
 DEPENDENCIES
   fastlane (= 2.237.0)
-
-BUNDLED WITH
-   2.4.6

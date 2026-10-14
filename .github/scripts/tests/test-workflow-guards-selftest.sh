@@ -211,6 +211,10 @@ edit "$DEPLOY" 's = s.replace("          bundle exec fastlane ios install_signin
 expect_fail "an inline gem install in a workflow is caught" "pinned gems come from a locked Gemfile"
 
 fresh_copy
+edit "$TMP/repo/example/ios/Gemfile.lock" 's = s + "\nBUNDLED WITH\n   2.4.6\n"'
+expect_fail "a Gemfile.lock that pins an old Bundler is caught" "no Gemfile.lock pins a Bundler version"
+
+fresh_copy
 edit "$TMP/repo/.github/dependabot.yml" 's = s.replace("package-ecosystem: bundler", "package-ecosystem: pip", 1)'
 expect_fail "dropping the bundler entry from dependabot is caught" "pinned gems come from a locked Gemfile"
 

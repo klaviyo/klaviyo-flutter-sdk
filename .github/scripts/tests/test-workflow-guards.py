@@ -387,6 +387,11 @@ for path in all_paths:
 bundler_entry = next((e for e in entries if re.match(r"package-ecosystem:\s*['\"]?bundler", e)), "")
 gemfile_dirs = [d for d in re.findall(r"(?m)^\s*directory:\s*['\"]?(/\S*?)['\"]?\s*$", bundler_entry)]
 gemfiles = [os.path.join(ROOT, d.lstrip("/"), "Gemfile.lock") for d in gemfile_dirs]
+# A BUNDLED WITH line makes bundler-cache install exactly that Bundler, and a version older than the
+# runner's Ruby cannot run on it, so the lock carries none and the Ruby's own Bundler is used.
+pinned_bundler = [g for g in gemfiles if os.path.exists(g) and "BUNDLED WITH" in read(g)]
+report(not pinned_bundler, "no Gemfile.lock pins a Bundler version with BUNDLED WITH",
+       "pins Bundler: " + ", ".join(os.path.relpath(g, ROOT) for g in pinned_bundler))
 report(not inline_installs and bool(gemfiles) and all(os.path.exists(g) for g in gemfiles),
        "pinned gems come from a locked Gemfile that Dependabot's bundler entry watches, not an inline install",
        "\n".join(inline_installs) or "no bundler entry in dependabot.yml, or its directory has no Gemfile.lock")
