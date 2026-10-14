@@ -9,9 +9,10 @@ platform's credentials without building or uploading.
 
 ## Scripts
 
-- `play-publish.sh`: Play Developer API upload with versionCode conflict retry.
-- `testflight-publish.sh`: build and `altool` upload loop with build-number conflict retry.
-- `asc.rb`: App Store Connect helper (next build number, TestFlight "What to Test").
+- fastlane (`example/ios/fastlane`, `example/android/fastlane`) does the signing, build number, upload and store
+  notes. iOS lanes: `install_signing`, `release`, `whats_new`, `next_build_number`. Android lanes: `release`,
+  `share` (Internal App Sharing link), `check_credentials`. Both retry an upload once with a fresh build number
+  or versionCode.
 - `release-notes.sh`: store release notes (build info header, CI run line, release body on release events).
 - `gradle-retry.sh`: retries the Android build with `--refresh-dependencies` on a JitPack failure.
 - `source-label.sh`: release tag, PR head branch, or branch name, shown in notes and Slack.

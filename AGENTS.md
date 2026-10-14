@@ -72,7 +72,7 @@ To test against a local native SDK build:
 
 ## Example app deployment
 
-`.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**`, published releases, `workflow_dispatch`, and same-repo PRs labeled `deploy-example-app[:android|:ios]`. Unit tests and lint gate every deploy. Deploys skip until the store secrets exist. Setup and secrets: `.github/scripts/README.md`.
+`.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**`, published releases, `workflow_dispatch`, and same-repo PRs labeled `deploy-example-app[:android|:ios]`. Unit tests and lint gate every deploy. Deploys skip until the store secrets exist. Uploads go through fastlane lanes in `example/ios/fastlane` and `example/android/fastlane`. Setup and secrets: `.github/scripts/README.md`.
 
 ## Code Review
 

@@ -1,0 +1,106 @@
+require "fileutils"
+require "tmpdir"
+
+default_platform(:android)
+
+PACKAGE = "com.klaviyo.flutterexample"
+EXAMPLE = File.expand_path("../..", __dir__)
+ROOT = File.expand_path("../../..", __dir__)
+AAB = File.join(EXAMPLE, "build/app/outputs/bundle/release/app-release.aab")
+
+def play_client
+  require "supply"
+  Supply.config = FastlaneCore::Configuration.create(
+    Supply::Options.available_options,
+    { package_name: PACKAGE, json_key_data: ENV.fetch("SERVICE_ACCOUNT_JSON") }
+  )
+  Supply::Client.make_from_config
+end
+
+def export_env(name, value)
+  return unless ENV["GITHUB_ENV"]
+
+  File.open(ENV["GITHUB_ENV"], "a") { |f| f.puts "#{name}=#{value}" }
+end
+
+# Play versionCodes are global to the app, so the floor is the highest bundle or APK ever uploaded.
+def highest_version_code
+  client = play_client
+  client.begin_edit(package_name: PACKAGE)
+  codes = client.aab_version_codes + client.apks_version_codes
+  client.abort_current_edit
+  codes.map(&:to_i).max || 0
+end
+
+def build_aab(code)
+  sh("cd '#{EXAMPLE}' && '#{ROOT}/.github/scripts/gradle-retry.sh' flutter build appbundle --release " \
+     "--build-name='#{ENV.fetch('SDK_VERSION')}' --build-number=#{code} --dart-define-from-file=build-info.json")
+end
+
+def upload_aab(code)
+  dir = Dir.mktmpdir
+  FileUtils.mkdir_p(File.join(dir, "en-US", "changelogs"))
+  body = File.join(dir, "release-body.txt")
+  File.write(body, ENV.fetch("RELEASE_BODY", ""))
+  notes = sh("cd '#{EXAMPLE}' && '#{ROOT}/.github/scripts/release-notes.sh' 500 android build-info.json #{code} '#{body}'", log: false)
+  UI.user_error!("The release notes command printed nothing; not releasing without notes") if notes.to_s.strip.empty?
+  File.write(File.join(dir, "en-US", "changelogs", "#{code}.txt"), notes)
+
+  upload_to_play_store(
+    package_name: PACKAGE,
+    json_key_data: ENV.fetch("SERVICE_ACCOUNT_JSON"),
+    track: "internal",
+    aab: AAB,
+    release_status: ENV.fetch("PLAY_RELEASE_STATUS", "completed"),
+    version_name: "#{ENV.fetch('SDK_VERSION')} (#{code}) #{ENV.fetch('COMMIT_SHORT')}",
+    metadata_path: dir,
+    skip_upload_apk: true,
+    skip_upload_metadata: true,
+    skip_upload_images: true,
+    skip_upload_screenshots: true
+  )
+end
+
+platform :android do
+  desc "Print and export (VERSION_CODE) the next versionCode: the highest Play has seen plus one"
+  lane :next_version_code do
+    code = highest_version_code + 1
+    export_env("VERSION_CODE", code)
+    UI.message("Next versionCode: #{code}")
+    code
+  end
+
+  desc "Read-only check that the Play service account can open an edit"
+  lane :check_credentials do
+    UI.message("Play API is reachable; highest versionCode seen: #{highest_version_code}")
+  end
+
+  desc "Build the bundle and release it to the internal track, retrying once with a fresh versionCode"
+  lane :release do
+    code = next_version_code
+    built = nil
+    attempts = 0
+    begin
+      attempts += 1
+      unless built == code
+        build_aab(code)
+        built = code
+      end
+      upload_aab(code)
+    rescue StandardError => e
+      raise if attempts >= 2
+
+      UI.important("Upload failed (#{e.message}); retrying once")
+      code = next_version_code
+      retry
+    end
+  end
+
+  desc "Upload to Internal App Sharing and write the masked download URL to the step output"
+  lane :share do
+    url = play_client.upload_bundle_to_internal_app_sharing(PACKAGE, AAB)
+    UI.user_error!("Internal App Sharing did not return a download URL") if url.to_s.empty?
+    puts "::add-mask::#{url}"
+    File.open(ENV["GITHUB_OUTPUT"], "a") { |f| f.puts "url=#{url}" } if ENV["GITHUB_OUTPUT"]
+  end
+end

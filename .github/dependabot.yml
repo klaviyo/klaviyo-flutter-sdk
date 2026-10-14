@@ -11,7 +11,9 @@ updates:
         patterns:
           - "*"
   - package-ecosystem: bundler
-    directory: /example/ios
+    directories:
+      - /example/ios
+      - /example/android
     schedule:
       interval: monthly
     groups:

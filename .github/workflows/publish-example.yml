@@ -218,7 +218,6 @@ jobs:
       - name: Check credentials only
         if: inputs.check_credentials == true
         env:
-          PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
           ALIAS: ${{ secrets.ALIAS }}
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -227,54 +226,44 @@ jobs:
             -storepass "$KEY_STORE_PASSWORD" -keypass "$KEY_PASSWORD" >/dev/null
           echo "Keystore opens and contains the '$ALIAS' alias"
 
-      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
         with:
-          credentials_json: ${{ secrets.SERVICE_ACCOUNT_JSON }}
-
-      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: example/android
 
       - name: Check Play API access only
         if: inputs.check_credentials == true
+        working-directory: example/android
         env:
-          PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
-        run: |
-          next="$(.github/scripts/play-publish.sh next-version-code)"
-          echo "Play API is reachable; highest versionCode seen: $((next - 1))"
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+        run: bundle exec fastlane android check_credentials
 
-      - name: Build and upload (retries on versionCode conflict)
+      - name: Build and upload
         if: inputs.check_credentials != true
         id: build
-        working-directory: example
+        working-directory: example/android
         env:
-          PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
-          AAB_PATH: build/app/outputs/bundle/release/app-release.aab
-          PLAY_TRACK: internal
-          # Play only accepts 'draft' releases until the app's first manual rollout.
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          SDK_VERSION: ${{ steps.buildinfo.outputs.sdk_version }}
+          COMMIT_SHORT: ${{ steps.buildinfo.outputs.commit_short }}
           PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
-          RELEASE_NAME_PREFIX: ${{ steps.buildinfo.outputs.sdk_version }}
-          RELEASE_NAME_SUFFIX: ${{ steps.buildinfo.outputs.commit_short }}
-          # Composed per attempt so a versionCode retry never ships stale notes.
           SOURCE_LABEL: ${{ steps.buildinfo.outputs.source_label }}
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_BODY: ${{ github.event.release.body }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          NOTES_CMD: printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt" && ../.github/scripts/release-notes.sh 500 android build-info.json "$BUILD_NUMBER" "$RUNNER_TEMP/release-body.txt"
         run: |
-          flutter pub get
-          # shellcheck disable=SC2016
-          ../.github/scripts/play-publish.sh deploy -- \
-            bash -c '../.github/scripts/gradle-retry.sh flutter build appbundle --release --build-name="$SDK_VERSION" --build-number="$VERSION_CODE" --dart-define-from-file=build-info.json'
+          (cd .. && flutter pub get)
+          bundle exec fastlane android release
 
-      # Uploads the published bundle to Internal App Sharing for the Slack
-      # install link; a sharing failure must not fail a deploy that landed.
       - name: Upload to Internal App Sharing
         if: success() && inputs.check_credentials != true
         id: internal_sharing
         continue-on-error: true
+        working-directory: example/android
         env:
-          PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
-          AAB_PATH: example/build/app/outputs/bundle/release/app-release.aab
-        run: .github/scripts/play-publish.sh share
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+        run: bundle exec fastlane android share
 
       - name: Clean up signing material
         if: always()
@@ -412,30 +401,14 @@ jobs:
           bundler-cache: true
           working-directory: example/ios
 
-      # altool and asc.rb both find the key at this conventional path.
-      - name: Write App Store Connect API key
-        id: apikey
-        env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
-        run: |
-          KEY_DIR="$HOME/.appstoreconnect/private_keys"
-          mkdir -p "$KEY_DIR"
-          printf '%s' "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
-          chmod 600 "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
-
-      - name: Resolve next build number from App Store Connect
-        id: buildnumber
+      - name: Check App Store Connect key only
+        if: inputs.check_credentials == true
+        working-directory: example/ios
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
-          BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
-        run: echo "INITIAL_BUILD_NUMBER=$(ruby .github/scripts/asc.rb next-build-number "$IOS_MARKETING_VERSION")" >> "$GITHUB_ENV"
-
-      - name: Check credentials only
-        if: inputs.check_credentials == true
-        run: |
-          echo "ASC API key accepted; next build number would be $INITIAL_BUILD_NUMBER"
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: bundle exec fastlane ios next_build_number version:"$IOS_MARKETING_VERSION"
 
       - name: Check match repo is readable
         if: inputs.check_credentials == true
@@ -450,7 +423,7 @@ jobs:
           GIT_SSH_COMMAND='ssh -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3' git ls-remote git@github.com:klaviyo/mobile-certificates.git HEAD >/dev/null
           echo "match repository is readable with the deploy key"
 
-      - name: Install signing identity and build, upload (retries on build number conflict)
+      - name: Install signing identity, build and upload
         if: inputs.check_credentials != true
         id: build
         working-directory: example/ios
@@ -462,9 +435,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
-          BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
-          IPA_PATH: ${{ github.workspace }}/example/build/ios/ipa/Runner.ipa
-          NEXT_BUILD_NUMBER_CMD: ruby ${{ github.workspace }}/.github/scripts/asc.rb next-build-number "$IOS_MARKETING_VERSION"
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -T 15 github.com >> ~/.ssh/known_hosts 2>/dev/null
@@ -474,9 +445,7 @@ jobs:
           printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 -d > "$CERT_P12_PATH"
           export CERT_P12_PATH
           bundle exec fastlane ios install_signing
-          # shellcheck disable=SC2016
-          ../../.github/scripts/testflight-publish.sh "$INITIAL_BUILD_NUMBER" -- \
-            bash -c 'bundle exec fastlane ios build_ipa build_number:"$BUILD_NUMBER"'
+          bundle exec fastlane ios release version:"$IOS_MARKETING_VERSION"
 
       - name: Record deployed build
         id: result
@@ -486,7 +455,7 @@ jobs:
           SDK_INFO: ${{ steps.buildinfo.outputs.sdk_info }}
         run: |
           {
-            echo "build_number=${BUILD_NUMBER:-$INITIAL_BUILD_NUMBER}"
+            echo "build_number=${BUILD_NUMBER:-}"
             echo "marketing_version=$(jq -r .sdkVersion "$BUILD_INFO_PATH")"
             echo "ios_marketing_version=$IOS_MARKETING_VERSION"
             echo "sdk_info=$SDK_INFO"
@@ -506,7 +475,7 @@ jobs:
       - name: Clean up signing material
         if: always()
         run: |
-          rm -rf "$HOME/.appstoreconnect/private_keys" "$RUNNER_TEMP/dist.p12"
+          rm -rf "$RUNNER_TEMP/dist.p12"
           ssh-add -D 2>/dev/null || true
 
       - name: Notify Slack on success
@@ -538,13 +507,13 @@ jobs:
           result: failure
           platform: TestFlight
           os: iOS
-          version_label: ${{ steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.BUILD_NUMBER || env.INITIAL_BUILD_NUMBER || '?' }}, attempted)
+          version_label: ${{ steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.BUILD_NUMBER || '?' }}, attempted)
           sdk_info: ${{ steps.buildinfo.outputs.sdk_info }}
           source_label: ${{ steps.buildinfo.outputs.source_label }}
           event_name: ${{ github.event_name }}
           commit_sha: ${{ steps.buildinfo.outputs.commit_sha }}
           commit_short: ${{ steps.buildinfo.outputs.commit_short }}
-          failed_step: ${{ steps.buildinfo.outcome == 'failure' && 'generate build info' || steps.flutterconfig.outcome == 'failure' && 'generate Flutter config' || steps.apikey.outcome == 'failure' && 'write App Store Connect key' || steps.buildnumber.outcome == 'failure' && 'resolve build number' || steps.build.outcome == 'failure' && 'sign, build and upload' || 'an unknown step' }}
+          failed_step: ${{ steps.buildinfo.outcome == 'failure' && 'generate build info' || steps.flutterconfig.outcome == 'failure' && 'generate Flutter config' || steps.build.outcome == 'failure' && 'sign, build and upload' || 'an unknown step' }}
 
   what-to-test:
     name: Set TestFlight "What to Test"
@@ -568,16 +537,8 @@ jobs:
       - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
         with:
           ruby-version: '3.3'
-
-      - name: Write App Store Connect API key
-        env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
-        run: |
-          KEY_DIR="$HOME/.appstoreconnect/private_keys"
-          mkdir -p "$KEY_DIR"
-          printf '%s' "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
-          chmod 600 "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          bundler-cache: true
+          working-directory: example/ios
 
       - name: Set TestFlight "What to Test"
         id: notes
@@ -587,7 +548,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
-          BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
           BUILD_NUMBER: ${{ needs.deploy-ios.outputs.build_number }}
           SOURCE_LABEL: ${{ needs.deploy-ios.outputs.source_label }}
           SDK_VERSION: ${{ needs.deploy-ios.outputs.marketing_version }}
@@ -617,11 +578,8 @@ jobs:
           # TestFlight allows 4000 characters.
           .github/scripts/release-notes.sh 4000 ios "$RUNNER_TEMP/build-info.json" "$BUILD_NUMBER" "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/testflight-notes.txt"
           cat "$RUNNER_TEMP/testflight-notes.txt"
-          ruby .github/scripts/asc.rb set-whats-new "$IOS_MARKETING_VERSION" "$BUILD_NUMBER" "$RUNNER_TEMP/testflight-notes.txt"
-
-      - name: Clean up signing material
-        if: always()
-        run: rm -rf "$HOME/.appstoreconnect/private_keys"
+          cd example/ios
+          bundle exec fastlane ios whats_new version:"$IOS_MARKETING_VERSION" build_number:"$BUILD_NUMBER" notes_file:"$RUNNER_TEMP/testflight-notes.txt"
 
       - name: Warn in Slack that What to Test failed
         if: failure()
