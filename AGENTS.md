@@ -66,13 +66,13 @@ To test against a local native SDK build:
 
 ### Gotchas
 
-- **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist, the example app's `pubspec.yaml`, the example `pubspec.lock`, and `MARKETING_VERSION` in the example app's Xcode project. Use `scripts/bump_version.sh` to update all version references at once.
-- **Example lockfiles are committed**: `example/pubspec.lock` and `example/ios/Podfile.lock` pin what the published example app ships with. Native SDK bumps and `scripts/configure-sdk.sh` overrides change `Podfile.lock` — regenerate it with `pod install` in `example/ios` and commit the result. Never commit a lock pointing at a feature branch or local checkout.
+- **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist, the example app's `pubspec.yaml`, and `MARKETING_VERSION` in the example app's Xcode project. Use `scripts/bump_version.sh` to update all version references at once.
+- **Example Podfile.lock is committed**: it pins the native iOS SDK the published example app ships with. Native SDK bumps and `scripts/configure-sdk.sh` overrides change it — regenerate with `pod install` in `example/ios` and commit the result. Never commit a lock pointing at a feature branch or local checkout.
 - `BufferedBroadcastStreamController` (`lib/src/utils/buffered_broadcast_stream_controller.dart`) exists because native events (push tokens, notifications) can fire before Dart listeners are attached. Don't replace it with a plain `StreamController.broadcast`.
 
 ## Example app deployment
 
-`.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**`, on published releases, on `workflow_dispatch`, and when a same-repo PR is labeled `deploy-example-app[:android|:ios]` (the label is removed after the run so re-applying re-triggers). Unit tests and lint gate every deploy via `needs:`. Deploys are skipped, not failed, until the required store secrets exist (push/release skip with a notice; dispatch and label deploys fail loudly). The `check_credentials` dispatch input runs a read-only verification of each platform's credentials instead of a deploy. Deploy jobs run in the GitHub environments `android-internal-track` and `testflight`; store secrets stay at repository level because the secret preflight cannot see environment secrets. Secrets and setup live in `.github/scripts/README.md`.
+`.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**`, published releases, `workflow_dispatch`, and same-repo PRs labeled `deploy-example-app[:android|:ios]`. Unit tests and lint gate every deploy. Deploys skip until the store secrets exist. Setup and secrets: `.github/scripts/README.md`.
 
 ## Code Review
 

@@ -11,12 +11,6 @@
 # (7 chars), with a `local:` prefix and optional `-dirty` suffix for local
 # checkouts, mirroring the native test apps. Any resolution failure degrades
 # to a readable string; the script never exits non-zero.
-#
-# Env overrides (used by the offline tests):
-#   REPO_ROOT, PUBSPEC, PODFILE_LOCK, PODFILE, PODSPEC,
-#   ANDROID_BUILD_GRADLE, ANDROID_SETTINGS_GRADLE, ANDROID_LS_REMOTE_CMD
-#   GITHUB_REF_TYPE, GITHUB_REF_NAME, GITHUB_HEAD_REF, GITHUB_EVENT_NAME,
-#   GITHUB_EVENT_PATH, GITHUB_SHA, BUILD_DATE
 
 set -u
 
@@ -30,33 +24,8 @@ ANDROID_BUILD_GRADLE="${ANDROID_BUILD_GRADLE:-$REPO_ROOT/android/build.gradle}"
 ANDROID_SETTINGS_GRADLE="${ANDROID_SETTINGS_GRADLE:-$REPO_ROOT/example/android/settings.gradle}"
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
 ANDROID_REPO="https://github.com/klaviyo/klaviyo-android-sdk.git"
-ANDROID_LS_REMOTE_CMD="${ANDROID_LS_REMOTE_CMD:-git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $ANDROID_REPO}"
-IOS_LS_REMOTE_CMD="${IOS_LS_REMOTE_CMD:-git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $SWIFT_REPO}"
-LS_REMOTE_DEADLINE="${LS_REMOTE_DEADLINE:-15}"
 OUT="${1:-$REPO_ROOT/example/build-info.json}"
 SHORT=7
-
-# ls_remote <command...>: runs a git ls-remote command with a hard deadline, because git has no connect
-# timeout and a dead remote would otherwise hold the build for over a minute. Prints its stdout; a timeout
-# prints nothing and returns 124, which callers treat like an unreachable remote. Needs no timeout(1).
-ls_remote() {
-  local out pid watcher rc=0
-  out="$(mktemp)"
-  "$@" > "$out" 2> /dev/null < /dev/null &
-  pid=$!
-  ( sleep "$LS_REMOTE_DEADLINE"; pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null ) > /dev/null 2>&1 &
-  watcher=$!
-  wait "$pid" 2>/dev/null || rc=$?
-  kill "$watcher" 2>/dev/null || true
-  wait "$watcher" 2>/dev/null || true
-  if [ "$rc" -eq 143 ] || [ "$rc" -eq 137 ]; then
-    rm -f "$out"
-    return 124
-  fi
-  cat "$out"
-  rm -f "$out"
-  return "$rc"
-}
 
 is_semver() {
   [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
@@ -144,8 +113,7 @@ resolve_ios_pod_lock() {
     if [ -n "$commit" ]; then
       # Commit pin: report the branch only if the commit is still its head.
       local heads
-      # shellcheck disable=SC2086
-      heads="$(ls_remote $IOS_LS_REMOTE_CMD \
+      heads="$(git ls-remote --heads "$SWIFT_REPO" 2>/dev/null \
         | awk -v c="$commit" 'index($1, c) == 1 {sub("refs/heads/", "", $2); print $2}' \
         | sort || true)"
       local best
@@ -253,8 +221,7 @@ resolve_android_ref() {
     # Commit pin via JitPack: report the branch only when the commit is a
     # current head (master first, then release branches).
     local heads
-    # shellcheck disable=SC2086
-    heads="$(ls_remote $ANDROID_LS_REMOTE_CMD \
+    heads="$(git ls-remote --heads "$ANDROID_REPO" 2>/dev/null \
       | awk -v c="$coordinate" 'index($1, c) == 1 {sub("refs/heads/", "", $2); print $2}' \
       | sort || true)"
     local best
@@ -274,8 +241,7 @@ resolve_android_ref() {
       # JitPack builds the branch head; `~` encodes `/`.
       local branch sha
       branch="$(printf '%s' "${coordinate%-SNAPSHOT}" | tr '~' '/')"
-      # shellcheck disable=SC2086
-      sha="$(ls_remote $ANDROID_LS_REMOTE_CMD "$branch" | awk '{print $1}' | head -1)"
+      sha="$(git ls-remote --heads "$ANDROID_REPO" "$branch" 2>/dev/null | awk '{print $1}' | head -1)"
       if [ -n "$sha" ]; then
         printf '%s@%s' "$branch" "$(printf '%s' "$sha" | cut -c1-$SHORT)"
       else
@@ -290,34 +256,11 @@ resolve_android_ref() {
 
 # ─── JSON output ──────────────────────────────────────────────────────
 
-# In CI the commit, branch and source must come from the event: GITHUB_SHA and GITHUB_REF_NAME are the
-# synthetic merge commit and "<n>/merge" on a label deploy, and git in a CI checkout reports the same
-# merge commit. A missing input fails the build and names the field. Local builds keep the git fallback.
-fail_stamp() {
-  echo "::error::sdk-ref.sh: $1 is empty in CI. Refusing to fall back to git or GITHUB_SHA/GITHUB_REF_NAME, which are the merge commit and \"<n>/merge\" on a label deploy." >&2
-  exit 1
-}
-
-if [ -n "${CI:-}" ]; then
-  if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
-    COMMIT=""
-    if [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
-      COMMIT="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["pull_request"]["head"]["sha"])' "$GITHUB_EVENT_PATH" 2>/dev/null || true)"
-    fi
-    BRANCH="${GITHUB_HEAD_REF:-}"
-  else
-    COMMIT="${GITHUB_SHA:-}"
-    BRANCH="${GITHUB_REF_NAME:-}"
-  fi
-  [ -n "$COMMIT" ] || fail_stamp "the commit"
-  [ -n "$BRANCH" ] || fail_stamp "the branch"
-else
-  COMMIT="${GITHUB_SHA:-$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)}"
-  if [ -n "${GITHUB_EVENT_NAME:-}" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
-    HEAD_SHA="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["pull_request"]["head"]["sha"])' "$GITHUB_EVENT_PATH" 2>/dev/null)"
-    [ -n "$HEAD_SHA" ] && COMMIT="$HEAD_SHA"
-  fi
-  BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)}}"
+COMMIT="${GITHUB_SHA:-$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)}"
+BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)}}"
+if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ] && [ -f "${GITHUB_EVENT_PATH:-}" ]; then
+  HEAD_SHA="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["pull_request"]["head"]["sha"])' "$GITHUB_EVENT_PATH" 2>/dev/null)"
+  [ -n "$HEAD_SHA" ] && COMMIT="$HEAD_SHA"
 fi
 FLUTTER_REF="$(resolve_flutter_ref)"
 IOS_REF="$(resolve_ios_ref)"
@@ -325,16 +268,9 @@ ANDROID_REF="$(resolve_android_ref)"
 SDK_VERSION="$(grep '^version:' "$PUBSPEC" 2>/dev/null | awk '{print $2}' | cut -d+ -f1)"
 APP_VERSION="$(grep '^version:' "$EXAMPLE_PUBSPEC" 2>/dev/null | awk '{print $2}' | cut -d+ -f1)"
 
-# The commit and source label are stamped once here; every consumer
-# (dart-defines, release notes, Slack) reads them from the JSON so the
-# surfaces cannot diverge. On PR events both come from the PR head, never
-# the synthetic merge commit.
 BUILD_DATE="${BUILD_DATE:-$(date -u '+%Y-%m-%d %H:%M UTC')}"
 
 SOURCE_LABEL="${SOURCE_LABEL:-$("$(cd "$(dirname "$0")" && pwd)/../.github/scripts/source-label.sh" || true)}"
-if [ -n "${CI:-}" ] && { [ -z "$SOURCE_LABEL" ] || [ "$SOURCE_LABEL" = "unknown" ]; }; then
-  fail_stamp "the source label"
-fi
 [ -n "$SOURCE_LABEL" ] || SOURCE_LABEL='—'
 EVENT_NAME_OUT="${GITHUB_EVENT_NAME:-—}"
 

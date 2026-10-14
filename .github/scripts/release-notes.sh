@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 #
 # Prints store release notes ("What's new" on Play, "What to Test" on
-# TestFlight) for an example app build: the shared header block (kept in sync
-# with the app's "Copy build info" text via tests/fixtures/build-info-cases.json)
+# TestFlight) for an example app build: the shared header block
 # followed by the GitHub release body (release events only). Header lines are
 # never cut. When the text is over the cap the release body is cut first, then
 # the CI run line. Truncation is by character and any cut is marked

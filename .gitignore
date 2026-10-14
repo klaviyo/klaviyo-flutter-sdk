@@ -6,9 +6,8 @@
 .pub-cache/
 .pub/
 build/
-# The example app's pubspec.lock and ios/Podfile.lock are committed so
-# published builds resolve the same native SDK versions.
 /pubspec.lock
+/example/pubspec.lock
 example/build-info.json
 
 # Android

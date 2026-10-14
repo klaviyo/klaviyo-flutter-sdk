@@ -11,9 +11,6 @@
 #     deploys that platform from the PR head; the cleanup-label job removes
 #     the label afterwards so re-applying re-triggers
 #
-# Pull requests that touch publish files get a dry run instead, from
-# publish-example-checks.yml (script tests plus unsigned builds, no secrets).
-#
 # Logs are public: pass secrets via env only, never echo them or enable
 # `set -x`. See .github/scripts/README.md for the required secrets and setup.
 
@@ -385,15 +382,17 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           ./scripts/sdk-ref.sh
+          SDK_VERSION="$(jq -r .sdkVersion example/build-info.json)"
+          MARKETING_VERSION="${SDK_VERSION%%[-+]*}"
           {
             echo "sdk_version=$(jq -r .sdkVersion example/build-info.json)"
             echo "commit_sha=$(jq -r .commit example/build-info.json)"
             echo "commit_short=$(jq -r .commitShort example/build-info.json)"
             echo "source_label=$(jq -r .sourceLabel example/build-info.json)"
             echo "sdk_info=$(jq -r '"Flutter \(.sdkVersion)\(if .flutterSdkRef == .sdkVersion then "" else " · \(.flutterSdkRef)" end) | iOS \(.iosSdkVersion)\(if .iosSdkRef == .iosSdkVersion then "" else " · \(.iosSdkRef)" end)"' example/build-info.json)"
-            echo "marketing_version=$(.github/scripts/ios-marketing-version.sh "$(jq -r .sdkVersion example/build-info.json)")"
+            echo "marketing_version=$MARKETING_VERSION"
           } >> "$GITHUB_OUTPUT"
-          echo "IOS_MARKETING_VERSION=$(.github/scripts/ios-marketing-version.sh "$(jq -r .sdkVersion example/build-info.json)")" >> "$GITHUB_ENV"
+          echo "IOS_MARKETING_VERSION=$MARKETING_VERSION" >> "$GITHUB_ENV"
 
       # Runs before setup-ruby so pod install uses the runner's own CocoaPods.
       # The build number here is a placeholder; build_ipa passes the real one

@@ -14,13 +14,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # The sync regenerates example/pubspec.lock with flutter pub get, so Flutter has to be on the runner
-      # or the drift check below would compare an untouched lockfile against itself.
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          flutter-version: 3.38.7
-          cache: true
-
       - name: Run version sync script
         run: ./scripts/sync_version.sh
 
@@ -29,7 +22,6 @@ jobs:
           files=(
             ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist
             example/pubspec.yaml
-            example/pubspec.lock
             example/ios/Runner.xcodeproj/project.pbxproj
           )
           if ! git diff --exit-code "${files[@]}"; then

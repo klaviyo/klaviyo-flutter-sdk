@@ -33,36 +33,15 @@
 #   MAX_ATTEMPTS        (default: 3)
 #   PLAY_ACCESS_TOKEN   (optional) OAuth token; otherwise minted with gcloud
 #                       from the active service-account credentials
-#   PLAY_API_ROOT       (optional) API origin override, used by tests
-#   PLAY_CONNECT_TIMEOUT (default: 15) seconds to open a connection
-#   PLAY_API_TIMEOUT    (default: 60) seconds for one API call
-#   PLAY_UPLOAD_TIMEOUT (default: 600) seconds for a bundle upload
-#   PLAY_TOKEN_TIMEOUT  (default: 60) seconds to mint a token with gcloud
 #
 set -euo pipefail
 
 : "${PACKAGE_NAME:?PACKAGE_NAME is required}"
 
-# Fail in seconds if a tool is missing, not after a build. gcloud is only needed to mint a token.
-needed="jq curl"
-[ -n "${PLAY_ACCESS_TOKEN:-}" ] || needed="$needed gcloud"
-missing=""
-for tool in $needed; do
-  command -v "$tool" >/dev/null 2>&1 || missing="$missing${missing:+, }$tool"
-done
-if [ -n "$missing" ]; then
-  echo "::error::play-publish.sh needs these tools on PATH: $missing" >&2
-  exit 1
-fi
-
 PLAY_TRACK="${PLAY_TRACK:-internal}"
 PLAY_RELEASE_STATUS="${PLAY_RELEASE_STATUS:-completed}"
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
-PLAY_CONNECT_TIMEOUT="${PLAY_CONNECT_TIMEOUT:-15}"
-PLAY_API_TIMEOUT="${PLAY_API_TIMEOUT:-60}"
-PLAY_UPLOAD_TIMEOUT="${PLAY_UPLOAD_TIMEOUT:-600}"
-PLAY_TOKEN_TIMEOUT="${PLAY_TOKEN_TIMEOUT:-60}"
-PLAY_API_ROOT="${PLAY_API_ROOT:-https://androidpublisher.googleapis.com}"
+PLAY_API_ROOT="https://androidpublisher.googleapis.com"
 API="$PLAY_API_ROOT/androidpublisher/v3/applications/$PACKAGE_NAME"
 UPLOAD_API="$PLAY_API_ROOT/upload/androidpublisher/v3/applications/$PACKAGE_NAME"
 
@@ -72,58 +51,25 @@ CONFLICT=3
 RESPONSE_FILE="$(mktemp)"
 trap 'rm -f "$RESPONSE_FILE"' EXIT
 
-# run_bounded <seconds> <command...>: runs the command and kills it if it overruns, without depending on
-# timeout(1), which stock macOS does not have. Output goes through files, so a child that outlives the kill
-# cannot keep the caller's pipes open. Prints the command's stdout and stderr; exits 124 on a timeout.
-run_bounded() {
-  local limit="$1" out err pid watcher rc=0
-  shift
-  out="$(mktemp)"
-  err="$(mktemp)"
-  "$@" > "$out" 2> "$err" < /dev/null &
-  pid=$!
-  ( sleep "$limit"; pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null ) > /dev/null 2>&1 &
-  watcher=$!
-  wait "$pid" 2>/dev/null || rc=$?
-  kill "$watcher" 2>/dev/null || true
-  wait "$watcher" 2>/dev/null || true
-  # 143 and 137 are the exit codes of a process killed by TERM and KILL: the watcher fired.
-  if [ "$rc" -eq 143 ] || [ "$rc" -eq 137 ]; then
-    rc=124
-  else
-    cat "$out"
-  fi
-  cat "$err" >&2
-  rm -f "$out" "$err"
-  return "$rc"
-}
-
 access_token() {
   if [ -n "${PLAY_ACCESS_TOKEN:-}" ]; then
     printf '%s' "$PLAY_ACCESS_TOKEN"
   else
     # The androidpublisher scope must be requested explicitly; the default
     # cloud-platform scope gets empty responses from the Play API.
-    local rc=0
-    run_bounded "$PLAY_TOKEN_TIMEOUT" gcloud auth print-access-token --scopes=https://www.googleapis.com/auth/androidpublisher || rc=$?
-    if [ "$rc" -eq 124 ]; then
-      echo "::error::gcloud did not return an access token within ${PLAY_TOKEN_TIMEOUT}s" >&2
-    fi
-    return "$rc"
+    gcloud auth print-access-token --scopes=https://www.googleapis.com/auth/androidpublisher
   fi
 }
 
 # api METHOD URL [curl args...]  -> sets API_STATUS, body in $RESPONSE_FILE.
 api() {
-  local method="$1" url="$2" max_time="$PLAY_API_TIMEOUT"
+  local method="$1" url="$2" max_time=60
   shift 2
   if [ "${1:-}" = "--upload" ]; then
-    max_time="$PLAY_UPLOAD_TIMEOUT"
+    max_time=600
     shift
   fi
-  # Every call is bounded, or a stalled connection would hold the job until its own timeout. A failure,
-  # including a timeout (curl exit 28), leaves API_STATUS at 000 and surfaces as a failed call.
-  API_STATUS="$(curl -sS --connect-timeout "$PLAY_CONNECT_TIMEOUT" --max-time "$max_time" \
+  API_STATUS="$(curl -sS --connect-timeout 15 --max-time "$max_time" \
     -X "$method" -o "$RESPONSE_FILE" -w '%{http_code}' \
     -H "Authorization: Bearer $TOKEN" "$@" "$url")" || API_STATUS=000
 }
@@ -200,9 +146,6 @@ upload() {
 
   local notes=""
   if [ -n "${NOTES_CMD:-}" ]; then
-    # upload runs on the left of ||, which turns set -e off for its whole body, so a failing notes
-    # command must be checked here. Nothing is published yet at this point, so stopping is cheap; a
-    # release that went out with an empty "What's new" would not be.
     local notes_rc=0
     notes="$(BUILD_NUMBER="$version_code" bash -c "$NOTES_CMD")" || notes_rc=$?
     if [ "$notes_rc" -ne 0 ] || [ -z "$notes" ]; then

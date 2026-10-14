@@ -19,17 +19,14 @@
 #   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_KEY_ISSUER_ID
 #   BUNDLE_ID
 #   APP_STORE_CONNECT_API_KEY_PATH (default: ~/.appstoreconnect/private_keys/AuthKey_<id>.p8)
-#   ASC_API_ROOT (default: https://api.appstoreconnect.apple.com; tests stub it)
-#   ASC_WAIT_ATTEMPTS (default 60), ASC_WAIT_SECONDS (default 30): the What to Test wait
 
 require 'json'
 require 'net/http'
 require 'openssl'
 require 'base64'
 require 'uri'
-require 'timeout'
 
-API = ENV.fetch('ASC_API_ROOT', 'https://api.appstoreconnect.apple.com')
+API = 'https://api.appstoreconnect.apple.com'
 
 def b64url(data)
   Base64.urlsafe_encode64(data, padding: false)
@@ -50,10 +47,6 @@ def token
   "#{header}.#{payload}.#{b64url(r + s)}"
 end
 
-ASC_OPEN_TIMEOUT = Integer(ENV.fetch('ASC_OPEN_TIMEOUT', '15'))
-ASC_READ_TIMEOUT = Integer(ENV.fetch('ASC_READ_TIMEOUT', '60'))
-ASC_TOTAL_TIMEOUT = Integer(ENV.fetch('ASC_TOTAL_TIMEOUT', '120'))
-
 def request(method, url, body = nil)
   uri = URI(url.start_with?('http') ? url : "#{API}#{url}")
   req = Net::HTTP.const_get(method.capitalize).new(uri)
@@ -62,9 +55,7 @@ def request(method, url, body = nil)
     req['Content-Type'] = 'application/json'
     req.body = body.to_json
   end
-  res = Timeout.timeout(ASC_TOTAL_TIMEOUT) do
-    Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: ASC_OPEN_TIMEOUT, read_timeout: ASC_READ_TIMEOUT, write_timeout: ASC_READ_TIMEOUT) { |h| h.request(req) }
-  end
+  res = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 15, read_timeout: 60) { |h| h.request(req) }
   [res.code.to_i, res.body.to_s.empty? ? {} : JSON.parse(res.body)]
 end
 
@@ -128,11 +119,9 @@ def set_whats_new(marketing_version, build_number, notes_file)
   # exist under an older version; the lookup must name both.
   filters = "filter[app]=#{id}&filter[preReleaseVersion.version]=#{URI.encode_www_form_component(marketing_version)}" \
             "&filter[version]=#{build_number}&limit=1"
-  # Builds usually appear within a few minutes of altool finishing. The attempt
-  # count and delay are bounded and come from the environment so a test can
-  # exhaust them in milliseconds instead of waiting out the real 30 minutes.
-  attempts = Integer(ENV.fetch('ASC_WAIT_ATTEMPTS', '60'))
-  delay = Float(ENV.fetch('ASC_WAIT_SECONDS', '30'))
+  # Builds usually appear within a few minutes of altool finishing.
+  attempts = 60
+  delay = 30
   attempts.times do |i|
     page = get!("/v1/builds?#{filters}")
     build = page['data'].first
