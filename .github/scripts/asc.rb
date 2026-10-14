@@ -67,6 +67,16 @@ def get!(url)
   json
 end
 
+# App Store Connect's preReleaseVersion.version holds the numeric marketing
+# version (0.3.2), never the SDK version with a prerelease suffix (0.3.2-alpha.1),
+# so a lookup that sends the suffix finds nothing. Fail now instead of waiting
+# out the processing timeout.
+def require_marketing_version!(value)
+  return value if value.to_s.match?(/\A\d+(\.\d+){0,2}\z/)
+
+  abort "marketing version must be numeric X[.Y[.Z]] with no prerelease or build suffix, got #{value.to_s.inspect}"
+end
+
 def app_id
   bundle_id = ENV.fetch('BUNDLE_ID')
   apps = get!("/v1/apps?filter[bundleId]=#{URI.encode_www_form_component(bundle_id)}&limit=1")
@@ -82,6 +92,7 @@ def write_env(name, value)
 end
 
 def next_build_number(marketing_version)
+  require_marketing_version!(marketing_version)
   id = app_id
   write_env('ASC_APP_ID', id)
   highest = 0
@@ -100,6 +111,8 @@ def next_build_number(marketing_version)
 end
 
 def set_whats_new(marketing_version, build_number, notes_file)
+  require_marketing_version!(marketing_version)
+  abort "build number must be numeric, got #{build_number.inspect}" unless build_number.to_s.match?(/\A\d+\z/)
   notes = File.read(notes_file).strip
   id = app_id
   build = nil
@@ -136,8 +149,13 @@ def set_whats_new(marketing_version, build_number, notes_file)
 end
 
 case ARGV[0]
-when 'next-build-number' then next_build_number(ARGV.fetch(1))
-when 'set-whats-new' then set_whats_new(ARGV.fetch(1), ARGV.fetch(2), ARGV.fetch(3))
+when 'next-build-number'
+  # Build numbers restart for each marketing version, so there is no global fallback.
+  abort 'next-build-number requires a marketing version' if ARGV[1].to_s.empty?
+  next_build_number(ARGV[1])
+when 'set-whats-new'
+  abort 'set-whats-new requires <marketing-version> <build-number> <notes-file>' if ARGV[1..3].to_a.any? { |a| a.to_s.empty? } || ARGV.length < 4
+  set_whats_new(ARGV[1], ARGV[2], ARGV[3])
 else
   warn 'usage: asc.rb next-build-number <marketing-version> | set-whats-new <marketing-version> <build-number> <notes-file>'
   exit 2

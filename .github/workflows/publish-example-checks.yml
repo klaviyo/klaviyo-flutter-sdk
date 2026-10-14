@@ -116,6 +116,11 @@ jobs:
       - name: Test App Store Connect helper
         run: ruby .github/scripts/tests/test-asc.rb
 
+      # Runs the notes with the env the workflow defines, per event, with decoy values stamped
+      # into build-info.json so a variable the workflow forgets to set shows up.
+      - name: Test the notes env the workflow defines
+        run: python3 -B .github/scripts/tests/test-workflow-notes-env.py
+
   dry-run-android:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
