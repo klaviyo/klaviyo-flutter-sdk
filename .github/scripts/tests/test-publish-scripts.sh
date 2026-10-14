@@ -345,7 +345,9 @@ FAKE
   }
   expect_failure "testflight: stale IPA number fails loudly, naming both numbers" \
     "IPA carries CFBundleVersion 1, expected 9" stale_build
-  check "testflight: a stale IPA is never uploaded" "0" "$(cat "$WORK/tf/uploads" 2>/dev/null | wc -l | tr -d ' ')"
+  uploads=0
+  [ -f "$WORK/tf/uploads" ] && uploads="$(wc -l < "$WORK/tf/uploads" | tr -d ' ')"
+  check "testflight: a stale IPA is never uploaded" "0" "$uploads"
 fi
 
 # ---------------------------------------------------------------- release notes
