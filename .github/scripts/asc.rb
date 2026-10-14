@@ -16,6 +16,7 @@
 #   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_KEY_ISSUER_ID
 #   BUNDLE_ID
 #   APP_STORE_CONNECT_API_KEY_PATH (default: ~/.appstoreconnect/private_keys/AuthKey_<id>.p8)
+#   ASC_API_ROOT (default: https://api.appstoreconnect.apple.com; tests stub it)
 
 require 'json'
 require 'net/http'
@@ -23,7 +24,7 @@ require 'openssl'
 require 'base64'
 require 'uri'
 
-API = 'https://api.appstoreconnect.apple.com'
+API = ENV.fetch('ASC_API_ROOT', 'https://api.appstoreconnect.apple.com')
 
 def b64url(data)
   Base64.urlsafe_encode64(data, padding: false)
