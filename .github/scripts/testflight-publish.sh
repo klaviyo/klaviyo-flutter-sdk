@@ -32,6 +32,20 @@ shift
 : "${APP_STORE_CONNECT_API_KEY_ISSUER_ID:?APP_STORE_CONNECT_API_KEY_ISSUER_ID is required}"
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
 
+# Fail in seconds, before the first archive, if a tool the post-build steps need is missing from the
+# runner image. SKIP_IPA_CHECK drops the IPA inspection (and so unzip and plutil) for tests.
+needed=""
+[ -n "${SKIP_IPA_CHECK:-}" ] || needed="$needed unzip plutil"
+[ -n "${ALTOOL:-}" ] || needed="$needed xcrun"
+missing=""
+for tool in $needed; do
+  command -v "$tool" >/dev/null 2>&1 || missing="$missing${missing:+, }$tool"
+done
+if [ -n "$missing" ]; then
+  echo "::error::testflight-publish.sh needs these tools on PATH before it builds: $missing" >&2
+  exit 1
+fi
+
 altool() {
   if [ -n "${ALTOOL:-}" ]; then
     "$ALTOOL" "$@"

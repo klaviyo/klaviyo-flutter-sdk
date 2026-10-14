@@ -38,6 +38,19 @@
 set -euo pipefail
 
 : "${PACKAGE_NAME:?PACKAGE_NAME is required}"
+
+# Fail in seconds if a tool is missing, not after a build. gcloud is only needed to mint a token.
+needed="jq curl"
+[ -n "${PLAY_ACCESS_TOKEN:-}" ] || needed="$needed gcloud"
+missing=""
+for tool in $needed; do
+  command -v "$tool" >/dev/null 2>&1 || missing="$missing${missing:+, }$tool"
+done
+if [ -n "$missing" ]; then
+  echo "::error::play-publish.sh needs these tools on PATH: $missing" >&2
+  exit 1
+fi
+
 PLAY_TRACK="${PLAY_TRACK:-internal}"
 PLAY_RELEASE_STATUS="${PLAY_RELEASE_STATUS:-completed}"
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
