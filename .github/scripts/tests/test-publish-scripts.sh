@@ -179,6 +179,29 @@ sent="$(jq -r '.releases[0].releaseNotes[0].text' "$WORK/play/track_body")"
 check "play: notes follow a retried versionCode" "Flutter Example 1.2.3 (43)" "$(head -1 <<<"$sent")"
 check "play: retried notes keep the release body" "1" "$(grep -c '^Fixed the thing$' <<<"$sent" | tr -d ' ')"
 
+# Play: a notes command that fails, or prints nothing, stops the release before it is published. upload
+# runs on the left of ||, where set -e is off, so the status has to be checked explicitly; without that the
+# release would go out with an empty "What's new" and exit 0.
+play_with_notes() { NOTES_CMD="$1" run_play; }
+reset_play 41
+: > "$WORK/play/calls"
+expect_failure "play: a failing notes command stops the release and says why" \
+  "release notes command failed \\(exit 7\\)" play_with_notes 'exit 7'
+check "play: nothing was assigned to the track when the notes failed" "0" "$(grep -c 'PUT edits/edit1/tracks' "$WORK/play/calls" | tr -d ' ')"
+check "play: nothing was committed when the notes failed" "0" "$(grep -c 'edit1:commit' "$WORK/play/calls" | tr -d ' ')"
+# Every edit that was opened is discarded: the preflight opens and deletes one, and the upload that
+# stopped at the notes opens and deletes another, so none is left dangling.
+check "play: every opened edit was discarded, none left dangling" \
+  "$(grep -c '^POST edits$' "$WORK/play/calls" | tr -d ' ')" "$(grep -c '^DELETE edits/edit1$' "$WORK/play/calls" | tr -d ' ')"
+reset_play 41
+expect_failure "play: a notes command that prints nothing stops the release" \
+  "failed \\(exit 0\\) or printed nothing" play_with_notes 'true'
+reset_play 41
+: > "$WORK/play/calls"
+out="$(play_with_notes 'echo fine' 2>/dev/null)"
+check "play: working notes still release" "42" "$out"
+check "play: working notes reach the track" "fine" "$(jq -r '.releases[0].releaseNotes[0].text' "$WORK/play/track_body")"
+
 # Play: gives up after MAX_ATTEMPTS.
 reset_play 41; echo 5 > "$WORK/play/conflicts"
 expect_failure "play: stops after max attempts" "Play upload still conflicted after 3 attempts" run_play

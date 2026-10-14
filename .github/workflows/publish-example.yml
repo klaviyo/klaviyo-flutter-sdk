@@ -552,8 +552,11 @@ jobs:
     name: Set TestFlight "What to Test"
     needs: deploy-ios
     # Skipped deploy-ios (missing secrets) must not fail this job out.
+    # A check_credentials run completes deploy-ios without building, and the next build number it records
+    # belongs to no build, so there is nothing to attach What to Test to.
     if: |
       needs.deploy-ios.result == 'success'
+      && inputs.check_credentials != true
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 60

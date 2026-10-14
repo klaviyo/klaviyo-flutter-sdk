@@ -348,6 +348,12 @@ fresh_copy
 edit "$DEPLOY" 's = s.replace("            echo \"ios_marketing_version=$IOS_MARKETING_VERSION\"\n", "", 1)'
 expect_fail "a missing stripped marketing version output is caught" "the deploy-ios result step exports the stripped marketing version"
 
+# --- what to test needs a build
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("      needs.deploy-ios.result == \x27success\x27\n      && inputs.check_credentials != true\n", "      needs.deploy-ios.result == \x27success\x27\n", 1)'
+expect_fail "what-to-test running on a check_credentials run is caught" "the what-to-test job does not run on a check_credentials run"
+
 # --- gating
 
 fresh_copy

@@ -14,6 +14,8 @@ on:
       - '.github/actions/notify-slack-publish/**'
       - '.github/scripts/**'
       - 'scripts/sdk-ref.sh'
+      - 'scripts/sync_version.sh'
+      - '.github/workflows/version-check.yml'
       - 'example/ios/fastlane/**'
       - 'example/android/app/build.gradle'
 
@@ -133,6 +135,9 @@ jobs:
 
       - name: Test Slack payload
         run: .github/scripts/tests/test-slack-payload.sh
+
+      - name: Test the version sync script
+        run: .github/scripts/tests/test-sync-version.sh
 
       # Static rules actionlint cannot check; the self-test breaks a copy of the
       # workflows once per rule and expects the guard to fail each time.

@@ -50,10 +50,24 @@ if [ -f "$EXAMPLE_PUBSPEC" ]; then
 
   echo "Synced version $VERSION to $EXAMPLE_PUBSPEC"
 
-  # The example lockfile is committed and records the path dependency's version.
-  if [ -f "$REPO_ROOT/example/pubspec.lock" ] && command -v dart >/dev/null 2>&1; then
-    (cd "$REPO_ROOT/example" && dart pub get >/dev/null)
-    echo "Synced version $VERSION to $REPO_ROOT/example/pubspec.lock"
+  # The example lockfile is committed and records the path dependency's version. flutter and dart
+  # write the same lock, so either works; flutter is preferred as the repo's own toolchain. Without
+  # one the lock cannot be regenerated, which is a warning, never a silent skip: the drift check
+  # would otherwise compare an untouched lock against itself and always pass.
+  if [ -f "$REPO_ROOT/example/pubspec.lock" ]; then
+    if command -v flutter >/dev/null 2>&1; then
+      (cd "$REPO_ROOT/example" && flutter pub get >/dev/null)
+      echo "Synced version $VERSION to $REPO_ROOT/example/pubspec.lock"
+    elif command -v dart >/dev/null 2>&1; then
+      (cd "$REPO_ROOT/example" && dart pub get >/dev/null)
+      echo "Synced version $VERSION to $REPO_ROOT/example/pubspec.lock"
+    else
+      echo "WARNING: neither flutter nor dart is on PATH, so example/pubspec.lock was NOT synced to $VERSION." >&2
+      echo "         Run 'flutter pub get' in example/ and commit the lock." >&2
+      if [ -n "${CI:-}" ]; then
+        exit 1
+      fi
+    fi
   fi
 fi
 

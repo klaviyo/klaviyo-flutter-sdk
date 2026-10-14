@@ -154,7 +154,16 @@ upload() {
 
   local notes=""
   if [ -n "${NOTES_CMD:-}" ]; then
-    notes="$(BUILD_NUMBER="$version_code" bash -c "$NOTES_CMD")"
+    # upload runs on the left of ||, which turns set -e off for its whole body, so a failing notes
+    # command must be checked here. Nothing is published yet at this point, so stopping is cheap; a
+    # release that went out with an empty "What's new" would not be.
+    local notes_rc=0
+    notes="$(BUILD_NUMBER="$version_code" bash -c "$NOTES_CMD")" || notes_rc=$?
+    if [ "$notes_rc" -ne 0 ] || [ -z "$notes" ]; then
+      discard_edit
+      echo "::error::The release notes command failed (exit $notes_rc) or printed nothing; not releasing without notes" >&2
+      return 1
+    fi
   elif [ -n "${NOTES_FILE:-}" ] && [ -s "$NOTES_FILE" ]; then
     notes="$(cat "$NOTES_FILE")"
   fi

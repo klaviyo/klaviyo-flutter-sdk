@@ -396,6 +396,11 @@ for job in ("deploy-android", "deploy-ios"):
 for gate in ("gate-test", "gate-lint"):
     report(reusable_job(deploy, gate), f"the {gate} job calls a reusable workflow")
 
+# What to Test attaches notes to a build that was uploaded. A check_credentials run completes deploy-ios
+# without building, so what-to-test must not run then, or it waits for a build that never existed.
+report("inputs.check_credentials != true" in job_if(jobs.get("what-to-test", "")),
+       "the what-to-test job does not run on a check_credentials run")
+
 # --- fork pull requests ----------------------------------------------------
 
 # Every job a pull_request can reach needs the same-repo check itself, not only the first one in the

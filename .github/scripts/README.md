@@ -26,18 +26,30 @@ platforms. Dry runs use no secrets.
   altool doesn't report the number.
 - `asc.rb`: App Store Connect API helper (next build number, TestFlight
   "What to Test"). Standard library only.
-- `release-notes.sh`: store release notes with the SDK version, source ref,
-  commit, UTC build date and the three SDK refs (when a `build-info.json` from
-  `scripts/sdk-ref.sh` is passed as BUILD_INFO), followed by the GitHub
-  release body or, failing that, the commit subject. Truncation ends with a
-  `[truncated]` marker.
+- `release-notes.sh`: store release notes for one platform. A header block (app version and build
+  number, the Flutter SDK and that platform's native SDK with their refs, commit, source, build time),
+  then the CI run line, then the GitHub release body on `release` events only. There is no commit
+  subject fallback. Over the cap (4000 characters for TestFlight, 500 for Play) the release body is cut
+  first, then the CI run line; header lines are never cut, and any cut ends with `…[truncated]`.
 - `gradle-retry.sh`: wraps the flutter build so a JitPack timeout or 404 while
   resolving the Android SDK retries with `--refresh-dependencies`; any other
   build failure exits immediately.
 - `scripts/sdk-ref.sh` (repo root): writes `example/build-info.json` with the
-  Flutter/iOS/Android SDK refs (plain version, or `branch@sha`) that the
-  builds embed via `--dart-define-from-file` and the app shows in the Profile
-  tab.
+  Flutter, iOS and Android SDK refs (plain version, or `branch@sha`), commit, branch, source label and
+  event that the builds embed via `--dart-define-from-file`. The app shows them in a Build info sheet
+  opened from the info button on the Profile tab. In CI an empty commit, branch or source label fails
+  the stamp instead of falling back to git or `GITHUB_SHA`.
+- `source-label.sh`: the source shown in notes and Slack: the release tag, the pull request head
+  branch with its number, or the branch name. It refuses a pull request without a head ref in CI.
+- `check-secrets.sh`: the preflight. Prints only the names of missing secrets; push and release skip
+  with a notice, manual and label deploys fail.
+- `slack-payload.sh`: builds the Slack message as JSON so a multiline value cannot break the request.
+- `ios-marketing-version.sh`: the numeric part of the SDK version for `CFBundleShortVersionString`
+  (`0.3.2-alpha.1` becomes `0.3.2`); fails on a version Apple would reject.
+- `lint-action-shell.py`: extracts the `run:` blocks from the composite actions and runs shellcheck on
+  them, since actionlint does not read `action.yml`.
+- `tests/`: offline suites for each of the above, plus `test-workflow-guards.py` and its self-test,
+  which check the workflows for what actionlint cannot.
 
 ## One-time setup (humans)
 
@@ -78,8 +90,8 @@ Repository secrets:
   shared distribution certificate (works around macOS 26 rejecting match's
   empty-password import)
 - `APPLE_TEAM_ID` (optional, defaults to `G3793W2RJ2`)
-- `SLACK_WEBHOOK_URL`: incoming webhook for the publish channel (the step is
-  skipped with a warning when unset)
+- `SLACK_WEBHOOK_URL`: incoming webhook for the publish channel. Optional: when unset the Slack steps
+  skip with a notice, and a Slack problem never fails a deploy.
 
 Repository variables:
 
