@@ -1,0 +1,194 @@
+{
+  "cases": [
+    {
+      "name": "release build",
+      "platform": "ios",
+      "appVersion": "1.2.3",
+      "buildNumber": "42",
+      "flutterVersion": "1.2.3",
+      "flutterRef": "1.2.3",
+      "nativeVersion": "5.4.1",
+      "nativeRef": "5.4.1",
+      "commitShort": "0123456",
+      "sourceLabel": "release 1.2.3",
+      "event": "release",
+      "runUrl": "https://github.com/klaviyo/klaviyo-flutter-sdk/actions/runs/1",
+      "buildDate": "2026-10-13 12:00 UTC",
+      "notesHeader": "Flutter Example 1.2.3 (42)\nKlaviyo Flutter SDK 1.2.3\nKlaviyo iOS SDK 5.4.1\nCommit: 0123456 on release 1.2.3 (release)\nBuilt: 2026-10-13 12:00 UTC\nCI run: https://github.com/klaviyo/klaviyo-flutter-sdk/actions/runs/1",
+      "cardRows": [
+        [
+          "App",
+          "1.2.3 (42)"
+        ],
+        [
+          "Klaviyo Flutter SDK",
+          "1.2.3"
+        ],
+        [
+          "Klaviyo iOS SDK",
+          "5.4.1"
+        ],
+        [
+          "App commit",
+          "0123456 on release 1.2.3"
+        ],
+        [
+          "Built",
+          "2026-10-13 12:00 UTC"
+        ]
+      ]
+    },
+    {
+      "name": "branch build",
+      "platform": "android",
+      "appVersion": "1.2.3",
+      "buildNumber": "4242",
+      "flutterVersion": "1.2.3",
+      "flutterRef": "feat/thing@0123456",
+      "nativeVersion": "4.5.1",
+      "nativeRef": "feat/widgets@89abcde",
+      "commitShort": "0123456",
+      "sourceLabel": "feat/thing (PR #138)",
+      "event": "pull_request",
+      "runUrl": "https://github.com/klaviyo/klaviyo-flutter-sdk/actions/runs/2",
+      "buildDate": "2026-10-13 12:00 UTC",
+      "notesHeader": "Flutter Example 1.2.3 (4242)\nKlaviyo Flutter SDK 1.2.3 · feat/thing@0123456\nKlaviyo Android SDK 4.5.1 · feat/widgets@89abcde\nCommit: 0123456 on feat/thing (PR #138) (pull_request)\nBuilt: 2026-10-13 12:00 UTC\nCI run: https://github.com/klaviyo/klaviyo-flutter-sdk/actions/runs/2",
+      "cardRows": [
+        [
+          "App",
+          "1.2.3 (4242)"
+        ],
+        [
+          "Klaviyo Flutter SDK",
+          "1.2.3 · feat/thing@0123456"
+        ],
+        [
+          "Klaviyo Android SDK",
+          "4.5.1 · feat/widgets@89abcde"
+        ],
+        [
+          "App commit",
+          "0123456 on feat/thing (PR #138)"
+        ],
+        [
+          "Built",
+          "2026-10-13 12:00 UTC"
+        ]
+      ]
+    },
+    {
+      "name": "prerelease build shows the full version",
+      "platform": "ios",
+      "appVersion": "0.3.2-alpha.1",
+      "buildNumber": "1",
+      "flutterVersion": "0.3.2-alpha.1",
+      "flutterRef": "0.3.2-alpha.1",
+      "nativeVersion": "5.4.1",
+      "nativeRef": "5.4.1",
+      "commitShort": "0123456",
+      "sourceLabel": "release 0.3.2-alpha.1",
+      "event": "release",
+      "runUrl": "https://github.com/klaviyo/klaviyo-flutter-sdk/actions/runs/3",
+      "buildDate": "2026-10-13 12:00 UTC",
+      "notesHeader": "Flutter Example 0.3.2-alpha.1 (1)\nKlaviyo Flutter SDK 0.3.2-alpha.1\nKlaviyo iOS SDK 5.4.1\nCommit: 0123456 on release 0.3.2-alpha.1 (release)\nBuilt: 2026-10-13 12:00 UTC\nCI run: https://github.com/klaviyo/klaviyo-flutter-sdk/actions/runs/3",
+      "cardRows": [
+        [
+          "App",
+          "0.3.2-alpha.1 (1)"
+        ],
+        [
+          "Klaviyo Flutter SDK",
+          "0.3.2-alpha.1"
+        ],
+        [
+          "Klaviyo iOS SDK",
+          "5.4.1"
+        ],
+        [
+          "App commit",
+          "0123456 on release 0.3.2-alpha.1"
+        ],
+        [
+          "Built",
+          "2026-10-13 12:00 UTC"
+        ]
+      ]
+    },
+    {
+      "name": "local build",
+      "platform": "ios",
+      "appVersion": "0.3.1",
+      "buildNumber": "1",
+      "flutterVersion": "0.3.1",
+      "flutterRef": "local:main@0123456-dirty",
+      "nativeVersion": "5.4.1",
+      "nativeRef": "local:feat/x@89abcde",
+      "commitShort": "0123456",
+      "sourceLabel": "—",
+      "event": "—",
+      "runUrl": "—",
+      "buildDate": "—",
+      "notesHeader": "Flutter Example 0.3.1 (1)\nKlaviyo Flutter SDK 0.3.1 · local:main@0123456-dirty\nKlaviyo iOS SDK 5.4.1 · local:feat/x@89abcde\nCommit: 0123456 on — (—)\nBuilt: —",
+      "cardRows": [
+        [
+          "App",
+          "0.3.1 (1)"
+        ],
+        [
+          "Klaviyo Flutter SDK",
+          "0.3.1 · local:main@0123456-dirty"
+        ],
+        [
+          "Klaviyo iOS SDK",
+          "5.4.1 · local:feat/x@89abcde"
+        ],
+        [
+          "App commit",
+          "0123456 on —"
+        ],
+        [
+          "Built",
+          "—"
+        ]
+      ]
+    },
+    {
+      "name": "missing values render as em dash",
+      "platform": "android",
+      "appVersion": "0.3.1",
+      "buildNumber": "1",
+      "flutterVersion": "0.3.1",
+      "flutterRef": "—",
+      "nativeVersion": "—",
+      "nativeRef": "—",
+      "commitShort": "—",
+      "sourceLabel": "—",
+      "event": "—",
+      "runUrl": "—",
+      "buildDate": "—",
+      "notesHeader": "Flutter Example 0.3.1 (1)\nKlaviyo Flutter SDK 0.3.1\nKlaviyo Android SDK —\nCommit: — on — (—)\nBuilt: —",
+      "cardRows": [
+        [
+          "App",
+          "0.3.1 (1)"
+        ],
+        [
+          "Klaviyo Flutter SDK",
+          "0.3.1"
+        ],
+        [
+          "Klaviyo Android SDK",
+          "—"
+        ],
+        [
+          "App commit",
+          "— on —"
+        ],
+        [
+          "Built",
+          "—"
+        ]
+      ]
+    }
+  ]
+}

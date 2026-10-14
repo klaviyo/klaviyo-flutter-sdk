@@ -2,43 +2,61 @@ name: Notify Slack of example app publish result
 description: Posts a Slack message summarizing an example app publish job (success or failure).
 inputs:
   webhook:
-    description: Slack incoming webhook URL
+    description: Slack incoming webhook URL; empty skips the notification
     required: true
   result:
-    description: "'success' or 'failure', drives icon and headline"
+    description: "'success', 'failure' or 'warning', drives icon and headline"
     required: true
   platform:
-    description: "Human-readable platform label (e.g. 'Play Store', 'TestFlight')"
+    description: "Store label (e.g. 'TestFlight', 'Play internal')"
+    required: true
+  os:
+    description: "iOS or Android, for the headline"
     required: true
   version_label:
-    description: Version string to show in the message (e.g. 'X.Y.Z (build)')
-    required: false
-    default: '?'
-  source_label:
-    description: Sanitized branch or release tag the build came from
+    description: "Full version with build number, e.g. '0.3.2-alpha.1 (42)'"
     required: false
     default: ''
   sdk_info:
     description: >-
-      Pre-formatted SDK refs line, e.g. "Flutter: a@b · iOS: 5.4.1 · Android:
-      4.5.1" (from scripts/sdk-ref.sh).
+      Pre-formatted SDK line, e.g. "Flutter 0.3.2 · feat/x@0123456 | iOS
+      5.4.1" (from the build-info fixture format).
     required: false
     default: ''
+  source_label:
+    description: Sanitized source label (source-label.sh)
+    required: false
+    default: ''
+  event_name:
+    description: github.event_name
+    required: false
+    default: ''
+  commit_sha:
+    description: >-
+      Commit to show and link (pass github.event.pull_request.head.sha || github.sha)
+    required: false
+    default: ''
+  commit_short:
+    description: "The 7-char sha, computed in a shell step (expressions cannot slice)"
+    required: false
+    default: ''
+  failed_step:
+    description: Name of the step that failed, for failure messages
+    required: false
+    default: an unknown step
   access_url:
     description: >-
-      Where testers get the build. This repo is public, so only pass links that
-      require an authorized Play tester / App Store Connect account to resolve;
+      Where testers get the build. This repo is public, so only pass links
+      that need an authorized tester / App Store Connect account to resolve;
       never a direct artifact or public TestFlight link.
     required: false
     default: ''
   access_label:
     description: Link text for access_url
     required: false
-    default: Open build
+    default: Get the build
   install_notes:
-    description: >-
-      Extra install guidance appended to the access line (e.g. TestFlight
-      processing time, tester-list requirement).
+    description: Install guidance shown when there is no access_url or after it
     required: false
     default: ''
 
@@ -48,25 +66,33 @@ runs:
     - name: Skip when no webhook is configured
       if: inputs.webhook == ''
       shell: bash
-      run: echo "::warning::SLACK_WEBHOOK_URL is not set; skipping Slack notification"
+      run: echo "::notice::SLACK_WEBHOOK_URL is not set; skipping Slack notification"
+
+    - name: Build Slack payload
+      if: inputs.webhook != ''
+      shell: bash
+      env:
+        RESULT: ${{ inputs.result }}
+        OS: ${{ inputs.os }}
+        PLATFORM: ${{ inputs.platform }}
+        VERSION_LABEL: ${{ inputs.version_label }}
+        SDK_INFO: ${{ inputs.sdk_info }}
+        SOURCE_LABEL: ${{ inputs.source_label }}
+        EVENT_NAME: ${{ inputs.event_name }}
+        COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
+        COMMIT_SHORT: ${{ inputs.commit_short }}
+        FAILED_STEP: ${{ inputs.failed_step }}
+        ACCESS_URL: ${{ inputs.access_url }}
+        ACCESS_LABEL: ${{ inputs.access_label }}
+        INSTALL_NOTES: ${{ inputs.install_notes }}
+        SERVER_URL: ${{ github.server_url }}
+        REPOSITORY: ${{ github.repository }}
+        RUN_ID: ${{ github.run_id }}
+      run: ${{ github.action_path }}/../../scripts/slack-payload.sh > "$RUNNER_TEMP/slack-payload.json"
 
     - if: inputs.webhook != ''
       uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
       with:
         webhook: ${{ inputs.webhook }}
         webhook-type: incoming-webhook
-        payload: |
-          text: "${{ inputs.result == 'success' && '✅' || '🚨' }} Flutter SDK Example App: ${{ inputs.platform }} ${{ inputs.result == 'success' && 'publish succeeded' || 'publish failed' }}"
-          blocks:
-            - type: "header"
-              text:
-                type: "plain_text"
-                text: "${{ inputs.result == 'success' && '✅' || '🚨' }} Flutter SDK Example App: ${{ inputs.platform }} ${{ inputs.result == 'success' && 'publish succeeded' || 'publish failed' }}"
-            - type: "section"
-              text:
-                type: "mrkdwn"
-                text: "*Repository:* ${{ github.repository }}\n*Trigger:* ${{ github.event_name }}${{ inputs.source_label != '' && format(' on `{0}`', inputs.source_label) || '' }}\n*Version:* `${{ inputs.version_label }}`${{ inputs.sdk_info != '' && format('\n*SDKs:* `{0}`', inputs.sdk_info) || '' }}\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>\n*Author:* ${{ github.actor }}${{ inputs.access_url != '' && format('\n*Get the build:* <{0}|{1}> (requires tester access)', inputs.access_url, inputs.access_label) || '' }}${{ inputs.install_notes != '' && format('\n{0}', inputs.install_notes) || '' }}"
-            - type: "section"
-              text:
-                type: "mrkdwn"
-                text: "*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+        payload-file-path: ${{ runner.temp }}/slack-payload.json

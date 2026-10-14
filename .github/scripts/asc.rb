@@ -5,9 +5,10 @@
 # Uses only the Ruby standard library so it runs on the runner's system Ruby.
 #
 # Usage:
-#   asc.rb next-build-number
-#       Prints (highest CFBundleVersion ever uploaded for BUNDLE_ID) + 1 and
-#       writes ASC_APP_ID=<id> to $GITHUB_ENV when set.
+#   asc.rb next-build-number <marketing-version>
+#       Prints (highest CFBundleVersion uploaded for BUNDLE_ID with that
+#       marketing version) + 1 — build numbers restart per marketing version —
+#       and writes ASC_APP_ID=<id> to $GITHUB_ENV when set.
 #   asc.rb set-whats-new <build-number> <notes-file>
 #       Waits for the uploaded build to appear in App Store Connect, then sets
 #       its en-US TestFlight "What to Test" text.
@@ -78,19 +79,21 @@ def write_env(name, value)
   File.open(ENV['GITHUB_ENV'], 'a') { |f| f.puts "#{name}=#{value}" }
 end
 
-def next_build_number
+def next_build_number(marketing_version)
   id = app_id
   write_env('ASC_APP_ID', id)
   highest = 0
-  # `version` is a string and uploadedDate can be null, so page through every
-  # build and take the numeric max instead of trusting the API's sort.
-  url = "/v1/builds?filter[app]=#{id}&fields[builds]=version&limit=200"
+  # `version` is a string and uploadedDate can be null, so page through the
+  # marketing version's builds and take the numeric max instead of trusting
+  # the API's sort. The preReleaseVersion filter keeps other marketing
+  # versions' build numbers out of the count.
+  url = "/v1/builds?filter[app]=#{id}&filter[preReleaseVersion.version]=#{URI.encode_www_form_component(marketing_version)}&fields[builds]=version&limit=200"
   while url
     page = get!(url)
     page['data'].each { |b| highest = [highest, b['attributes']['version'].to_i].max }
     url = page.dig('links', 'next')
   end
-  warn "Highest build number in App Store Connect: #{highest}"
+  warn "Highest build number for #{marketing_version} in App Store Connect: #{highest}"
   puts highest + 1
 end
 
@@ -127,9 +130,9 @@ def set_whats_new(build_number, notes_file)
 end
 
 case ARGV[0]
-when 'next-build-number' then next_build_number
+when 'next-build-number' then next_build_number(ARGV.fetch(1))
 when 'set-whats-new' then set_whats_new(ARGV.fetch(1), ARGV.fetch(2))
 else
-  warn 'usage: asc.rb next-build-number | set-whats-new <build-number> <notes-file>'
+  warn 'usage: asc.rb next-build-number <marketing-version> | set-whats-new <build-number> <notes-file>'
   exit 2
 end

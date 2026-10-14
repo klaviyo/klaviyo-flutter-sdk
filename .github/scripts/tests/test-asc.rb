@@ -83,7 +83,7 @@ describe 'asc.rb' do
     it 'signs a valid ES256 token with the expected header and claims' do
       apps = { 'code' => 200, 'body' => { 'data' => [{ 'id' => 'app1' }] } }
       builds = { 'code' => 200, 'body' => { 'data' => [], 'links' => {} } }
-      run_asc(['next-build-number'], responses: [apps, builds]) do |key, _out, rc, requests, _env|
+      run_asc(['next-build-number', '0.3.1'], responses: [apps, builds]) do |key, _out, rc, requests, _env|
         assert_equal 0, rc
         auth = requests.first['auth']
         assert_match(/^Bearer /, auth)
@@ -109,7 +109,7 @@ describe 'asc.rb' do
   end
 
   describe 'next-build-number' do
-    it 'takes the numeric max across pages and ignores null/non-numeric versions' do
+    it 'filters builds by marketing version and pages' do
       apps = { 'code' => 200, 'body' => { 'data' => [{ 'id' => 'app1' }] } }
       page1 = { 'code' => 200, 'body' => {
         'data' => [{ 'attributes' => { 'version' => '41' } },
@@ -121,18 +121,28 @@ describe 'asc.rb' do
         'data' => [{ 'attributes' => { 'version' => '7' } }],
         'links' => {}
       } }
-      run_asc(['next-build-number'], responses: [apps, page1, page2]) do |_key, out, rc, requests, env|
+      run_asc(['next-build-number', '0.3.1'], responses: [apps, page1, page2]) do |_key, out, rc, requests, env|
         assert_equal 0, rc, out
         assert_equal "42\n", out
         assert_equal 3, requests.length
+        assert_includes requests[1]['path'], 'filter[preReleaseVersion.version]=0.3.1'
         assert_equal '/v1/builds?page=2', requests[2]['path']
         assert_match(/^ASC_APP_ID=app1/, env)
       end
     end
 
+    it 'returns 1 when the marketing version has no builds yet' do
+      apps = { 'code' => 200, 'body' => { 'data' => [{ 'id' => 'app1' }] } }
+      none = { 'code' => 200, 'body' => { 'data' => [], 'links' => {} } }
+      run_asc(['next-build-number', '9.9.9'], responses: [apps, none]) do |_key, out, rc, _requests, _env|
+        assert_equal 0, rc, out
+        assert_equal "1\n", out
+      end
+    end
+
     it 'fails when no app matches the bundle id' do
       apps = { 'code' => 200, 'body' => { 'data' => [] } }
-      run_asc(['next-build-number'], responses: [apps]) do |_key, _out, rc, _requests, _env|
+      run_asc(['next-build-number', '0.3.1'], responses: [apps]) do |_key, _out, rc, _requests, _env|
         refute_equal 0, rc
       end
     end

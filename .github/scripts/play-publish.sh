@@ -17,11 +17,19 @@
 # Env:
 #   PACKAGE_NAME        (required) Play application id
 #   AAB_PATH            (deploy) bundle produced by the build command
-#   NOTES_FILE          (deploy, optional) en-US release notes, <= 500 chars
+#   NOTES_CMD           (deploy, optional) command printing the en-US release
+#                       notes; runs per attempt with BUILD_NUMBER set to the
+#                       versionCode, so a retry never ships a stale number
+#   NOTES_FILE          (deploy, optional) static notes file; ignored when
+#                       NOTES_CMD is set
 #   PLAY_TRACK          (default: internal)
 #   PLAY_RELEASE_STATUS (default: completed; must be "draft" until the app's
 #                        first release has been rolled out from the console)
-#   RELEASE_NAME        (deploy, optional) release name shown in Play Console
+#   RELEASE_NAME_PREFIX, RELEASE_NAME_SUFFIX
+#                       (deploy, optional) the release name shown in Play
+#                       Console is "<prefix> (<versionCode>) <suffix>",
+#                       composed after the versionCode settles so retries
+#                       show the code actually shipped
 #   MAX_ATTEMPTS        (default: 3)
 #   PLAY_ACCESS_TOKEN   (optional) OAuth token; otherwise minted with gcloud
 #                       from the active service-account credentials
@@ -132,8 +140,14 @@ upload() {
   fi
 
   local notes=""
-  if [ -n "${NOTES_FILE:-}" ] && [ -s "$NOTES_FILE" ]; then
+  if [ -n "${NOTES_CMD:-}" ]; then
+    notes="$(BUILD_NUMBER="$version_code" bash -c "$NOTES_CMD")"
+  elif [ -n "${NOTES_FILE:-}" ] && [ -s "$NOTES_FILE" ]; then
     notes="$(cat "$NOTES_FILE")"
+  fi
+  local name=""
+  if [ -n "${RELEASE_NAME_PREFIX:-}" ]; then
+    name="$RELEASE_NAME_PREFIX ($version_code)${RELEASE_NAME_SUFFIX:+ $RELEASE_NAME_SUFFIX}"
   fi
   local release
   release="$(jq -n \
@@ -141,7 +155,7 @@ upload() {
     --arg code "$version_code" \
     --arg status "$PLAY_RELEASE_STATUS" \
     --arg notes "$notes" \
-    --arg name "${RELEASE_NAME:-}" \
+    --arg name "$name" \
     '{track: $track, releases: [{versionCodes: [$code], status: $status}
       + (if $notes == "" then {} else {releaseNotes: [{language: "en-US", text: $notes}]} end)
       + (if $name == "" then {} else {name: $name} end)]}')"
@@ -171,13 +185,15 @@ deploy() {
   version_code="$(next_version_code)"
   for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     echo "=== Attempt $attempt/$MAX_ATTEMPTS: versionCode $version_code ===" >&2
+    if [ -n "${GITHUB_ENV:-}" ]; then
+      # The failure notification reads VERSION_CODE too; keep it at the last
+      # attempted code so it never implies an unshipped number shipped.
+      echo "VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+    fi
     VERSION_CODE="$version_code" "$@"
     rc=0
     upload "$version_code" || rc=$?
     if [ "$rc" -eq 0 ]; then
-      if [ -n "${GITHUB_ENV:-}" ]; then
-        echo "VERSION_CODE=$version_code" >> "$GITHUB_ENV"
-      fi
       echo "$version_code"
       return 0
     fi
@@ -192,11 +208,12 @@ deploy() {
   exit 1
 }
 
-# share: upload AAB_PATH to Internal App Sharing and print the download URL.
+# share: upload AAB_PATH to Internal App Sharing. The download URL is masked
+# before anything else, never printed, and written to $GITHUB_OUTPUT as url=.
 share() {
   : "${AAB_PATH:?AAB_PATH is required}"
   TOKEN="$(access_token)"
-  api POST "$PLAY_API_ROOT/upload/internalappsharing/$PACKAGE_NAME/artifacts/bundle?uploadType=media" \
+  api POST "$PLAY_API_ROOT/upload/androidpublisher/v3/applications/internalappsharing/$PACKAGE_NAME/artifacts/bundle?uploadType=media" \
     -H 'Content-Type: application/octet-stream' --data-binary "@$AAB_PATH"
   api_ok || fail "Internal App Sharing upload failed"
   local url
@@ -205,7 +222,11 @@ share() {
     echo "::warning::Internal App Sharing did not return a download URL" >&2
     exit 1
   fi
-  echo "$url"
+  echo "::add-mask::$url"
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "url=$url" >> "$GITHUB_OUTPUT"
+  fi
+  echo "Uploaded to Internal App Sharing" >&2
 }
 
 case "${1:-}" in

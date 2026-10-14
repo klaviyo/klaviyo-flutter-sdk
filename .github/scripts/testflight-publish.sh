@@ -49,9 +49,29 @@ recheck_build_number() {
 BUILD_NUMBER="$INITIAL"
 for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   echo "=== Attempt $attempt/$MAX_ATTEMPTS: build number $BUILD_NUMBER ==="
+  if [ -n "${GITHUB_ENV:-}" ]; then
+    # The failure notification reads BUILD_NUMBER too; keep it at the last
+    # attempted number so it never implies an unshipped build shipped.
+    echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+  fi
   rm -f "$IPA_PATH"
   BUILD_NUMBER="$BUILD_NUMBER" "$@"
   [ -f "$IPA_PATH" ] || { echo "::error::Build did not produce $IPA_PATH" >&2; exit 1; }
+
+  # A stale bundle would be rejected as a duplicate below and burn an
+  # attempt; catch it while the message is still clear.
+  if [ -z "${SKIP_IPA_CHECK:-}" ]; then
+    ACTUAL="$(unzip -p "$IPA_PATH" 'Payload/*.app/Info.plist' 2>/dev/null \
+      | plutil -extract CFBundleVersion raw -o - - 2>/dev/null || true)"
+    if [ -z "$ACTUAL" ]; then
+      echo "::error::Could not read CFBundleVersion from $IPA_PATH" >&2
+      exit 1
+    fi
+    if [ "$ACTUAL" != "$BUILD_NUMBER" ]; then
+      echo "::error::IPA carries CFBundleVersion $ACTUAL, expected $BUILD_NUMBER — the build did not pick up the retried number" >&2
+      exit 1
+    fi
+  fi
 
   # A competing run can take the number while we build; catch it before
   # burning an upload.
@@ -71,9 +91,6 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   echo "$UPLOAD_OUTPUT"
 
   if [ "$UPLOAD_RC" -eq 0 ] && ! grep -q "ERROR:" <<<"$UPLOAD_OUTPUT"; then
-    if [ -n "${GITHUB_ENV:-}" ]; then
-      echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
-    fi
     echo "Uploaded build $BUILD_NUMBER to TestFlight"
     exit 0
   fi

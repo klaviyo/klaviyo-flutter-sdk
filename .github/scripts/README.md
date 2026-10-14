@@ -2,9 +2,13 @@
 
 `.github/workflows/publish-example.yml` builds the example app and ships it to the
 Play internal track and TestFlight on pushes to `master` and `rel/**` and on
-published GitHub releases. It does nothing on those triggers until the repo
-variable `EXAMPLE_APP_PUBLISH_ENABLED` is `true`. `workflow_dispatch` ignores the
-variable, so you can try a deploy by hand before switching it on.
+published GitHub releases, and from a same-repo PR labeled
+`deploy-example-app` (both), `deploy-example-app:android` or
+`deploy-example-app:ios`; the label is removed after the run, so re-applying it
+deploys again. Unit tests and lint must pass first. Deploys are skipped, not
+failed, until the required secrets exist: a push or release with missing secrets
+ends green with a notice naming them, while a manual or label deploy fails
+loudly.
 
 Pull requests that touch the publish files get a dry run: shellcheck, the offline
 tests in `tests/test-publish-scripts.sh`, and unsigned release builds on both
@@ -79,19 +83,23 @@ Repository secrets:
 
 Repository variables:
 
-- `EXAMPLE_APP_PUBLISH_ENABLED=true` to turn on automatic deploys
 - `PLAY_RELEASE_STATUS=draft` until the first Play release is rolled out
 
 The deploy jobs run in GitHub environments — `android-internal-track` for
-Play, `testflight` for App Store Connect (same names as the native test apps).
-Move the store secrets above into those two environments and restrict their
-deployment branches to `master`, `rel/**` and release tags, so a workflow
-edited in a pull request can't read them. `workflow_dispatch` with
-`check_credentials` verifies both setups end to end without uploading:
-keystore + Play edit round-trip on Android, ASC key + match repo read on iOS.
+Play, `testflight` for App Store Connect (same names as the native test
+apps) — for the deploy URL and history. Store secrets must be repository
+secrets, not environment secrets; the preflight jobs declare no environment
+and cannot see environment secrets, so they would skip every deploy forever.
+Deploys are skipped, not failed, until the required secrets exist: pushes to
+`master`/`rel/**` and releases skip green with a `::notice::` naming the
+missing secrets, while `workflow_dispatch` and `deploy-example-app` label
+deploys fail loudly. `workflow_dispatch` with `check_credentials` verifies
+both setups end to end without uploading: keystore + Play edit round-trip on
+Android, ASC key + match repo read on iOS.
 
 A push to `rel/**` followed by a published release from the same commit
-deploys twice with different build numbers; both deploys are valid.
+deploys twice with different build numbers; both deploys are valid (the
+second gets the next build number via the pre-upload recheck).
 
 ## Public build logs
 

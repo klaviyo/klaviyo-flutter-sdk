@@ -1,0 +1,167 @@
+# Dry runs for the example app publish workflow on PRs that touch the publish
+# files: script lint + offline tests and unsigned release builds on both
+# platforms. No store access and no secrets.
+
+name: publish-example-checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/publish-example.yml'
+      - '.github/workflows/publish-example-checks.yml'
+      - '.github/actions/notify-slack-publish/**'
+      - '.github/scripts/**'
+      - 'scripts/sdk-ref.sh'
+      - 'example/ios/fastlane/**'
+      - 'example/android/app/build.gradle'
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.38.7
+  ANDROID_PACKAGE: com.klaviyo.flutterexample
+  GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
+
+jobs:
+  dry-run-scripts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+        with:
+          ruby-version: '3.3'
+
+      - name: Lint scripts
+        run: |
+          shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh
+          ruby -c .github/scripts/asc.rb
+          ruby -c example/ios/fastlane/Fastfile
+
+      - name: Lint workflow files
+        run: |
+          curl -sSLo actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
+            && tar xzf actionlint.tar.gz actionlint
+          ./actionlint .github/workflows/publish-example.yml .github/workflows/publish-example-checks.yml
+
+      - name: The removed internal-track link format stays gone
+        run: |
+          ! grep -R 'play.google.com/apps/test' .github/ \
+            || { echo "::error::play.google.com/apps/test is an Internal App Sharing path and does not resolve for internal-track builds"; exit 1; }
+
+      # String slicing is unavailable in GitHub expressions; sha7 values come
+      # from a shell step instead. Only flag slicing inside ${{ }} so shell
+      # and Ruby slicing in scripts never trips the check.
+      - name: No string slicing inside GitHub expressions
+        run: |
+          check() {
+            if grep -R -n -E '\$\{\{[^}]*[[:<:]](substr|substring|slice)[[:space:]]*\(' "$@"; then
+              return 1
+            fi
+          }
+          printf 'x: $%s substr(github.sha, 0, 7) %s\n' '{{' '}}' > "$RUNNER_TEMP/bad-expr.yml"
+          if check "$RUNNER_TEMP/bad-expr.yml"; then
+            echo "::error::self-test: the slicing check let substr() through"
+            exit 1
+          fi
+          check .github/workflows .github/actions \
+            || { echo "::error::string slicing inside a GitHub expression; compute short values in a shell step instead"; exit 1; }
+
+      - name: Test retry loops and release notes
+        run: .github/scripts/tests/test-publish-scripts.sh
+
+      - name: Test SDK ref resolution
+        run: .github/scripts/tests/test-sdk-ref.sh
+
+      - name: Test JitPack retry wrapper
+        run: .github/scripts/tests/test-gradle-retry.sh
+
+      - name: Test secrets preflight
+        run: .github/scripts/tests/test-check-secrets.sh
+
+      - name: Test source label and marketing version helpers
+        run: .github/scripts/tests/test-source-label.sh
+
+      - name: Test Slack payload
+        run: .github/scripts/tests/test-slack-payload.sh
+
+      - name: Test App Store Connect helper
+        run: ruby .github/scripts/tests/test-asc.rb
+
+  dry-run-android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # Placeholder config, as in build-android.yml; the real file comes from
+      # the GOOGLE_SERVICES_JSON secret at publish time.
+      - name: Create placeholder Firebase config
+        run: |
+          jq -n --arg pkg "$ANDROID_PACKAGE" '{
+            project_info: {project_number: "123456789000", project_id: "klaviyo-flutter-sdk-example-ci"},
+            client: [{
+              client_info: {mobilesdk_app_id: "1:123456789000:android:abc123def456ci", android_client_info: {package_name: $pkg}},
+              oauth_client: [],
+              api_key: [{current_key: "AIzaSyDummyKeyForCIBuildOnly1234567890123"}],
+              services: {appinvite_service: {other_platform_oauth_client: []}}
+            }],
+            configuration_version: "1"
+          }' > example/android/app/google-services.json
+
+      # Same command as the publish job, minus signing (falls back to the
+      # debug key when key.properties is absent).
+      - name: Build release App Bundle
+        working-directory: example
+        run: |
+          flutter pub get
+          ../scripts/sdk-ref.sh
+          ../.github/scripts/gradle-retry.sh flutter build appbundle --release --build-number=4242 --dart-define-from-file=build-info.json
+          test -f build/app/outputs/bundle/release/app-release.aab
+
+      - name: Clean up placeholder config
+        if: always()
+        run: rm -f example/android/app/google-services.json
+
+  dry-run-ios:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # Unsigned release archive: same Release configuration and build-number
+      # plumbing as the publish job, without match or App Store Connect.
+      - name: Build unsigned release archive
+        working-directory: example
+        run: |
+          flutter pub get
+          ../scripts/sdk-ref.sh
+          flutter build ipa --release --no-codesign --build-number=4242 --dart-define-from-file=build-info.json
+          PLIST=build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Info.plist
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")" = 4242

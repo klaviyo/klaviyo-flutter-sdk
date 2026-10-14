@@ -1,16 +1,21 @@
 # Publishes the example app to the Play internal track and TestFlight.
 #
 # Triggers:
-#   - push to master / rel/**, release: published  -> both platforms, only when
-#     the repo variable EXAMPLE_APP_PUBLISH_ENABLED is 'true'
-#   - workflow_dispatch -> chosen platform(s); ignores the variable. With
-#     check_credentials set, no builds: each platform job instead verifies its
-#     store credentials are usable (read-only) and reports.
-#   - pull_request touching publish files -> dry run: script tests plus
-#     unsigned release builds, no store access and no secrets
+#   - push to master / rel/**, release: published -> both platforms, unless
+#     the preflight finds missing store secrets (then the deploy skips green;
+#     see .github/scripts/check-secrets.sh)
+#   - workflow_dispatch -> chosen platform(s); missing secrets fail loudly.
+#     With check_credentials set, no builds: each platform job instead
+#     verifies its store credentials are usable (read-only) and reports.
+#   - pull_request: labeled -> a `deploy-example-app[:android|:ios]` label
+#     deploys that platform from the PR head; the cleanup-label job removes
+#     the label afterwards so re-applying re-triggers
 #
-# Logs are public: pass secrets via env only, never echo them or enable `set -x`.
-# See .github/scripts/README.md for the required secrets and setup.
+# Pull requests that touch publish files get a dry run instead, from
+# publish-example-checks.yml (script tests plus unsigned builds, no secrets).
+#
+# Logs are public: pass secrets via env only, never echo them or enable
+# `set -x`. See .github/scripts/README.md for the required secrets and setup.
 
 name: publish-example
 
@@ -38,12 +43,7 @@ on:
         default: false
         type: boolean
   pull_request:
-    paths:
-      - '.github/workflows/publish-example.yml'
-      - '.github/actions/notify-slack-publish/**'
-      - '.github/scripts/**'
-      - 'example/ios/fastlane/**'
-      - 'example/android/app/build.gradle'
+    types: [labeled]
 
 permissions:
   contents: read
@@ -52,148 +52,94 @@ env:
   FLUTTER_VERSION: 3.38.7
   ANDROID_PACKAGE: com.klaviyo.flutterexample
   IOS_BUNDLE_ID: com.klaviyo.FlutterExample
+  MOBILE_SLACK_CHANNEL: '#mobile-push-team'
   GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
 
 jobs:
-  dry-run-scripts:
-    if: github.event_name == 'pull_request'
+  gate-test:
+    # Tests and lint gate every deploy; check-credentials runs need neither,
+    # and a pull_request label event only runs them for a deploy label.
+    if: |
+      inputs.check_credentials != true
+      && (github.event_name != 'pull_request'
+        || (github.event.pull_request.head.repo.full_name == github.repository
+          && startsWith(github.event.label.name, 'deploy-example-app')))
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+
+  gate-lint:
+    if: |
+      inputs.check_credentials != true
+      && (github.event_name != 'pull_request'
+        || (github.event.pull_request.head.repo.full_name == github.repository
+          && startsWith(github.event.label.name, 'deploy-example-app')))
+    uses: ./.github/workflows/lint.yml
+    permissions:
+      contents: read
+
+  preflight-android:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 2
           persist-credentials: false
 
-      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
-        with:
-          ruby-version: '3.3'
+      - name: Check Android deploy secrets
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+        run: .github/scripts/check-secrets.sh android
 
-      - name: Lint scripts
-        run: |
-          shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh
-          ruby -c .github/scripts/asc.rb
-          ruby -c example/ios/fastlane/Fastfile
-
-      - name: Lint workflow files
-        run: |
-          curl -sSLo actionlint https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
-            && tar xzf actionlint actionlint
-          ./actionlint .github/workflows/publish-example.yml
-
-      - name: Test retry loops and release notes
-        run: .github/scripts/tests/test-publish-scripts.sh
-
-      - name: Test SDK ref resolution
-        run: .github/scripts/tests/test-sdk-ref.sh
-
-      - name: Test JitPack retry wrapper
-        run: .github/scripts/tests/test-gradle-retry.sh
-
-      - name: Test App Store Connect helper
-        run: ruby .github/scripts/tests/test-asc.rb
-
-  dry-run-android:
-    if: github.event_name == 'pull_request'
+  preflight-ios:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
-      # Placeholder config, as in build-android.yml; the real file comes from
-      # the GOOGLE_SERVICES_JSON secret at publish time.
-      - name: Create placeholder Firebase config
-        run: |
-          jq -n --arg pkg "$ANDROID_PACKAGE" '{
-            project_info: {project_number: "123456789000", project_id: "klaviyo-flutter-sdk-example-ci"},
-            client: [{
-              client_info: {mobilesdk_app_id: "1:123456789000:android:abc123def456ci", android_client_info: {package_name: $pkg}},
-              oauth_client: [],
-              api_key: [{current_key: "AIzaSyDummyKeyForCIBuildOnly1234567890123"}],
-              services: {appinvite_service: {other_platform_oauth_client: []}}
-            }],
-            configuration_version: "1"
-          }' > example/android/app/google-services.json
-
-      # Same command as the publish job, minus signing (falls back to the
-      # debug key when key.properties is absent).
-      - name: Build release App Bundle
-        working-directory: example
-        run: |
-          flutter pub get
-          ../scripts/sdk-ref.sh
-          ../.github/scripts/gradle-retry.sh flutter build appbundle --release --build-number=4242 --dart-define-from-file=build-info.json
-          test -f build/app/outputs/bundle/release/app-release.aab
-
-  dry-run-ios:
-    if: github.event_name == 'pull_request'
-    runs-on: macos-26
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
-      # Unsigned release archive: same Release configuration and build-number
-      # plumbing as the publish job, without match or App Store Connect.
-      - name: Build unsigned release archive
-        working-directory: example
-        run: |
-          flutter pub get
-          ../scripts/sdk-ref.sh
-          flutter build ipa --release --no-codesign --build-number=4242 --dart-define-from-file=build-info.json
-          PLIST=build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Info.plist
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")" = 4242
-
-  verify:
-    if: github.event_name != 'pull_request' && inputs.check_credentials != true
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
-      - name: Analyze and test the plugin
-        run: |
-          flutter pub get
-          flutter analyze --no-fatal-infos
-          flutter test
-
-      - name: Analyze and test the example app
-        working-directory: example
-        run: |
-          flutter pub get
-          flutter analyze --no-fatal-infos
-          flutter test
+      - name: Check iOS deploy secrets
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        run: .github/scripts/check-secrets.sh ios
 
   deploy-android:
     name: Publish to Play internal track
-    needs: verify
+    needs: [gate-test, gate-lint, preflight-android]
+    # A skipped gate skips its dependents, so the status check is explicit:
+    # tests and lint must have passed, unless check_credentials skipped them.
     if: |
-      (github.event_name == 'workflow_dispatch' && inputs.platform != 'ios')
-      || ((github.event_name == 'push' || github.event_name == 'release') && vars.EXAMPLE_APP_PUBLISH_ENABLED == 'true')
+      !cancelled()
+      && needs.preflight-android.outputs.ready == 'true'
+      && (inputs.check_credentials == true
+        || (needs.gate-test.result == 'success' && needs.gate-lint.result == 'success'))
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name == 'push'
+        || github.event_name == 'release'
+        || (github.event_name == 'workflow_dispatch' && inputs.platform != 'ios')
+        || (github.event_name == 'pull_request' && (github.event.label.name == 'deploy-example-app' || github.event.label.name == 'deploy-example-app:android')))
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     environment: android-internal-track
     concurrency:
       group: publish-example-android-${{ github.event_name == 'push' && github.ref || github.run_id }}
@@ -203,18 +149,27 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Set source label
+      # Stamps every event field (source label, event, commit, refs) into
+      # build-info.json; notes, Slack and the app all read it from there.
+      - name: Generate build info
+        id: buildinfo
         env:
+          EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ -n "$RELEASE_TAG" ]; then
-            source_label="release $RELEASE_TAG"
-          else
-            source_label="$REF_NAME"
-          fi
-          echo "SOURCE_LABEL=$(printf '%s' "$source_label" | tr -cd 'A-Za-z0-9._/ +-')" >> "$GITHUB_ENV"
+          ./scripts/sdk-ref.sh
+          {
+            echo "sdk_version=$(jq -r .sdkVersion example/build-info.json)"
+            echo "commit_sha=$(jq -r .commit example/build-info.json)"
+            echo "commit_short=$(jq -r .commitShort example/build-info.json)"
+            echo "source_label=$(jq -r .sourceLabel example/build-info.json)"
+            echo "sdk_info=$(jq -r '"Flutter \(.sdkVersion)\(if .flutterSdkRef == .sdkVersion then "" else " · \(.flutterSdkRef)" end) | Android \(.androidSdkVersion)\(if .androidSdkRef == .androidSdkVersion then "" else " · \(.androidSdkRef)" end)"' example/build-info.json)"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
@@ -226,17 +181,8 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - name: Generate build info
-        run: |
-          ./scripts/sdk-ref.sh
-          SDK_INFO="$(jq -r '"Flutter: \(.flutterSdkRef) · iOS: \(.iosSdkRef) · Android: \(.androidSdkRef)"' example/build-info.json)"
-          {
-            echo "SDK_INFO=$SDK_INFO"
-            echo "SDK_VERSION=$(jq -r .sdkVersion example/build-info.json)"
-            echo "SHORT_SHA=$(jq -r .commitShort example/build-info.json)"
-          } >> "$GITHUB_ENV"
-
       - name: Write Firebase config and signing keystore
+        id: signing
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
@@ -244,12 +190,6 @@ jobs:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          for name in GOOGLE_SERVICES_JSON SIGNING_KEY ALIAS KEY_STORE_PASSWORD KEY_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Secret $name is not set. See .github/scripts/README.md."
-              exit 1
-            fi
-          done
           printf '%s' "$GOOGLE_SERVICES_JSON" > example/android/app/google-services.json
           printf '%s' "$SIGNING_KEY" | base64 -d > "$RUNNER_TEMP/upload.jks"
           # Read by example/android/app/build.gradle's release signingConfig.
@@ -286,32 +226,20 @@ jobs:
           next="$(.github/scripts/play-publish.sh next-version-code)"
           echo "Play API is reachable; highest versionCode seen: $((next - 1))"
 
-      - name: Prepare release notes
-        if: inputs.check_credentials != true
-        env:
-          RELEASE_BODY: ${{ github.event.release.body }}
-          RELEASE_NAME: ${{ github.event.release.name }}
-          GIT_REF_NAME: ${{ env.SOURCE_LABEL }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt"
-          # Play caps release notes at 500 characters per locale; the CI run
-          # link only fits TestFlight's 4000.
-          BUILD_INFO=example/build-info.json \
-            .github/scripts/release-notes.sh 500 "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/play-notes.txt"
-          cat "$RUNNER_TEMP/play-notes.txt"
-
       - name: Build and upload (retries on versionCode conflict)
         if: inputs.check_credentials != true
+        id: build
         working-directory: example
         env:
           PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
           AAB_PATH: build/app/outputs/bundle/release/app-release.aab
-          NOTES_FILE: ${{ runner.temp }}/play-notes.txt
           PLAY_TRACK: internal
           # Play only accepts 'draft' releases until the app's first manual rollout.
           PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
-          RELEASE_NAME: ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }}) ${{ env.SHORT_SHA }}
+          RELEASE_NAME_PREFIX: ${{ steps.buildinfo.outputs.sdk_version }}
+          RELEASE_NAME_SUFFIX: ${{ steps.buildinfo.outputs.commit_short }}
+          # Composed per attempt so a versionCode retry never ships stale notes.
+          NOTES_CMD: ../.github/scripts/release-notes.sh 500 android build-info.json "$BUILD_NUMBER" /dev/null
         run: |
           flutter pub get
           # shellcheck disable=SC2016
@@ -327,98 +255,133 @@ jobs:
         env:
           PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
           AAB_PATH: example/build/app/outputs/bundle/release/app-release.aab
-        run: echo "url=$(.github/scripts/play-publish.sh share)" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/play-publish.sh share
 
       - name: Clean up signing material
         if: always()
-        run: rm -f "$RUNNER_TEMP/upload.jks" example/android/key.properties
+        run: rm -f "$RUNNER_TEMP/upload.jks" example/android/key.properties example/android/app/google-services.json
 
       - name: Notify Slack on success
         if: success() && inputs.check_credentials != true
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: success
-          platform: Play Store internal track
-          version_label: ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }})
-          source_label: ${{ env.SOURCE_LABEL }}
-          sdk_info: ${{ env.SDK_INFO }}
-          # Internal App Sharing when the upload worked; otherwise the
-          # internal-track link, which only resolves for Google accounts on
-          # the internal testers list.
-          access_url: ${{ steps.internal_sharing.outputs.url || format('https://play.google.com/apps/test/{0}/{1}', env.ANDROID_PACKAGE, env.VERSION_CODE) }}
-          access_label: Install from Play (internal testers)
-          install_notes: Install ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }}) with a Google account on the internal testers list.
+          platform: Play internal
+          os: Android
+          version_label: ${{ steps.buildinfo.outputs.sdk_version }} (${{ env.VERSION_CODE }})
+          sdk_info: ${{ steps.buildinfo.outputs.sdk_info }}
+          source_label: ${{ steps.buildinfo.outputs.source_label }}
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ steps.buildinfo.outputs.commit_sha }}
+          commit_short: ${{ steps.buildinfo.outputs.commit_short }}
+          access_url: ${{ steps.internal_sharing.outputs.url }}
+          access_label: Internal App Sharing link
+          install_notes: ${{ steps.internal_sharing.outputs.url == '' && format('Install {0} ({1}) from the Play Store with a Google account on the internal testers list; ask in {2} to be added.', steps.buildinfo.outputs.sdk_version, env.VERSION_CODE, env.MOBILE_SLACK_CHANNEL) || '' }}
+
 
       - name: Notify Slack on failure
         if: failure()
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: failure
-          platform: Play Store internal track
-          version_label: ${{ env.SDK_VERSION || '?' }} (${{ env.VERSION_CODE || '?' }})
-          source_label: ${{ env.SOURCE_LABEL }}
-          sdk_info: ${{ env.SDK_INFO }}
+          platform: Play internal
+          os: Android
+          version_label: ${{ steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.VERSION_CODE || '?' }})
+          sdk_info: ${{ steps.buildinfo.outputs.sdk_info }}
+          source_label: ${{ steps.buildinfo.outputs.source_label }}
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ steps.buildinfo.outputs.commit_sha }}
+          commit_short: ${{ steps.buildinfo.outputs.commit_short }}
+          failed_step: ${{ steps.buildinfo.outcome == 'failure' && 'generate build info' || steps.signing.outcome == 'failure' && 'write signing material' || steps.build.outcome == 'failure' && 'build and upload' || 'an unknown step' }}
 
   deploy-ios:
     name: Publish to TestFlight
-    needs: verify
+    needs: [gate-test, gate-lint, preflight-ios]
+    # A skipped gate skips its dependents, so the status check is explicit:
+    # tests and lint must have passed, unless check_credentials skipped them.
     if: |
-      (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
-      || ((github.event_name == 'push' || github.event_name == 'release') && vars.EXAMPLE_APP_PUBLISH_ENABLED == 'true')
+      !cancelled()
+      && needs.preflight-ios.outputs.ready == 'true'
+      && (inputs.check_credentials == true
+        || (needs.gate-test.result == 'success' && needs.gate-lint.result == 'success'))
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name == 'push'
+        || github.event_name == 'release'
+        || (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
+        || (github.event_name == 'pull_request' && (github.event.label.name == 'deploy-example-app' || github.event.label.name == 'deploy-example-app:ios')))
     runs-on: macos-26
     timeout-minutes: 45
-    environment: testflight
+    environment:
+      name: testflight
+      url: ${{ steps.result.outputs.testflight_url }}
     concurrency:
       group: publish-example-ios-${{ github.event_name == 'push' && github.ref || github.run_id }}
       cancel-in-progress: ${{ github.event_name == 'push' }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     outputs:
-      build_number: ${{ env.BUILD_NUMBER }}
-      marketing_version: ${{ env.SDK_VERSION }}
-      sdk_info: ${{ env.SDK_INFO }}
-      source_label: ${{ env.SOURCE_LABEL }}
+      build_number: ${{ steps.result.outputs.build_number }}
+      marketing_version: ${{ steps.result.outputs.marketing_version }}
+      sdk_info: ${{ steps.result.outputs.sdk_info }}
+      source_label: ${{ steps.result.outputs.source_label }}
+      commit_sha: ${{ steps.result.outputs.commit_sha }}
+      commit_short: ${{ steps.result.outputs.commit_short }}
+      build_date: ${{ steps.result.outputs.build_date }}
+      event: ${{ steps.result.outputs.event }}
+      flutter_sdk_ref: ${{ steps.result.outputs.flutter_sdk_ref }}
+      ios_sdk_version: ${{ steps.result.outputs.ios_sdk_version }}
+      ios_sdk_ref: ${{ steps.result.outputs.ios_sdk_ref }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 2
           persist-credentials: false
-
-      - name: Set source label
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          if [ -n "$RELEASE_TAG" ]; then
-            source_label="release $RELEASE_TAG"
-          else
-            source_label="$REF_NAME"
-          fi
-          echo "SOURCE_LABEL=$(printf '%s' "$source_label" | tr -cd 'A-Za-z0-9._/ +-')" >> "$GITHUB_ENV"
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
+      # Stamps every event field (source label, event, commit, refs) into
+      # build-info.json; notes, Slack and the app all read it from there.
+      # CFBundleShortVersionString is the numeric core only; build numbers
+      # reset per marketing version, so a prerelease shares the sequence of
+      # the version it precedes.
       - name: Generate build info
+        id: buildinfo
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           ./scripts/sdk-ref.sh
-          SDK_INFO="$(jq -r '"Flutter: \(.flutterSdkRef) · iOS: \(.iosSdkRef) · Android: \(.androidSdkRef)"' example/build-info.json)"
-          echo "SDK_INFO=$SDK_INFO" >> "$GITHUB_ENV"
-          echo "SDK_VERSION=$(jq -r .sdkVersion example/build-info.json)" >> "$GITHUB_ENV"
+          {
+            echo "sdk_version=$(jq -r .sdkVersion example/build-info.json)"
+            echo "commit_sha=$(jq -r .commit example/build-info.json)"
+            echo "commit_short=$(jq -r .commitShort example/build-info.json)"
+            echo "source_label=$(jq -r .sourceLabel example/build-info.json)"
+            echo "sdk_info=$(jq -r '"Flutter \(.sdkVersion)\(if .flutterSdkRef == .sdkVersion then "" else " · \(.flutterSdkRef)" end) | iOS \(.iosSdkVersion)\(if .iosSdkRef == .iosSdkVersion then "" else " · \(.iosSdkRef)" end)"' example/build-info.json)"
+            echo "marketing_version=$(.github/scripts/ios-marketing-version.sh "$(jq -r .sdkVersion example/build-info.json)")"
+          } >> "$GITHUB_OUTPUT"
+          echo "IOS_MARKETING_VERSION=$(.github/scripts/ios-marketing-version.sh "$(jq -r .sdkVersion example/build-info.json)")" >> "$GITHUB_ENV"
 
       # Runs before setup-ruby so pod install uses the runner's own CocoaPods.
       # The build number here is a placeholder; build_ipa passes the real one
       # to xcodebuild on every attempt.
       - name: Generate Flutter config and install pods
+        id: flutterconfig
         working-directory: example
         run: |
           flutter pub get
           flutter build ios --release --config-only --no-codesign \
-            --build-name="$SDK_VERSION" --build-number=1 \
+            --build-name="$IOS_MARKETING_VERSION" --build-number=1 \
             --dart-define-from-file=build-info.json
 
       - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
@@ -430,25 +393,23 @@ jobs:
 
       # altool and asc.rb both find the key at this conventional path.
       - name: Write App Store Connect API key
+        id: apikey
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
         run: |
-          if [ -z "$APP_STORE_CONNECT_API_KEY_ID" ] || [ -z "$APP_STORE_CONNECT_API_KEY_BASE64" ]; then
-            echo "::error::App Store Connect API key secrets are not set. See .github/scripts/README.md."
-            exit 1
-          fi
           KEY_DIR="$HOME/.appstoreconnect/private_keys"
           mkdir -p "$KEY_DIR"
           printf '%s' "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
           chmod 600 "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
 
       - name: Resolve next build number from App Store Connect
+        id: buildnumber
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
-        run: echo "INITIAL_BUILD_NUMBER=$(ruby .github/scripts/asc.rb next-build-number)" >> "$GITHUB_ENV"
+        run: echo "INITIAL_BUILD_NUMBER=$(ruby .github/scripts/asc.rb next-build-number "$IOS_MARKETING_VERSION")" >> "$GITHUB_ENV"
 
       - name: Check credentials only
         if: inputs.check_credentials == true
@@ -459,9 +420,7 @@ jobs:
         if: inputs.check_credentials == true
         working-directory: example/ios
         env:
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
-          MATCH_READONLY: "true"
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
@@ -472,6 +431,7 @@ jobs:
 
       - name: Install signing identity and build, upload (retries on build number conflict)
         if: inputs.check_credentials != true
+        id: build
         working-directory: example/ios
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
@@ -483,14 +443,8 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
           IPA_PATH: ${{ github.workspace }}/example/build/ios/ipa/Runner.ipa
-          NEXT_BUILD_NUMBER_CMD: ruby ${{ github.workspace }}/.github/scripts/asc.rb next-build-number
+          NEXT_BUILD_NUMBER_CMD: ruby ${{ github.workspace }}/.github/scripts/asc.rb next-build-number "$IOS_MARKETING_VERSION"
         run: |
-          for name in MATCH_PASSWORD MATCH_DEPLOY_KEY BUILD_CERTIFICATE_BASE64 P12_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Secret $name is not set. See .github/scripts/README.md."
-              exit 1
-            fi
-          done
           mkdir -p ~/.ssh
           ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
           eval "$(ssh-agent -s)"
@@ -503,41 +457,82 @@ jobs:
           ../../.github/scripts/testflight-publish.sh "$INITIAL_BUILD_NUMBER" -- \
             bash -c 'fastlane ios build_ipa build_number:"$BUILD_NUMBER"'
 
+      - name: Record deployed build
+        id: result
+        if: always()
+        env:
+          BUILD_INFO_PATH: example/build-info.json
+          SDK_INFO: ${{ steps.buildinfo.outputs.sdk_info }}
+        run: |
+          {
+            echo "build_number=${BUILD_NUMBER:-$INITIAL_BUILD_NUMBER}"
+            echo "marketing_version=$(jq -r .sdkVersion "$BUILD_INFO_PATH")"
+            echo "sdk_info=$SDK_INFO"
+            echo "source_label=$(jq -r .sourceLabel "$BUILD_INFO_PATH")"
+            echo "commit_sha=$(jq -r .commit "$BUILD_INFO_PATH")"
+            echo "commit_short=$(jq -r .commitShort "$BUILD_INFO_PATH")"
+            echo "build_date=$(jq -r .buildDate "$BUILD_INFO_PATH")"
+            echo "event=$(jq -r .event "$BUILD_INFO_PATH")"
+            echo "flutter_sdk_ref=$(jq -r .flutterSdkRef "$BUILD_INFO_PATH")"
+            echo "ios_sdk_version=$(jq -r .iosSdkVersion "$BUILD_INFO_PATH")"
+            echo "ios_sdk_ref=$(jq -r .iosSdkRef "$BUILD_INFO_PATH")"
+            if [ -n "${ASC_APP_ID:-}" ]; then
+              echo "testflight_url=https://beta.itunes.apple.com/v1/app/$ASC_APP_ID"
+            fi
+          } >> "$GITHUB_OUTPUT"
+
       - name: Clean up signing material
         if: always()
-        run: rm -rf "$HOME/.appstoreconnect/private_keys" "$RUNNER_TEMP/dist.p12"
+        run: |
+          rm -rf "$HOME/.appstoreconnect/private_keys" "$RUNNER_TEMP/dist.p12"
+          ssh-add -D 2>/dev/null || true
 
       - name: Notify Slack on success
         if: success() && inputs.check_credentials != true
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: success
           platform: TestFlight
-          version_label: ${{ env.SDK_VERSION }} (${{ env.BUILD_NUMBER }})
-          source_label: ${{ env.SOURCE_LABEL }}
-          sdk_info: ${{ env.SDK_INFO }}
+          os: iOS
+          version_label: ${{ steps.buildinfo.outputs.sdk_version }} (${{ env.BUILD_NUMBER }})
+          sdk_info: ${{ steps.buildinfo.outputs.sdk_info }}
+          source_label: ${{ steps.buildinfo.outputs.source_label }}
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ steps.buildinfo.outputs.commit_sha }}
+          commit_short: ${{ steps.buildinfo.outputs.commit_short }}
           # Requires an App Store Connect login; testers install via the TestFlight app.
           access_url: https://appstoreconnect.apple.com/apps/${{ env.ASC_APP_ID }}/testflight/ios
           access_label: TestFlight in App Store Connect
-          install_notes: Install ${{ env.SDK_VERSION }} (${{ env.BUILD_NUMBER }}) from the TestFlight app once Apple finishes processing it, usually in 5 to 30 minutes. Not a tester yet? Ask in #mobile-push-team to be added, and give them your Apple ID email.
+          install_notes: Install from the TestFlight app once Apple finishes processing it, usually in 5 to 30 minutes. Not a tester yet? Ask in #mobile-push-team to be added, and give them your Apple ID email.
 
       - name: Notify Slack on failure
         if: failure()
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: failure
           platform: TestFlight
-          version_label: ${{ env.SDK_VERSION || '?' }} (${{ env.BUILD_NUMBER || env.INITIAL_BUILD_NUMBER || '?' }})
-          source_label: ${{ env.SOURCE_LABEL }}
-          sdk_info: ${{ env.SDK_INFO }}
+          os: iOS
+          version_label: ${{ steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.BUILD_NUMBER || env.INITIAL_BUILD_NUMBER || '?' }}, attempted)
+          sdk_info: ${{ steps.buildinfo.outputs.sdk_info }}
+          source_label: ${{ steps.buildinfo.outputs.source_label }}
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ steps.buildinfo.outputs.commit_sha }}
+          commit_short: ${{ steps.buildinfo.outputs.commit_short }}
+          failed_step: ${{ steps.buildinfo.outcome == 'failure' && 'generate build info' || steps.flutterconfig.outcome == 'failure' && 'generate Flutter config' || steps.apikey.outcome == 'failure' && 'write App Store Connect key' || steps.buildnumber.outcome == 'failure' && 'resolve build number' || steps.build.outcome == 'failure' && 'sign, build and upload' || 'an unknown step' }}
 
   what-to-test:
     name: Set TestFlight "What to Test"
     needs: deploy-ios
+    # Skipped deploy-ios (missing secrets) must not fail this job out.
+    if: needs.deploy-ios.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    # The build already shipped; a notes problem warns in Slack and leaves the run green.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -552,30 +547,47 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
         run: |
-          if [ -z "$APP_STORE_CONNECT_API_KEY_ID" ] || [ -z "$APP_STORE_CONNECT_API_KEY_BASE64" ]; then
-            echo "::error::App Store Connect API key secrets are not set. See .github/scripts/README.md."
-            exit 1
-          fi
           KEY_DIR="$HOME/.appstoreconnect/private_keys"
           mkdir -p "$KEY_DIR"
           printf '%s' "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
           chmod 600 "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
 
       - name: Set TestFlight "What to Test"
+        id: notes
         env:
           RELEASE_BODY: ${{ github.event.release.body }}
-          RELEASE_NAME: ${{ github.event.release.name }}
-          GIT_REF_NAME: ${{ needs.deploy-ios.outputs.source_label }}
-          EVENT_NAME: ${{ github.event_name }}
+          EVENT_NAME: ${{ needs.deploy-ios.outputs.event }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           BUNDLE_ID: ${{ env.IOS_BUNDLE_ID }}
           BUILD_NUMBER: ${{ needs.deploy-ios.outputs.build_number }}
+          SOURCE_LABEL: ${{ needs.deploy-ios.outputs.source_label }}
+          SDK_VERSION: ${{ needs.deploy-ios.outputs.marketing_version }}
+          FLUTTER_SDK_REF: ${{ needs.deploy-ios.outputs.flutter_sdk_ref }}
+          IOS_SDK_VERSION: ${{ needs.deploy-ios.outputs.ios_sdk_version }}
+          IOS_SDK_REF: ${{ needs.deploy-ios.outputs.ios_sdk_ref }}
+          COMMIT_SHA: ${{ needs.deploy-ios.outputs.commit_sha }}
+          COMMIT_SHORT: ${{ needs.deploy-ios.outputs.commit_short }}
+          BUILD_DATE: ${{ needs.deploy-ios.outputs.build_date }}
         run: |
           printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt"
+          # build-info.json lives on the deploy runner; rebuild it from the
+          # deploy job's outputs so the notes match what the app shows.
+          jq -n \
+            --arg sdk "$SDK_VERSION" \
+            --arg fref "$FLUTTER_SDK_REF" \
+            --arg iver "$IOS_SDK_VERSION" \
+            --arg iref "$IOS_SDK_REF" \
+            --arg sha "$COMMIT_SHA" \
+            --arg short "$COMMIT_SHORT" \
+            --arg built "$BUILD_DATE" \
+            '{sdkVersion: $sdk, flutterSdkRef: $fref, iosSdkVersion: $iver, iosSdkRef: $iref,
+              androidSdkVersion: "—", androidSdkRef: "—",
+              commit: $sha, commitShort: $short, branch: "—", appVersion: $sdk, buildDate: $built}' \
+            > "$RUNNER_TEMP/build-info.json"
           # TestFlight allows 4000 characters.
-          .github/scripts/release-notes.sh 4000 "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/testflight-notes.txt"
+          .github/scripts/release-notes.sh 4000 ios "$RUNNER_TEMP/build-info.json" "$BUILD_NUMBER" "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/testflight-notes.txt"
           cat "$RUNNER_TEMP/testflight-notes.txt"
           ruby .github/scripts/asc.rb set-whats-new "$BUILD_NUMBER" "$RUNNER_TEMP/testflight-notes.txt"
 
@@ -583,14 +595,51 @@ jobs:
         if: always()
         run: rm -rf "$HOME/.appstoreconnect/private_keys"
 
-      - name: Notify Slack on failure
+      - name: Warn in Slack that What to Test failed
         if: failure()
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: failure
-          platform: TestFlight "What to Test"
+          result: warning
+          platform: TestFlight
+          os: iOS
           version_label: ${{ needs.deploy-ios.outputs.marketing_version }} (${{ needs.deploy-ios.outputs.build_number }})
-          source_label: ${{ needs.deploy-ios.outputs.source_label }}
           sdk_info: ${{ needs.deploy-ios.outputs.sdk_info }}
-          install_notes: The build itself is on TestFlight; only the "What to Test" notes failed to save.
+          source_label: ${{ needs.deploy-ios.outputs.source_label }}
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ needs.deploy-ios.outputs.commit_sha }}
+          commit_short: ${{ needs.deploy-ios.outputs.commit_short }}
+          failed_step: ${{ steps.notes.outcome == 'failure' && 'saving What to Test' || 'an unknown step' }}
+
+  # Remove the deploy-example-app[:platform] label after the run so
+  # re-applying re-triggers. Runs even when the deploys were skipped.
+  cleanup-label:
+    name: Remove deploy-example-app label
+    needs: [deploy-android, deploy-ios]
+    if: |
+      always()
+      && github.event_name == 'pull_request'
+      && startsWith(github.event.label.name, 'deploy-example-app')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove label
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+        env:
+          LABEL_NAME: ${{ github.event.label.name }}
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                name: process.env.LABEL_NAME,
+              });
+            } catch (e) {
+              // 404 = label already gone (e.g. removed manually mid-run).
+              if (e.status !== 404) throw e;
+            }

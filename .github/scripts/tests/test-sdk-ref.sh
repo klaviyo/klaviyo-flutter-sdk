@@ -200,12 +200,11 @@ check "ios: branch pin from Podfile.lock" "feat/widgets@0bb71d7" "$(run_ref iosS
 
 # iOS commit pin: the stub remote reports the pinned commit as master's head.
 PODFILE_LOCK="$WORK/repo/podlock-commit"
-FAKE_HEADS="$WORK/heads-master" bash -c 'echo "deadbee0cafe00112233445566778899001122	refs/heads/other" > "$FAKE_HEADS"'
 printf 'deadbeefcafe00112233445566778899001122\trefs/heads/master\ndeadbee0cafe00112233445566778899001122\trefs/heads/other\n' > "$WORK/heads-master"
-check "ios: commit pin that is a branch head" "master@deadbee" "$(FAKE_HEADS="$WORK/heads-master" run_ref iosSdkRef)"
+check "ios: commit pin that is a branch head" "master@deadbee" "$(FAKE_HEADS="$WORK/heads-master" IOS_LS_REMOTE_CMD="$WORK/ls-remote" run_ref iosSdkRef)"
 
 printf '0000000000000000000000000000000000000000\trefs/heads/master\n' > "$WORK/heads-other"
-check "ios: commit pin that is not a head" "deadbee" "$(FAKE_HEADS="$WORK/heads-other" run_ref iosSdkRef)"
+check "ios: commit pin that is not a head" "deadbee" "$(FAKE_HEADS="$WORK/heads-other" IOS_LS_REMOTE_CMD="$WORK/ls-remote" run_ref iosSdkRef)"
 
 PODFILE_LOCK="$WORK/repo/podlock-local"
 check "ios: local path pod" "local:feat/widgets@$SWIFT_LOCAL_SHA" "$(run_ref iosSdkRef)"
@@ -257,6 +256,89 @@ check "flutter: commit is PR head" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" "$
   PODFILE_LOCK="$WORK/repo/podlock-release" T_EVENT_NAME=pull_request T_HEAD_REF=pr-branch \
     T_EVENT_PATH="$WORK/event.json" run_ref commit
 )"
+
+# Default ls-remote commands: a fake `git` on PATH records args and serves
+# per-repo heads, so the default command construction is exercised without an
+# override masking the repo URL.
+mkdir -p "$WORK/bin"
+cat > "$WORK/bin/git" <<'FAKE'
+#!/usr/bin/env bash
+echo "$*" >> "$FAKE_GIT_ARGS"
+repo=""
+for arg in "$@"; do repo="$arg"; done
+case "$repo" in
+  *klaviyo-swift-sdk*) cat "$FAKE_SWIFT_HEADS" 2>/dev/null || true ;;
+  *klaviyo-android-sdk*) cat "$FAKE_ANDROID_HEADS" 2>/dev/null || true ;;
+esac
+FAKE
+chmod +x "$WORK/bin/git"
+
+run_ref_default_remote() {
+  local out="$WORK/out.json"
+  rm -f "$out"
+  env -u GITHUB_REF_TYPE -u GITHUB_HEAD_REF -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH \
+    PATH="$WORK/bin:$PATH" \
+    REPO_ROOT="$WORK/repo" \
+    PUBSPEC="$WORK/repo/pubspec.yaml" \
+    EXAMPLE_PUBSPEC="$WORK/repo/example-pubspec.yaml" \
+    PODFILE_LOCK="$PODFILE_LOCK" \
+    PODFILE=/dev/null PODSPEC="$WORK/repo/podspec" \
+    ANDROID_BUILD_GRADLE="$ANDROID_BUILD_GRADLE" \
+    ANDROID_SETTINGS_GRADLE="$WORK/repo/settings-plain.gradle" \
+    GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+    GITHUB_REF_NAME=feat/thing \
+    BUILD_DATE='2026-10-13 12:00 UTC' \
+    bash "$SCRIPT" "$out" >/dev/null
+  python3 -I -c "import json,sys; d=json.load(open('$out')); print(d[sys.argv[1]])" "$1"
+}
+
+printf 'deadbeefcafe00112233445566778899001122\trefs/heads/swift-branch\n' > "$WORK/swift-heads"
+printf '0123456789abcdef0123456789abcdef01234567\trefs/heads/rel/4.6.0\n' > "$WORK/android-heads"
+: > "$WORK/git-args"
+
+PODFILE_LOCK="$WORK/repo/podlock-commit" ANDROID_BUILD_GRADLE="$WORK/repo/build-gradle-commit"
+check "ios: default ls-remote targets the swift repo" \
+  "swift-branch@deadbee" \
+  "$(FAKE_GIT_ARGS="$WORK/git-args" FAKE_SWIFT_HEADS="$WORK/swift-heads" FAKE_ANDROID_HEADS="$WORK/android-heads" run_ref_default_remote iosSdkRef)"
+check "android: default ls-remote targets the android repo" \
+  "rel/4.6.0@0123456" \
+  "$(FAKE_GIT_ARGS="$WORK/git-args" FAKE_SWIFT_HEADS="$WORK/swift-heads" FAKE_ANDROID_HEADS="$WORK/android-heads" run_ref_default_remote androidSdkRef)"
+check "ls-remote hit both repo URLs" \
+  "klaviyo-android-sdk.git klaviyo-swift-sdk.git" \
+  "$(awk '{print $NF}' "$WORK/git-args" | sed 's|.*/||' | sort -u | paste -sd' ' -)"
+
+# ---------------------------------------------------------------- stamping
+# One stamping step feeds build-info.json; consumers (notes, Slack inputs)
+# must all read the same sourceLabel/event/commit from it. Runs the stamper
+# per event type and checks those three fields.
+run_stamp() {
+  local out="$WORK/stamp.json"
+  env -u GITHUB_REF_TYPE -u GITHUB_EVENT_PATH \
+    PATH="$PATH" \
+    REPO_ROOT="$WORK/repo" \
+    PUBSPEC="$WORK/repo/pubspec.yaml" \
+    EXAMPLE_PUBSPEC="$WORK/repo/example-pubspec.yaml" \
+    PODFILE_LOCK="$WORK/repo/podlock-release" \
+    PODFILE=/dev/null PODSPEC="$WORK/repo/podspec" \
+    ANDROID_BUILD_GRADLE="$WORK/repo/build-gradle-release" \
+    ANDROID_SETTINGS_GRADLE="$WORK/repo/settings-plain.gradle" \
+    ANDROID_LS_REMOTE_CMD="$WORK/ls-remote" \
+    BUILD_DATE='2026-10-13 12:00 UTC' \
+    "$@" bash "$SCRIPT" "$out" >/dev/null
+  python3 -I -c "import json; d=json.load(open('$out')); print('|'.join([d['sourceLabel'], d['event'], d['commit']]))"
+}
+
+check "stamp: push" "feat/thing|push|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+  "$(run_stamp env GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME=feat/thing GITHUB_EVENT_NAME=push GITHUB_HEAD_REF= GITHUB_RELEASE_TAG= EVENT_NAME=push RELEASE_TAG= HEAD_REF= PR_NUMBER= REF_NAME=feat/thing)"
+
+check "stamp: release names the tag" "release 1.2.3-alpha.1|release|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+  "$(run_stamp env GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME=1.2.3-alpha.1 GITHUB_EVENT_NAME=release EVENT_NAME=release RELEASE_TAG=1.2.3-alpha.1 HEAD_REF= PR_NUMBER= REF_NAME=1.2.3-alpha.1)"
+
+check "stamp: PR label deploy uses the head sha, never the merge commit" "feat/y (PR #138)|pull_request|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
+  "$(run_stamp env GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME=138/merge GITHUB_EVENT_NAME=pull_request GITHUB_HEAD_REF=feat/y GITHUB_EVENT_PATH="$WORK/event.json" EVENT_NAME=pull_request RELEASE_TAG= HEAD_REF=feat/y PR_NUMBER=138 REF_NAME=138/merge)"
+
+check "stamp: workflow_dispatch" "feat/thing|workflow_dispatch|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+  "$(run_stamp env GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_REF_NAME=feat/thing GITHUB_EVENT_NAME=workflow_dispatch GITHUB_HEAD_REF= EVENT_NAME=workflow_dispatch RELEASE_TAG= HEAD_REF= PR_NUMBER= REF_NAME=feat/thing)"
 
 # ---------------------------------------------------------------- misc
 

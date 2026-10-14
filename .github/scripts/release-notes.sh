@@ -1,99 +1,99 @@
 #!/usr/bin/env bash
 #
-# Prints store release notes ("What's new" on Play, "What to Test" on TestFlight)
-# for an example app build. Every build gets the SDK version, native SDK refs,
-# source ref, commit and build date; a human-authored body (e.g. a GitHub
-# release body) is appended when present, otherwise the commit subject is used.
+# Prints store release notes ("What's new" on Play, "What to Test" on
+# TestFlight) for an example app build: the shared header block (kept in sync
+# with the app's "Copy build info" text via tests/fixtures/build-info-cases.json)
+# followed by the GitHub release body (release events only). Header lines are
+# never cut; the CI run line is dropped before the body is cut. Truncation is
+# by character and any cut is marked "…[truncated]", which counts toward the
+# cap. All text handling is in Python: bash 3.2 command substitution corrupts
+# multi-byte text at pipe-buffer boundaries.
 #
-# Usage: release-notes.sh <max-chars> [body-file]
+# Usage: release-notes.sh <max-chars> <platform: ios|android> <build-info.json> <build-number> [body-file]
 #
-# Env (all optional, defaults come from git / pubspec.yaml):
-#   SDK_VERSION   SDK version string (default: version from pubspec.yaml)
-#   GIT_SHA       commit to describe (default: HEAD)
-#   GIT_REF_NAME  branch or tag name shown next to the commit
-#   EVENT_NAME    github.event_name, shown next to the ref when set
-#   RELEASE_NAME  GitHub release name, shown above the body on releases
-#   RUN_URL       workflow run URL; appended when it fits (TestFlight's 4000
-#                 chars leave room; Play's 500 usually don't)
-#   BUILD_DATE    override for the build date (default: now, UTC)
-#   BUILD_INFO    path to a build-info.json from scripts/sdk-ref.sh; when
-#                 present, its three SDK refs are listed
+# Env:
+#   SOURCE_LABEL  sanitized source label (source-label.sh)
+#   EVENT_NAME    github.event_name
+#   RUN_URL       workflow run URL
 #
 set -euo pipefail
 
-MAX_CHARS="${1:?usage: release-notes.sh <max-chars> [body-file]}"
-BODY_FILE="${2:-}"
+MAX_CHARS="${1:?usage: release-notes.sh <max-chars> <ios|android> <build-info.json> <build-number> [body-file]}"
+PLATFORM="${2:?}"
+BUILD_INFO="${3:?}"
+BUILD_NUMBER="${4:?}"
+BODY_FILE="${5:-}"
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
+case "$PLATFORM" in
+  ios) NATIVE_NAME="iOS" ;;
+  android) NATIVE_NAME="Android" ;;
+  *) echo "::error::platform must be ios or android" >&2; exit 2 ;;
+esac
 
-if [ -z "${SDK_VERSION:-}" ]; then
-  SDK_VERSION="$(grep '^version:' "$REPO_ROOT/pubspec.yaml" | awk '{print $2}')"
-fi
-GIT_SHA="${GIT_SHA:-$(git rev-parse HEAD)}"
-SHORT_SHA="${GIT_SHA:0:7}"
-BUILD_DATE="${BUILD_DATE:-$(date -u '+%Y-%m-%d %H:%M UTC')}"
+MAX_CHARS="$MAX_CHARS" NATIVE_NAME="$NATIVE_NAME" BUILD_INFO="$BUILD_INFO" \
+  BUILD_NUMBER="$BUILD_NUMBER" BODY_FILE="$BODY_FILE" \
+  SOURCE_LABEL="${SOURCE_LABEL:-—}" EVENT_NAME="${EVENT_NAME:-—}" RUN_URL="${RUN_URL:-}" \
+  python3 -I - <<'PY'
+import os
 
-REF_LINE="Ref: ${GIT_REF_NAME:-unknown}"
-if [ -n "${EVENT_NAME:-}" ]; then
-  REF_LINE="$REF_LINE ($EVENT_NAME)"
-fi
+MISSING = "—"
+MARKER = "…[truncated]"
 
-SDK_REFS=""
-if [ -n "${BUILD_INFO:-}" ] && [ -f "$BUILD_INFO" ]; then
-  SDK_REFS="$(python3 -I - "$BUILD_INFO" <<'PY'
 import json
-import sys
 
-try:
-    with open(sys.argv[1]) as fh:
-        info = json.load(fh)
-except (OSError, ValueError):
-    sys.exit(0)
-for key, label in (("flutterSdkRef", "Flutter"), ("iosSdkRef", "iOS"), ("androidSdkRef", "Android")):
-    ref = info.get(key)
-    if ref:
-        print(f"{label} SDK: {ref}")
+with open(os.environ["BUILD_INFO"]) as fh:
+    info = json.load(fh)
+
+cap = int(os.environ["MAX_CHARS"])
+
+
+def sdk_line(name, version, ref):
+    # "<version> · <ref>"; the ref is omitted when it is missing or just
+    # restates the release version.
+    if not ref or ref == MISSING or ref == version:
+        return f"{name} {version or MISSING}"
+    return f"{name} {version or MISSING} · {ref}"
+
+
+platform = "ios" if os.environ["NATIVE_NAME"] == "iOS" else "android"
+header = [
+    f"Flutter Example {info.get('appVersion') or MISSING} ({os.environ['BUILD_NUMBER']})",
+    sdk_line("Klaviyo Flutter SDK", info.get("sdkVersion"), info.get("flutterSdkRef")),
+    sdk_line(
+        f"Klaviyo {os.environ['NATIVE_NAME']} SDK",
+        info.get(f"{platform}SdkVersion"),
+        info.get(f"{platform}SdkRef"),
+    ),
+    f"Commit: {info.get('commitShort') or MISSING} on {os.environ['SOURCE_LABEL']} ({os.environ['EVENT_NAME']})",
+    f"Built: {info.get('buildDate') or MISSING}",
+]
+
+run_url = os.environ.get("RUN_URL", "")
+
+body = ""
+body_file = os.environ.get("BODY_FILE", "")
+if os.environ.get("EVENT_NAME") == "release" and body_file:
+    try:
+        body = open(body_file).read().strip()
+    except OSError:
+        body = ""
+
+
+def render(with_run):
+    lines = list(header)
+    if with_run and run_url:
+        lines.append(f"CI run: {run_url}")
+    text = "\n".join(lines)
+    if body:
+        text += "\n\n" + body
+    return text
+
+
+notes = render(with_run=True)
+if len(notes) > cap:
+    # Drop the CI run line first; the header itself is never cut.
+    notes = render(with_run=False)
+if len(notes) > cap:
+    notes = notes[: cap - len(MARKER)] + MARKER
+print(notes)
 PY
-)"
-fi
-
-BODY=""
-if [ -n "$BODY_FILE" ] && [ -s "$BODY_FILE" ]; then
-  BODY="$(cat "$BODY_FILE")"
-fi
-if [ -z "${BODY//[[:space:]]/}" ]; then
-  BODY="$(git log -1 --format=%s "$GIT_SHA" 2>/dev/null || true)"
-fi
-if [ -n "${RELEASE_NAME:-}" ]; then
-  BODY="$RELEASE_NAME
-$BODY"
-fi
-
-NOTES="Klaviyo Flutter SDK $SDK_VERSION
-$REF_LINE
-Commit: $SHORT_SHA
-Built: $BUILD_DATE"
-if [ -n "$SDK_REFS" ]; then
-  NOTES="$NOTES
-$SDK_REFS"
-fi
-if [ -n "$BODY" ]; then
-  NOTES="$NOTES
-
-$BODY"
-fi
-if [ -n "${RUN_URL:-}" ]; then
-  NOTES="$NOTES
-
-CI run: $RUN_URL"
-fi
-
-# Truncate by character, not byte, so multi-byte text near the limit stays
-# valid UTF-8. Requires a UTF-8 locale (the default on GitHub runners).
-MARKER="[truncated]"
-if [ "${#NOTES}" -gt "$MAX_CHARS" ]; then
-  NOTES="${NOTES:0:$((MAX_CHARS - ${#MARKER} - 1))}
-$MARKER"
-fi
-
-printf '%s\n' "$NOTES"
