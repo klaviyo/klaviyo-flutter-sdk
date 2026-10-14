@@ -17,6 +17,9 @@ on:
       - 'scripts/sync_version.sh'
       - '.github/workflows/version-check.yml'
       - 'example/ios/fastlane/**'
+      - 'example/ios/Gemfile'
+      - 'example/ios/Gemfile.lock'
+      - '.github/dependabot.yml'
       - 'example/android/app/build.gradle'
 
 permissions:

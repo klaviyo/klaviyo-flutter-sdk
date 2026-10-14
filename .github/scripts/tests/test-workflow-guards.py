@@ -387,11 +387,26 @@ for path in all_paths:
 bundler_entry = next((e for e in entries if re.match(r"package-ecosystem:\s*['\"]?bundler", e)), "")
 gemfile_dirs = [d for d in re.findall(r"(?m)^\s*directory:\s*['\"]?(/\S*?)['\"]?\s*$", bundler_entry)]
 gemfiles = [os.path.join(ROOT, d.lstrip("/"), "Gemfile.lock") for d in gemfile_dirs]
-# A BUNDLED WITH line makes bundler-cache install exactly that Bundler, and a version older than the
-# runner's Ruby cannot run on it, so the lock carries none and the Ruby's own Bundler is used.
-pinned_bundler = [g for g in gemfiles if os.path.exists(g) and "BUNDLED WITH" in read(g)]
-report(not pinned_bundler, "no Gemfile.lock pins a Bundler version with BUNDLED WITH",
-       "pins Bundler: " + ", ".join(os.path.relpath(g, ROOT) for g in pinned_bundler))
+# Dependabot's bundler updates always write a BUNDLED WITH line, so the line is allowed. bundler-cache
+# installs exactly that Bundler, and Ruby 3.3 (the version the workflow sets up) needs Bundler 2.5 or newer,
+# so an older version fails the guard before it breaks the deploy.
+MIN_BUNDLER = (2, 5)
+old_bundler = []
+for g in gemfiles:
+    if not os.path.exists(g):
+        continue
+    found = re.search(r"(?m)^BUNDLED WITH\s*\n\s+(\d+)\.(\d+)", read(g))
+    if found and (int(found.group(1)), int(found.group(2))) < MIN_BUNDLER:
+        old_bundler.append(f"{os.path.relpath(g, ROOT)}: BUNDLED WITH {found.group(1)}.{found.group(2)}")
+report(not old_bundler, "no Gemfile.lock pins a Bundler older than 2.5, which cannot run on Ruby 3.3",
+       "; ".join(old_bundler))
+# A Dependabot bump of a pin file only reaches the guard and the tests if the PR-time path filter lists it.
+checks_text_for_paths = read(CHECKS_PATH)
+filter_paths = re.findall(r"(?m)^      - '([^']+)'\s*$", checks_text_for_paths.split("\npermissions:", 1)[0])
+needed_paths = [os.path.relpath(g, ROOT) for g in gemfiles] + [os.path.relpath(g, ROOT)[: -len(".lock")] for g in gemfiles] + [".github/dependabot.yml"]
+missing_paths = [n for n in needed_paths if n not in filter_paths]
+report(not missing_paths, "the checks workflow path filter lists every pin file and dependabot.yml",
+       "missing from on.pull_request.paths: " + ", ".join(missing_paths))
 report(not inline_installs and bool(gemfiles) and all(os.path.exists(g) for g in gemfiles),
        "pinned gems come from a locked Gemfile that Dependabot's bundler entry watches, not an inline install",
        "\n".join(inline_installs) or "no bundler entry in dependabot.yml, or its directory has no Gemfile.lock")

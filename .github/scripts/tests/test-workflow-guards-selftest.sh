@@ -212,7 +212,15 @@ expect_fail "an inline gem install in a workflow is caught" "pinned gems come fr
 
 fresh_copy
 edit "$TMP/repo/example/ios/Gemfile.lock" 's = s + "\nBUNDLED WITH\n   2.4.6\n"'
-expect_fail "a Gemfile.lock that pins an old Bundler is caught" "no Gemfile.lock pins a Bundler version"
+expect_fail "a Gemfile.lock that pins an old Bundler is caught" "no Gemfile.lock pins a Bundler older than 2.5"
+
+fresh_copy
+edit "$TMP/repo/example/ios/Gemfile.lock" 's = s + "\nBUNDLED WITH\n   2.5.22\n"'
+expect_pass "a Gemfile.lock with the BUNDLED WITH line Dependabot writes is accepted"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("      - \x27example/ios/Gemfile.lock\x27\n", "", 1)'
+expect_fail "a path filter that skips Gemfile.lock is caught" "the checks workflow path filter lists every pin file"
 
 fresh_copy
 edit "$TMP/repo/.github/dependabot.yml" 's = s.replace("package-ecosystem: bundler", "package-ecosystem: pip", 1)'
