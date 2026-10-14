@@ -62,9 +62,10 @@ resolve_flutter_ref() {
 
   local sha branch tag=""
   sha="${GITHUB_SHA:-$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)}"
-  tag="$(git -C "$REPO_ROOT" describe --exact-match --tags "$sha" 2>/dev/null)"
   if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
-    tag="${GITHUB_REF_NAME:-$tag}"
+    tag="${GITHUB_REF_NAME:-}"
+  elif [ -z "${GITHUB_SHA:-}" ]; then
+    tag="$(git -C "$REPO_ROOT" describe --exact-match --tags "$sha" 2>/dev/null)"
   fi
   # Official release: building the tag that matches the pubspec version.
   if [ -n "$tag" ] && { [ "$tag" = "$version" ] || [ "$tag" = "v$version" ]; }; then
