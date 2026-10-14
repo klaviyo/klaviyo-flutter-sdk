@@ -31,10 +31,11 @@ def run_asc(args, responses: [])
       require 'json'
       $responses = JSON.parse(#{responses.to_json.inspect})
       $log = []
-      Net::HTTP.define_singleton_method(:start) do |_host, _port, **_opts, &blk|
+      Net::HTTP.define_singleton_method(:start) do |_host, _port, **opts, &blk|
         http = Object.new
         http.define_singleton_method(:request) do |req|
           $log << {
+            'opts' => opts.transform_keys(&:to_s),
             'method' => req.method,
             'path' => req.uri.request_uri,
             'auth' => req['Authorization'],
@@ -326,6 +327,22 @@ describe 'asc.rb against a stateful App Store Connect' do
 end
 
 describe 'asc.rb' do
+  describe 'network timeouts' do
+    it 'bounds every request with connect, read and write timeouts' do
+      apps = { 'code' => 200, 'body' => { 'data' => [{ 'id' => 'app1' }] } }
+      builds = { 'code' => 200, 'body' => { 'data' => [], 'links' => {} } }
+      run_asc(['next-build-number', '0.3.1'], responses: [apps, builds]) do |_key, _out, rc, requests, _env|
+        assert_equal 0, rc
+        refute_empty requests
+        requests.each do |r|
+          assert_equal 15, r['opts']['open_timeout']
+          assert_equal 60, r['opts']['read_timeout']
+          assert_equal 60, r['opts']['write_timeout']
+        end
+      end
+    end
+  end
+
   describe 'JWT' do
     it 'signs a valid ES256 token with the expected header and claims' do
       apps = { 'code' => 200, 'body' => { 'data' => [{ 'id' => 'app1' }] } }

@@ -45,9 +45,10 @@ check "warning: headline" \
 out="$(base RESULT=success INSTALL_NOTES=$'Line one "quoted"\nLine two <!channel> $(whoami) `id`' \
   SOURCE_LABEL='a"b')"
 check "hostile values: valid JSON" "ok" "$(jq -e . >/dev/null <<<"$out" && echo ok)"
-check "hostile values: kept literally, one message" \
+# Shell-looking text stays literal (it is only text), and <!channel> is escaped so it cannot ping.
+check "hostile values: shell text stays literal, the ping is escaped, one message" \
   'Line one "quoted"
-Line two <!channel> $(whoami) `id`' \
+Line two &lt;!channel&gt; $(whoami) `id`' \
   "$(jq -r '.blocks[1].text.text' <<<"$out" | tail -2)"
 
 out="$(base RESULT=success COMMIT_SHORT='' COMMIT_SHA='')"
@@ -57,6 +58,23 @@ check "no commit: CI run link only" "*Commit:* <https://github.com/klaviyo/r/act
 out="$(base RESULT=failure)"
 check "failure without a step name falls back" \
   "❌ Flutter Example (iOS) → TestFlight deploy failed at an unknown step" "$(jq -r .text <<<"$out")"
+
+# Branch- and tag-derived text is escaped so <!channel>, <!here> and <url|text> cannot render. Git allows
+# <!channel> in a branch name, so this is reachable. The links the payload builds itself stay markup.
+out="$(base RESULT=success SDK_INFO='Flutter 1.2.3 · feat/<!channel>@abc1234 | iOS 5.4.1' \
+  SOURCE_LABEL='feat/<!here>&x (PR #1)' VERSION_LABEL='1.0<!everyone>' COMMIT_SHORT='a<b' \
+  INSTALL_NOTES='<https://evil.example|click me> & <!channel>' ACCESS_URL=https://ok.example/x ACCESS_LABEL='get <it>')"
+body="$(jq -r '.blocks[1].text.text' <<<"$out")"
+check "mrkdwn: a branch in the SDK line cannot ping the channel" "*SDKs:* Flutter 1.2.3 · feat/&lt;!channel&gt;@abc1234 | iOS 5.4.1" "$(grep '^\*SDKs' <<<"$body")"
+check "mrkdwn: the source label is escaped and keeps its ampersand as an entity" "*Source:* feat/&lt;!here&gt;&amp;x (PR #1) (pull_request)" "$(grep '^\*Source' <<<"$body")"
+check "mrkdwn: the build line is escaped" "*Build:* 1.0&lt;!everyone&gt;" "$(grep '^\*Build' <<<"$body")"
+check "mrkdwn: install notes cannot render a link or a ping" "&lt;https://evil.example|click me&gt; &amp; &lt;!channel&gt;" "$(tail -1 <<<"$body")"
+check "mrkdwn: the access link keeps its markup and only its text is escaped" "*Get the build:* <https://ok.example/x|get &lt;it&gt;>" "$(grep '^\*Get the build' <<<"$body")"
+check "mrkdwn: the commit and CI links keep their markup" "1" "$(grep -c '^\*Commit:\* <https://github.com/klaviyo/r/commit/abcdef0123|a&lt;b> · <https://github.com/klaviyo/r/actions/runs/9|CI run>$' <<<"$body" | tr -d ' ')"
+head_text="$(jq -r .text <<<"$(base RESULT=failure FAILED_STEP='build <!channel>' OS='i<OS>')")"
+check "mrkdwn: the failed step is escaped in the headline too" "❌ Flutter Example (i&lt;OS&gt;) → TestFlight deploy failed at build &lt;!channel&gt;" "$head_text"
+none="$(jq -r '.blocks[1].text.text' <<<"$out" | grep -c '<!channel>\|<!here>\|<!everyone>' || true)"
+check "mrkdwn: no raw broadcast mention survives anywhere in the message" "0" "$none"
 
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES test(s) failed"; exit 1; fi
 echo "All slack payload tests passed"

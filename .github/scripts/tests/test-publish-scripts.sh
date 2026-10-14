@@ -49,6 +49,8 @@ while [ "$#" -gt 0 ]; do
     -X) method="$2"; shift 2 ;;
     -o) out="$2"; shift 2 ;;
     -w|-H) shift 2 ;;
+    --connect-timeout) echo "$method connect=$2" >> "$FAKE_PLAY/timeouts"; shift 2 ;;
+    --max-time) echo "$method max=$2" >> "$FAKE_PLAY/timeouts"; shift 2 ;;
     -d|--data-binary) data="$2"; shift 2 ;;
     -*) shift ;;
     *) url="$1"; shift ;;
@@ -126,6 +128,30 @@ check "play: built once" 42 "$(paste -sd, "$WORK/play/builds")"
 check "play: exports VERSION_CODE" "VERSION_CODE=42" "$(cat "$WORK/play/github_env")"
 check "play: release notes attached" "Klaviyo Flutter SDK 1.2.3" "$(jq -r '.releases[0].releaseNotes[0].text' "$WORK/play/track_body")"
 check "play: completed release" "completed" "$(jq -r '.releases[0].status' "$WORK/play/track_body")"
+
+# Play: every call is bounded; only the bundle upload gets the long limit.
+check "play: every API call sets a connect timeout" "$(wc -l < "$WORK/play/calls" | tr -d ' ')" "$(grep -c 'connect=15$' "$WORK/play/timeouts" | tr -d ' ')"
+check "play: every API call sets a total timeout" "$(wc -l < "$WORK/play/calls" | tr -d ' ')" "$(grep -c ' max=' "$WORK/play/timeouts" | tr -d ' ')"
+check "play: only the bundle upload gets the upload limit" "1" "$(grep -c 'max=600$' "$WORK/play/timeouts" | tr -d ' ')"
+check "play: ordinary calls get the API limit" "$(( $(wc -l < "$WORK/play/calls" | tr -d ' ') - 1 ))" "$(grep -c 'max=60$' "$WORK/play/timeouts" | tr -d ' ')"
+reset_play 41
+out="$(PLAY_CONNECT_TIMEOUT=3 PLAY_API_TIMEOUT=7 PLAY_UPLOAD_TIMEOUT=9 run_play 2>/dev/null)"
+check "play: timeouts can be overridden from the environment" "3 7 9" "$(grep -c 'connect=3$' "$WORK/play/timeouts" >/dev/null && echo 3) $(grep -q 'max=7$' "$WORK/play/timeouts" && echo 7) $(grep -q 'max=9$' "$WORK/play/timeouts" && echo 9)"
+
+# Play: a gcloud that never answers is cut off and named, not waited on.
+mkdir -p "$WORK/hang-bin"
+printf '#!/bin/sh\nsleep 30\n' > "$WORK/hang-bin/gcloud"
+chmod +x "$WORK/hang-bin/gcloud"
+reset_play 41
+hung_play() {
+  env -u PLAY_ACCESS_TOKEN FAKE_PLAY="$WORK/play" PATH="$WORK/hang-bin:$WORK/bin:$PATH" PACKAGE_NAME=com.example \
+    PLAY_TOKEN_TIMEOUT=1 PLAY_API_ROOT=https://play.test AAB_PATH="$WORK/app.aab" NOTES_FILE="$WORK/notes.txt" \
+    GITHUB_ENV="$WORK/play/github_env" "$SCRIPTS/play-publish.sh" deploy -- true
+}
+started="$(date +%s)"
+expect_failure "play: a hung gcloud fails with a message naming the timeout" "gcloud did not return an access token within 1s" hung_play
+check "play: the hung gcloud was cut off within seconds" "yes" "$([ $(( $(date +%s) - started )) -lt 15 ] && echo yes || echo no)"
+reset_play 41
 
 # Play: upload rejected twice for versionCode conflict, then succeeds.
 reset_play 41; echo 2 > "$WORK/play/conflicts"

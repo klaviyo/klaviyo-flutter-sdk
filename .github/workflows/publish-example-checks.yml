@@ -49,10 +49,10 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/lint"
           cd "$RUNNER_TEMP/lint"
-          curl -fsSLo shellcheck.tar.xz https://github.com/koalaman/shellcheck/releases/download/v0.9.0/shellcheck-v0.9.0.linux.x86_64.tar.xz
+          curl --connect-timeout 15 --max-time 120 -fsSLo shellcheck.tar.xz https://github.com/koalaman/shellcheck/releases/download/v0.9.0/shellcheck-v0.9.0.linux.x86_64.tar.xz
           echo "700324c6dd0ebea0117591c6cc9d7350d9c7c5c287acbad7630fa17b1d4d9e2f  shellcheck.tar.xz" | sha256sum -c -
           tar xJf shellcheck.tar.xz
-          curl -fsSLo actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
+          curl --connect-timeout 15 --max-time 120 -fsSLo actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
           echo "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  actionlint.tar.gz" | sha256sum -c -
           tar xzf actionlint.tar.gz actionlint
           echo "$RUNNER_TEMP/lint/shellcheck-v0.9.0" >> "$GITHUB_PATH"

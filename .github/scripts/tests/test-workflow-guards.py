@@ -11,6 +11,7 @@ The workflows are read as text and sliced by indentation, so the checks depend
 neither on a YAML library nor on the awk dialect of the machine.
 """
 
+import fnmatch
 import glob
 import os
 import re
@@ -25,9 +26,12 @@ SLACK_ACTION = "./.github/actions/notify-slack-publish"
 
 # Functions GitHub Actions expressions provide. Anything else called inside ${{ }}
 # fails when it evaluates, usually only after the upload has already happened.
+# Function names are case-insensitive in expressions, so the set is compared lowercased.
 ALLOWED_FUNCTIONS = {
-    "contains", "startsWith", "endsWith", "format", "join", "toJSON", "fromJSON",
-    "hashFiles", "case", "success", "always", "cancelled", "failure",
+    name.lower() for name in (
+        "contains", "startsWith", "endsWith", "format", "join", "toJSON", "fromJSON",
+        "hashFiles", "case", "success", "always", "cancelled", "failure",
+    )
 }
 
 SAME_REPO = "github.event.pull_request.head.repo.full_name == github.repository"
@@ -67,6 +71,33 @@ def job_if(job_text):
     """The job-level `if:` expression, including a multi-line block."""
     match = re.search(r"(?ms)^    if:(.*?)(?=^    [a-z-]+:)", job_text)
     return match.group(1) if match else ""
+
+
+def top_level_conjuncts(expression):
+    """Splits an expression on `&&` outside parentheses and quotes. Returns None when a top-level `||`
+    is present, because then no single clause is required for the whole expression to be true."""
+    text = " ".join(expression.split())
+    parts, depth, quote, start, index = [], 0, None, 0, 0
+    while index < len(text):
+        char = text[index]
+        if quote:
+            if char == quote:
+                quote = None
+        elif char in "'\"":
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        elif depth == 0 and text.startswith("||", index):
+            return None
+        elif depth == 0 and text.startswith("&&", index):
+            parts.append(text[start:index].strip())
+            start = index + 2
+            index += 1
+        index += 1
+    parts.append(text[start:].strip())
+    return parts
 
 
 def checkout_states(text):
@@ -138,7 +169,7 @@ unsupported = set()
 for path in all_paths:
     for expression in expressions(read(path)):
         for name in re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\(", expression):
-            if name not in ALLOWED_FUNCTIONS:
+            if name.lower() not in ALLOWED_FUNCTIONS:
                 unsupported.add(name)
 report(not unsupported, "expressions only call functions that GitHub Actions provides",
        "unsupported: " + ", ".join(sorted(unsupported)))
@@ -209,6 +240,57 @@ report(bool(globs) and scripts_seen > 0 and not uncovered,
        f"the shellcheck step covers every script under .github and scripts/sdk-ref.sh ({scripts_seen} found)",
        ("uncovered: " + ", ".join(uncovered)) if uncovered else "no shellcheck line found in the Lint scripts step")
 
+# --- script injection ---------------------------------------------------------
+
+# A ${{ }} inside a run: script is substituted into the shell text BEFORE the shell runs, so a value an
+# attacker controls (a branch or tag name, a PR title, a release name or body, or a step output derived
+# from one) executes: a branch named $(curl ...) runs the command. Pass it through env: and use "$VAR".
+# Paths the runner itself defines (github.action_path, github.workspace, runner.*, github.run_id and the
+# like) are not attacker controlled and are allowed.
+UNTRUSTED = re.compile(
+    r"github\.(?:head_ref|ref_name|ref|base_ref|event\.(?:release|pull_request|issue|comment|head_commit|"
+    r"commits|workflow_run|review|pages|client_payload|inputs)\b|actor\b)|"
+    r"\binputs\.|steps\.[A-Za-z0-9_-]+\.outputs\.|needs\.[A-Za-z0-9_-]+\.outputs\.|"
+    r"\benv\.", re.I)
+
+
+def run_script_lines(text):
+    """Yields (line number, line) for every line inside a run: script, one line or a block scalar."""
+    lines = text.split("\n")
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)(?:- )?run:[ \t]*(.*)$", line)
+        if not match:
+            continue
+        indent, rest = len(match.group(1)), match.group(2)
+        if rest.startswith(("|", ">")):
+            block_indent = None
+            for number, following in enumerate(lines[index + 1:], index + 2):
+                if not following.strip():
+                    continue
+                current = len(following) - len(following.lstrip())
+                if block_indent is None:
+                    block_indent = current
+                if current < block_indent or current <= indent:
+                    break
+                yield number, following
+        else:
+            yield index + 1, rest
+
+
+injection = []
+run_lines_seen = 0
+for path in all_paths:
+    for number, line in run_script_lines(read(path)):
+        run_lines_seen += 1
+        if line.lstrip().startswith("#"):
+            continue
+        for expression in re.findall(r"\$\{\{(.*?)\}\}", line):
+            if UNTRUSTED.search(expression):
+                injection.append(f"{os.path.relpath(path, ROOT)}:{number}: ${{{{{expression}}}}} in a run script")
+report(run_lines_seen > 0 and not injection,
+       f"no run script interpolates a branch, tag, release, pull request, input or step output ({run_lines_seen} script lines)",
+       "\n".join(injection) + "\nmove the value into env: and use \"$VAR\"")
+
 # --- portability -------------------------------------------------------------
 
 # Scripts here run on macOS (a laptop, macos-26) and Linux (ubuntu runners). These flags exist on one
@@ -244,6 +326,36 @@ for path in script_files:
                 found.append(f"{os.path.relpath(path, ROOT)}:{number}: {label}: {line.strip()[:90]}")
 report(not found, f"no scripts use flags that exist on only one of macOS and Linux ({len(script_files)} files scanned)",
        "\n".join(found))
+
+# --- network timeouts ----------------------------------------------------------
+
+# A stalled connection holds a runner until the job's own timeout. Every curl in the shipped scripts and
+# workflows sets --connect-timeout and --max-time. Backslash continuations are joined; tests and comments
+# are skipped.
+unbounded = []
+for path in script_files:
+    if not os.path.exists(path) or os.sep + "tests" + os.sep in path:
+        continue
+    text = read(path).replace("\\\n", " ")
+    for number, line in enumerate(text.split("\n"), 1):
+        if line.lstrip().startswith("#"):
+            continue
+        if re.search(r"(?<![\w./-])curl\s+-", line) and not ("--connect-timeout" in line and "--max-time" in line):
+            unbounded.append(f"{os.path.relpath(path, ROOT)}: {line.strip()[:100]}")
+report(not unbounded, "every curl sets --connect-timeout and --max-time", "\n".join(unbounded))
+
+# --- dependabot ---------------------------------------------------------------
+
+# Dependabot's github-actions ecosystem reads workflows from the listed directories only; a composite
+# action under .github/actions is not covered by `/`, so its pins would go stale unseen.
+DEPENDABOT_PATH = os.path.join(ROOT, ".github", "dependabot.yml")
+dependabot = read(DEPENDABOT_PATH) if os.path.exists(DEPENDABOT_PATH) else ""
+listed = re.findall(r"(?m)^\s*-?\s*directory:\s*['\"]?(/\S*?)['\"]?\s*$", dependabot)
+listed += re.findall(r"(?m)^\s+-\s+['\"]?(/\S*?)['\"]?\s*$", dependabot)
+action_dirs = sorted("/" + os.path.relpath(os.path.dirname(a), ROOT) for a in action_paths)
+uncovered = [d for d in action_dirs if not any(fnmatch.fnmatchcase(d, pattern.rstrip("/") or "/") for pattern in listed)]
+report("/" in listed and not uncovered, "dependabot watches the workflows and every composite action directory",
+       "not covered: " + ", ".join((["/"] if "/" not in listed else []) + uncovered))
 
 # --- composite actions -------------------------------------------------------
 
@@ -398,8 +510,10 @@ for gate in ("gate-test", "gate-lint"):
 
 # What to Test attaches notes to a build that was uploaded. A check_credentials run completes deploy-ios
 # without building, so what-to-test must not run then, or it waits for a build that never existed.
-report("inputs.check_credentials != true" in job_if(jobs.get("what-to-test", "")),
-       "the what-to-test job does not run on a check_credentials run")
+conjuncts = top_level_conjuncts(job_if(jobs.get("what-to-test", "")))
+report(conjuncts is not None and "inputs.check_credentials != true" in conjuncts,
+       "the what-to-test job does not run on a check_credentials run",
+       "inputs.check_credentials != true must be a required clause, not part of an || or a substring")
 
 # --- fork pull requests ----------------------------------------------------
 

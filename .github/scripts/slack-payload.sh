@@ -41,21 +41,26 @@ jq -n \
   --arg server "${SERVER_URL:-https://github.com}" \
   --arg repo "${REPOSITORY:-}" \
   --arg run "${RUN_ID:-}" '
+  # Slack mrkdwn treats & < > as control characters: <!channel> pings everyone and <url|text> renders a
+  # link. A branch or tag may contain them (git allows <!channel> as a branch name), so every value that
+  # comes from one is escaped before it is placed in the message. The links built below are markup on
+  # purpose and are not escaped; only their text is.
+  def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
   def icon: if $result == "success" then "✅" elif $result == "warning" then "⚠️" else "❌" end;
   def headline:
-    "\(icon) Flutter Example (\($os)) → \($platform)"
-    + (if $result == "failure" then " deploy failed at \($step)"
-       elif $result == "warning" then " notes failed at \($step)" else "" end);
+    "\(icon) Flutter Example (\($os | esc)) → \($platform | esc)"
+    + (if $result == "failure" then " deploy failed at \($step | esc)"
+       elif $result == "warning" then " notes failed at \($step | esc)" else "" end);
   def runlink: "<\($server)/\($repo)/actions/runs/\($run)|CI run>";
   def commit:
     if $short == "" then runlink
-    else "<\($server)/\($repo)/commit/\($sha)|\($short)> · " + runlink end;
-  ([ (if $version != "" then "*Build:* \($version)" else empty end),
-     (if $sdks != "" then "*SDKs:* \($sdks)" else empty end),
-     (if $source != "" then "*Source:* \($source) (\($event))" else empty end),
+    else "<\($server)/\($repo)/commit/\($sha)|\($short | esc)> · " + runlink end;
+  ([ (if $version != "" then "*Build:* \($version | esc)" else empty end),
+     (if $sdks != "" then "*SDKs:* \($sdks | esc)" else empty end),
+     (if $source != "" then "*Source:* \($source | esc) (\($event | esc))" else empty end),
      "*Commit:* " + commit,
-     (if $url != "" then "*Get the build:* <\($url)|\($urllabel)>" else empty end),
-     (if $notes != "" then $notes else empty end) ] | join("\n")) as $body
+     (if $url != "" then "*Get the build:* <\($url)|\($urllabel | esc)>" else empty end),
+     (if $notes != "" then ($notes | esc) else empty end) ] | join("\n")) as $body
   | { text: headline,
       blocks: [
         { type: "header", text: { type: "plain_text", text: headline } },

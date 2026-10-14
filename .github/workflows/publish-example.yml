@@ -446,10 +446,10 @@ jobs:
           MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -T 15 github.com >> ~/.ssh/known_hosts 2>/dev/null
           eval "$(ssh-agent -s)"
           printf '%s\n' "$MATCH_DEPLOY_KEY" | ssh-add - 2>/dev/null
-          git ls-remote git@github.com:klaviyo/mobile-certificates.git HEAD >/dev/null
+          GIT_SSH_COMMAND='ssh -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3' git ls-remote git@github.com:klaviyo/mobile-certificates.git HEAD >/dev/null
           echo "match repository is readable with the deploy key"
 
       - name: Install signing identity and build, upload (retries on build number conflict)
@@ -469,7 +469,7 @@ jobs:
           NEXT_BUILD_NUMBER_CMD: ruby ${{ github.workspace }}/.github/scripts/asc.rb next-build-number "$IOS_MARKETING_VERSION"
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -T 15 github.com >> ~/.ssh/known_hosts 2>/dev/null
           eval "$(ssh-agent -s)"
           printf '%s\n' "$MATCH_DEPLOY_KEY" | ssh-add - 2>/dev/null
           CERT_P12_PATH="$RUNNER_TEMP/dist.p12"

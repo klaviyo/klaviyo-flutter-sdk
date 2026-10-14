@@ -49,6 +49,9 @@ def token
   "#{header}.#{payload}.#{b64url(r + s)}"
 end
 
+ASC_OPEN_TIMEOUT = Integer(ENV.fetch('ASC_OPEN_TIMEOUT', '15'))
+ASC_READ_TIMEOUT = Integer(ENV.fetch('ASC_READ_TIMEOUT', '60'))
+
 def request(method, url, body = nil)
   uri = URI(url.start_with?('http') ? url : "#{API}#{url}")
   req = Net::HTTP.const_get(method.capitalize).new(uri)
@@ -57,7 +60,7 @@ def request(method, url, body = nil)
     req['Content-Type'] = 'application/json'
     req.body = body.to_json
   end
-  res = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |h| h.request(req) }
+  res = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: ASC_OPEN_TIMEOUT, read_timeout: ASC_READ_TIMEOUT, write_timeout: ASC_READ_TIMEOUT) { |h| h.request(req) }
   [res.code.to_i, res.body.to_s.empty? ? {} : JSON.parse(res.body)]
 end
 

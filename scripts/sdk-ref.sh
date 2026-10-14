@@ -30,8 +30,8 @@ ANDROID_BUILD_GRADLE="${ANDROID_BUILD_GRADLE:-$REPO_ROOT/android/build.gradle}"
 ANDROID_SETTINGS_GRADLE="${ANDROID_SETTINGS_GRADLE:-$REPO_ROOT/example/android/settings.gradle}"
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
 ANDROID_REPO="https://github.com/klaviyo/klaviyo-android-sdk.git"
-ANDROID_LS_REMOTE_CMD="${ANDROID_LS_REMOTE_CMD:-git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $ANDROID_REPO}"
-IOS_LS_REMOTE_CMD="${IOS_LS_REMOTE_CMD:-git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $SWIFT_REPO}"
+ANDROID_LS_REMOTE_CMD="${ANDROID_LS_REMOTE_CMD:-git -c http.connectTimeout=15 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $ANDROID_REPO}"
+IOS_LS_REMOTE_CMD="${IOS_LS_REMOTE_CMD:-git -c http.connectTimeout=15 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $SWIFT_REPO}"
 OUT="${1:-$REPO_ROOT/example/build-info.json}"
 SHORT=7
 

@@ -32,6 +32,7 @@ fresh_copy() {
   mkdir -p "$TMP/repo/.github/workflows" "$TMP/repo/.github/actions" "$TMP/repo/.github/scripts/tests"
   cp "$ROOT"/.github/workflows/*.yml "$TMP/repo/.github/workflows/"
   cp -R "$ROOT"/.github/actions/. "$TMP/repo/.github/actions/"
+  cp "$ROOT/.github/dependabot.yml" "$TMP/repo/.github/"
   cp "$ROOT/.github/scripts/check-secrets.sh" "$TMP/repo/.github/scripts/"
   mkdir -p "$TMP/repo/scripts"
   cp "$ROOT/scripts/sdk-ref.sh" "$TMP/repo/scripts/"
@@ -100,6 +101,14 @@ fresh_copy
 edit "$DEPLOY" 's = s.replace("RELEASE_TAG: ${{ github.event.release.tag_name }}", "RELEASE_TAG: ${{ toLower(github.event.release.tag_name) }}", 1)'
 expect_fail "an unknown function inside an expression is caught" "expressions only call functions"
 
+fresh_copy
+edit "$SLACK" 's = s.replace("inputs.commit_sha || github.sha", "SubStr(inputs.commit_sha, 0, 7) || github.sha", 1)'
+expect_fail "a mixed-case unsupported function is caught" "expressions only call functions"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("needs.preflight-android.outputs.ready == \x27true\x27", "CONTAINS(needs.preflight-android.outputs.ready, \x27true\x27)", 1)'
+expect_pass "a supported function in other casing is accepted"
+
 # --- pinned actions
 
 LINT_WF="$W/lint.yml"
@@ -139,6 +148,40 @@ expect_fail "a script added outside the shellcheck globs is caught" "the shellch
 fresh_copy
 edit "$CHECKS" 's = s.replace("shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh scripts/sdk-ref.sh", "shellcheck .github/scripts/*.sh .github/scripts/tests/*.sh", 1)'
 expect_fail "dropping scripts/sdk-ref.sh from the shellcheck step is caught" "the shellcheck step covers every script"
+
+# --- script injection: each untrusted source inside a run script is caught, runner paths are not
+
+inject_case() { # <label> <expression to place in a run script> <expect: fail|pass>
+  fresh_copy
+  # An extra step, so every other rule still sees the workflow it expects.
+  JUNK="$2" edit "$W/publish-example-checks.yml" '
+import os
+i = s.index("      - name: Lint composite action shell")
+s = s[:i] + "      - name: Probe\n        run: echo " + os.environ["JUNK"] + "\n\n" + s[i:]
+'
+  if [ "$3" = fail ]; then
+    expect_fail "$1" "no run script interpolates a branch, tag, release"
+  else
+    expect_pass "$1"
+  fi
+}
+inject_case "a branch name in a run script is caught" '${{ github.head_ref }}' fail
+inject_case "ref_name in a run script is caught" '${{ github.ref_name }}' fail
+inject_case "a release body in a run script is caught" '${{ github.event.release.body }}' fail
+inject_case "a release name in a run script is caught" '${{ github.event.release.name }}' fail
+inject_case "a pull request title in a run script is caught" '${{ github.event.pull_request.title }}' fail
+inject_case "a step output in a run script is caught" '${{ steps.buildinfo.outputs.sdk_info }}' fail
+inject_case "a job output in a run script is caught" '${{ needs.deploy-ios.outputs.source_label }}' fail
+inject_case "a workflow input in a run script is caught" '${{ inputs.platform }}' fail
+inject_case "an env context value in a run script is caught" '${{ env.SOURCE_LABEL }}' fail
+inject_case "the case-insensitive spelling of a context is caught" '${{ GitHub.Head_Ref }}' fail
+inject_case "the action path in a run script is allowed" '${{ github.action_path }}' pass
+inject_case "the runner temp directory in a run script is allowed" '${{ runner.temp }}' pass
+inject_case "the run id in a run script is allowed" '${{ github.run_id }}' pass
+
+# a secret in an env: block is the safe form and must not be flagged
+fresh_copy
+expect_pass "values in env: blocks are not flagged"
 
 # --- portability: each one-sided flag is caught, the portable forms are not
 
@@ -353,6 +396,34 @@ expect_fail "a missing stripped marketing version output is caught" "the deploy-
 fresh_copy
 edit "$DEPLOY" 's = s.replace("      needs.deploy-ios.result == \x27success\x27\n      && inputs.check_credentials != true\n", "      needs.deploy-ios.result == \x27success\x27\n", 1)'
 expect_fail "what-to-test running on a check_credentials run is caught" "the what-to-test job does not run on a check_credentials run"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("      && inputs.check_credentials != true\n      && (github.event_name != \x27pull_request\x27 || github.event.pull_request.head.repo.full_name == github.repository)\n    runs-on: ubuntu-24.04\n    timeout-minutes: 60", "      && (inputs.check_credentials != true || true)\n      && (github.event_name != \x27pull_request\x27 || github.event.pull_request.head.repo.full_name == github.repository)\n    runs-on: ubuntu-24.04\n    timeout-minutes: 60", 1)'
+expect_fail "a what-to-test condition that ORs the check away is caught" "the what-to-test job does not run on a check_credentials run"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("      needs.deploy-ios.result == \x27success\x27\n      && inputs.check_credentials != true\n", "      needs.deploy-ios.result == \x27success\x27 || inputs.check_credentials != true\n", 1)'
+expect_fail "a what-to-test condition with a top-level OR is caught" "the what-to-test job does not run on a check_credentials run"
+
+# --- network timeouts
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("curl --connect-timeout 15 --max-time 120 -fsSLo shellcheck.tar.xz", "curl -fsSLo shellcheck.tar.xz", 1)'
+expect_fail "a workflow curl with no timeouts is caught" "every curl sets --connect-timeout and --max-time"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("curl --connect-timeout 15 --max-time 120 -fsSLo actionlint.tar.gz", "curl --connect-timeout 15 -fsSLo actionlint.tar.gz", 1)'
+expect_fail "a curl with a connect timeout but no total limit is caught" "every curl sets --connect-timeout and --max-time"
+
+# --- dependabot
+
+fresh_copy
+edit "$TMP/repo/.github/dependabot.yml" 's = s.replace("      - /.github/actions/*\n", "", 1)'
+expect_fail "dependabot not watching the composite action directory is caught" "dependabot watches the workflows and every composite action directory"
+
+fresh_copy
+edit "$TMP/repo/.github/dependabot.yml" 's = s.replace("      - /\n", "", 1)'
+expect_fail "dependabot not watching the workflows is caught" "dependabot watches the workflows and every composite action directory"
 
 # --- gating
 
