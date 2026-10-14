@@ -168,6 +168,8 @@ chmod +x "$WORK/ls-remote"
 run_ref() {
   local out="$WORK/out.json"
   rm -f "$out"
+  # Re-set GITHUB_* explicitly from the caller's overrides so the runner's
+  # own ambient values (real checkout on CI) never reach the script.
   REPO_ROOT="$WORK/repo" \
     PUBSPEC="$WORK/repo/pubspec.yaml" \
     EXAMPLE_PUBSPEC="$WORK/repo/example-pubspec.yaml" \
@@ -179,6 +181,10 @@ run_ref() {
     ANDROID_LS_REMOTE_CMD="$WORK/ls-remote" \
     GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
     GITHUB_REF_NAME=feat/thing \
+    GITHUB_REF_TYPE="${T_REF_TYPE:-}" \
+    GITHUB_HEAD_REF="${T_HEAD_REF:-}" \
+    GITHUB_EVENT_NAME="${T_EVENT_NAME:-}" \
+    GITHUB_EVENT_PATH="${T_EVENT_PATH:-}" \
     BUILD_DATE='2026-10-13 12:00 UTC' \
     bash "$SCRIPT" "$out" >/dev/null
   python3 -I -c "import json,sys; d=json.load(open('$out')); print(d[sys.argv[1]])" "$1"
@@ -244,18 +250,19 @@ cat > "$WORK/event.json" <<'EOF'
 {"pull_request": {"head": {"sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}}
 EOF
 check "flutter: PR head sha" "pr-branch@bbbbbbb" "$(
-  PODFILE_LOCK="$WORK/repo/podlock-release" GITHUB_EVENT_NAME=pull_request GITHUB_HEAD_REF=pr-branch \
-    GITHUB_EVENT_PATH="$WORK/event.json" run_ref flutterSdkRef
+  PODFILE_LOCK="$WORK/repo/podlock-release" T_EVENT_NAME=pull_request T_HEAD_REF=pr-branch \
+    T_EVENT_PATH="$WORK/event.json" run_ref flutterSdkRef
 )"
 check "flutter: commit is PR head" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" "$(
-  PODFILE_LOCK="$WORK/repo/podlock-release" GITHUB_EVENT_NAME=pull_request GITHUB_HEAD_REF=pr-branch \
-    GITHUB_EVENT_PATH="$WORK/event.json" run_ref commit
+  PODFILE_LOCK="$WORK/repo/podlock-release" T_EVENT_NAME=pull_request T_HEAD_REF=pr-branch \
+    T_EVENT_PATH="$WORK/event.json" run_ref commit
 )"
 
 # ---------------------------------------------------------------- misc
 
 out="$WORK/out.json"
-REPO_ROOT="$WORK/repo" PUBSPEC="$WORK/repo/pubspec.yaml" EXAMPLE_PUBSPEC="$WORK/repo/example-pubspec.yaml" \
+env -u GITHUB_REF_TYPE -u GITHUB_HEAD_REF -u GITHUB_EVENT_NAME -u GITHUB_EVENT_PATH \
+  REPO_ROOT="$WORK/repo" PUBSPEC="$WORK/repo/pubspec.yaml" EXAMPLE_PUBSPEC="$WORK/repo/example-pubspec.yaml" \
   PODFILE_LOCK="$WORK/repo/podlock-release" PODFILE=/dev/null PODSPEC="$WORK/repo/podspec" \
   ANDROID_BUILD_GRADLE="$WORK/repo/build-gradle-release" ANDROID_SETTINGS_GRADLE="$WORK/repo/settings-plain.gradle" \
   ANDROID_LS_REMOTE_CMD="$WORK/ls-remote" GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \

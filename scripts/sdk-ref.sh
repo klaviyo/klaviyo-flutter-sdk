@@ -74,7 +74,7 @@ resolve_flutter_ref() {
   fi
 
   # PR builds: report the head branch and head sha, not the merge commit.
-  if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
+  if [ -n "${GITHUB_EVENT_NAME:-}" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
     branch="${GITHUB_HEAD_REF:-}"
     if [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
       local head_sha
