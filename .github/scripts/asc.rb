@@ -27,6 +27,7 @@ require 'net/http'
 require 'openssl'
 require 'base64'
 require 'uri'
+require 'timeout'
 
 API = ENV.fetch('ASC_API_ROOT', 'https://api.appstoreconnect.apple.com')
 
@@ -51,6 +52,7 @@ end
 
 ASC_OPEN_TIMEOUT = Integer(ENV.fetch('ASC_OPEN_TIMEOUT', '15'))
 ASC_READ_TIMEOUT = Integer(ENV.fetch('ASC_READ_TIMEOUT', '60'))
+ASC_TOTAL_TIMEOUT = Integer(ENV.fetch('ASC_TOTAL_TIMEOUT', '120'))
 
 def request(method, url, body = nil)
   uri = URI(url.start_with?('http') ? url : "#{API}#{url}")
@@ -60,7 +62,9 @@ def request(method, url, body = nil)
     req['Content-Type'] = 'application/json'
     req.body = body.to_json
   end
-  res = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: ASC_OPEN_TIMEOUT, read_timeout: ASC_READ_TIMEOUT, write_timeout: ASC_READ_TIMEOUT) { |h| h.request(req) }
+  res = Timeout.timeout(ASC_TOTAL_TIMEOUT) do
+    Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: ASC_OPEN_TIMEOUT, read_timeout: ASC_READ_TIMEOUT, write_timeout: ASC_READ_TIMEOUT) { |h| h.request(req) }
+  end
   [res.code.to_i, res.body.to_s.empty? ? {} : JSON.parse(res.body)]
 end
 

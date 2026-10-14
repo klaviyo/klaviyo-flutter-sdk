@@ -30,10 +30,33 @@ ANDROID_BUILD_GRADLE="${ANDROID_BUILD_GRADLE:-$REPO_ROOT/android/build.gradle}"
 ANDROID_SETTINGS_GRADLE="${ANDROID_SETTINGS_GRADLE:-$REPO_ROOT/example/android/settings.gradle}"
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
 ANDROID_REPO="https://github.com/klaviyo/klaviyo-android-sdk.git"
-ANDROID_LS_REMOTE_CMD="${ANDROID_LS_REMOTE_CMD:-git -c http.connectTimeout=15 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $ANDROID_REPO}"
-IOS_LS_REMOTE_CMD="${IOS_LS_REMOTE_CMD:-git -c http.connectTimeout=15 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $SWIFT_REPO}"
+ANDROID_LS_REMOTE_CMD="${ANDROID_LS_REMOTE_CMD:-git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $ANDROID_REPO}"
+IOS_LS_REMOTE_CMD="${IOS_LS_REMOTE_CMD:-git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $SWIFT_REPO}"
+LS_REMOTE_DEADLINE="${LS_REMOTE_DEADLINE:-15}"
 OUT="${1:-$REPO_ROOT/example/build-info.json}"
 SHORT=7
+
+# ls_remote <command...>: runs a git ls-remote command with a hard deadline, because git has no connect
+# timeout and a dead remote would otherwise hold the build for over a minute. Prints its stdout; a timeout
+# prints nothing and returns 124, which callers treat like an unreachable remote. Needs no timeout(1).
+ls_remote() {
+  local out pid watcher rc=0
+  out="$(mktemp)"
+  "$@" > "$out" 2> /dev/null < /dev/null &
+  pid=$!
+  ( sleep "$LS_REMOTE_DEADLINE"; pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null ) > /dev/null 2>&1 &
+  watcher=$!
+  wait "$pid" 2>/dev/null || rc=$?
+  kill "$watcher" 2>/dev/null || true
+  wait "$watcher" 2>/dev/null || true
+  if [ "$rc" -eq 143 ] || [ "$rc" -eq 137 ]; then
+    rm -f "$out"
+    return 124
+  fi
+  cat "$out"
+  rm -f "$out"
+  return "$rc"
+}
 
 is_semver() {
   [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
@@ -121,7 +144,8 @@ resolve_ios_pod_lock() {
     if [ -n "$commit" ]; then
       # Commit pin: report the branch only if the commit is still its head.
       local heads
-      heads="$($IOS_LS_REMOTE_CMD 2>/dev/null \
+      # shellcheck disable=SC2086
+      heads="$(ls_remote $IOS_LS_REMOTE_CMD \
         | awk -v c="$commit" 'index($1, c) == 1 {sub("refs/heads/", "", $2); print $2}' \
         | sort || true)"
       local best
@@ -229,7 +253,8 @@ resolve_android_ref() {
     # Commit pin via JitPack: report the branch only when the commit is a
     # current head (master first, then release branches).
     local heads
-    heads="$($ANDROID_LS_REMOTE_CMD 2>/dev/null \
+    # shellcheck disable=SC2086
+    heads="$(ls_remote $ANDROID_LS_REMOTE_CMD \
       | awk -v c="$coordinate" 'index($1, c) == 1 {sub("refs/heads/", "", $2); print $2}' \
       | sort || true)"
     local best
@@ -249,7 +274,8 @@ resolve_android_ref() {
       # JitPack builds the branch head; `~` encodes `/`.
       local branch sha
       branch="$(printf '%s' "${coordinate%-SNAPSHOT}" | tr '~' '/')"
-      sha="$($ANDROID_LS_REMOTE_CMD "$branch" 2>/dev/null | awk '{print $1}' | head -1)"
+      # shellcheck disable=SC2086
+      sha="$(ls_remote $ANDROID_LS_REMOTE_CMD "$branch" | awk '{print $1}' | head -1)"
       if [ -n "$sha" ]; then
         printf '%s@%s' "$branch" "$(printf '%s' "$sha" | cut -c1-$SHORT)"
       else

@@ -34,6 +34,7 @@ def run_asc(args, responses: [])
       Net::HTTP.define_singleton_method(:start) do |_host, _port, **opts, &blk|
         http = Object.new
         http.define_singleton_method(:request) do |req|
+          sleep ENV['STUB_DELAY'].to_f if ENV['STUB_DELAY']
           $log << {
             'opts' => opts.transform_keys(&:to_s),
             'method' => req.method,
@@ -340,6 +341,21 @@ describe 'asc.rb' do
           assert_equal 60, r['opts']['write_timeout']
         end
       end
+    end
+
+    it 'abandons a request that outlives the total deadline' do
+      ENV['STUB_DELAY'] = '30'
+      ENV['ASC_TOTAL_TIMEOUT'] = '1'
+      started = Time.now
+      apps = { 'code' => 200, 'body' => { 'data' => [{ 'id' => 'app1' }] } }
+      run_asc(['next-build-number', '0.3.1'], responses: [apps]) do |_key, _out, rc, _requests, _env, err|
+        refute_equal 0, rc
+        assert_match(/execution expired/, err)
+        assert_operator Time.now - started, :<, 20
+      end
+    ensure
+      ENV.delete('STUB_DELAY')
+      ENV.delete('ASC_TOTAL_TIMEOUT')
     end
   end
 

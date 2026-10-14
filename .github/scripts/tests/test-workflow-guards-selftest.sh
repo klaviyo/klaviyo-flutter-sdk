@@ -161,7 +161,7 @@ i = s.index("      - name: Lint composite action shell")
 s = s[:i] + "      - name: Probe\n        run: echo " + os.environ["JUNK"] + "\n\n" + s[i:]
 '
   if [ "$3" = fail ]; then
-    expect_fail "$1" "no run script interpolates a branch, tag, release"
+    expect_fail "$1" "run scripts interpolate only trusted contexts"
   else
     expect_pass "$1"
   fi
@@ -176,6 +176,12 @@ inject_case "a job output in a run script is caught" '${{ needs.deploy-ios.outpu
 inject_case "a workflow input in a run script is caught" '${{ inputs.platform }}' fail
 inject_case "an env context value in a run script is caught" '${{ env.SOURCE_LABEL }}' fail
 inject_case "the case-insensitive spelling of a context is caught" '${{ GitHub.Head_Ref }}' fail
+inject_case "a head commit message in a run script is caught" '${{ github.event.head_commit.message }}' fail
+inject_case "the actor in a run script is caught" '${{ github.actor }}' fail
+inject_case "a context the denylist never named is caught" '${{ github.event.workflow_run.head_branch }}' fail
+inject_case "the repository in a run script is allowed" '${{ github.repository }}' pass
+inject_case "the repository owner in a run script is allowed" '${{ github.repository_owner }}' pass
+inject_case "the commit sha in a run script is allowed" '${{ github.sha }}' pass
 inject_case "the action path in a run script is allowed" '${{ github.action_path }}' pass
 inject_case "the runner temp directory in a run script is allowed" '${{ runner.temp }}' pass
 inject_case "the run id in a run script is allowed" '${{ github.run_id }}' pass
@@ -189,7 +195,7 @@ import os
 i = s.index("      - name: Lint composite action shell")
 s = s[:i] + "      - name: Probe\n        run: " + os.environ["JUNK"] + "\n            echo ${{ github.head_ref }}\n\n" + s[i:]
 '
-  expect_fail "$1" "no run script interpolates a branch, tag, release"
+  expect_fail "$1" "run scripts interpolate only trusted contexts"
 }
 header_case "a run: | block is scanned" '|'
 header_case "a run: |- block is scanned" '|-'
@@ -212,6 +218,23 @@ expect_fail "dropping the bundler entry from dependabot is caught" "pinned gems 
 fresh_copy
 edit "$TMP/repo/.github/dependabot.yml" 's = s.replace("      - /.github/actions/*\n", "", 1) + "    # bundler below lists /.github/actions/notify-slack-publish\n"'
 expect_fail "directories outside the github-actions entry do not count" "dependabot watches the workflows and every composite action directory"
+
+fresh_copy
+edit "$W/publish-example-checks.yml" '
+i = s.index("      - name: Lint composite action shell")
+s = s[:i] + "      - name: Probe\n        run: |\n          # ${{ github.event.release.body }}\n          true\n\n" + s[i:]
+'
+expect_fail "an expression on a shell comment line is caught" "run scripts interpolate only trusted contexts"
+
+# --- every job has a timeout
+
+fresh_copy
+edit "$TMP/repo/.github/workflows/test.yml" 's = s.replace("    timeout-minutes: 30\n", "", 1)'
+expect_fail "a reusable test job without timeout-minutes is caught" "every job that runs steps sets timeout-minutes"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("    timeout-minutes: 5\n", "", 1)'
+expect_fail "a deploy workflow job without timeout-minutes is caught" "every job that runs steps sets timeout-minutes"
 
 # a secret in an env: block is the safe form and must not be flagged
 fresh_copy

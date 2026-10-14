@@ -243,15 +243,14 @@ report(bool(globs) and scripts_seen > 0 and not uncovered,
 # --- script injection ---------------------------------------------------------
 
 # A ${{ }} inside a run: script is substituted into the shell text BEFORE the shell runs, so a value an
-# attacker controls (a branch or tag name, a PR title, a release name or body, or a step output derived
-# from one) executes: a branch named $(curl ...) runs the command. Pass it through env: and use "$VAR".
-# Paths the runner itself defines (github.action_path, github.workspace, runner.*, github.run_id and the
-# like) are not attacker controlled and are allowed.
-UNTRUSTED = re.compile(
-    r"github\.(?:head_ref|ref_name|ref|base_ref|event\.(?:release|pull_request|issue|comment|head_commit|"
-    r"commits|workflow_run|review|pages|client_payload|inputs)\b|actor\b)|"
-    r"\binputs\.|steps\.[A-Za-z0-9_-]+\.outputs\.|needs\.[A-Za-z0-9_-]+\.outputs\.|"
-    r"\benv\.", re.I)
+# attacker controls (a branch or tag name, a PR title, a release name or body, an actor, a commit message
+# or a step output derived from one) executes: a branch named $(curl ...) runs the command. Pass it
+# through env: and use "$VAR". Only this short allowlist of contexts the runner or GitHub fixes itself may
+# appear in run text, and comment lines are checked too, because the substitution happens before the shell
+# decides a line is a comment (a newline in the value ends the comment).
+TRUSTED_EXPRESSION = re.compile(
+    r"\s*(?:github\.(?:action_path|run_id|run_number|run_attempt|sha|repository|repository_owner|server_url|workspace)"
+    r"|runner\.[a-z_]+|job\.status)\s*", re.I)
 
 
 # A YAML block scalar header: | or >, then an indentation digit and a chomping sign in either order,
@@ -286,13 +285,11 @@ run_lines_seen = 0
 for path in all_paths:
     for number, line in run_script_lines(read(path)):
         run_lines_seen += 1
-        if line.lstrip().startswith("#"):
-            continue
         for expression in re.findall(r"\$\{\{(.*?)\}\}", line):
-            if UNTRUSTED.search(expression):
+            if not TRUSTED_EXPRESSION.fullmatch(expression):
                 injection.append(f"{os.path.relpath(path, ROOT)}:{number}: ${{{{{expression}}}}} in a run script")
 report(run_lines_seen > 0 and not injection,
-       f"no run script interpolates a branch, tag, release, pull request, input or step output ({run_lines_seen} script lines)",
+       f"run scripts interpolate only trusted contexts, never a branch, tag, release, pull request, input, actor or step output ({run_lines_seen} script lines)",
        "\n".join(injection) + "\nmove the value into env: and use \"$VAR\"")
 
 # --- portability -------------------------------------------------------------
@@ -330,6 +327,23 @@ for path in script_files:
                 found.append(f"{os.path.relpath(path, ROOT)}:{number}: {label}: {line.strip()[:90]}")
 report(not found, f"no scripts use flags that exist on only one of macOS and Linux ({len(script_files)} files scanned)",
        "\n".join(found))
+
+# --- job timeouts --------------------------------------------------------------
+
+# A job without timeout-minutes can hold a runner for the default six hours. Every job that runs steps,
+# in every workflow the deploy runs or calls, sets one. A job that only calls a reusable workflow cannot.
+missing_timeout = []
+for name in ("publish-example.yml", "publish-example-checks.yml", "test.yml", "lint.yml", "version-check.yml"):
+    wf = os.path.join(WORKFLOW_DIR, name)
+    if not os.path.exists(wf):
+        missing_timeout.append(f"{name}: file not found")
+        continue
+    for job_id, job_text in split_jobs(read(wf)).items():
+        if re.search(r"(?m)^    uses:", job_text):
+            continue
+        if not re.search(r"(?m)^    timeout-minutes:\s*\d+\s*$", job_text):
+            missing_timeout.append(f"{name}: {job_id}")
+report(not missing_timeout, "every job that runs steps sets timeout-minutes", "no timeout-minutes: " + ", ".join(missing_timeout))
 
 # --- network timeouts ----------------------------------------------------------
 

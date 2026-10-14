@@ -207,6 +207,14 @@ check "ios: commit pin that is a branch head" "master@deadbee" "$(FAKE_HEADS="$W
 printf '0000000000000000000000000000000000000000\trefs/heads/master\n' > "$WORK/heads-other"
 check "ios: commit pin that is not a head" "deadbee" "$(FAKE_HEADS="$WORK/heads-other" IOS_LS_REMOTE_CMD="$WORK/ls-remote" run_ref iosSdkRef)"
 
+# A remote that never answers is cut off at the deadline and the ref degrades like an unreachable remote.
+printf '#!/bin/sh\nsleep 30\n' > "$WORK/ls-remote-hang"
+chmod +x "$WORK/ls-remote-hang"
+PODFILE_LOCK="$WORK/repo/podlock-commit"
+started="$(date +%s)"
+check "ios: a hung remote degrades to the bare commit" "deadbee" "$(LS_REMOTE_DEADLINE=1 IOS_LS_REMOTE_CMD="$WORK/ls-remote-hang" run_ref iosSdkRef)"
+check "ios: a hung remote was cut off within seconds" "yes" "$([ $(( $(date +%s) - started )) -lt 15 ] && echo yes || echo no)"
+
 PODFILE_LOCK="$WORK/repo/podlock-local"
 check "ios: local path pod" "local:feat/widgets@$SWIFT_LOCAL_SHA" "$(run_ref iosSdkRef)"
 
