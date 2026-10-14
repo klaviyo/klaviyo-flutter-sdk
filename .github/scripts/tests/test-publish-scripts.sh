@@ -42,6 +42,11 @@ while [ "$#" -gt 0 ]; do
 done
 path="${url#*applications/*/}"
 echo "$method $path" >> "$FAKE_PLAY/calls"
+if [[ "$url" == *internalappsharing* ]]; then
+  printf '%s' '{"downloadUrl":"https://play.google.com/apps/internaltest/abc123"}' > "$out"
+  printf '200'
+  exit 0
+fi
 read_n() { cat "$FAKE_PLAY/$1" 2>/dev/null || echo 0; }
 dec() { echo $(( $(read_n "$1") - 1 )) > "$FAKE_PLAY/$1"; }
 code=200 body='{}'
@@ -134,6 +139,14 @@ check "play: release name sent" "1.2.3 (42) 0123456" "$(jq -r '.releases[0].name
 reset_play 41; echo 5 > "$WORK/play/conflicts"
 if run_play >/dev/null 2>&1; then fail "play: stops after max attempts"; else pass "play: stops after max attempts"; fi
 check "play: three builds attempted" 3 "$(wc -l < "$WORK/play/builds" | tr -d ' ')"
+
+# Internal App Sharing upload returns the download URL.
+reset_play 41
+out="$(FAKE_PLAY="$WORK/play" PATH="$WORK/bin:$PATH" PACKAGE_NAME=com.example PLAY_ACCESS_TOKEN=fake \
+  PLAY_API_ROOT=https://play.test AAB_PATH="$WORK/app.aab" \
+  "$SCRIPTS/play-publish.sh" share 2>/dev/null)"
+check "play: share prints the Internal App Sharing URL" \
+  "https://play.google.com/apps/internaltest/abc123" "$out"
 
 # ---------------------------------------------------------------- fake altool
 cat > "$WORK/bin/altool" <<'FAKE'

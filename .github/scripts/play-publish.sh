@@ -192,8 +192,25 @@ deploy() {
   exit 1
 }
 
+# share: upload AAB_PATH to Internal App Sharing and print the download URL.
+share() {
+  : "${AAB_PATH:?AAB_PATH is required}"
+  TOKEN="$(access_token)"
+  api POST "$PLAY_API_ROOT/upload/internalappsharing/$PACKAGE_NAME/artifacts/bundle?uploadType=media" \
+    -H 'Content-Type: application/octet-stream' --data-binary "@$AAB_PATH"
+  api_ok || fail "Internal App Sharing upload failed"
+  local url
+  url="$(jq -r '.downloadUrl // empty' "$RESPONSE_FILE")"
+  if [ -z "$url" ]; then
+    echo "::warning::Internal App Sharing did not return a download URL" >&2
+    exit 1
+  fi
+  echo "$url"
+}
+
 case "${1:-}" in
   next-version-code) next_version_code ;;
   deploy) shift; deploy "$@" ;;
-  *) echo "usage: $0 next-version-code | deploy -- <build command...>" >&2; exit 2 ;;
+  share) share ;;
+  *) echo "usage: $0 next-version-code | deploy -- <build command...> | share" >&2; exit 2 ;;
 esac

@@ -318,6 +318,17 @@ jobs:
           ../.github/scripts/play-publish.sh deploy -- \
             bash -c '../.github/scripts/gradle-retry.sh flutter build appbundle --release --build-name="$SDK_VERSION" --build-number="$VERSION_CODE" --dart-define-from-file=build-info.json'
 
+      # Uploads the published bundle to Internal App Sharing for the Slack
+      # install link; a sharing failure must not fail a deploy that landed.
+      - name: Upload to Internal App Sharing
+        if: success() && inputs.check_credentials != true
+        id: internal_sharing
+        continue-on-error: true
+        env:
+          PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
+          AAB_PATH: example/build/app/outputs/bundle/release/app-release.aab
+        run: echo "url=$(.github/scripts/play-publish.sh share)" >> "$GITHUB_OUTPUT"
+
       - name: Clean up signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks" example/android/key.properties
@@ -332,10 +343,12 @@ jobs:
           version_label: ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }})
           source_label: ${{ env.SOURCE_LABEL }}
           sdk_info: ${{ env.SDK_INFO }}
-          # Only resolves for Google accounts on the internal testers list.
-          access_url: https://play.google.com/apps/test/${{ env.ANDROID_PACKAGE }}/${{ env.VERSION_CODE }}
+          # Internal App Sharing when the upload worked; otherwise the
+          # internal-track link, which only resolves for Google accounts on
+          # the internal testers list.
+          access_url: ${{ steps.internal_sharing.outputs.url || format('https://play.google.com/apps/test/{0}/{1}', env.ANDROID_PACKAGE, env.VERSION_CODE) }}
           access_label: Install from Play (internal testers)
-          install_notes: Install ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }}) from the link with a Google account on the internal testers list.
+          install_notes: Install ${{ env.SDK_VERSION }} (${{ env.VERSION_CODE }}) with a Google account on the internal testers list.
 
       - name: Notify Slack on failure
         if: failure()
