@@ -31,8 +31,10 @@ run_secrets() {
     pairs+=("$s=SECRET-VALUE-$s")
   done
   local out rc
+  # ${pairs[@]+"${pairs[@]}"} expands to nothing for an empty array; bash 3.2 treats a bare
+  # "${pairs[@]}" on an empty array as an unbound variable under set -u.
   out="$(env -i PATH="$PATH" GITHUB_OUTPUT="$WORK/ghout" EVENT_NAME="$event" \
-    "${pairs[@]}" \
+    ${pairs[@]+"${pairs[@]}"} \
     bash "$SCRIPTS/check-secrets.sh" "$platform" 2>&1)" && rc=0 || rc=$?
   local ready
   ready="$(grep '^ready=' "$WORK/ghout" 2>/dev/null | cut -d= -f2)"
@@ -61,7 +63,8 @@ out=All android deploy secrets are present" "$result"
 done
 
 # One missing on push -> skip quietly, exit 0, notice names the missing one.
-mapfile -t ios_no_p12 < <(without P12_PASSWORD "${IOS_SECRETS[@]}")
+ios_no_p12=()
+while IFS= read -r line; do ios_no_p12+=("$line"); done < <(without P12_PASSWORD "${IOS_SECRETS[@]}")
 result="$(run_secrets ios push "${ios_no_p12[@]}")"
 check "secrets: push with one missing skips green" "rc=0" "$(head -1 <<<"$result")"
 check "secrets: ready=false" "ready=false" "$(sed -n 2p <<<"$result")"
@@ -72,7 +75,8 @@ else
 fi
 
 # One missing on release -> same skip.
-mapfile -t android_no_alias < <(without ALIAS "${ANDROID_SECRETS[@]}")
+android_no_alias=()
+while IFS= read -r line; do android_no_alias+=("$line"); done < <(without ALIAS "${ANDROID_SECRETS[@]}")
 result="$(run_secrets android release "${android_no_alias[@]}")"
 check "secrets: release with one missing skips green" "rc=0" "$(head -1 <<<"$result")"
 if grep -q '::notice::Skipping android deploy, missing secrets: ALIAS' <<<"$result"; then

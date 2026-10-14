@@ -352,19 +352,26 @@ fi
 
 # ---------------------------------------------------------------- tool preflight
 # A tool missing from the runner image must fail in seconds, before the expensive build, and name
-# the tool. These use the real `command -v` lookup against a PATH that genuinely lacks the tool (a
-# stub on PATH would hide it), and a build command that records whether it ever ran.
+# the tool. The scripts under test use the real `command -v` lookup, so each case runs them with a PATH
+# directory that holds only the tools that case provides. Tools the preflight merely looks for
+# (unzip, plutil, xcrun, gcloud, jq, curl) are empty executables made here, never links to the host's
+# copies: ubuntu runners have no plutil, xcrun or gcloud, and a test that needs them from the host
+# passes on a Mac and fails in CI. Only the tools the scripts actually run (bash and coreutils) are
+# linked from the host. A build command records whether it ever ran.
 REAL_BASH="$(command -v bash)"
-tool_dir() { # <dest> <tool...>: a PATH directory holding only the named tools, linked from the real ones
+BASE_TOOLS=(bash cat grep head tr sed seq mktemp rm mkdir date dirname basename env wc paste tail)
+# tool_dir <dest> <tool...>: a PATH directory holding the base tools (linked from the host, which every
+# runner has) plus an empty executable for each named tool.
+tool_dir() {
   local dest="$1"; shift
   rm -rf "$dest"; mkdir -p "$dest"
   local t
-  for t in "$@"; do ln -s "$(command -v "$t")" "$dest/$t"; done
+  for t in "${BASE_TOOLS[@]}"; do ln -s "$(command -v "$t")" "$dest/$t"; done
+  for t in "$@"; do printf '#!/bin/sh\nexit 0\n' > "$dest/$t"; chmod +x "$dest/$t"; done
 }
-BASE_TOOLS=(bash cat grep head tr sed seq mktemp rm mkdir date dirname basename env wc paste tail)
 
 reset_tf 0
-tool_dir "$WORK/path-no-unzip" "${BASE_TOOLS[@]}" plutil xcrun
+tool_dir "$WORK/path-no-unzip" plutil xcrun
 : > "$WORK/tf/build-ran"
 tf_without() { # <PATH dir> -- runs the real script with that PATH and a build that records it ran
   PATH="$1" FAKE_TF="$WORK/tf" IPA_PATH="$WORK/tf/Runner.ipa" \
@@ -375,15 +382,15 @@ expect_failure "testflight: a missing unzip fails before the build and names it"
   "needs these tools on PATH before it builds: unzip" tf_without "$WORK/path-no-unzip"
 check "testflight: the build never ran when a tool was missing" "0" "$(wc -l < "$WORK/tf/build-ran" | tr -d ' ')"
 
-tool_dir "$WORK/path-no-plutil" "${BASE_TOOLS[@]}" unzip xcrun
+tool_dir "$WORK/path-no-plutil" unzip xcrun
 expect_failure "testflight: a missing plutil fails before the build and names it" \
   "before it builds: plutil" tf_without "$WORK/path-no-plutil"
 
-tool_dir "$WORK/path-none" "${BASE_TOOLS[@]}"
+tool_dir "$WORK/path-none"
 expect_failure "testflight: every missing tool is named together" \
   "before it builds: unzip, plutil, xcrun" tf_without "$WORK/path-none"
 
-tool_dir "$WORK/path-ok" "${BASE_TOOLS[@]}" unzip plutil xcrun
+tool_dir "$WORK/path-ok" unzip plutil xcrun
 : > "$WORK/tf/build-ran"
 tf_without "$WORK/path-ok" >/dev/null 2>&1 || true
 check "testflight: with every tool present the check passes and the build runs" "1" "$(wc -l < "$WORK/tf/build-ran" | tr -d ' ')"
@@ -393,9 +400,9 @@ play_without() { # <PATH dir> [token]
   PATH="$1" PACKAGE_NAME=com.example PLAY_API_ROOT=https://play.test ${2:+PLAY_ACCESS_TOKEN=$2} \
     "$REAL_BASH" "$SCRIPTS/play-publish.sh" next-version-code
 }
-tool_dir "$WORK/path-play-nojq" "${BASE_TOOLS[@]}" curl gcloud
+tool_dir "$WORK/path-play-nojq" curl gcloud
 expect_failure "play: a missing jq fails first and names it" "play-publish.sh needs these tools on PATH: jq" play_without "$WORK/path-play-nojq"
-tool_dir "$WORK/path-play-nogcloud" "${BASE_TOOLS[@]}" curl jq
+tool_dir "$WORK/path-play-nogcloud" curl jq
 expect_failure "play: a missing gcloud is named when no token is supplied" "PATH: gcloud" play_without "$WORK/path-play-nogcloud"
 out="$(play_without "$WORK/path-play-nogcloud" tok 2>&1 || true)"
 check "play: gcloud is not required when a token is supplied" "0" "$(grep -c 'needs these tools' <<<"$out" | tr -d ' ')"
