@@ -49,10 +49,23 @@ jobs:
             && tar xzf actionlint.tar.gz actionlint
           ./actionlint .github/workflows/publish-example.yml .github/workflows/publish-example-checks.yml
 
+      # An Internal App Sharing path does not resolve for internal-track
+      # builds, so it must not come back as a "get the build" link. The checks
+      # workflow itself is excluded because it names the string it guards.
       - name: The removed internal-track link format stays gone
         run: |
-          ! grep -R 'play.google.com/apps/test' .github/ \
-            || { echo "::error::play.google.com/apps/test is an Internal App Sharing path and does not resolve for internal-track builds"; exit 1; }
+          check() {
+            if grep -R -n -F 'play.google.com/apps/test' --exclude=publish-example-checks.yml "$@"; then
+              return 1
+            fi
+          }
+          printf 'url: https://play.google.com/apps/test/pkg/1\n' > "$RUNNER_TEMP/bad-link.yml"
+          if check "$RUNNER_TEMP/bad-link.yml"; then
+            echo "::error::self-test: the link check let the removed format through"
+            exit 1
+          fi
+          check .github \
+            || { echo "::error::play.google.com/apps/test does not resolve for internal-track builds; use the Internal App Sharing link or instructions"; exit 1; }
 
       # String slicing is unavailable in GitHub expressions; sha7 values come
       # from a shell step instead. Only flag slicing inside ${{ }} so shell
