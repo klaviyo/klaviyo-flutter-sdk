@@ -73,7 +73,7 @@ jobs:
       - name: No string slicing inside GitHub expressions
         run: |
           check() {
-            if grep -R -n -E '\$\{\{[^}]*[[:<:]](substr|substring|slice)[[:space:]]*\(' "$@"; then
+            if grep -R -n -E '\$\{\{[^}]*\b(substr|substring|slice)[[:space:]]*\(' "$@"; then
               return 1
             fi
           }
