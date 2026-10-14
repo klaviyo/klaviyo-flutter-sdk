@@ -205,6 +205,24 @@ fresh_copy
 edit "$DEPLOY" 's = s.replace("          ref: ${{ github.event.pull_request.head.sha || github.sha }}", "          ref: ${{ github.sha }}", 1)'
 expect_fail "building the merge commit is caught" "builds the pull request head, not the merge commit"
 
+# --- notes inputs
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("          RELEASE_BODY: ${{ github.event.release.body }}\n          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n          NOTES_CMD:", "          NOTES_CMD:", 1)'
+expect_fail "an Android notes command without the release body and run url is caught" "the deploy-android notes command gets"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("\"$RUNNER_TEMP/release-body.txt\"\x27", "/dev/null\x27", 1) if False else s.replace("release-notes.sh 500 android build-info.json \"$BUILD_NUMBER\" \"$RUNNER_TEMP/release-body.txt\"", "release-notes.sh 500 android build-info.json \"$BUILD_NUMBER\" /dev/null", 1)'
+expect_fail "an Android notes command that passes /dev/null as the body is caught" "the deploy-android notes command gets"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("set-whats-new \"$IOS_MARKETING_VERSION\" \"$BUILD_NUMBER\"", "set-whats-new \"$BUILD_NUMBER\"", 1)'
+expect_fail "a What to Test lookup by build number alone is caught" "what-to-test looks the build up by the iOS marketing version"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("            echo \"ios_marketing_version=$IOS_MARKETING_VERSION\"\n", "", 1)'
+expect_fail "a missing stripped marketing version output is caught" "the deploy-ios result step exports the stripped marketing version"
+
 # --- gating
 
 fresh_copy

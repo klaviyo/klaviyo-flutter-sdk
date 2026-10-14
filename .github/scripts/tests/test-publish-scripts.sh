@@ -140,6 +140,31 @@ reset_play 41; echo 2 > "$WORK/play/conflicts"
 out="$(RELEASE_NAME_PREFIX='1.2.3' RELEASE_NAME_SUFFIX='0123456' run_play 2>/dev/null)"
 check "play: release name follows the retried code" "1.2.3 (44) 0123456" "$(jq -r '.releases[0].name' "$WORK/play/track_body")"
 
+# Play: NOTES_CMD, run the way the workflow sets it, carries the source, event,
+# release body and CI run into the notes that reach Play, with the shipped code.
+write_notes_info() {
+  cat > "$1" <<'JSON'
+{"sdkVersion":"1.2.3","appVersion":"1.2.3","flutterSdkRef":"1.2.3","androidSdkVersion":"4.5.1","androidSdkRef":"4.5.1","commitShort":"0123456","buildDate":"2026-10-13 12:00 UTC"}
+JSON
+}
+write_notes_info "$WORK/notes-bi.json"
+reset_play 41
+NOTES_CMD_VALUE='printf '"'"'%s'"'"' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt" && '"$SCRIPTS"'/release-notes.sh 500 android '"$WORK"'/notes-bi.json "$BUILD_NUMBER" "$RUNNER_TEMP/release-body.txt"'
+out="$(RUNNER_TEMP="$WORK" RELEASE_BODY='Fixed the thing' SOURCE_LABEL='release 1.2.3' EVENT_NAME=release \
+  RUN_URL='https://example.com/run/1' NOTES_CMD="$NOTES_CMD_VALUE" run_play 2>/dev/null)"
+sent="$(jq -r '.releases[0].releaseNotes[0].text' "$WORK/play/track_body")"
+check "play: notes carry the source and event" "1" "$(grep -c '^Commit: 0123456 on release 1.2.3 (release)$' <<<"$sent" | tr -d ' ')"
+check "play: notes carry the release body" "1" "$(grep -c '^Fixed the thing$' <<<"$sent" | tr -d ' ')"
+check "play: notes carry the shipped build number" "Flutter Example 1.2.3 (42)" "$(head -1 <<<"$sent")"
+check "play: notes carry the CI run" "1" "$(grep -c '^CI run: https://example.com/run/1$' <<<"$sent" | tr -d ' ')"
+check "play: notes never show a placeholder source" "0" "$(grep -c 'on — (' <<<"$sent" | tr -d ' ')"
+reset_play 41; echo 1 > "$WORK/play/conflicts"
+out="$(RUNNER_TEMP="$WORK" RELEASE_BODY='Fixed the thing' SOURCE_LABEL='release 1.2.3' EVENT_NAME=release \
+  RUN_URL='https://example.com/run/1' NOTES_CMD="$NOTES_CMD_VALUE" run_play 2>/dev/null)"
+sent="$(jq -r '.releases[0].releaseNotes[0].text' "$WORK/play/track_body")"
+check "play: notes follow a retried versionCode" "Flutter Example 1.2.3 (43)" "$(head -1 <<<"$sent")"
+check "play: retried notes keep the release body" "1" "$(grep -c '^Fixed the thing$' <<<"$sent" | tr -d ' ')"
+
 # Play: gives up after MAX_ATTEMPTS.
 reset_play 41; echo 5 > "$WORK/play/conflicts"
 if run_play >/dev/null 2>&1; then fail "play: stops after max attempts"; else pass "play: stops after max attempts"; fi

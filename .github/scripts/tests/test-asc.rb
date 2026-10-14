@@ -158,7 +158,7 @@ describe 'asc.rb' do
       Dir.mktmpdir do |dir|
         notes = File.join(dir, 'notes.txt')
         File.write(notes, "What to test\nLine two")
-        run_asc(['set-whats-new', '9', notes], responses: [apps, build, none, created]) do |_key, out, rc, requests, _env|
+        run_asc(['set-whats-new', '0.3.2', '9', notes], responses: [apps, build, none, created]) do |_key, out, rc, requests, _env|
           assert_equal 0, rc, out
           post = requests.last
           assert_equal 'POST', post['method']
@@ -171,13 +171,54 @@ describe 'asc.rb' do
       end
     end
 
+    it 'looks the build up by marketing version as well as build number' do
+      none = { 'code' => 200, 'body' => { 'data' => [] } }
+      created = { 'code' => 201, 'body' => {} }
+      Dir.mktmpdir do |dir|
+        notes = File.join(dir, 'notes.txt')
+        File.write(notes, 'x')
+        run_asc(['set-whats-new', '0.3.2', '9', notes], responses: [apps, build, none, created]) do |_key, out, rc, requests, _env|
+          assert_equal 0, rc, out
+          lookup = requests.find { |r| r['path'].start_with?('/v1/builds?') }
+          refute_nil lookup
+          assert_includes lookup['path'], 'filter[preReleaseVersion.version]=0.3.2'
+          assert_includes lookup['path'], 'filter[version]=9'
+          assert_includes lookup['path'], 'filter[app]=app1'
+        end
+      end
+    end
+
+    it 'passes a prerelease-free marketing version, never the full SDK version' do
+      none = { 'code' => 200, 'body' => { 'data' => [] } }
+      created = { 'code' => 201, 'body' => {} }
+      Dir.mktmpdir do |dir|
+        notes = File.join(dir, 'notes.txt')
+        File.write(notes, 'x')
+        run_asc(['set-whats-new', '0.3.2', '12', notes], responses: [apps, build, none, created]) do |_key, _out, rc, requests, _env|
+          assert_equal 0, rc
+          lookup = requests.find { |r| r['path'].start_with?('/v1/builds?') }
+          refute_includes lookup['path'], 'alpha'
+        end
+      end
+    end
+
+    it 'fails without a marketing version argument' do
+      Dir.mktmpdir do |dir|
+        notes = File.join(dir, 'notes.txt')
+        File.write(notes, 'x')
+        run_asc(['set-whats-new', '9', notes], responses: [apps, build]) do |_key, _out, rc, _requests, _env|
+          refute_equal 0, rc
+        end
+      end
+    end
+
     it 'patches the existing en-US localization when present' do
       existing = { 'code' => 200, 'body' => { 'data' => [{ 'id' => 'loc1', 'attributes' => { 'locale' => 'en-US' } }] } }
       patched = { 'code' => 200, 'body' => {} }
       Dir.mktmpdir do |dir|
         notes = File.join(dir, 'notes.txt')
         File.write(notes, 'Updated notes')
-        run_asc(['set-whats-new', '9', notes], responses: [apps, build, existing, patched]) do |_key, out, rc, requests, _env|
+        run_asc(['set-whats-new', '0.3.2', '9', notes], responses: [apps, build, existing, patched]) do |_key, out, rc, requests, _env|
           assert_equal 0, rc, out
           patch = requests.last
           assert_equal 'PATCH', patch['method']

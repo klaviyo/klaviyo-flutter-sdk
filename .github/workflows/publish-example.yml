@@ -257,7 +257,11 @@ jobs:
           RELEASE_NAME_PREFIX: ${{ steps.buildinfo.outputs.sdk_version }}
           RELEASE_NAME_SUFFIX: ${{ steps.buildinfo.outputs.commit_short }}
           # Composed per attempt so a versionCode retry never ships stale notes.
-          NOTES_CMD: ../.github/scripts/release-notes.sh 500 android build-info.json "$BUILD_NUMBER" /dev/null
+          SOURCE_LABEL: ${{ steps.buildinfo.outputs.source_label }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          NOTES_CMD: printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.txt" && ../.github/scripts/release-notes.sh 500 android build-info.json "$BUILD_NUMBER" "$RUNNER_TEMP/release-body.txt"
         run: |
           flutter pub get
           # shellcheck disable=SC2016
@@ -344,6 +348,7 @@ jobs:
     outputs:
       build_number: ${{ steps.result.outputs.build_number }}
       marketing_version: ${{ steps.result.outputs.marketing_version }}
+      ios_marketing_version: ${{ steps.result.outputs.ios_marketing_version }}
       sdk_info: ${{ steps.result.outputs.sdk_info }}
       source_label: ${{ steps.result.outputs.source_label }}
       commit_sha: ${{ steps.result.outputs.commit_sha }}
@@ -485,6 +490,7 @@ jobs:
           {
             echo "build_number=${BUILD_NUMBER:-$INITIAL_BUILD_NUMBER}"
             echo "marketing_version=$(jq -r .sdkVersion "$BUILD_INFO_PATH")"
+            echo "ios_marketing_version=$IOS_MARKETING_VERSION"
             echo "sdk_info=$SDK_INFO"
             echo "source_label=$(jq -r .sourceLabel "$BUILD_INFO_PATH")"
             echo "commit_sha=$(jq -r .commit "$BUILD_INFO_PATH")"
@@ -584,6 +590,7 @@ jobs:
           BUILD_NUMBER: ${{ needs.deploy-ios.outputs.build_number }}
           SOURCE_LABEL: ${{ needs.deploy-ios.outputs.source_label }}
           SDK_VERSION: ${{ needs.deploy-ios.outputs.marketing_version }}
+          IOS_MARKETING_VERSION: ${{ needs.deploy-ios.outputs.ios_marketing_version }}
           FLUTTER_SDK_REF: ${{ needs.deploy-ios.outputs.flutter_sdk_ref }}
           IOS_SDK_VERSION: ${{ needs.deploy-ios.outputs.ios_sdk_version }}
           IOS_SDK_REF: ${{ needs.deploy-ios.outputs.ios_sdk_ref }}
@@ -609,7 +616,7 @@ jobs:
           # TestFlight allows 4000 characters.
           .github/scripts/release-notes.sh 4000 ios "$RUNNER_TEMP/build-info.json" "$BUILD_NUMBER" "$RUNNER_TEMP/release-body.txt" > "$RUNNER_TEMP/testflight-notes.txt"
           cat "$RUNNER_TEMP/testflight-notes.txt"
-          ruby .github/scripts/asc.rb set-whats-new "$BUILD_NUMBER" "$RUNNER_TEMP/testflight-notes.txt"
+          ruby .github/scripts/asc.rb set-whats-new "$IOS_MARKETING_VERSION" "$BUILD_NUMBER" "$RUNNER_TEMP/testflight-notes.txt"
 
       - name: Clean up signing material
         if: always()

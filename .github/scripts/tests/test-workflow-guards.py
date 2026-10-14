@@ -219,6 +219,22 @@ for job in ("deploy-android", "deploy-ios"):
     report("ref: ${{ github.event.pull_request.head.sha || github.sha }}" in checkout,
            f"the {job} job builds the pull request head, not the merge commit")
 
+# The notes are rendered from the same event fields and the release body the app is stamped with.
+build_step = next((b for b in split_steps(jobs.get("deploy-android", "")) if "id: build\n" in b), "")
+missing = [v for v in ("SOURCE_LABEL", "EVENT_NAME", "RELEASE_BODY", "RUN_URL", "NOTES_CMD") if f"{v}:" not in build_step]
+report(bool(build_step) and not missing and "/dev/null" not in build_step,
+       "the deploy-android notes command gets the event fields, run url and release body",
+       "missing: " + (", ".join(missing) or ("a /dev/null body" if "/dev/null" in build_step else "the build step")))
+
+# What to Test names the iOS marketing version, because build numbers restart for each one. The
+# job output for it must be the stripped value, not the full SDK version used for display.
+whats = next((b for b in split_steps(jobs.get("what-to-test", "")) if "id: notes" in b), "")
+report('set-whats-new "$IOS_MARKETING_VERSION"' in whats and "IOS_MARKETING_VERSION: ${{ needs.deploy-ios.outputs.ios_marketing_version }}" in whats,
+       "what-to-test looks the build up by the iOS marketing version, not just the build number")
+result = next((b for b in split_steps(jobs.get("deploy-ios", "")) if "id: result" in b), "")
+report('echo "ios_marketing_version=$IOS_MARKETING_VERSION"' in result,
+       "the deploy-ios result step exports the stripped marketing version separately from the display version")
+
 # --- gating ----------------------------------------------------------------
 
 for job in ("deploy-android", "deploy-ios"):

@@ -9,9 +9,11 @@
 #       Prints (highest CFBundleVersion uploaded for BUNDLE_ID with that
 #       marketing version) + 1 — build numbers restart per marketing version —
 #       and writes ASC_APP_ID=<id> to $GITHUB_ENV when set.
-#   asc.rb set-whats-new <build-number> <notes-file>
-#       Waits for the uploaded build to appear in App Store Connect, then sets
-#       its en-US TestFlight "What to Test" text.
+#   asc.rb set-whats-new <marketing-version> <build-number> <notes-file>
+#       Waits for that build of that marketing version to appear in App Store
+#       Connect, then sets its en-US TestFlight "What to Test" text. The
+#       marketing version is part of the lookup because build numbers restart
+#       for each marketing version.
 #
 # Env:
 #   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_KEY_ISSUER_ID
@@ -97,20 +99,24 @@ def next_build_number(marketing_version)
   puts highest + 1
 end
 
-def set_whats_new(build_number, notes_file)
+def set_whats_new(marketing_version, build_number, notes_file)
   notes = File.read(notes_file).strip
   id = app_id
   build = nil
+  # Build numbers restart for each marketing version, so the same number can
+  # exist under an older version; the lookup must name both.
+  filters = "filter[app]=#{id}&filter[preReleaseVersion.version]=#{URI.encode_www_form_component(marketing_version)}" \
+            "&filter[version]=#{build_number}&limit=1"
   # Builds usually appear within a few minutes of altool finishing.
   60.times do
-    page = get!("/v1/builds?filter[app]=#{id}&filter[version]=#{build_number}&limit=1")
+    page = get!("/v1/builds?#{filters}")
     build = page['data'].first
     break if build
 
-    warn "Build #{build_number} not visible in App Store Connect yet; waiting…"
+    warn "Build #{marketing_version} (#{build_number}) not visible in App Store Connect yet; waiting…"
     sleep 30
   end
-  raise "Build #{build_number} never appeared in App Store Connect" unless build
+  raise "Build #{marketing_version} (#{build_number}) never appeared in App Store Connect" unless build
 
   existing = get!("/v1/builds/#{build['id']}/betaBuildLocalizations")['data']
                 .find { |l| l['attributes']['locale'] == 'en-US' }
@@ -126,13 +132,13 @@ def set_whats_new(build_number, notes_file)
   end
   raise "Could not set What to Test: HTTP #{code}\n#{JSON.pretty_generate(json)}" unless code.between?(200, 299)
 
-  warn "Set What to Test for build #{build_number}"
+  warn "Set What to Test for build #{marketing_version} (#{build_number})"
 end
 
 case ARGV[0]
 when 'next-build-number' then next_build_number(ARGV.fetch(1))
-when 'set-whats-new' then set_whats_new(ARGV.fetch(1), ARGV.fetch(2))
+when 'set-whats-new' then set_whats_new(ARGV.fetch(1), ARGV.fetch(2), ARGV.fetch(3))
 else
-  warn 'usage: asc.rb next-build-number <marketing-version> | set-whats-new <build-number> <notes-file>'
+  warn 'usage: asc.rb next-build-number <marketing-version> | set-whats-new <marketing-version> <build-number> <notes-file>'
   exit 2
 end
