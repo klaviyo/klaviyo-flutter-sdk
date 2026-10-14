@@ -4,9 +4,8 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import '../build_info.dart';
 import '../main.dart' show setupSilentPushListener, setupPushActionListener;
-import '../widgets/build_info_card.dart';
+import '../widgets/build_info_button.dart';
 import 'forms_tab.dart';
 import 'geofencing_tab.dart';
 
@@ -40,7 +39,6 @@ class _ProfileTabState extends State<ProfileTab> {
   String? _currentEmail;
   String? _currentPhoneNumber;
   String? _currentExternalId;
-  BuildInfo? _buildInfo;
 
   static const String _apiKeyPrefsKey = 'klaviyo_api_key';
 
@@ -50,11 +48,6 @@ class _ProfileTabState extends State<ProfileTab> {
   void initState() {
     super.initState();
     _loadSavedApiKey();
-    BuildInfo.load().then((info) {
-      if (mounted) {
-        setState(() => _buildInfo = info);
-      }
-    });
   }
 
   Future<void> _loadSavedApiKey() async {
@@ -386,6 +379,7 @@ class _ProfileTabState extends State<ProfileTab> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
+        actions: const [BuildInfoButton()],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -637,13 +631,6 @@ class _ProfileTabState extends State<ProfileTab> {
                 ),
                 child: const Text('Reset SDK & Change API Key'),
               ),
-            ],
-
-            if (_buildInfo != null) ...[
-              const SizedBox(height: 20),
-              const Divider(),
-              const SizedBox(height: 10),
-              BuildInfoCard(info: _buildInfo!),
             ],
           ],
         ),
