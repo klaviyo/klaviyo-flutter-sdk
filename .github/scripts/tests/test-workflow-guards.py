@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+"""Static checks on the publish workflows that actionlint cannot make.
+
+Prints one PASS/FAIL line per case and exits 1 if any case fails.
+
+Env (used by the self-test):
+  WORKFLOW_DIR   directory with publish-example.yml and publish-example-checks.yml
+  ACTIONS_DIR    directory with the composite actions
+
+The workflows are read as text and sliced by indentation, so the checks depend
+neither on a YAML library nor on the awk dialect of the machine.
+"""
+
+import glob
+import os
+import re
+import sys
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+WORKFLOW_DIR = os.environ.get("WORKFLOW_DIR", os.path.join(ROOT, ".github", "workflows"))
+ACTIONS_DIR = os.environ.get("ACTIONS_DIR", os.path.join(ROOT, ".github", "actions"))
+DEPLOY_PATH = os.path.join(WORKFLOW_DIR, "publish-example.yml")
+CHECKS_PATH = os.path.join(WORKFLOW_DIR, "publish-example-checks.yml")
+SLACK_ACTION = "./.github/actions/notify-slack-publish"
+
+# Functions GitHub Actions expressions provide. Anything else called inside ${{ }}
+# fails when it evaluates, usually only after the upload has already happened.
+ALLOWED_FUNCTIONS = {
+    "contains", "startsWith", "endsWith", "format", "join", "toJSON", "fromJSON",
+    "hashFiles", "case", "success", "always", "cancelled", "failure",
+}
+
+SAME_REPO = "github.event.pull_request.head.repo.full_name == github.repository"
+
+failures = 0
+
+
+def read(path):
+    with open(path) as handle:
+        return handle.read()
+
+
+def report(ok, name, detail=""):
+    global failures
+    if ok:
+        print(f"PASS: {name}")
+        return
+    failures += 1
+    print(f"FAIL: {name}")
+    for line in detail.splitlines():
+        print(f"  | {line}")
+
+
+def split_jobs(text):
+    """Maps job id to the text of that top-level job."""
+    body = text.split("\njobs:\n", 1)[1]
+    parts = re.split(r"^  ([a-z][a-z0-9-]*):\n", body, flags=re.M)
+    return dict(zip(parts[1::2], parts[2::2]))
+
+
+def split_steps(job_text):
+    """The steps of a job as text blocks, each starting at its first key."""
+    return re.split(r"(?m)^      - ", job_text)[1:]
+
+
+def job_if(job_text):
+    """The job-level `if:` expression, including a multi-line block."""
+    match = re.search(r"(?ms)^    if:(.*?)(?=^    [a-z-]+:)", job_text)
+    return match.group(1) if match else ""
+
+
+def checkout_states(text):
+    """Yields (line number, safe) for each checkout. A checkout is safe when
+    persist-credentials: false appears anywhere in its own step, however far
+    below `uses:` the `with:` block puts it."""
+    lines = text.split("\n")
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)(- )?uses: actions/checkout@", line)
+        if not match:
+            continue
+        key_indent = len(match.group(1)) + (2 if match.group(2) else 0)
+        step_indent = len(match.group(1))
+        safe = False
+        for following in lines[index + 1:]:
+            if not following.strip():
+                continue
+            indent = len(following) - len(following.lstrip())
+            if indent < key_indent:
+                break
+            if indent == step_indent and re.match(r"^\s*- ", following):
+                break
+            if re.match(r"^\s*persist-credentials:\s*false\s*$", following):
+                safe = True
+        yield index + 1, safe
+
+
+def reusable_job(text, name):
+    """Job ids (in a workflow) that call a reusable workflow instead of running steps."""
+    return name in split_jobs(text) and "    uses: ./" in split_jobs(text)[name]
+
+
+deploy = read(DEPLOY_PATH)
+checks = read(CHECKS_PATH)
+jobs = split_jobs(deploy)
+action_paths = sorted(glob.glob(os.path.join(ACTIONS_DIR, "*", "action.yml")))
+slack_action_path = os.path.join(ACTIONS_DIR, "notify-slack-publish", "action.yml")
+slack_action = read(slack_action_path)
+workflow_paths = [DEPLOY_PATH, CHECKS_PATH]
+# Every workflow file the deploy workflow calls, because they run with the same trust.
+for called in re.findall(r"uses: \./\.github/workflows/([A-Za-z0-9_.-]+)", deploy):
+    workflow_paths.append(os.path.join(WORKFLOW_DIR, called))
+all_paths = workflow_paths + action_paths
+
+# --- expressions -----------------------------------------------------------
+
+def expressions(text):
+    """Every expression GitHub evaluates: ${{ }} spans, plus the bare values of `if:` keys
+    (a step or job `if:` has no ${{ }} and is evaluated as an expression all the same)."""
+    found = re.findall(r"\$\{\{.*?\}\}", text, flags=re.S)
+    for match in re.finditer(r"(?m)^(\s*)(?:- )?if:[ \t]*(\|[-+]?)?[ \t]*(.*)$", text):
+        indent, block, rest = len(match.group(1)), match.group(2), match.group(3)
+        if not block:
+            found.append(rest)
+            continue
+        lines = []
+        for following in text[match.end():].split("\n")[1:]:
+            if following.strip() and len(following) - len(following.lstrip()) <= indent:
+                break
+            lines.append(following)
+        found.append("\n".join(lines))
+    return found
+
+
+unsupported = set()
+for path in all_paths:
+    for expression in expressions(read(path)):
+        for name in re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\(", expression):
+            if name not in ALLOWED_FUNCTIONS:
+                unsupported.add(name)
+report(not unsupported, "expressions only call functions that GitHub Actions provides",
+       "unsupported: " + ", ".join(sorted(unsupported)))
+
+# --- checkouts -------------------------------------------------------------
+
+total = 0
+unsafe = []
+for path in all_paths:
+    for line, safe in checkout_states(read(path)):
+        total += 1
+        if not safe:
+            unsafe.append(f"{os.path.relpath(path, ROOT)}:{line}")
+report(total > 0 and not unsafe, f"every checkout sets persist-credentials: false ({total} checked)",
+       "unsafe:\n" + "\n".join(unsafe))
+
+for job in ("preflight-android", "preflight-ios", "deploy-android", "deploy-ios", "what-to-test"):
+    body = jobs.get(job)
+    if body is None:
+        report(False, f"the {job} job exists (the guard is out of date)")
+    else:
+        report("actions/checkout" in body, f"the {job} job checks out the repository")
+
+# --- Slack -----------------------------------------------------------------
+
+# Every Slack-posting step is found by the action it uses, never by its name. That covers the success
+# message, the notes warning and the failure notifier alike, in every job.
+slack_steps = [
+    (job, block)
+    for job, body in jobs.items()
+    for block in split_steps(body)
+    if f"uses: {SLACK_ACTION}" in block
+]
+intolerant = [f"{job}: {block.splitlines()[0]}" for job, block in slack_steps if "continue-on-error: true" not in block]
+report(bool(slack_steps) and not intolerant, f"every Slack step has continue-on-error ({len(slack_steps)} checked)",
+       "\n".join(intolerant) or "no Slack steps found")
+
+direct = [os.path.relpath(p, ROOT) for p in all_paths
+          if "slackapi/slack-github-action" in read(p) and p != slack_action_path]
+report(not direct, "Slack is only posted through the composite action, so every rule sees every message",
+       "direct use in: " + ", ".join(direct))
+
+yaml_payload = [os.path.relpath(p, ROOT) for p in all_paths if re.search(r"^\s*payload: \|", read(p), flags=re.M)]
+report(not yaml_payload and "payload-file-path:" in slack_action,
+       "the Slack payload is sent from a JSON file, not a YAML block",
+       ("YAML payload in: " + ", ".join(yaml_payload)) if yaml_payload else "no payload-file-path found")
+
+build_step = re.search(r"(?ms)^    - name: Build Slack payload\n(.*?)(?=^    - )", slack_action)
+report(bool(build_step) and "continue-on-error: true" in build_step.group(1),
+       "the Slack action tolerates a failure of its own payload step",
+       "the 'Build Slack payload' step is missing or has no continue-on-error")
+
+# A result the workflow can post must be one the payload script knows, for every platform.
+results = {}
+for job, block in slack_steps:
+    match = re.search(r"(?m)^\s+result: (\S+)", block)
+    platform = "android" if "android" in job else "ios"
+    results.setdefault(platform, set()).add(match.group(1) if match else "?")
+report(results.get("android", set()) >= {"success", "failure"} and results.get("ios", set()) >= {"success", "failure", "warning"},
+       "each platform posts a success and a failure, and iOS also posts a notes warning",
+       f"seen: {results}")
+
+# --- preflight -------------------------------------------------------------
+
+for job in ("preflight-android", "preflight-ios"):
+    body = jobs.get(job, "")
+    report(not re.search(r"(?m)^    environment:", body), f"the {job} job declares no environment")
+    report("SLACK_WEBHOOK_URL" not in body, f"SLACK_WEBHOOK_URL is not a required secret in {job}")
+
+# --- one source of event fields -------------------------------------------
+
+for job in ("deploy-android", "deploy-ios"):
+    stamping = next((b for b in split_steps(jobs.get(job, "")) if "scripts/sdk-ref.sh" in b and "id: buildinfo" in b), "")
+    needed = ("EVENT_NAME", "RELEASE_TAG", "HEAD_REF", "PR_NUMBER", "REF_NAME")
+    missing = [var for var in needed if f"{var}:" not in stamping]
+    report(bool(stamping) and not missing, f"the {job} stamping step sets the shared event fields",
+           "missing: " + (", ".join(missing) or "the stamping step itself"))
+
+for job in ("deploy-android", "deploy-ios"):
+    checkout = next((b for b in split_steps(jobs.get(job, "")) if "actions/checkout" in b), "")
+    report("ref: ${{ github.event.pull_request.head.sha || github.sha }}" in checkout,
+           f"the {job} job builds the pull request head, not the merge commit")
+
+# --- gating ----------------------------------------------------------------
+
+for job in ("deploy-android", "deploy-ios"):
+    body = jobs.get(job, "")
+    needs = re.search(r"(?m)^    needs: (.+)$", body)
+    gated = bool(needs) and "gate-test" in needs.group(1) and "gate-lint" in needs.group(1)
+    report(gated, f"the {job} job needs the test and lint gates")
+    condition = job_if(body)
+    report("needs.gate-test.result == 'success'" in condition and "needs.gate-lint.result == 'success'" in condition,
+           f"the {job} job requires the gates to have succeeded, not merely finished",
+           "a skipped gate would otherwise let the deploy through when check_credentials is off")
+
+for gate in ("gate-test", "gate-lint"):
+    report(reusable_job(deploy, gate), f"the {gate} job calls a reusable workflow")
+
+# --- fork pull requests ----------------------------------------------------
+
+# Every job a pull_request can reach needs the same-repo check itself, not only the first one in the
+# chain, so a fork PR with a deploy label cannot reach a job that holds store secrets.
+for job in ("gate-test", "gate-lint", "preflight-android", "preflight-ios", "deploy-android", "deploy-ios",
+            "what-to-test", "cleanup-label"):
+    report(SAME_REPO in job_if(jobs.get(job, "")), f"the {job} job requires a same-repo pull request")
+
+for job in ("gate-test", "gate-lint"):
+    report("startsWith(github.event.label.name, 'deploy-example-app')" in job_if(jobs.get(job, "")),
+           f"the {job} job only runs for a deploy label on pull requests")
+
+trigger = re.search(r"(?m)^  pull_request:\n((?:    .*\n)+)", deploy)
+report(bool(trigger) and re.search(r"types:\s*\[labeled\]", trigger.group(1)) is not None,
+       "the pull_request trigger is labeled only")
+
+report(re.search(r"(?m)^      always\(\)", jobs.get("cleanup-label", "")) is not None,
+       "the label cleanup runs with always()")
+
+# --- optional Slack webhook, secrets ---------------------------------------
+
+required = re.search(r'ios\)\n\s+required="([^"]+)"', read(os.path.join(ROOT, ".github", "scripts", "check-secrets.sh")))
+android = re.search(r'android\)\n\s+required="([^"]+)"', read(os.path.join(ROOT, ".github", "scripts", "check-secrets.sh")))
+report(bool(required) and bool(android) and "SLACK_WEBHOOK_URL" not in required.group(1) + android.group(1),
+       "check-secrets.sh never requires SLACK_WEBHOOK_URL")
+
+print()
+if failures:
+    print(f"{failures} test(s) failed")
+    sys.exit(1)
+print("All tests passed")

@@ -69,7 +69,9 @@ runs:
       run: echo "::notice::SLACK_WEBHOOK_URL is not set; skipping Slack notification"
 
     - name: Build Slack payload
+      id: payload
       if: inputs.webhook != ''
+      continue-on-error: true
       shell: bash
       env:
         RESULT: ${{ inputs.result }}
@@ -90,7 +92,7 @@ runs:
         RUN_ID: ${{ github.run_id }}
       run: ${{ github.action_path }}/../../scripts/slack-payload.sh > "$RUNNER_TEMP/slack-payload.json"
 
-    - if: inputs.webhook != ''
+    - if: inputs.webhook != '' && steps.payload.outcome == 'success'
       uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
       with:
         webhook: ${{ inputs.webhook }}

@@ -79,6 +79,15 @@ jobs:
       contents: read
 
   preflight-android:
+    # Only for the platform that was asked for: a manual ios-only run or a
+    # ios label must not fail on android's missing secrets, and an unrelated
+    # label must not start anything.
+    if: |
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name == 'push'
+        || github.event_name == 'release'
+        || (github.event_name == 'workflow_dispatch' && inputs.platform != 'ios')
+        || (github.event_name == 'pull_request' && (github.event.label.name == 'deploy-example-app' || github.event.label.name == 'deploy-example-app:android')))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
@@ -101,6 +110,15 @@ jobs:
         run: .github/scripts/check-secrets.sh android
 
   preflight-ios:
+    # Only for the platform that was asked for: a manual android-only run or a
+    # android label must not fail on ios's missing secrets, and an unrelated
+    # label must not start anything.
+    if: |
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name == 'push'
+        || github.event_name == 'release'
+        || (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
+        || (github.event_name == 'pull_request' && (github.event.label.name == 'deploy-example-app' || github.event.label.name == 'deploy-example-app:ios')))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
@@ -528,7 +546,9 @@ jobs:
     name: Set TestFlight "What to Test"
     needs: deploy-ios
     # Skipped deploy-ios (missing secrets) must not fail this job out.
-    if: needs.deploy-ios.result == 'success'
+    if: |
+      needs.deploy-ios.result == 'success'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     # The build already shipped; a notes problem warns in Slack and leaves the run green.
@@ -620,6 +640,7 @@ jobs:
     if: |
       always()
       && github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
       && startsWith(github.event.label.name, 'deploy-example-app')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
