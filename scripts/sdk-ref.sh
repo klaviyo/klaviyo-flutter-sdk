@@ -31,6 +31,7 @@ ANDROID_SETTINGS_GRADLE="${ANDROID_SETTINGS_GRADLE:-$REPO_ROOT/example/android/s
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
 ANDROID_REPO="https://github.com/klaviyo/klaviyo-android-sdk.git"
 ANDROID_LS_REMOTE_CMD="${ANDROID_LS_REMOTE_CMD:-git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $ANDROID_REPO}"
+IOS_LS_REMOTE_CMD="${IOS_LS_REMOTE_CMD:-git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --heads $SWIFT_REPO}"
 OUT="${1:-$REPO_ROOT/example/build-info.json}"
 SHORT=7
 
@@ -132,7 +133,7 @@ resolve_ios_pod_lock() {
     if [ -n "$commit" ]; then
       # Commit pin: report the branch only if the commit is still its head.
       local heads
-      heads="$($ANDROID_LS_REMOTE_CMD "$SWIFT_REPO" 2>/dev/null \
+      heads="$($IOS_LS_REMOTE_CMD 2>/dev/null \
         | awk -v c="$commit" 'index($1, c) == 1 {sub("refs/heads/", "", $2); print $2}' \
         | sort || true)"
       local best
@@ -280,32 +281,52 @@ IOS_REF="$(resolve_ios_ref)"
 ANDROID_REF="$(resolve_android_ref)"
 SDK_VERSION="$(grep '^version:' "$PUBSPEC" 2>/dev/null | awk '{print $2}' | cut -d+ -f1)"
 APP_VERSION="$(grep '^version:' "$EXAMPLE_PUBSPEC" 2>/dev/null | awk '{print $2}' | cut -d+ -f1)"
+
+# The commit and source label are stamped once here; every consumer
+# (dart-defines, release notes, Slack) reads them from the JSON so the
+# surfaces cannot diverge. On PR events both come from the PR head, never
+# the synthetic merge commit.
 COMMIT="${GITHUB_SHA:-$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)}"
-if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+if [ -n "${GITHUB_EVENT_NAME:-}" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
   HEAD_SHA="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["pull_request"]["head"]["sha"])' "$GITHUB_EVENT_PATH" 2>/dev/null)"
   [ -n "$HEAD_SHA" ] && COMMIT="$HEAD_SHA"
 fi
 BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)}}"
 BUILD_DATE="${BUILD_DATE:-$(date -u '+%Y-%m-%d %H:%M UTC')}"
 
+SOURCE_LABEL="${SOURCE_LABEL:-$("$(cd "$(dirname "$0")" && pwd)/../.github/scripts/source-label.sh" 2>/dev/null || echo '—')}"
+EVENT_NAME_OUT="${GITHUB_EVENT_NAME:-—}"
+
+# The native SDK version is known only when the ref is a release pin.
+IOS_SDK_VERSION="—"
+is_semver "$IOS_REF" && IOS_SDK_VERSION="$IOS_REF"
+ANDROID_SDK_VERSION="—"
+is_semver "$ANDROID_REF" && ANDROID_SDK_VERSION="$ANDROID_REF"
+
 mkdir -p "$(dirname "$OUT")"
 FLUTTER_REF="$FLUTTER_REF" IOS_REF="$IOS_REF" ANDROID_REF="$ANDROID_REF" \
+  IOS_SDK_VERSION="$IOS_SDK_VERSION" ANDROID_SDK_VERSION="$ANDROID_SDK_VERSION" \
   SDK_VERSION="$SDK_VERSION" APP_VERSION="$APP_VERSION" COMMIT="$COMMIT" \
-  BRANCH="$BRANCH" BUILD_DATE="$BUILD_DATE" OUT="$OUT" \
+  BRANCH="$BRANCH" BUILD_DATE="$BUILD_DATE" SOURCE_LABEL="$SOURCE_LABEL" \
+  EVENT_NAME_OUT="$EVENT_NAME_OUT" OUT="$OUT" \
   python3 -I - <<'PY'
 import json
 import os
 
 info = {
-    "sdkVersion": os.environ.get("SDK_VERSION") or "unknown",
-    "flutterSdkRef": os.environ.get("FLUTTER_REF") or "unknown",
-    "iosSdkRef": os.environ.get("IOS_REF") or "unknown",
-    "androidSdkRef": os.environ.get("ANDROID_REF") or "unknown",
-    "commit": os.environ.get("COMMIT") or "unknown",
-    "commitShort": (os.environ.get("COMMIT") or "unknown")[:7],
-    "branch": os.environ.get("BRANCH") or "unknown",
-    "appVersion": os.environ.get("APP_VERSION") or "unknown",
-    "buildDate": os.environ.get("BUILD_DATE") or "unknown",
+    "sdkVersion": os.environ.get("SDK_VERSION") or "—",
+    "flutterSdkRef": os.environ.get("FLUTTER_REF") or "—",
+    "iosSdkVersion": os.environ.get("IOS_SDK_VERSION") or "—",
+    "iosSdkRef": os.environ.get("IOS_REF") or "—",
+    "androidSdkVersion": os.environ.get("ANDROID_SDK_VERSION") or "—",
+    "androidSdkRef": os.environ.get("ANDROID_REF") or "—",
+    "commit": os.environ.get("COMMIT") or "—",
+    "commitShort": (os.environ.get("COMMIT") or "—")[:7],
+    "branch": os.environ.get("BRANCH") or "—",
+    "appVersion": os.environ.get("APP_VERSION") or "—",
+    "buildDate": os.environ.get("BUILD_DATE") or "—",
+    "sourceLabel": os.environ.get("SOURCE_LABEL") or "—",
+    "event": os.environ.get("EVENT_NAME_OUT") or "—",
 }
 with open(os.environ["OUT"], "w") as fh:
     json.dump(info, fh, indent=2)

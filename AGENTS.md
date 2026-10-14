@@ -72,7 +72,7 @@ To test against a local native SDK build:
 
 ## Example app deployment
 
-`.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**` and on published releases, gated by the repo variable `EXAMPLE_APP_PUBLISH_ENABLED`. `workflow_dispatch` ignores the gate; its `check_credentials` input runs a read-only verification of each platform's store credentials instead of a deploy. Deploy jobs run in the GitHub environments `android-internal-track` and `testflight`. Secrets and setup live in `.github/scripts/README.md`.
+`.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**`, on published releases, on `workflow_dispatch`, and when a same-repo PR is labeled `deploy-example-app[:android|:ios]` (the label is removed after the run so re-applying re-triggers). Unit tests and lint gate every deploy via `needs:`. Deploys are skipped, not failed, until the required store secrets exist (push/release skip with a notice; dispatch and label deploys fail loudly). The `check_credentials` dispatch input runs a read-only verification of each platform's credentials instead of a deploy. Deploy jobs run in the GitHub environments `android-internal-track` and `testflight`; store secrets stay at repository level because the secret preflight cannot see environment secrets. Secrets and setup live in `.github/scripts/README.md`.
 
 ## Code Review
 
