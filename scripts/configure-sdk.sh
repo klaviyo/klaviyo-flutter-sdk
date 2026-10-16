@@ -190,12 +190,10 @@ remove_ios_override() {
 update_podspec_versions() {
     local version="$1"
     if [[ -n "$version" ]]; then
-        sedi -E "s|(s\.dependency 'KlaviyoCore').*|\1, '$version'|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1, '$version'|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1, '$version'|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1, '$version'|" "$PODSPEC"
     else
-        sedi -E "s|(s\.dependency 'KlaviyoCore').*|\1|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1|" "$PODSPEC"
