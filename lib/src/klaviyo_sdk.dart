@@ -319,7 +319,8 @@ class KlaviyoSDK {
     }
   }
 
-  /// Detaches a previously-registered auth token provider — e.g. on logout.
+  /// Detaches the auth token provider and turns personalization off.
+  /// This is not a logout; use [resetProfile] to clear the current profile.
   ///
   /// Clears the active provider (so any further native request is ignored) and
   /// forwards to the native SDK's `unregisterAuthTokenProvider()`, which clears
