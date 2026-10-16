@@ -491,7 +491,7 @@ The `sessionTimeoutDuration` controls how long forms remain eligible to display 
 
 ### Personalized Forms Authentication
 
-> Available in the upcoming Flutter SDK 0.4.0 release, using native Android SDK 4.6.0 and iOS SDK 5.5.0 or later. Personalized Forms authentication must be enabled for your Klaviyo account.
+> Available in Flutter SDK 0.4.0 and higher, using native Android SDK 4.6.0 and iOS SDK 5.5.0 or later. Personalized Forms authentication must be enabled for your Klaviyo account.
 
 Personalized In-App Forms show content from the signed-in user's Klaviyo profile. Your app proves who the user is with a JSON Web Token (JWT).
 
