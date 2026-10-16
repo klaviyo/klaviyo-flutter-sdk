@@ -4,6 +4,7 @@ TEAM_ID = ENV["APPLE_TEAM_ID"].to_s.empty? ? "G3793W2RJ2" : ENV["APPLE_TEAM_ID"]
 APP_ID = "com.klaviyo.FlutterExample"
 EXT_ID = "com.klaviyo.FlutterExample.NotificationServiceExtension"
 PROJECT = File.expand_path("../Runner.xcodeproj", __dir__)
+EXAMPLE = File.expand_path("../..", __dir__)
 
 def asc_key
   app_store_connect_api_key(
@@ -19,6 +20,15 @@ def export_env(name, value)
   return unless ENV["GITHUB_ENV"]
 
   File.open(ENV["GITHUB_ENV"], "a") { |f| f.puts "#{name}=#{value}" }
+end
+
+ROOT = File.expand_path("../../..", __dir__)
+
+def derive_app_version(build_number)
+  version = sh("'#{ROOT}/.github/scripts/app-version.sh' '#{ENV.fetch('SDK_VERSION')}' '#{build_number}'", log: false).strip
+  ENV["APP_VERSION"] = version
+  export_env("APP_VERSION", version)
+  version
 end
 
 # match runs read-only against klaviyo/mobile-certificates (shared App Store
@@ -61,12 +71,20 @@ platform :ios do
     File.write(pbxproj, content)
   end
 
-  # Expects `flutter build ios --release --config-only --build-number=N` to
-  # have run first so Generated.xcconfig and Pods are in place.
+  # Expects `flutter build ios --release --config-only` to have run first so
+  # Pods are in place; it runs again here so Generated.xcconfig carries the
+  # real build number and derived version.
   desc "Archive + export a signed IPA to example/build/ios/ipa/Runner.ipa"
   lane :build_ipa do |options|
     build_number = options.fetch(:build_number).to_s
     UI.user_error!("build_number must be numeric") unless build_number.match?(/\A\d+\z/)
+    app_version = derive_app_version(build_number)
+
+    Bundler.with_unbundled_env do
+      sh("cd '#{EXAMPLE}' && flutter build ios --release --config-only --no-codesign " \
+         "--build-name='#{ENV.fetch('IOS_MARKETING_VERSION')}' --build-number=#{build_number} " \
+         "--dart-define-from-file=build-info.json --dart-define=derivedAppVersion='#{app_version}'")
+    end
 
     build_app(
       workspace: File.expand_path("../Runner.xcworkspace", __dir__),
@@ -77,7 +95,7 @@ platform :ios do
       codesigning_identity: "Apple Distribution",
       # The extension hardcodes CURRENT_PROJECT_VERSION = 1; App Store Connect
       # wants it to match the host app's CFBundleVersion.
-      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} FLUTTER_BUILD_NUMBER=#{build_number}",
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} FLUTTER_BUILD_NUMBER=#{build_number} KLAVIYO_APP_VERSION='#{app_version}'",
       clean: false,
       output_directory: File.expand_path("../../build/ios/ipa", __dir__),
       output_name: "Runner.ipa",

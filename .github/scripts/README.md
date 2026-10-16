@@ -13,6 +13,7 @@ platform's credentials without building or uploading.
   notes. iOS lanes: `install_signing`, `release`, `whats_new`, `next_build_number`. Android lanes: `release`,
   `share` (Internal App Sharing link), `check_credentials`. Both retry an upload once with a fresh build number
   or versionCode.
+- `app-version.sh`: derives the app version from the SDK version and build number (`X.Y.Z` on a release, `X.Y.Z-rc.N` on `rel/*`, `X.Y.Z-alpha.N` otherwise); fails when it cannot. Android `versionName` and the in-app, notes and Slack text use the full string; iOS `CFBundleShortVersionString` stays `X.Y.Z` and the full string goes in the `KlaviyoAppVersion` Info.plist key.
 - `release-notes.sh`: store release notes (build info header, CI run line, release body on release events).
 - `gradle-retry.sh`: retries the Android build with `--refresh-dependencies` on a JitPack failure.
 - `source-label.sh`: release tag, PR head branch, or branch name, shown in notes and Slack.

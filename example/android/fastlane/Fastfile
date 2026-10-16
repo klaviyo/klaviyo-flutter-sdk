@@ -32,9 +32,18 @@ def highest_version_code
   codes.map(&:to_i).max || 0
 end
 
+def derive_app_version(code)
+  version = sh("'#{ROOT}/.github/scripts/app-version.sh' '#{ENV.fetch('SDK_VERSION')}' '#{code}'", log: false).strip
+  ENV["APP_VERSION"] = version
+  export_env("APP_VERSION", version)
+  version
+end
+
 def build_aab(code)
+  version = derive_app_version(code)
   sh("cd '#{EXAMPLE}' && '#{ROOT}/.github/scripts/gradle-retry.sh' flutter build appbundle --release " \
-     "--build-name='#{ENV.fetch('SDK_VERSION')}' --build-number=#{code} --dart-define-from-file=build-info.json")
+     "--build-name='#{version}' --build-number=#{code} --dart-define-from-file=build-info.json " \
+     "--dart-define=derivedAppVersion='#{version}'")
 end
 
 def upload_aab(code)
@@ -52,7 +61,7 @@ def upload_aab(code)
     track: "internal",
     aab: AAB,
     release_status: ENV.fetch("PLAY_RELEASE_STATUS", "completed"),
-    version_name: "#{ENV.fetch('SDK_VERSION')} (#{code}) #{ENV.fetch('COMMIT_SHORT')}",
+    version_name: "#{ENV.fetch('APP_VERSION')} (#{code}) #{ENV.fetch('COMMIT_SHORT')}",
     metadata_path: dir,
     skip_upload_apk: true,
     skip_upload_metadata: true,

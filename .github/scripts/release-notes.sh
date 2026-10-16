@@ -15,6 +15,7 @@
 #   SOURCE_LABEL  sanitized source label (source-label.sh)
 #   EVENT_NAME    github.event_name
 #   RUN_URL       workflow run URL
+#   APP_VERSION   derived app version (app-version.sh); defaults to build-info appVersion
 #
 set -euo pipefail
 
@@ -57,7 +58,7 @@ def sdk_line(name, version, ref):
 
 platform = "ios" if os.environ["NATIVE_NAME"] == "iOS" else "android"
 header = [
-    f"Flutter Example {info.get('appVersion') or MISSING} ({os.environ['BUILD_NUMBER']})",
+    f"Flutter Example {os.environ.get('APP_VERSION') or info.get('appVersion') or MISSING} ({os.environ['BUILD_NUMBER']})",
     sdk_line("Klaviyo Flutter SDK", info.get("sdkVersion"), info.get("flutterSdkRef")),
     sdk_line(
         f"Klaviyo {os.environ['NATIVE_NAME']} SDK",

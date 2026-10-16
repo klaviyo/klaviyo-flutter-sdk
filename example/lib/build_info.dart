@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 const _missing = '—';
+const _derivedAppVersion = String.fromEnvironment('derivedAppVersion');
 
 /// Which SDK builds this app was compiled against, written by
 /// scripts/sdk-ref.sh and passed to the build with
@@ -35,8 +36,8 @@ class BuildInfo {
   final String sourceLabel;
   final String event;
 
-  /// Marketing version from the store config (CFBundleShortVersionString /
-  /// versionName), read at runtime so it always matches the installed build.
+  /// The derived version (e.g. `0.3.1-alpha.12`) on CD builds, otherwise the
+  /// store config version (CFBundleShortVersionString / versionName).
   final String appVersion;
 
   /// CFBundleVersion / versionCode, read at runtime.
@@ -97,7 +98,9 @@ class BuildInfo {
             defaultValue: _missing,
           ),
           event: const String.fromEnvironment('event', defaultValue: _missing),
-          appVersion: packageInfo.version,
+          appVersion: _derivedAppVersion.isNotEmpty
+              ? _derivedAppVersion
+              : packageInfo.version,
           buildNumber: packageInfo.buildNumber,
           buildDate: const String.fromEnvironment(
             'buildDate',

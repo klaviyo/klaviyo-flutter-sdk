@@ -247,6 +247,9 @@ jobs:
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           SDK_VERSION: ${{ steps.buildinfo.outputs.sdk_version }}
           COMMIT_SHORT: ${{ steps.buildinfo.outputs.commit_short }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
           PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
           SOURCE_LABEL: ${{ steps.buildinfo.outputs.source_label }}
           EVENT_NAME: ${{ github.event_name }}
@@ -278,7 +281,7 @@ jobs:
           result: success
           platform: Play internal
           os: Android
-          version_label: ${{ steps.buildinfo.outputs.sdk_version }} (${{ env.VERSION_CODE }})
+          version_label: ${{ env.APP_VERSION }} (${{ env.VERSION_CODE }})
           sdk_info: ${{ steps.buildinfo.outputs.sdk_info }}
           source_label: ${{ steps.buildinfo.outputs.source_label }}
           event_name: ${{ github.event_name }}
@@ -286,7 +289,7 @@ jobs:
           commit_short: ${{ steps.buildinfo.outputs.commit_short }}
           access_url: ${{ steps.internal_sharing.outputs.url }}
           access_label: Internal App Sharing link
-          install_notes: ${{ steps.internal_sharing.outputs.url == '' && format('Install {0} ({1}) from the Play Store with a Google account on the internal testers list; ask in {2} to be added.', steps.buildinfo.outputs.sdk_version, env.VERSION_CODE, env.MOBILE_SLACK_CHANNEL) || '' }}
+          install_notes: ${{ steps.internal_sharing.outputs.url == '' && format('Install {0} ({1}) from the Play Store with a Google account on the internal testers list; ask in {2} to be added.', env.APP_VERSION, env.VERSION_CODE, env.MOBILE_SLACK_CHANNEL) || '' }}
 
 
       - name: Notify Slack on failure
@@ -298,7 +301,7 @@ jobs:
           result: failure
           platform: Play internal
           os: Android
-          version_label: ${{ steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.VERSION_CODE || '?' }})
+          version_label: ${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.VERSION_CODE || '?' }})
           sdk_info: ${{ steps.buildinfo.outputs.sdk_info }}
           source_label: ${{ steps.buildinfo.outputs.source_label }}
           event_name: ${{ github.event_name }}
@@ -335,6 +338,7 @@ jobs:
       build_number: ${{ steps.result.outputs.build_number }}
       marketing_version: ${{ steps.result.outputs.marketing_version }}
       ios_marketing_version: ${{ steps.result.outputs.ios_marketing_version }}
+      app_version: ${{ steps.result.outputs.app_version }}
       sdk_info: ${{ steps.result.outputs.sdk_info }}
       source_label: ${{ steps.result.outputs.source_label }}
       commit_sha: ${{ steps.result.outputs.commit_sha }}
@@ -436,6 +440,11 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          SDK_VERSION: ${{ steps.buildinfo.outputs.sdk_version }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -T 15 github.com >> ~/.ssh/known_hosts 2>/dev/null
@@ -458,6 +467,7 @@ jobs:
             echo "build_number=${BUILD_NUMBER:-}"
             echo "marketing_version=$(jq -r .sdkVersion "$BUILD_INFO_PATH")"
             echo "ios_marketing_version=$IOS_MARKETING_VERSION"
+            echo "app_version=${APP_VERSION:-}"
             echo "sdk_info=$SDK_INFO"
             echo "source_label=$(jq -r .sourceLabel "$BUILD_INFO_PATH")"
             echo "commit_sha=$(jq -r .commit "$BUILD_INFO_PATH")"
@@ -487,7 +497,7 @@ jobs:
           result: success
           platform: TestFlight
           os: iOS
-          version_label: ${{ steps.buildinfo.outputs.sdk_version }} (${{ env.BUILD_NUMBER }})
+          version_label: ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
           sdk_info: ${{ steps.buildinfo.outputs.sdk_info }}
           source_label: ${{ steps.buildinfo.outputs.source_label }}
           event_name: ${{ github.event_name }}
@@ -507,7 +517,7 @@ jobs:
           result: failure
           platform: TestFlight
           os: iOS
-          version_label: ${{ steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.BUILD_NUMBER || '?' }}, attempted)
+          version_label: ${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.BUILD_NUMBER || '?' }}, attempted)
           sdk_info: ${{ steps.buildinfo.outputs.sdk_info }}
           source_label: ${{ steps.buildinfo.outputs.source_label }}
           event_name: ${{ github.event_name }}
@@ -553,6 +563,7 @@ jobs:
           SOURCE_LABEL: ${{ needs.deploy-ios.outputs.source_label }}
           SDK_VERSION: ${{ needs.deploy-ios.outputs.marketing_version }}
           IOS_MARKETING_VERSION: ${{ needs.deploy-ios.outputs.ios_marketing_version }}
+          APP_VERSION: ${{ needs.deploy-ios.outputs.app_version }}
           FLUTTER_SDK_REF: ${{ needs.deploy-ios.outputs.flutter_sdk_ref }}
           IOS_SDK_VERSION: ${{ needs.deploy-ios.outputs.ios_sdk_version }}
           IOS_SDK_REF: ${{ needs.deploy-ios.outputs.ios_sdk_ref }}
@@ -590,7 +601,7 @@ jobs:
           result: warning
           platform: TestFlight
           os: iOS
-          version_label: ${{ needs.deploy-ios.outputs.marketing_version }} (${{ needs.deploy-ios.outputs.build_number }})
+          version_label: ${{ needs.deploy-ios.outputs.app_version }} (${{ needs.deploy-ios.outputs.build_number }})
           sdk_info: ${{ needs.deploy-ios.outputs.sdk_info }}
           source_label: ${{ needs.deploy-ios.outputs.source_label }}
           event_name: ${{ github.event_name }}
