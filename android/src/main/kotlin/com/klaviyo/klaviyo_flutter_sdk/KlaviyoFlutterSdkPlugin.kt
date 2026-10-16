@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
 import com.google.firebase.messaging.FirebaseMessaging
+import com.klaviyo.analytics.AuthTokenProvider
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.Klaviyo.isKlaviyoNotificationIntent
 import com.klaviyo.analytics.model.Event
@@ -17,7 +18,6 @@ import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
-import com.klaviyo.core.auth.AuthTokenProvider
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
