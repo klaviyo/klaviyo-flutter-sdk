@@ -157,6 +157,7 @@ platform :ios do
     upload_to_testflight(
       api_key: asc_key,
       app_identifier: APP_ID,
+      app_platform: "ios",
       app_version: options.fetch(:version),
       build_number: options.fetch(:build_number).to_s,
       changelog: File.read(options.fetch(:notes_file)),
