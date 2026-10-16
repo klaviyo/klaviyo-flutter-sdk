@@ -10,10 +10,9 @@ import 'dart:io';
 /// the native SDK.
 ///
 /// The provider is invoked by the native SDK when it needs a token. It should
-/// return the current end-user's JWT, by whatever mechanism the host uses to
-/// obtain one (calling its auth server, exchanging an OAuth refresh token,
-/// reading from a session cache). It should read the current user fresh on
-/// each invocation rather than capturing identity at registration.
+/// fetch a fresh JWT from the host's backend on every invocation rather than
+/// returning a cached token. Read the current user on each invocation rather
+/// than capturing identity at registration.
 ///
 /// **Connectivity failures:** if the provider throws because the device is
 /// offline, the native SDK can wait for connectivity to return and retry — but

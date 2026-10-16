@@ -22,6 +22,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Rich Push](#rich-push)
   - [Badge Count (iOS)](#badge-count-ios-only)
 - [In-App Forms](#in-app-forms)
+  - [Personalized Forms Authentication](#personalized-forms-authentication)
   - [Monitoring Form Lifecycle Events](#monitoring-form-lifecycle-events)
 - [Deep Linking](#deep-linking)
 - [Geofencing](#geofencing)
@@ -487,6 +488,47 @@ await KlaviyoSDK().unregisterFromInAppForms();
 ```
 
 The `sessionTimeoutDuration` controls how long forms remain eligible to display after app backgrounding. For more details, see the native SDK documentation: [Android](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) | [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages)
+
+### Personalized Forms Authentication
+
+> Available in the upcoming Flutter SDK 0.4.0 release, using native Android SDK 4.6.0 and iOS SDK 5.5.0 or later. Personalized Forms authentication must be enabled for your Klaviyo account.
+
+Personalized In-App Forms show content from the signed-in user's Klaviyo profile. Your app proves who the user is with a JSON Web Token (JWT).
+
+Set up an authenticated endpoint on your backend that mints a fresh JWT for the signed-in user. Keep the signing credentials on your server. The JWT must carry valid `iat` and `exp` claims and the user's matching `email` claim. Keep the SDK's profile identifiers in sync with the signed-in user (see [Profile Management](#profile-management)).
+
+After initializing the SDK, register an `AuthTokenProvider` that fetches a token from your backend:
+
+```dart
+await KlaviyoSDK().registerAuthTokenProvider(() async {
+  // Replace authService with your own backend client.
+  return await authService.fetchKlaviyoJWT().timeout(
+    const Duration(seconds: 10),
+  );
+});
+```
+
+Register the provider once and keep it registered across profile changes. Read the current signed-in user on every invocation and fetch a fresh JWT each time; do not cache tokens in the provider.
+
+On logout, clear the SDK profile:
+
+```dart
+await KlaviyoSDK().resetProfile();
+```
+
+A form that is already open keeps its token until it expires, whether you call `resetProfile()` or `unregisterAuthTokenProvider()`. `unregisterAuthTokenProvider()` turns personalization off. It is not a logout.
+
+#### Provider requirements
+
+The SDK does not time out your provider, so your code must:
+
+- **Return or throw exactly once.** `AuthTokenProvider` is a `Future<String> Function()`. Complete each invocation with a JWT or an error whenever the SDK needs a fresh token.
+- **Report errors by throwing.** Throw instead of returning an empty or placeholder token.
+- **Bound your own work.** Apply a timeout to every network call. A provider that never completes blocks later token fetches until you register, unregister, or reset the profile.
+- **Fail fast.** If you cannot produce a token, for example when no user is signed in, throw instead of waiting or retrying.
+- **Preserve connectivity failures.** A Dart `SocketException` is automatically classified as a connectivity failure so the native SDK can retry after reconnect. Rethrow it without wrapping it. If you use another networking client, throw an error object with a boolean `isConnectivityError` getter returning `true` for connectivity failures. An explicit `false` opts out of this classification; other errors are treated as non-connectivity failures.
+
+For the equivalent native integration guides, see [Android Personalized Forms Authentication](https://github.com/klaviyo/klaviyo-android-sdk#personalized-forms-authentication) and [iOS Personalized Forms Authentication](https://github.com/klaviyo/klaviyo-swift-sdk#personalized-forms-authentication).
 
 ### Monitoring Form Lifecycle Events
 
