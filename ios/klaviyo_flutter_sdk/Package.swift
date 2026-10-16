@@ -13,7 +13,7 @@ let package = Package(
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
         .package(
             url: "https://github.com/klaviyo/klaviyo-swift-sdk",
-            branch: "feat/jwts-for-personalized-forms"
+            .upToNextMinor(from: "5.5.0")
         )
     ],
     targets: [
@@ -21,7 +21,6 @@ let package = Package(
             name: "klaviyo_flutter_sdk",
             dependencies: [
                 .product(name: "FlutterFramework", package: "FlutterFramework"),
-                .product(name: "KlaviyoCore", package: "klaviyo-swift-sdk"),
                 .product(name: "KlaviyoSwift", package: "klaviyo-swift-sdk"),
                 .product(name: "KlaviyoForms", package: "klaviyo-swift-sdk")
             ],
