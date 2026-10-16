@@ -5,7 +5,7 @@ import 'dart:io';
 /// Personalized In-App Forms require the SDK to present a user-identifying JWT
 /// to the Klaviyo backend. The Flutter SDK is a thin wrapper: the underlying
 /// native iOS and Android SDKs own all token state management (caching,
-/// proactive refresh, timeouts, WebView injection, and all token-related
+/// proactive refresh, WebView injection, and all token-related
 /// logging). The wrapper's sole responsibility is to bridge this provider to
 /// the native SDK.
 ///
