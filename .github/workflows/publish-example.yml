@@ -47,8 +47,6 @@ permissions:
 
 env:
   FLUTTER_VERSION: 3.38.7
-  ANDROID_PACKAGE: com.klaviyo.flutterexample
-  IOS_BUNDLE_ID: com.klaviyo.FlutterExample
   MOBILE_SLACK_CHANNEL: '#mobile-push-team'
   GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
 

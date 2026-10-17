@@ -109,7 +109,8 @@ platform :android do
   lane :share do
     url = play_client.upload_bundle_to_internal_app_sharing(PACKAGE, AAB)
     UI.user_error!("Internal App Sharing did not return a download URL") if url.to_s.empty?
-    puts "::add-mask::#{url}"
+    $stdout.puts "::add-mask::#{url}"
+    $stdout.flush
     File.open(ENV["GITHUB_OUTPUT"], "a") { |f| f.puts "url=#{url}" } if ENV["GITHUB_OUTPUT"]
   end
 end
