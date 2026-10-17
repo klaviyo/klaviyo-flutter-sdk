@@ -71,5 +71,5 @@ jq -n \
      (if $notes != "" then ($notes | esc) else empty end) ] | join("\n")) as $body
   | { text: headline,
       blocks: [
-        { type: "header", text: { type: "plain_text", text: headline } },
+        { type: "header", text: { type: "plain_text", text: (headline | .[0:150]) } },
         { type: "section", text: { type: "mrkdwn", text: $body } } ] }'

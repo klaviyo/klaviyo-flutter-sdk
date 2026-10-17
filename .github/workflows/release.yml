@@ -48,6 +48,7 @@ jobs:
   verify:
     needs: publish
     runs-on: ubuntu-latest
+    permissions: {}
     timeout-minutes: 10
     steps:
       - name: Wait for the version on pub.dev
@@ -103,6 +104,8 @@ jobs:
     if: always() && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     continue-on-error: true
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -113,6 +116,8 @@ jobs:
           PUBLISH: ${{ needs.publish.result }}
           VERIFY: ${{ needs.verify.result }}
           GITHUB_RELEASE: ${{ needs.github-release.result }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
           failed=""
           [ "$VALIDATE" = "success" ] || failed="validate (${VALIDATE})"
@@ -126,6 +131,9 @@ jobs:
             echo "failed_step=${failed}" >> "$GITHUB_OUTPUT"
           fi
           echo "commit_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "release_url=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Notify Slack
         uses: ./.github/actions/notify-slack-publish
@@ -135,7 +143,7 @@ jobs:
           title: klaviyo_flutter_sdk ${{ github.ref_name }} → pub.dev
           version_heading: Version
           version_label: ${{ github.ref_name }}
-          release_url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+          release_url: ${{ steps.result.outputs.release_url }}
           access_url: ${{ steps.result.outputs.result == 'success' && format('https://pub.dev/packages/klaviyo_flutter_sdk/versions/{0}', github.ref_name) || '' }}
           access_label: pub.dev
           event_name: ${{ github.event_name }}
