@@ -62,8 +62,10 @@ jobs:
               echo "klaviyo_flutter_sdk ${VERSION} is live on pub.dev"
               exit 0
             fi
-            echo "Attempt ${attempt}/20: pub.dev returned ${status}; retrying in 15s"
-            sleep 15
+            echo "Attempt ${attempt}/20: pub.dev returned ${status}"
+            if [ "$attempt" -lt 20 ]; then
+              sleep 15
+            fi
           done
           echo "::error::klaviyo_flutter_sdk ${VERSION} did not appear on pub.dev within 5 minutes"
           exit 1
@@ -141,8 +143,6 @@ jobs:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: ${{ steps.result.outputs.result }}
           title: klaviyo_flutter_sdk ${{ github.ref_name }} → pub.dev
-          version_heading: Version
-          version_label: ${{ github.ref_name }}
           release_url: ${{ steps.result.outputs.release_url }}
           access_url: ${{ steps.result.outputs.result == 'success' && format('https://pub.dev/packages/klaviyo_flutter_sdk/versions/{0}', github.ref_name) || '' }}
           access_label: pub.dev
