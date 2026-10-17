@@ -161,8 +161,6 @@ jobs:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: pending
           title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting release approval
-          version_heading: Version
-          version_label: ${{ inputs.version }}
           release_url: ${{ steps.draft.outputs.url }}
           event_name: ${{ github.event_name }}
           commit_sha: ${{ steps.ref.outputs.sha }}
@@ -217,8 +215,6 @@ jobs:
           result: failure
           title: klaviyo_flutter_sdk ${{ inputs.version }} release
           failed_step: publish
-          version_heading: Version
-          version_label: ${{ inputs.version }}
           release_url: ${{ needs.prepare.outputs.release_url }}
           event_name: ${{ github.event_name }}
           commit_sha: ${{ needs.prepare.outputs.sha }}
