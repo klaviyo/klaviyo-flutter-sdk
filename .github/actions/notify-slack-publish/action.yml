@@ -5,7 +5,7 @@ inputs:
     description: Slack incoming webhook URL; empty skips the notification
     required: true
   result:
-    description: "'success', 'failure' or 'warning', drives icon and headline"
+    description: "'success', 'failure', 'warning' or 'pending', drives icon and headline"
     required: true
   platform:
     description: "Store label (e.g. 'TestFlight', 'Play internal'); unused when title is set"

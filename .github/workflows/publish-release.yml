@@ -1,0 +1,224 @@
+# Starts an SDK release from the Actions tab (or `gh workflow run
+# publish-release.yml -f version=X.Y.Z`) instead of publishing a draft
+# release in the GitHub UI.
+#
+#   prepare  checks the version, CHANGELOG and CI on the commit, then finds or
+#            creates the draft GitHub release and posts it to Slack.
+#   publish  waits for approval in the `release` environment, publishes the
+#            draft (which creates the tag) and dispatches release.yml and
+#            publish-example.yml at the tag.
+#
+# A release published with GITHUB_TOKEN does not trigger tag-push or
+# release-published workflows, so downstream workflows are dispatched.
+# Publishing a draft in the UI still works and triggers them as before.
+
+name: publish-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (X.Y.Z), must match pubspec.yaml
+        required: true
+        type: string
+      ref:
+        description: Branch or commit to release; defaults to rel/<version> if it exists, else the default branch
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: publish-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      checks: read
+    outputs:
+      sha: ${{ steps.ref.outputs.sha }}
+      release_url: ${{ steps.draft.outputs.url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      INPUT_REF: ${{ inputs.ref }}
+    steps:
+      - name: Validate version and tag
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version '${VERSION}' is not X.Y.Z"
+            exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" > /dev/null 2>&1; then
+            echo "::error::Tag ${VERSION} already exists"
+            exit 1
+          fi
+
+      - name: Resolve commit
+        id: ref
+        run: |
+          ref="$INPUT_REF"
+          if [ -z "$ref" ]; then
+            if gh api "repos/${GITHUB_REPOSITORY}/branches/rel/${VERSION}" > /dev/null 2>&1; then
+              ref="rel/${VERSION}"
+            else
+              ref=$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)
+            fi
+          fi
+          sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${ref}" --jq .sha)
+          echo "Releasing ${ref} at ${sha}"
+          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.ref.outputs.sha }}
+          persist-credentials: false
+
+      - name: Check pubspec version
+        run: |
+          raw=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          if [ "${raw%%+*}" != "$VERSION" ]; then
+            echo "::error::pubspec.yaml version is '${raw}', expected ${VERSION}"
+            exit 1
+          fi
+
+      - name: Check synced version files
+        run: |
+          ./scripts/sync_version.sh
+          files=(
+            ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist
+            example/pubspec.yaml
+            example/ios/Runner.xcodeproj/project.pbxproj
+          )
+          if ! git diff --exit-code "${files[@]}"; then
+            echo "::error::Files synced from pubspec.yaml are out of date. Run ./scripts/sync_version.sh and commit the result."
+            exit 1
+          fi
+
+      - name: Check CHANGELOG entry
+        run: |
+          if ! grep -Eq "^## \[?${VERSION//./\\.}\]?([^0-9.]|$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## ${VERSION}' entry"
+            exit 1
+          fi
+
+      - name: Check CI on the commit
+        env:
+          SHA: ${{ steps.ref.outputs.sha }}
+        run: |
+          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \
+            --jq '.check_runs[] | select(.name != "prepare" and .name != "publish") | "\(.status) \(.conclusion) \(.name)"')
+          if [ -z "$runs" ]; then
+            echo "::error::No check runs found on ${SHA}"
+            exit 1
+          fi
+          echo "$runs"
+          bad=$(echo "$runs" | awk '$1 != "completed" || ($2 != "success" && $2 != "skipped" && $2 != "neutral")')
+          if [ -n "$bad" ]; then
+            echo "::error::CI is not green on ${SHA}:"
+            echo "$bad"
+            exit 1
+          fi
+
+      - name: Find or create draft release
+        id: draft
+        env:
+          SHA: ${{ steps.ref.outputs.sha }}
+        run: |
+          existing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \
+            --jq ".[] | select(.tag_name == \"${VERSION}\") | \"\(.draft) \(.html_url)\"" | head -n1)
+          if [ -n "$existing" ]; then
+            if [ "${existing%% *}" != "true" ]; then
+              echo "::error::Release ${VERSION} is already published"
+              exit 1
+            fi
+            url="${existing#* }"
+            echo "Using existing draft ${url}; notes are left as written"
+            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --target "$SHA" > /dev/null
+          else
+            url=$(gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" --draft \
+              --title "$VERSION" --target "$SHA" --generate-notes)
+            echo "Created draft ${url}"
+          fi
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### klaviyo_flutter_sdk ${VERSION} awaiting approval"
+            echo
+            echo "Review and edit the [draft release notes](${url}), then approve the \`publish\` job."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: pending
+          title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting release approval
+          version_heading: Version
+          version_label: ${{ inputs.version }}
+          release_url: ${{ steps.draft.outputs.url }}
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ steps.ref.outputs.sha }}
+          access_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          access_label: Approve the publish job
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      SHA: ${{ needs.prepare.outputs.sha }}
+    steps:
+      - name: Publish the draft release
+        run: |
+          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --target "$SHA"
+          tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${VERSION}" --jq .sha)
+          if [ "$tag_sha" != "$SHA" ]; then
+            echo "::error::Tag ${VERSION} points at ${tag_sha}, expected ${SHA}"
+            exit 1
+          fi
+
+      - name: Dispatch downstream workflows
+        run: |
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
+          gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both
+          {
+            echo "### klaviyo_flutter_sdk ${VERSION} published"
+            echo
+            echo "Dispatched at tag \`${VERSION}\`:"
+            echo "- [release.yml](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml) (pub.dev, waits for \`pub.dev\` approval)"
+            echo "- [publish-example.yml](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/publish-example.yml)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: failure()
+        with:
+          persist-credentials: false
+
+      - name: Notify Slack on failure
+        if: failure()
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: failure
+          title: klaviyo_flutter_sdk ${{ inputs.version }} release
+          failed_step: publish
+          version_heading: Version
+          version_label: ${{ inputs.version }}
+          release_url: ${{ needs.prepare.outputs.release_url }}
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ needs.prepare.outputs.sha }}

@@ -7,7 +7,7 @@
 # Usage: slack-payload.sh > payload.json
 #
 # Env:
-#   RESULT         success | failure | warning
+#   RESULT         success | failure | warning | pending
 #   OS             iOS | Android
 #   PLATFORM       store label, e.g. "TestFlight", "Play internal"
 #   TITLE          headline subject (optional, replaces the OS/PLATFORM headline)
@@ -52,7 +52,7 @@ jq -n \
   # comes from one is escaped before it is placed in the message. The links built below are markup on
   # purpose and are not escaped; only their text is.
   def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
-  def icon: if $result == "success" then "✅" elif $result == "warning" then "⚠️" else "❌" end;
+  def icon: if $result == "success" then "✅" elif $result == "warning" then "⚠️" elif $result == "pending" then "⏳" else "❌" end;
   def headline:
     "\(icon) "
     + (if $title != "" then ($title | esc) else "Flutter Example (\($os | esc)) → \($platform | esc)" end)
