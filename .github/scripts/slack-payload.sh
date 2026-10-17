@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Prints the Slack message payload (JSON) for an example app publish result.
+# Prints the Slack message payload (JSON) for an example app or SDK publish result.
 # Every value arrives through the environment and is encoded by jq, so
 # newlines, quotes and Slack markup in a value cannot break the request.
 #
@@ -10,7 +10,10 @@
 #   RESULT         success | failure | warning
 #   OS             iOS | Android
 #   PLATFORM       store label, e.g. "TestFlight", "Play internal"
+#   TITLE          headline subject (optional, replaces the OS/PLATFORM headline)
 #   VERSION_LABEL  full version with build number
+#   VERSION_HEADING  label for VERSION_LABEL (default "Build")
+#   RELEASE_URL    GitHub release page (optional)
 #   SDK_INFO       pre-formatted SDK line
 #   SOURCE_LABEL   sanitized source label
 #   EVENT_NAME     github.event_name
@@ -28,7 +31,10 @@ jq -n \
   --arg result "${RESULT:?RESULT is required}" \
   --arg os "${OS:-}" \
   --arg platform "${PLATFORM:-}" \
+  --arg title "${TITLE:-}" \
   --arg version "${VERSION_LABEL:-}" \
+  --arg versionheading "${VERSION_HEADING:-Build}" \
+  --arg release "${RELEASE_URL:-}" \
   --arg sdks "${SDK_INFO:-}" \
   --arg source "${SOURCE_LABEL:-}" \
   --arg event "${EVENT_NAME:-}" \
@@ -48,14 +54,16 @@ jq -n \
   def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
   def icon: if $result == "success" then "✅" elif $result == "warning" then "⚠️" else "❌" end;
   def headline:
-    "\(icon) Flutter Example (\($os | esc)) → \($platform | esc)"
+    "\(icon) "
+    + (if $title != "" then ($title | esc) else "Flutter Example (\($os | esc)) → \($platform | esc)" end)
     + (if $result == "failure" then " deploy failed at \($step | esc)"
        elif $result == "warning" then " notes failed at \($step | esc)" else "" end);
   def runlink: "<\($server)/\($repo)/actions/runs/\($run)|CI run>";
   def commit:
     if $short == "" then runlink
     else "<\($server)/\($repo)/commit/\($sha)|\($short | esc)> · " + runlink end;
-  ([ (if $version != "" then "*Build:* \($version | esc)" else empty end),
+  ([ (if $version != "" then "*\($versionheading | esc):* \($version | esc)" else empty end),
+     (if $release != "" then "*Release:* <\($release)|GitHub release>" else empty end),
      (if $sdks != "" then "*SDKs:* \($sdks | esc)" else empty end),
      (if $source != "" then "*Source:* \($source | esc) (\($event | esc))" else empty end),
      "*Commit:* " + commit,

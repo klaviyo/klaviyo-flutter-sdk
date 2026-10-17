@@ -1,5 +1,5 @@
-name: Notify Slack of example app publish result
-description: Posts a Slack message summarizing an example app publish job (success or failure).
+name: Notify Slack of a publish result
+description: Posts a Slack message summarizing an example app or SDK publish job (success or failure).
 inputs:
   webhook:
     description: Slack incoming webhook URL; empty skips the notification
@@ -8,11 +8,27 @@ inputs:
     description: "'success', 'failure' or 'warning', drives icon and headline"
     required: true
   platform:
-    description: "Store label (e.g. 'TestFlight', 'Play internal')"
-    required: true
+    description: "Store label (e.g. 'TestFlight', 'Play internal'); unused when title is set"
+    required: false
+    default: ''
   os:
-    description: "iOS or Android, for the headline"
-    required: true
+    description: "iOS or Android, for the headline; unused when title is set"
+    required: false
+    default: ''
+  title:
+    description: >-
+      Headline subject, e.g. "klaviyo_flutter_sdk 0.4.0 → pub.dev". Defaults to
+      "Flutter Example (<os>) → <platform>".
+    required: false
+    default: ''
+  version_heading:
+    description: Label for the version_label line
+    required: false
+    default: Build
+  release_url:
+    description: GitHub release page to link
+    required: false
+    default: ''
   version_label:
     description: "Full version with build number, e.g. '0.3.2-alpha.1 (42)'"
     required: false
@@ -77,6 +93,9 @@ runs:
         RESULT: ${{ inputs.result }}
         OS: ${{ inputs.os }}
         PLATFORM: ${{ inputs.platform }}
+        TITLE: ${{ inputs.title }}
+        VERSION_HEADING: ${{ inputs.version_heading }}
+        RELEASE_URL: ${{ inputs.release_url }}
         VERSION_LABEL: ${{ inputs.version_label }}
         SDK_INFO: ${{ inputs.sdk_info }}
         SOURCE_LABEL: ${{ inputs.source_label }}
