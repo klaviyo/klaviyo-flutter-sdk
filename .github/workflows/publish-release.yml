@@ -1,5 +1,6 @@
 # Starts an SDK release from the Actions tab (or `gh workflow run
-# publish-release.yml -f version=X.Y.Z`) instead of publishing a draft
+# publish-release.yml -f version=X.Y.Z`; a version with a -suffix such as
+# X.Y.Z-rc.1 is published as a GitHub prerelease) instead of publishing a draft
 # release in the GitHub UI.
 #
 #   prepare  checks the version, CHANGELOG and CI on the commit, then finds or
@@ -19,11 +20,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to release (X.Y.Z), must match pubspec.yaml
+        description: Version to release (X.Y.Z or X.Y.Z-suffix for a prerelease), must match pubspec.yaml
         required: true
         type: string
       ref:
-        description: Branch or commit to release; defaults to rel/<version> if it exists, else the default branch
+        description: Branch or commit to release; defaults to rel/<version>, then rel/<X.Y.Z>, if one exists, else the default branch
         required: false
         type: string
         default: ''
@@ -48,12 +49,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
+      PRERELEASE: ${{ contains(inputs.version, '-') }}
       INPUT_REF: ${{ inputs.ref }}
     steps:
       - name: Validate version and tag
         run: |
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::version '${VERSION}' is not X.Y.Z"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::version '${VERSION}' is not X.Y.Z or X.Y.Z-suffix"
             exit 1
           fi
           if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" > /dev/null 2>&1; then
@@ -68,6 +70,8 @@ jobs:
           if [ -z "$ref" ]; then
             if gh api "repos/${GITHUB_REPOSITORY}/branches/rel/${VERSION}" > /dev/null 2>&1; then
               ref="rel/${VERSION}"
+            elif gh api "repos/${GITHUB_REPOSITORY}/branches/rel/${VERSION%%-*}" > /dev/null 2>&1; then
+              ref="rel/${VERSION%%-*}"
             else
               ref=$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)
             fi
@@ -105,7 +109,7 @@ jobs:
 
       - name: Check CHANGELOG entry
         run: |
-          if ! grep -Eq "^## \[?${VERSION//./\\.}\]?([^0-9.]|$)" CHANGELOG.md; then
+          if ! grep -Eq "^## \[?${VERSION//./\\.}\]?([[:space:]]|$)" CHANGELOG.md; then
             echo "::error::CHANGELOG.md has no '## ${VERSION}' entry"
             exit 1
           fi
@@ -142,10 +146,10 @@ jobs:
             fi
             url="${existing#* }"
             echo "Using existing draft ${url}; notes are left as written"
-            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --target "$SHA" > /dev/null
+            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --target "$SHA" "--prerelease=${PRERELEASE}" > /dev/null
           else
             url=$(gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" --draft \
-              --title "$VERSION" --target "$SHA" --generate-notes)
+              --title "$VERSION" --target "$SHA" --generate-notes "--prerelease=${PRERELEASE}")
             echo "Created draft ${url}"
           fi
           echo "url=${url}" >> "$GITHUB_OUTPUT"
@@ -165,11 +169,17 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
+      PRERELEASE: ${{ contains(inputs.version, '-') }}
       SHA: ${{ needs.prepare.outputs.sha }}
     steps:
       - name: Publish the draft release
         run: |
-          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --target "$SHA"
+          latest=true
+          if [ "$PRERELEASE" = "true" ]; then
+            latest=false
+          fi
+          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --target "$SHA" \
+            "--prerelease=${PRERELEASE}" "--latest=${latest}"
           tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${VERSION}" --jq .sha)
           if [ "$tag_sha" != "$SHA" ]; then
             echo "::error::Tag ${VERSION} points at ${tag_sha}, expected ${SHA}"
