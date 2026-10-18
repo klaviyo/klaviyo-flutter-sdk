@@ -27,6 +27,7 @@ import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.registerFormLifecycleHandler
+import com.klaviyo.forms.setFormsPreviewToken
 import com.klaviyo.forms.unregisterFormLifecycleHandler
 import com.klaviyo.forms.unregisterFromInAppForms
 import com.klaviyo.location.LocationManager
@@ -453,8 +454,13 @@ class KlaviyoFlutterSdkPlugin :
                             }
                         }
 
+                    val previewToken = configuration?.get("previewToken") as? String
+
                     Klaviyo.registerForInAppForms(
-                        InAppFormsConfig(sessionTimeoutDuration = sessionTimeout),
+                        InAppFormsConfig(
+                            sessionTimeoutDuration = sessionTimeout,
+                            previewToken = previewToken,
+                        ),
                     )
 
                     // Unregister any existing handler to prevent duplicates
@@ -500,6 +506,18 @@ class KlaviyoFlutterSdkPlugin :
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
+                }
+            }
+
+            "setFormsPreviewToken" -> {
+                try {
+                    Klaviyo.setFormsPreviewToken(call.argument<String>("token"))
+                    result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to set the forms preview token", null)
                 }
             }
 

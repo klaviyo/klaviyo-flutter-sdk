@@ -7,6 +7,7 @@ export 'src/models/event_metric.dart';
 export 'src/models/klaviyo_subscription.dart';
 export 'src/models/klaviyo_location.dart';
 export 'src/models/in_app_form_config.dart';
+export 'src/models/forms_preview.dart';
 export 'src/models/geofence.dart';
 export 'src/models/form_lifecycle_event.dart';
 export 'src/models/auth_token.dart';

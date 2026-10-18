@@ -242,11 +242,32 @@ extension KlaviyoFlutterSdkPlugin {
                 sessionTimeout = 3600 // default: 1 hour
             }
 
+            let previewToken = configuration?["previewToken"] as? String
+
             DispatchQueue.main.async {
                 KlaviyoSDK().registerForInAppForms(
-                    configuration: InAppFormsConfig(sessionTimeoutDuration: sessionTimeout)
+                    configuration: InAppFormsConfig(
+                        sessionTimeoutDuration: sessionTimeout,
+                        previewToken: previewToken
+                    )
                 )
                 self.subscribeToFormLifecycleEvents()
+            }
+            result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
+
+        case "setFormsPreviewToken":
+            #if canImport(KlaviyoForms)
+            let token = (call.arguments as? [String: Any])?["token"] as? String
+            Task { @MainActor in
+                KlaviyoSDK().setFormsPreviewToken(token)
             }
             result(nil)
             #else
