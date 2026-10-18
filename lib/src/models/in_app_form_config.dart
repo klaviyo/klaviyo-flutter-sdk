@@ -1,4 +1,5 @@
 const int _infiniteTimeoutSentinel = -1;
+void _unchangedCallback() {}
 
 class InAppFormConfig {
   /// - null → platform default (1 hour)
@@ -8,55 +9,99 @@ class InAppFormConfig {
   final Duration? sessionTimeoutDuration;
   final bool isInfinite;
 
+  /// Positive loading budget through forms readiness. Null uses the native
+  /// network timeout. Native SDKs normalize invalid or unsafe values.
+  final Duration? loadTimeout;
+
+  /// Recent analytics history replayed after loading (default 10 seconds,
+  /// capped at 30 seconds). Zero disables history while retaining live events.
+  final Duration? eventReplayWindow;
+
+  /// Called on terminal loading failure, independently of form lifecycle events.
+  /// Retry is host-controlled. This callback is never serialized.
+  final void Function()? onFailure;
+
   const InAppFormConfig._({
     this.sessionTimeoutDuration,
     required this.isInfinite,
+    this.loadTimeout,
+    this.eventReplayWindow,
+    this.onFailure,
   });
 
   /// Platform default (1hr) or custom timeout
-  const InAppFormConfig({Duration? sessionTimeoutDuration})
-      : this._(
+  const InAppFormConfig({
+    Duration? sessionTimeoutDuration,
+    Duration? loadTimeout,
+    Duration? eventReplayWindow,
+    void Function()? onFailure,
+  }) : this._(
           sessionTimeoutDuration: sessionTimeoutDuration,
           isInfinite: false,
+          loadTimeout: loadTimeout,
+          eventReplayWindow: eventReplayWindow,
+          onFailure: onFailure,
         );
 
   /// No timeout (infinite)
-  const InAppFormConfig.infinite()
-      : this._(sessionTimeoutDuration: null, isInfinite: true);
+  const InAppFormConfig.infinite({
+    Duration? loadTimeout,
+    Duration? eventReplayWindow,
+    void Function()? onFailure,
+  }) : this._(
+          isInfinite: true,
+          loadTimeout: loadTimeout,
+          eventReplayWindow: eventReplayWindow,
+          onFailure: onFailure,
+        );
 
   factory InAppFormConfig.fromJson(Map<String, dynamic> json) {
     final raw = json['sessionTimeoutDuration'];
 
-    if (raw == _infiniteTimeoutSentinel) {
-      return const InAppFormConfig.infinite();
-    }
-
-    if (raw is int) {
-      return InAppFormConfig(sessionTimeoutDuration: Duration(seconds: raw));
-    }
-
-    return const InAppFormConfig();
+    return InAppFormConfig._(
+      isInfinite: raw == _infiniteTimeoutSentinel,
+      sessionTimeoutDuration: raw is int && raw != _infiniteTimeoutSentinel
+          ? Duration(seconds: raw)
+          : null,
+      loadTimeout: _durationFromSeconds(json['loadTimeout']),
+      eventReplayWindow: _durationFromSeconds(json['eventReplayWindow']),
+    );
   }
+
+  static Duration? _durationFromSeconds(dynamic value) => value is num &&
+          value.isFinite
+      ? Duration(microseconds: (value * Duration.microsecondsPerSecond).round())
+      : null;
 
   Map<String, dynamic> toJson() {
     return {
       'sessionTimeoutDuration': isInfinite
           ? _infiniteTimeoutSentinel
           : sessionTimeoutDuration?.inSeconds,
+      'loadTimeout': loadTimeout == null
+          ? null
+          : loadTimeout!.inMicroseconds / Duration.microsecondsPerSecond,
+      'eventReplayWindow': eventReplayWindow == null
+          ? null
+          : eventReplayWindow!.inMicroseconds / Duration.microsecondsPerSecond,
     };
   }
 
   InAppFormConfig copyWith({
     Duration? sessionTimeoutDuration,
     bool? isInfinite,
+    Duration? loadTimeout,
+    Duration? eventReplayWindow,
+    void Function()? onFailure = _unchangedCallback,
   }) {
-    if (isInfinite == true) {
-      return const InAppFormConfig.infinite();
-    }
-
-    return InAppFormConfig(
+    return InAppFormConfig._(
+      isInfinite: isInfinite ?? this.isInfinite,
       sessionTimeoutDuration:
           sessionTimeoutDuration ?? this.sessionTimeoutDuration,
+      loadTimeout: loadTimeout ?? this.loadTimeout,
+      eventReplayWindow: eventReplayWindow ?? this.eventReplayWindow,
+      onFailure:
+          identical(onFailure, _unchangedCallback) ? this.onFailure : onFailure,
     );
   }
 

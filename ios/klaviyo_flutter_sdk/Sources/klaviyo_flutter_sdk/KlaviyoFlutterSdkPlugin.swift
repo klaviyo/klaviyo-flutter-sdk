@@ -29,6 +29,15 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     public static let shared = KlaviyoFlutterSdkPlugin()
 
     private var eventSink: FlutterEventSink?
+    private var formsEpoch: String?
+    private var formsListenerEpoch: String?
+    private lazy var formsFailureForwarder: () -> Void = { [weak self] in
+        guard let epoch = self?.formsEpoch else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.formsEpoch == epoch else { return }
+            self.eventSink?(["type": "_forms_failure", "formsEpoch": epoch])
+        }
+    }
 
     // Cache values to handle the race condition where the value arrives
     // before Flutter has finished initializing the EventChannel.
@@ -231,23 +240,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
         case "registerForInAppForms":
             #if canImport(KlaviyoForms)
-            let configuration = (call.arguments as? [String: Any])?["configuration"] as? [String: Any]
-            let sessionTimeout: TimeInterval
-            if let timeout = configuration?["sessionTimeoutDuration"] as? Int, timeout == -1 {
-                sessionTimeout = TimeInterval.infinity
-            } else if let timeout = configuration?["sessionTimeoutDuration"] as? Int {
-                sessionTimeout = TimeInterval(timeout)
-            } else {
-                sessionTimeout = 3600 // default: 1 hour
-            }
-
-            DispatchQueue.main.async {
-                KlaviyoSDK().registerForInAppForms(
-                    configuration: InAppFormsConfig(sessionTimeoutDuration: sessionTimeout)
-                )
-                self.subscribeToFormLifecycleEvents()
-            }
-            result(nil)
+            registerForms(call, result: result)
             #else
             result(FlutterError(
                 code: "FORMS_NOT_AVAILABLE",
@@ -258,12 +251,13 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             #endif
 
         case "unregisterFromInAppForms":
+            formsEpoch = nil
             #if canImport(KlaviyoForms)
-            Task { @MainActor in
+            DispatchQueue.main.async {
                 KlaviyoSDK().unregisterFormLifecycleHandler()
                 KlaviyoSDK().unregisterFromInAppForms()
+                result(nil)
             }
-            result(nil)
             #else
             result(FlutterError(
                 code: "FORMS_NOT_AVAILABLE",
@@ -379,11 +373,58 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 // MARK: - FlutterStreamHandler (Event Channel)
 
 extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
+    #if canImport(KlaviyoForms)
+    private func registerForms(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        let arguments = call.arguments as? [String: Any]
+        guard eventSink != nil, let formsListenerEpoch,
+              arguments?["listenerEpoch"] as? String == formsListenerEpoch else {
+            result(FlutterError(
+                code: "FORMS_EVENT_LISTENER_UNAVAILABLE",
+                message: "Forms event listener is not attached",
+                details: nil
+            ))
+            return
+        }
+        formsEpoch = arguments?["formsEpoch"] as? String
+        let epoch = formsEpoch
+        let configuration = arguments?["configuration"] as? [String: Any]
+        let sessionTimeout: TimeInterval
+        if let timeout = configuration?["sessionTimeoutDuration"] as? Int, timeout == -1 {
+            sessionTimeout = TimeInterval.infinity
+        } else if let timeout = configuration?["sessionTimeoutDuration"] as? Int {
+            sessionTimeout = TimeInterval(timeout)
+        } else {
+            sessionTimeout = 3600
+        }
+        DispatchQueue.main.async {
+            guard self.formsEpoch == epoch else {
+                result(nil)
+                return
+            }
+            KlaviyoSDK().registerForInAppForms(
+                configuration: InAppFormsConfig(
+                    sessionTimeoutDuration: sessionTimeout,
+                    loadTimeout: (configuration?["loadTimeout"] as? NSNumber)?.doubleValue,
+                    eventReplayWindow: (configuration?["eventReplayWindow"] as? NSNumber)?.doubleValue ?? 10,
+                    onFailure: self.formsFailureForwarder
+                )
+            )
+            self.subscribeToFormLifecycleEvents()
+            result(nil)
+        }
+    }
+    #endif
+
     public func onListen(
         withArguments arguments: Any?,
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
         eventSink = events
+        formsListenerEpoch = (arguments as? [String: Any])?["listenerEpoch"] as? String
+        events([
+            "type": "_forms_listener_ready",
+            "listenerEpoch": formsListenerEpoch ?? ""
+        ])
 
         // If we have cached values from early app launch, send them now.
         // This solves the race condition where values arrive before Flutter is ready.
@@ -411,8 +452,17 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
     }
 
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        formsEpoch = nil
+        formsListenerEpoch = nil
         eventSink = nil
         return nil
+    }
+
+    public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+        formsEpoch = nil
+        formsListenerEpoch = nil
+        eventSink?(FlutterEndOfEventStream)
+        eventSink = nil
     }
 }
 
