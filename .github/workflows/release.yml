@@ -30,10 +30,17 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      - name: Validate release files exist
+      - name: Check version and CHANGELOG match the tag
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          if [ ! -f "CHANGELOG.md" ]; then
-            echo "Error: CHANGELOG.md not found"
+          raw=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          if [ "${raw%%+*}" != "$TAG" ]; then
+            echo "::error::pubspec.yaml version is '${raw}', but the tag is ${TAG}"
+            exit 1
+          fi
+          if ! grep -Eq "^## \[?${TAG//./\\.}\]?([^0-9.]|$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## ${TAG}' entry"
             exit 1
           fi
 
