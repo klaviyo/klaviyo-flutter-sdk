@@ -67,3 +67,6 @@ flutter_macos_arm64_stable.zip
 
 # Claude Code
 .claude/settings.local.json
+
+# SwiftPM build artifacts
+ios/klaviyo_flutter_sdk/.build/
