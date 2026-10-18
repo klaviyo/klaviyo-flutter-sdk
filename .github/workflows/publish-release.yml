@@ -3,10 +3,11 @@
 # release in the GitHub UI.
 #
 #   prepare  checks the version, CHANGELOG and CI on the commit, then finds or
-#            creates the draft GitHub release and posts it to Slack.
-#   publish  waits for approval in the `release` environment, publishes the
-#            draft (which creates the tag) and dispatches release.yml and
-#            publish-example.yml at the tag.
+#            creates the draft GitHub release.
+#   publish  publishes the draft (which creates the tag), dispatches
+#            release.yml and publish-example.yml at the tag, and posts to
+#            Slack. The pub.dev upload in release.yml waits for approval in
+#            the `pub.dev` environment, the only approval on this path.
 #
 # A release published with GITHUB_TOKEN does not trigger tag-push or
 # release-published workflows, so downstream workflows are dispatched.
@@ -149,29 +150,15 @@ jobs:
           fi
           echo "url=${url}" >> "$GITHUB_OUTPUT"
           {
-            echo "### klaviyo_flutter_sdk ${VERSION} awaiting approval"
+            echo "### klaviyo_flutter_sdk ${VERSION} prepared"
             echo
-            echo "Review and edit the [draft release notes](${url}), then approve the \`publish\` job."
+            echo "[Release notes](${url})"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Notify Slack
-        continue-on-error: true
-        uses: ./.github/actions/notify-slack-publish
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: pending
-          title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting release approval
-          release_url: ${{ steps.draft.outputs.url }}
-          event_name: ${{ github.event_name }}
-          commit_sha: ${{ steps.ref.outputs.sha }}
-          access_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          access_label: Approve the publish job
 
   publish:
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: release
     permissions:
       contents: write
       actions: write
@@ -190,6 +177,7 @@ jobs:
           fi
 
       - name: Dispatch downstream workflows
+        id: dispatch
         run: |
           gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
           gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both
@@ -200,11 +188,25 @@ jobs:
             echo "- [release.yml](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml) (pub.dev, waits for \`pub.dev\` approval)"
             echo "- [publish-example.yml](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/publish-example.yml)"
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "release_runs=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        if: failure()
+        if: always()
         with:
           persist-credentials: false
+
+      - name: Notify Slack
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: pending
+          title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting pub.dev approval
+          release_url: ${{ needs.prepare.outputs.release_url }}
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ needs.prepare.outputs.sha }}
+          access_url: ${{ steps.dispatch.outputs.release_runs }}
+          access_label: Approve the pub.dev deployment
 
       - name: Notify Slack on failure
         if: failure()
