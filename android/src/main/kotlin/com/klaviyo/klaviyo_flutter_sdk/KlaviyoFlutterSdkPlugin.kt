@@ -25,6 +25,7 @@ import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
+import com.klaviyo.forms.InAppFormsFailureHandler
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.registerFormLifecycleHandler
 import com.klaviyo.forms.unregisterFormLifecycleHandler
@@ -40,6 +41,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.lang.ref.WeakReference
 import java.net.SocketException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -57,6 +59,23 @@ class KlaviyoFlutterSdkPlugin :
     private var eventSink: EventChannel.EventSink? = null
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
+    private var formsEpoch: String? = null
+    private var formsListenerEpoch: String? = null
+    private val formsFailureForwarder by lazy {
+        val plugin = WeakReference(this)
+        InAppFormsFailureHandler {
+            val epoch = plugin.get()?.formsEpoch
+            if (epoch != null) {
+                Handler(Looper.getMainLooper()).post {
+                    plugin.get()?.let { owner ->
+                        if (owner.formsEpoch == epoch) {
+                            owner.eventSink?.success(mapOf("type" to "_forms_failure", "formsEpoch" to epoch))
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Pending auth token requests keyed by correlation ID. The native SDK
@@ -132,6 +151,13 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
+                    formsListenerEpoch = (arguments as? Map<*, *>)?.get("listenerEpoch") as? String
+                    events?.success(
+                        mapOf(
+                            "type" to "_forms_listener_ready",
+                            "listenerEpoch" to formsListenerEpoch,
+                        ),
+                    )
                     // Whichever engine has a live Dart listener owns event delivery.
                     instance = this@KlaviyoFlutterSdkPlugin
                     // Replay a silent push that arrived before Flutter subscribed.
@@ -140,6 +166,8 @@ class KlaviyoFlutterSdkPlugin :
                 }
 
                 override fun onCancel(arguments: Any?) {
+                    formsEpoch = null
+                    formsListenerEpoch = null
                     eventSink = null
                     // The Dart side keeps a permanent auth-event listener, so this
                     // fires at engine teardown. Tear the auth bridge down here too
@@ -431,8 +459,15 @@ class KlaviyoFlutterSdkPlugin :
             }
 
             "registerForInAppForms" -> {
+                if (eventSink == null || formsListenerEpoch == null ||
+                    call.argument<String>("listenerEpoch") != formsListenerEpoch
+                ) {
+                    result.error("FORMS_EVENT_LISTENER_UNAVAILABLE", "Forms event listener is not attached", null)
+                    return
+                }
                 try {
                     val configuration = call.argument<Map<String, Any>>("configuration")
+                    formsEpoch = call.argument<String>("formsEpoch")
 
                     val sessionTimeout: Duration =
                         when (val timeout = configuration?.get("sessionTimeoutDuration") as? Int) {
@@ -454,7 +489,14 @@ class KlaviyoFlutterSdkPlugin :
                         }
 
                     Klaviyo.registerForInAppForms(
-                        InAppFormsConfig(sessionTimeoutDuration = sessionTimeout),
+                        InAppFormsConfig(
+                            sessionTimeoutDuration = sessionTimeout,
+                            loadTimeout = (configuration?.get("loadTimeout") as? Number)?.toDouble()?.seconds,
+                            eventReplayWindow =
+                                (configuration?.get("eventReplayWindow") as? Number)?.toDouble()?.seconds
+                                    ?: InAppFormsConfig.DEFAULT_EVENT_REPLAY_WINDOW,
+                            onFailure = formsFailureForwarder,
+                        ),
                     )
 
                     // Unregister any existing handler to prevent duplicates
@@ -504,6 +546,7 @@ class KlaviyoFlutterSdkPlugin :
             }
 
             "unregisterFromInAppForms" -> {
+                formsEpoch = null
                 try {
                     Klaviyo.unregisterFormLifecycleHandler()
                     Klaviyo.unregisterFromInAppForms()
@@ -805,6 +848,10 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
+        formsEpoch = null
+        formsListenerEpoch = null
+        eventSink?.endOfStream()
+        eventChannel.setStreamHandler(null)
         if (instance === this) {
             instance = null
         }
