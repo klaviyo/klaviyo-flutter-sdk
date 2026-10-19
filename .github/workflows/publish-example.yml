@@ -261,15 +261,6 @@ jobs:
           (cd .. && flutter pub get)
           bundle exec fastlane android release
 
-      - name: Upload to Internal App Sharing
-        if: success() && inputs.check_credentials != true
-        id: internal_sharing
-        continue-on-error: true
-        working-directory: example/android
-        env:
-          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
-        run: bundle exec fastlane android share
-
       - name: Clean up signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks" example/android/key.properties example/android/app/google-services.json
@@ -289,9 +280,9 @@ jobs:
           event_name: ${{ github.event_name }}
           commit_sha: ${{ steps.buildinfo.outputs.commit_sha }}
           commit_short: ${{ steps.buildinfo.outputs.commit_short }}
-          access_url: ${{ steps.internal_sharing.outputs.url }}
-          access_label: Internal App Sharing link
-          install_notes: ${{ steps.internal_sharing.outputs.url == '' && format('Install {0} ({1}) from the Play Store with a Google account on the internal testers list.', env.APP_VERSION, env.VERSION_CODE) || '' }}
+          access_url: https://play.google.com/apps/test/com.klaviyo.flutterexample/${{ env.VERSION_CODE }}
+          access_label: Install Klaviyo Flutter Example from Google Play
+          install_notes: Installs for anyone who has done the internal-track opt-in, once Play has finished processing the release.
 
 
       - name: Notify Slack on failure
