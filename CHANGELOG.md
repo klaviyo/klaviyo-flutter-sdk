@@ -11,6 +11,12 @@
 
 - Adds Flutter integration guidance for backend JWT setup, provider requirements, connectivity failures, profile changes, and logout. ([#142](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/142))
 
+### Platform Support
+
+- **iOS**: Minimum deployment target 13.0, wraps [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk) ~> 5.5.0
+- **Android**: Minimum SDK version 23, wraps [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk) 4.6.0
+- **Flutter**: Minimum Flutter 3.27.0, Dart 3.0.0+
+
 ## 0.3.1 - 2026-09-04
 
 ### Bug Fixes

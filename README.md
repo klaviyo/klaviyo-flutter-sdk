@@ -630,7 +630,7 @@ A form that is already open keeps its token until it expires, whether you call `
 
 The SDK does not time out your provider, so your code must:
 
-- **Return or throw exactly once.** `AuthTokenProvider` is a `Future<String> Function()`. Complete each invocation with a JWT or an error whenever the SDK needs a fresh token.
+- **Complete with a JWT or throw.** Do not leave the `Future<String>` returned by your provider pending.
 - **Report errors by throwing.** Throw instead of returning an empty or placeholder token.
 - **Bound your own work.** Apply a timeout to every network call. A provider that never completes blocks later token fetches until you register, unregister, or reset the profile.
 - **Fail fast.** If you cannot produce a token, for example when no user is signed in, throw instead of waiting or retrying.
