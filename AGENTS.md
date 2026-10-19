@@ -67,7 +67,12 @@ To test against a local native SDK build:
 ### Gotchas
 
 - **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist, the example app's `pubspec.yaml`, and `MARKETING_VERSION` in the example app's Xcode project. Use `scripts/bump_version.sh` to update all version references at once.
+- **Example Podfile.lock is committed**: it pins the native iOS SDK the published example app ships with. Native SDK bumps and `scripts/configure-sdk.sh` overrides change it — regenerate with `pod install` in `example/ios` and commit the result. Never commit a lock pointing at a feature branch or local checkout.
 - `BufferedBroadcastStreamController` (`lib/src/utils/buffered_broadcast_stream_controller.dart`) exists because native events (push tokens, notifications) can fire before Dart listeners are attached. Don't replace it with a plain `StreamController.broadcast`.
+
+## Example app deployment
+
+`.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**`, published releases, `workflow_dispatch`, and same-repo PRs labeled `deploy-example-app[:android|:ios]`. Unit tests and lint gate every deploy. Deploys skip until the store secrets exist. Uploads go through fastlane lanes in `example/ios/fastlane` and `example/android/fastlane`. Setup and secrets: `.github/scripts/README.md`.
 
 ## Code Review
 
