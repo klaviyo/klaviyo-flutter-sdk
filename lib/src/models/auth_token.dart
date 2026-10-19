@@ -31,7 +31,7 @@ class ClassifiedProviderError {
 
   /// Whether the failure is a connectivity error. When `true`, the native
   /// bridge reconstitutes a typed network error (`URLError` on iOS,
-  /// `IOException` on Android) that the SDK's connectivity-driven refresh
+  /// `SocketException` on Android) that the SDK's connectivity-driven refresh
   /// retry recognizes.
   final bool isConnectivityError;
 
