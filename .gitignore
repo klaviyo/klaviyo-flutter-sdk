@@ -6,9 +6,7 @@
 .pub-cache/
 .pub/
 build/
-/pubspec.lock
-/example/pubspec.lock
-example/build-info.json
+*.lock
 
 # Android
 **/android/**/gradle-wrapper.jar
