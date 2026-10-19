@@ -323,10 +323,10 @@ class KlaviyoSDK {
   /// Registers a provider that the native SDK invokes when it needs to acquire
   /// or refresh an authentication token (JWT) for the current end-user.
   ///
-  /// The Flutter SDK is a thin bridge: all token state management (caching,
-  /// proactive refresh, timeouts, WebView injection, and token logging) lives
-  /// in the native iOS and Android SDKs. This wrapper only relays [provider]
-  /// invocations across the platform channel.
+  /// The Flutter SDK is a thin bridge: token state management (caching,
+  /// proactive refresh, WebView injection, and token logging) lives in the
+  /// native iOS and Android SDKs. A native caller's timeout does not cancel the
+  /// Future returned by [provider]; the provider must bound its own work.
   ///
   /// Calling this replaces any previously-registered provider. See
   /// [AuthTokenProvider] for the provider contract, including how to signal a
@@ -360,7 +360,8 @@ class KlaviyoSDK {
     }
   }
 
-  /// Detaches a previously-registered auth token provider — e.g. on logout.
+  /// Detaches the auth token provider and turns personalization off.
+  /// This is not a logout; use [resetProfile] to clear the current profile.
   ///
   /// Clears the active provider (so any further native request is ignored) and
   /// forwards to the native SDK's `unregisterAuthTokenProvider()`, which clears
