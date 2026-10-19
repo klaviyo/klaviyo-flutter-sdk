@@ -36,8 +36,16 @@ if [ -z "$tag" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
   tag="${REF_NAME:-}"
 fi
 if [ -n "$tag" ]; then
-  [ "$tag" = "$base" ] || [ "$tag" = "v$base" ] || fail "release tag '$tag' does not match SDK version $base"
-  printf '%s\n' "$base"
+  # Strip an optional v prefix, then split the tag into its X.Y.Z base and
+  # any -prerelease suffix. The base must match the SDK version; a suffix is
+  # carried through so a prerelease release stamps the full tag.
+  tag_base="${tag#v}"
+  suffix=""
+  case "$tag_base" in
+    *-*) suffix="-${tag_base#*-}"; tag_base="${tag_base%%-*}" ;;
+  esac
+  [ "$tag_base" = "$base" ] || fail "release tag '$tag' does not match SDK version $base"
+  printf '%s%s\n' "$base" "$suffix"
   exit 0
 fi
 
