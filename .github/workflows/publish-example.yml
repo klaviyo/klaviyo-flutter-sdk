@@ -47,7 +47,6 @@ permissions:
 
 env:
   FLUTTER_VERSION: 3.38.7
-  MOBILE_SLACK_CHANNEL: '#mobile-push-team'
   GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
 
 jobs:
@@ -287,7 +286,7 @@ jobs:
           commit_short: ${{ steps.buildinfo.outputs.commit_short }}
           access_url: ${{ steps.internal_sharing.outputs.url }}
           access_label: Internal App Sharing link
-          install_notes: ${{ steps.internal_sharing.outputs.url == '' && format('Install {0} ({1}) from the Play Store with a Google account on the internal testers list; ask in {2} to be added.', env.APP_VERSION, env.VERSION_CODE, env.MOBILE_SLACK_CHANNEL) || '' }}
+          install_notes: ${{ steps.internal_sharing.outputs.url == '' && format('Install {0} ({1}) from the Play Store with a Google account on the internal testers list.', env.APP_VERSION, env.VERSION_CODE) || '' }}
 
 
       - name: Notify Slack on failure
@@ -504,7 +503,7 @@ jobs:
           # Requires an App Store Connect login; testers install via the TestFlight app.
           access_url: https://appstoreconnect.apple.com/apps/${{ env.ASC_APP_ID }}/testflight/ios
           access_label: TestFlight in App Store Connect
-          install_notes: Install from the TestFlight app once Apple finishes processing it, usually in 5 to 30 minutes. Not a tester yet? Ask in #mobile-push-team to be added, and give them your Apple ID email.
+          install_notes: Install from the TestFlight app once Apple finishes processing it, usually in 5 to 30 minutes.
 
       - name: Notify Slack on failure
         if: failure()
