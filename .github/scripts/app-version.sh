@@ -45,6 +45,7 @@ if [ -n "$tag" ]; then
     *-*) suffix="-${tag_base#*-}"; tag_base="${tag_base%%-*}" ;;
   esac
   [ "$tag_base" = "$base" ] || fail "release tag '$tag' does not match SDK version $base"
+  [[ "$suffix" =~ ^(-[0-9A-Za-z.-]+)?$ ]] || fail "release tag '$tag' has an unsafe suffix"
   printf '%s%s\n' "$base" "$suffix"
   exit 0
 fi

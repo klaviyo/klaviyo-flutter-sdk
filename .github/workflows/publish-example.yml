@@ -159,8 +159,8 @@ jobs:
     timeout-minutes: 45
     environment: android-internal-track
     concurrency:
-      group: publish-example-android-${{ github.event_name == 'push' && github.ref || github.run_id }}
-      cancel-in-progress: ${{ github.event_name == 'push' }}
+      group: publish-example-android
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -323,8 +323,8 @@ jobs:
       name: testflight
       url: ${{ steps.result.outputs.testflight_url }}
     concurrency:
-      group: publish-example-ios-${{ github.event_name == 'push' && github.ref || github.run_id }}
-      cancel-in-progress: ${{ github.event_name == 'push' }}
+      group: publish-example-ios
+      cancel-in-progress: false
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     outputs:
