@@ -161,6 +161,7 @@ jobs:
     concurrency:
       group: publish-example-android
       cancel-in-progress: false
+      queue: max
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -325,6 +326,7 @@ jobs:
     concurrency:
       group: publish-example-ios
       cancel-in-progress: false
+      queue: max
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     outputs:
