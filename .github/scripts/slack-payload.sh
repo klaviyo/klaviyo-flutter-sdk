@@ -50,7 +50,7 @@ jq -n \
   def headline:
     "\(icon) Flutter Example (\($os | esc)) → \($platform | esc)"
     + (if $result == "failure" then " deploy failed at \($step | esc)"
-       elif $result == "warning" then " notes failed at \($step | esc)" else "" end);
+       elif $result == "warning" then " uploaded, but \($step | esc) failed" else "" end);
   def runlink: "<\($server)/\($repo)/actions/runs/\($run)|CI run>";
   def commit:
     if $short == "" then runlink
