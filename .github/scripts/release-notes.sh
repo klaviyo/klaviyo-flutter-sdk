@@ -34,7 +34,7 @@ case "$PLATFORM" in
   *) echo "::error::platform must be ios or android" >&2; exit 2 ;;
 esac
 
-if [ "$BODY_FILE" = "" ] && [ "${EVENT_NAME:-}" = "workflow_dispatch" ] && [ "${REF_TYPE:-}" = "tag" ]; then
+if { [ -z "$BODY_FILE" ] || [ ! -s "$BODY_FILE" ]; } && [ "${EVENT_NAME:-}" = "workflow_dispatch" ] && [ "${REF_TYPE:-}" = "tag" ]; then
   BODY_FILE=$(mktemp)
   trap 'rm -f "$BODY_FILE"' EXIT
   if ! gh release view "${REF_NAME:?REF_NAME is required on a tag dispatch}" --repo "${GITHUB_REPOSITORY:?}" --json body -q .body > "$BODY_FILE"; then

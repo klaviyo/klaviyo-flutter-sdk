@@ -254,6 +254,7 @@ jobs:
       SKIP_CI: ${{ needs.prepare.outputs.ci_skipped }}
     steps:
       - name: Create the tag
+        id: tag
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f "ref=refs/tags/${VERSION}" -f "sha=${SHA}" > /dev/null
           tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" --jq .object.sha)
@@ -274,6 +275,12 @@ jobs:
             echo "publish-example.yml is dispatched by release.yml once the upload is verified."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "release_runs=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml" >> "$GITHUB_OUTPUT"
+
+      - name: Remove the tag if the dispatch failed
+        if: failure() && steps.tag.outcome == 'success' && steps.dispatch.outcome == 'failure'
+        run: |
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}"
+          echo "::warning::Dispatching release.yml failed; deleted tag ${VERSION}"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: always()

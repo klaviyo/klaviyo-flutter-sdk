@@ -70,7 +70,7 @@ jobs:
 
   verify:
     needs: [validate, publish]
-    if: needs.validate.outputs.already_live == 'true' || needs.publish.result == 'success'
+    if: "!cancelled() && (needs.validate.outputs.already_live == 'true' || needs.publish.result == 'success')"
     runs-on: ubuntu-latest
     permissions: {}
     timeout-minutes: 10
@@ -226,7 +226,7 @@ jobs:
           elif [ "$PUBLISH" != "success" ] && [ "$PUBLISH" != "skipped" ]; then
             # A rejected environment approval fails the job before its steps run.
             steps=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs" \
-              --jq '[.jobs[] | select(.name == "publish") | .steps | length] | add // 0' || echo "unknown")
+              --jq '[.jobs[] | select(.name == "publish" or (.name | startswith("publish / "))) | .steps | length] | add // 0' || echo "unknown")
             if [ "$steps" = "0" ]; then
               result=stopped
               failed="pub.dev approval rejected"
@@ -234,7 +234,7 @@ jobs:
               result=failure
               failed="publish (${PUBLISH})"
             fi
-          elif [ "$VERIFY" != "success" ] && [ "$VERIFY" != "skipped" ]; then
+          elif [ "$VERIFY" != "success" ] && { [ "$VERIFY" != "skipped" ] || [ "$PUBLISH" = "success" ]; }; then
             result=failure
             failed="pub.dev verify (${VERIFY})"
           elif [ "$FINALIZE" != "success" ] && [ "$FINALIZE" != "skipped" ]; then
@@ -243,7 +243,7 @@ jobs:
           else
             result=success
           fi
-          if [ "$result" = "stopped" ] && [ "$TAG_REMOVED" = "true" ]; then
+          if [ "$TAG_REMOVED" = "true" ]; then
             failed="${failed}, tag removed"
           fi
           {
