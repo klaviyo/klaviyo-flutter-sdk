@@ -7,7 +7,7 @@
 # Usage: slack-payload.sh > payload.json
 #
 # Env:
-#   RESULT         success | failure | warning | pending
+#   RESULT         success | failure | warning | pending | stopped
 #   OS             iOS | Android
 #   PLATFORM       store label, e.g. "TestFlight", "Play internal"
 #   TITLE          headline subject (optional, replaces the OS/PLATFORM headline)
@@ -19,7 +19,7 @@
 #   EVENT_NAME     github.event_name
 #   COMMIT_SHA     commit to link
 #   COMMIT_SHORT   7-char sha
-#   FAILED_STEP    step name for failure and warning messages
+#   FAILED_STEP    step name for failure and warning messages; stop reason for stopped
 #   ACCESS_URL     link testers must sign in to reach (optional)
 #   ACCESS_LABEL   link text for ACCESS_URL
 #   INSTALL_NOTES  install guidance (optional)
@@ -52,12 +52,13 @@ jq -n \
   # comes from one is escaped before it is placed in the message. The links built below are markup on
   # purpose and are not escaped; only their text is.
   def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
-  def icon: if $result == "success" then "✅" elif $result == "warning" then "⚠️" elif $result == "pending" then "⏳" else "❌" end;
+  def icon: if $result == "success" then "✅" elif $result == "warning" then "⚠️" elif $result == "pending" then "⏳" elif $result == "stopped" then "⏹" else "❌" end;
   def headline:
     "\(icon) "
     + (if $title != "" then ($title | esc) else "Flutter Example (\($os | esc)) → \($platform | esc)" end)
     + (if $result == "failure" then " deploy failed at \($step | esc)"
-       elif $result == "warning" then " notes failed at \($step | esc)" else "" end);
+       elif $result == "warning" then " notes failed at \($step | esc)"
+       elif $result == "stopped" then " stopped: \($step | esc)" else "" end);
   def runlink: "<\($server)/\($repo)/actions/runs/\($run)|CI run>";
   def commit:
     if $short == "" then runlink
