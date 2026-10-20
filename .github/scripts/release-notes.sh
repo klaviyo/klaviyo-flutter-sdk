@@ -2,7 +2,8 @@
 #
 # Prints store release notes ("What's new" on Play, "What to Test" on
 # TestFlight) for an example app build: the shared header block
-# followed by the GitHub release body (release events only). Header lines are
+# followed by the GitHub release body (release events and workflow_dispatch
+# runs on a tag). Header lines are
 # never cut. When the text is over the cap the release body is cut first, then
 # the CI run line. Truncation is by character and any cut is marked
 # "…[truncated]" on its own last line, which counts toward the cap. Only when
@@ -14,8 +15,10 @@
 # Env:
 #   SOURCE_LABEL  sanitized source label (source-label.sh)
 #   EVENT_NAME    github.event_name
+#   REF_TYPE      github.ref_type; "tag" on a tag dispatch
 #   RUN_URL       workflow run URL
 #   APP_VERSION   derived app version (app-version.sh); defaults to build-info appVersion
+#   GH_TOKEN      for `gh release view` on a tag dispatch (EVENT_NAME=workflow_dispatch, REF_TYPE=tag)
 #
 set -euo pipefail
 
@@ -30,6 +33,15 @@ case "$PLATFORM" in
   android) NATIVE_NAME="Android" ;;
   *) echo "::error::platform must be ios or android" >&2; exit 2 ;;
 esac
+
+if [ "$BODY_FILE" = "" ] && [ "${EVENT_NAME:-}" = "workflow_dispatch" ] && [ "${REF_TYPE:-}" = "tag" ]; then
+  BODY_FILE=$(mktemp)
+  trap 'rm -f "$BODY_FILE"' EXIT
+  if ! gh release view "${REF_NAME:?REF_NAME is required on a tag dispatch}" --repo "${GITHUB_REPOSITORY:?}" --json body -q .body > "$BODY_FILE"; then
+    echo "::error::Could not read the GitHub release for ${REF_NAME}; no store notes body" >&2
+    exit 1
+  fi
+fi
 
 MAX_CHARS="$MAX_CHARS" NATIVE_NAME="$NATIVE_NAME" BUILD_INFO="$BUILD_INFO" \
   BUILD_NUMBER="$BUILD_NUMBER" BODY_FILE="$BODY_FILE" \
@@ -73,7 +85,9 @@ run_url = os.environ.get("RUN_URL", "")
 
 body = ""
 body_file = os.environ.get("BODY_FILE", "")
-if os.environ.get("EVENT_NAME") == "release" and body_file:
+if body_file and (
+    os.environ.get("EVENT_NAME") == "release" or os.environ.get("REF_TYPE") == "tag"
+):
     try:
         body = open(body_file).read().strip()
     except OSError:
