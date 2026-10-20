@@ -3,16 +3,17 @@
 # X.Y.Z-rc.1 is published as a GitHub prerelease) instead of publishing a draft
 # release in the GitHub UI.
 #
-#   prepare  checks the version, CHANGELOG and CI on the commit, then finds or
-#            creates the draft GitHub release.
-#   publish  publishes the draft (which creates the tag), dispatches
-#            release.yml and publish-example.yml at the tag, and posts to
+#   prepare  checks the version, CHANGELOG, CI and pub.dev packaging on the
+#            commit, then finds or creates the draft GitHub release.
+#   publish  creates the tag, dispatches release.yml at it, and posts ⏳ to
 #            Slack. The pub.dev upload in release.yml waits for approval in
 #            the `pub.dev` environment, the only approval on this path.
+#            Rejecting that approval stops the run and removes the tag.
 #
-# A release published with GITHUB_TOKEN does not trigger tag-push or
-# release-published workflows, so downstream workflows are dispatched.
-# Publishing a draft in the UI still works and triggers them as before.
+# The tag is created with GITHUB_TOKEN, which triggers no tag-push workflow,
+# so release.yml is dispatched. release.yml publishes the draft release and
+# dispatches publish-example.yml once the upload is verified. Publishing a
+# draft in the UI still works and triggers them as before.
 
 name: publish-release
 
@@ -28,6 +29,16 @@ on:
         required: false
         type: string
         default: ''
+      dry_run:
+        description: 'Dry run: run the checks and `dart pub publish --dry-run`; create no release, tag or dispatch'
+        required: false
+        type: boolean
+        default: false
+      skip_ci_check:
+        description: Skip the CI-green check on the commit (version, branch and tag checks still run)
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: publish-release-${{ inputs.version }}
@@ -39,17 +50,20 @@ permissions:
 jobs:
   prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
       checks: read
     outputs:
       sha: ${{ steps.ref.outputs.sha }}
       release_url: ${{ steps.draft.outputs.url }}
+      ci_skipped: ${{ inputs.skip_ci_check == true }}
     env:
       VERSION: ${{ inputs.version }}
       PRERELEASE: ${{ contains(inputs.version, '-') }}
       INPUT_REF: ${{ inputs.ref }}
+      SKIP_CI: ${{ inputs.skip_ci_check == true }}
+      FLUTTER_VERSION: 3.38.7
     steps:
       - name: Validate version and tag
         env:
@@ -87,7 +101,18 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ steps.ref.outputs.sha }}
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Require a commit on master or rel/*
+        env:
+          SHA: ${{ steps.ref.outputs.sha }}
+        run: |
+          git fetch --no-tags --quiet origin '+refs/heads/master:refs/remotes/origin/master' '+refs/heads/rel/*:refs/remotes/origin/rel/*'
+          if ! git branch -r --contains "$SHA" | grep -Eq 'origin/master$|origin/rel/'; then
+            echo "::error::${SHA} is not on master or a rel/* branch"
+            exit 1
+          fi
 
       - name: Check pubspec version
         run: |
@@ -117,7 +142,12 @@ jobs:
             exit 1
           fi
 
+      - name: Skip CI check
+        if: inputs.skip_ci_check == true
+        run: echo "::warning::CI check skipped by request; the commit's CI was not verified"
+
       - name: Check CI on the commit
+        if: inputs.skip_ci_check != true
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.ref.outputs.sha }}
@@ -136,8 +166,19 @@ jobs:
             exit 1
           fi
 
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Dry-run the pub.dev publish
+        run: |
+          flutter pub get
+          dart pub publish --dry-run
+
       - name: Find or create draft release
         id: draft
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.ref.outputs.sha }}
@@ -158,14 +199,49 @@ jobs:
             echo "Created draft ${url}"
           fi
           echo "url=${url}" >> "$GITHUB_OUTPUT"
+
+      - name: Write summary
+        env:
+          SHA: ${{ steps.ref.outputs.sha }}
+          RELEASE_URL: ${{ steps.draft.outputs.url }}
+        run: |
           {
-            echo "### klaviyo_flutter_sdk ${VERSION} prepared"
+            echo "### klaviyo_flutter_sdk ${VERSION}${{ inputs.dry_run && ' (dry run)' || '' }} prepared"
             echo
-            echo "[Release notes](${url})"
+            echo "- Commit: \`${SHA}\`"
+            [ -z "$RELEASE_URL" ] || echo "- [Release notes](${RELEASE_URL})"
+            if [ "$SKIP_CI" = "true" ]; then
+              echo "- ⚠️ CI check skipped by request"
+            fi
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo
+              echo "Dry run: no release, tag or dispatch."
+            else
+              echo
+              echo "Next: create the tag and dispatch release.yml, then approve \`pub.dev\` on that run."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: failure()
+        with:
+          persist-credentials: false
+
+      - name: Notify Slack on failure
+        if: failure()
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: failure
+          title: klaviyo_flutter_sdk ${{ inputs.version }} release
+          failed_step: ${{ (steps.ref.outputs.sha == '' && 'validate version and tag or resolve commit') || 'prepare checks' }}
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ steps.ref.outputs.sha || github.sha }}
 
   publish:
     needs: prepare
+    if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -174,34 +250,28 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
-      PRERELEASE: ${{ contains(inputs.version, '-') }}
       SHA: ${{ needs.prepare.outputs.sha }}
+      SKIP_CI: ${{ needs.prepare.outputs.ci_skipped }}
     steps:
-      - name: Publish the draft release
+      - name: Create the tag
         run: |
-          latest=true
-          if [ "$PRERELEASE" = "true" ]; then
-            latest=false
-          fi
-          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --target "$SHA" \
-            "--prerelease=${PRERELEASE}" "--latest=${latest}"
-          tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${VERSION}" --jq .sha)
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f "ref=refs/tags/${VERSION}" -f "sha=${SHA}" > /dev/null
+          tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" --jq .object.sha)
           if [ "$tag_sha" != "$SHA" ]; then
             echo "::error::Tag ${VERSION} points at ${tag_sha}, expected ${SHA}"
             exit 1
           fi
+          echo "Tag ${VERSION} created at ${SHA}; the draft release stays a draft until the upload is verified"
 
-      - name: Dispatch downstream workflows
+      - name: Dispatch release.yml at the tag
         id: dispatch
         run: |
           gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
-          gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both
           {
-            echo "### klaviyo_flutter_sdk ${VERSION} published"
+            echo "### klaviyo_flutter_sdk ${VERSION} tagged"
             echo
-            echo "Dispatched at tag \`${VERSION}\`:"
-            echo "- [release.yml](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml) (pub.dev, waits for \`pub.dev\` approval)"
-            echo "- [publish-example.yml](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/publish-example.yml)"
+            echo "Dispatched [release.yml](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml) at tag \`${VERSION}\` (pub.dev, waits for \`pub.dev\` approval)."
+            echo "publish-example.yml is dispatched by release.yml once the upload is verified."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "release_runs=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml" >> "$GITHUB_OUTPUT"
 
@@ -211,12 +281,13 @@ jobs:
           persist-credentials: false
 
       - name: Notify Slack
+        if: success()
         continue-on-error: true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: pending
-          title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting pub.dev approval
+          title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting pub.dev approval${{ needs.prepare.outputs.ci_skipped == 'true' && ' (CI check skipped)' || '' }}
           release_url: ${{ needs.prepare.outputs.release_url }}
           event_name: ${{ github.event_name }}
           commit_sha: ${{ needs.prepare.outputs.sha }}
