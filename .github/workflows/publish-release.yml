@@ -47,12 +47,13 @@ jobs:
       sha: ${{ steps.ref.outputs.sha }}
       release_url: ${{ steps.draft.outputs.url }}
     env:
-      GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
       PRERELEASE: ${{ contains(inputs.version, '-') }}
       INPUT_REF: ${{ inputs.ref }}
     steps:
       - name: Validate version and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::version '${VERSION}' is not X.Y.Z or X.Y.Z-suffix"
@@ -65,6 +66,8 @@ jobs:
 
       - name: Resolve commit
         id: ref
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           ref="$INPUT_REF"
           if [ -z "$ref" ]; then
@@ -89,7 +92,7 @@ jobs:
       - name: Check pubspec version
         run: |
           raw=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-          if [ "${raw%%+*}" != "$VERSION" ]; then
+          if [ "$raw" != "$VERSION" ]; then
             echo "::error::pubspec.yaml version is '${raw}', expected ${VERSION}"
             exit 1
           fi
@@ -116,12 +119,13 @@ jobs:
 
       - name: Check CI on the commit
         env:
+          GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.ref.outputs.sha }}
         run: |
           runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \
-            --jq '.check_runs[] | select(.name != "prepare" and .name != "publish") | "\(.status) \(.conclusion) \(.name)"')
+            --jq '.check_runs[] | select(.name | test("^(test|lint|build-android|build-ios|verify-version-sync)$")) | "\(.status) \(.conclusion) \(.name)"')
           if [ -z "$runs" ]; then
-            echo "::error::No check runs found on ${SHA}"
+            echo "::error::No test, lint, build or version-check runs found on ${SHA}"
             exit 1
           fi
           echo "$runs"
@@ -135,6 +139,7 @@ jobs:
       - name: Find or create draft release
         id: draft
         env:
+          GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.ref.outputs.sha }}
         run: |
           existing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \

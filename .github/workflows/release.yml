@@ -35,7 +35,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           raw=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-          if [ "${raw%%+*}" != "$TAG" ]; then
+          if [ "$raw" != "$TAG" ]; then
             echo "::error::pubspec.yaml version is '${raw}', but the tag is ${TAG}"
             exit 1
           fi
