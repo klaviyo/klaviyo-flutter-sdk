@@ -100,5 +100,5 @@ def fit():
 
 
 notes = fit()
-print(notes)
+print(notes, end="")
 PY
