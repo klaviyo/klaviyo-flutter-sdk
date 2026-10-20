@@ -162,7 +162,6 @@ jobs:
     if: |
       always()
       && startsWith(github.ref, 'refs/tags/')
-      && needs.validate.result == 'success'
       && needs.validate.outputs.already_live != 'true'
       && needs.publish.result != 'success'
     runs-on: ubuntu-latest
