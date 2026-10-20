@@ -9,6 +9,7 @@ import 'models/klaviyo_subscription.dart';
 import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
+import 'models/auth_token.dart';
 import 'models/klaviyo_push_action.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
@@ -40,6 +41,17 @@ class KlaviyoSDK {
   String? _apiKey;
   bool _loggingEnabled = true;
   Level _dartLogLevel = Level.INFO;
+
+  // A single, permanent subscription to native `auth_token_requested` events,
+  // attached lazily on first registration and never cancelled. The events flow
+  // through a BufferedBroadcastStreamController, which queues events while it
+  // has no listener; cancelling and re-subscribing would let a racing event
+  // buffer during the gap and then replay a stale request id into a replacement
+  // provider. Keeping one listener alive and gating on [_authTokenProvider]
+  // avoids that — the handler consumes every event immediately and ignores any
+  // that arrive while no provider is registered.
+  StreamSubscription<Map<String, dynamic>>? _authTokenSubscription;
+  AuthTokenProvider? _authTokenProvider;
 
   // Getters
   bool get isInitialized => _isInitialized;
@@ -304,6 +316,129 @@ class KlaviyoSDK {
     }
   }
 
+  // ============================================================================
+  // Auth Token (JWT) — personalized In-App Forms
+  // ============================================================================
+
+  /// Registers a provider that the native SDK invokes when it needs to acquire
+  /// or refresh an authentication token (JWT) for the current end-user.
+  ///
+  /// The Flutter SDK is a thin bridge: token state management (caching,
+  /// proactive refresh, WebView injection, and token logging) lives in the
+  /// native iOS and Android SDKs. A native caller's timeout does not cancel the
+  /// Future returned by [provider]; the provider must bound its own work.
+  ///
+  /// Calling this replaces any previously-registered provider. See
+  /// [AuthTokenProvider] for the provider contract, including how to signal a
+  /// connectivity failure so the native SDK can retry on reconnect.
+  Future<void> registerAuthTokenProvider(AuthTokenProvider provider) async {
+    _ensureInitialized();
+
+    // Attach the single permanent listener once (see [_authTokenSubscription]).
+    _authTokenSubscription ??=
+        _nativeWrapper.onAuthTokenRequested.listen(_handleAuthTokenRequest);
+
+    // Re-register: tear down the native provider first so it drains any pending
+    // requests before the replacement takes over. The Dart listener stays put;
+    // swapping [_authTokenProvider] is what redirects future requests.
+    if (_authTokenProvider != null) {
+      try {
+        await _nativeWrapper.unregisterAuthTokenProvider();
+      } catch (e) {
+        _logger.warning('Failed to tear down previous auth token provider: $e');
+      }
+    }
+
+    _authTokenProvider = provider;
+
+    try {
+      await _nativeWrapper.registerAuthTokenProvider();
+      _logger.info('Auth token provider registered');
+    } catch (e) {
+      _authTokenProvider = null;
+      throw KlaviyoException('Failed to register auth token provider: $e');
+    }
+  }
+
+  /// Detaches the auth token provider and turns personalization off.
+  /// This is not a logout; use [resetProfile] to clear the current profile.
+  ///
+  /// Clears the active provider (so any further native request is ignored) and
+  /// forwards to the native SDK's `unregisterAuthTokenProvider()`, which clears
+  /// the provider and tears down its token state. Re-registering afterward
+  /// works normally. The permanent event listener is intentionally left
+  /// attached (see [_authTokenSubscription]).
+  Future<void> unregisterAuthTokenProvider() async {
+    _ensureInitialized();
+
+    _authTokenProvider = null;
+
+    try {
+      await _nativeWrapper.unregisterAuthTokenProvider();
+      _logger.info('Auth token provider unregistered');
+    } catch (e) {
+      throw KlaviyoException('Failed to unregister auth token provider: $e');
+    }
+  }
+
+  /// Handles a single native `auth_token_requested` event: invokes the active
+  /// host provider and relays the outcome back to native. Never logs the token.
+  Future<void> _handleAuthTokenRequest(Map<String, dynamic> event) async {
+    final id = parseAuthTokenRequestedEventId(event);
+    if (id == null) {
+      _logger.warning('Ignoring auth token request with invalid id');
+      return;
+    }
+
+    final provider = _authTokenProvider;
+    String? jwt;
+    String? responseError;
+    var isConnectivityError = false;
+
+    if (provider == null) {
+      _logger.info('Auth token request received with no active provider');
+      responseError = 'No auth token provider registered';
+    } else {
+      _logger.info('Auth token provider event received');
+      try {
+        final token = await provider();
+        if (!identical(_authTokenProvider, provider)) {
+          _logger.info(
+            'Auth token provider changed during fetch; discarding result for $id',
+          );
+          responseError = 'Auth token provider changed during fetch';
+        } else if (token.isEmpty) {
+          throw const KlaviyoException(
+            'Auth token provider resolved without a token',
+          );
+        } else {
+          jwt = token;
+        }
+      } catch (error) {
+        final classified = classifyAuthTokenProviderError(error);
+        responseError = classified.message;
+        isConnectivityError = classified.isConnectivityError;
+        _logger.warning(
+          'Auth token provider failed for request $id: ${classified.message}',
+        );
+      }
+    }
+
+    try {
+      await _nativeWrapper.respondToAuthTokenRequest(
+        id,
+        jwt: jwt,
+        error: responseError,
+        isConnectivityError: isConnectivityError,
+      );
+      if (jwt != null) {
+        _logger.info('Auth token response sent to native');
+      }
+    } catch (error) {
+      _logger.warning('Failed to send auth token response to native: $error');
+    }
+  }
+
   /// Begin monitoring geofences configured in your Klaviyo account
   /// Requires location permissions to be granted by user
   Future<void> registerGeofencing() async {
@@ -537,6 +672,22 @@ class KlaviyoSDK {
 
   /// Dispose resources
   void dispose() {
+    // Tear down the auth bridge before the wrapper closes its event
+    // controllers. Otherwise a still-registered native provider keeps emitting
+    // `auth_token_requested` events into a closed stream — the add() throws and
+    // is swallowed, so the native request is never answered and stalls until the
+    // SDK timeout. Only act if a provider is registered (which implies the SDK
+    // was initialized, so the native call is safe).
+    if (_authTokenProvider != null) {
+      _authTokenSubscription?.cancel();
+      _authTokenSubscription = null;
+      _authTokenProvider = null;
+      // dispose() is synchronous; fire-and-forget the native unregister.
+      _nativeWrapper.unregisterAuthTokenProvider().catchError((Object e) {
+        _logger
+            .warning('Failed to unregister auth token provider on dispose: $e');
+      });
+    }
     _nativeWrapper.dispose();
   }
 }

@@ -60,22 +60,21 @@ PODS:
   - GoogleUtilities/UserDefaults (8.1.4):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
-  - klaviyo_flutter_sdk (0.3.1):
+  - klaviyo_flutter_sdk (0.4.0):
     - Flutter
-    - KlaviyoCore (~> 5.4.1)
-    - KlaviyoForms (~> 5.4.1)
-    - KlaviyoLocation (~> 5.4.1)
-    - KlaviyoSwift (~> 5.4.1)
-  - KlaviyoCore (5.4.1):
+    - KlaviyoForms (~> 5.5.0)
+    - KlaviyoLocation (~> 5.5.0)
+    - KlaviyoSwift (~> 5.5.0)
+  - KlaviyoCore (5.5.0):
     - AnyCodable-FlightSchool
-  - KlaviyoForms (5.4.1):
-    - KlaviyoCore (~> 5.4.1)
-  - KlaviyoLocation (5.4.1):
-    - KlaviyoSwift (~> 5.4.1)
-  - KlaviyoSwift (5.4.1):
+  - KlaviyoForms (5.5.0):
+    - KlaviyoCore (~> 5.5.0)
+  - KlaviyoLocation (5.5.0):
+    - KlaviyoSwift (~> 5.5.0)
+  - KlaviyoSwift (5.5.0):
     - AnyCodable-FlightSchool
-    - KlaviyoCore (~> 5.4.1)
-  - KlaviyoSwiftExtension (5.4.1)
+    - KlaviyoCore (~> 5.5.0)
+  - KlaviyoSwiftExtension (5.5.0)
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -95,7 +94,7 @@ DEPENDENCIES:
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
   - klaviyo_flutter_sdk (from `.symlinks/plugins/klaviyo_flutter_sdk/ios`)
-  - KlaviyoSwiftExtension (~> 5.4.1)
+  - KlaviyoSwiftExtension (~> 5.5.0)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -137,8 +136,8 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   AnyCodable-FlightSchool: 261cbe76757802b17d471b9059b21e6fa5edf57b
   Firebase: 7ca191e43724142f79fae653547b3382c45413cc
-  firebase_core: 7ed66bd750bf2b7a29268b21d63eec7bc6799ee8
-  firebase_messaging: 437b5662e6a3a945a7a07166bfba05a86c998b55
+  firebase_core: 55de508663ceda7d1dc369a32b327a5655019ae2
+  firebase_messaging: df68cb5feefa02766144a50fa5348362a0127008
   FirebaseCore: c990214798d7c568ad436a15ba7da25c7a278c9a
   FirebaseCoreInternal: 656b1c2fd5a1c5976183dc54b73deda78fb26ee3
   FirebaseInstallations: f70a49eed611f5602f373e40974b3b01556ac217
@@ -146,18 +145,18 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleUtilities: db34c1c11c6f2eccb6fab2340cb8ceb1451299dc
-  klaviyo_flutter_sdk: 46ba46055e9814901cfcbf52cb8c36549cb95455
-  KlaviyoCore: 252a62ea36e47109e92bd376b0a1c4026b956e75
-  KlaviyoForms: b9767202597c87c1637969f1070903fd7fecfc7e
-  KlaviyoLocation: d69799af58502deb4ce5ce47fec7b6b7e5791f4f
-  KlaviyoSwift: fabd2b2da05f9e7e32ab0d23b560eb90640196b6
-  KlaviyoSwiftExtension: 2f5b9348e2198af88c6bd5189123865732a0ae7c
+  klaviyo_flutter_sdk: 67f97e1a99b5c22f7077dd2c60f354c56d39eaa8
+  KlaviyoCore: 54a67b4684ecb6f14334210ef139e5226cf3cd5d
+  KlaviyoForms: e5e3138223616a007c86e43b1e3fe816a4527a42
+  KlaviyoLocation: 7fb35c1c13bd49d5dd51c817d2f150a473e7ac24
+  KlaviyoSwift: 86c0923a6631509f1eaf6c6f1fe4fa97bd83f5b6
+  KlaviyoSwiftExtension: a37b45143f0bf795044206e0dbb6ceda19b0e382
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
-  package_info_plus: c0502532a26c7662a62a356cebe2692ec5fe4ec4
-  permission_handler_apple: ee2fe0fd04551b304eb002714ff067c371c822ed
+  package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
+  permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
-  shared_preferences_foundation: 5086985c1d43c5ba4d5e69a4e8083a389e2909e6
+  shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
 
-PODFILE CHECKSUM: a20f81715ef8adb0de3510a3ca6e82484ad1c721
+PODFILE CHECKSUM: eba8ef2b0bd6c67dd1a0297f378da63db942c3f5
 
 COCOAPODS: 1.16.2
