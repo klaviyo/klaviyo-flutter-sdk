@@ -42,7 +42,7 @@ on:
         default: false
 
 concurrency:
-  group: publish-release-${{ inputs.version }}
+  group: publish-release
   cancel-in-progress: false
 
 permissions:
@@ -156,10 +156,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.ref.outputs.sha }}
         run: |
-          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \
+          ci_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" \
+            --jq "[.[] | select(.merge_commit_sha == \"${SHA}\")][0].head.sha // empty")
+          ci_sha=${ci_sha:-$SHA}
+          echo "Checking CI on ${ci_sha}"
+          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${ci_sha}/check-runs" \
             --jq '.check_runs[] | select(.name | test("^(test|lint|build-android|build-ios|verify-version-sync)$")) | "\(.status) \(.conclusion) \(.name)"')
           if [ -z "$runs" ]; then
-            echo "::error::No test, lint, build or version-check runs found on ${SHA}"
+            echo "::error::No test, lint, build or version-check runs found on ${ci_sha}"
             exit 1
           fi
           echo "$runs"
