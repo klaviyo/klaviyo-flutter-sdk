@@ -8,7 +8,8 @@
 #   publish  creates the tag, dispatches release.yml at it, and posts ⏳ to
 #            Slack. The pub.dev upload in release.yml waits for approval in
 #            the `pub.dev` environment, the only approval on this path.
-#            Rejecting that approval stops the run and removes the tag.
+#            Rejecting that approval stops the run; the tag stays (tags can't
+#            be deleted), so retry by running release.yml at the tag.
 #
 # The tag is created with GITHUB_TOKEN, which triggers no tag-push workflow,
 # so release.yml is dispatched. release.yml publishes the draft release and
@@ -74,7 +75,7 @@ jobs:
             exit 1
           fi
           if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" > /dev/null 2>&1; then
-            echo "::error::Tag ${VERSION} already exists"
+            echo "::error::Tag ${VERSION} already exists. To retry a stopped release, run release.yml at the tag from the Actions tab."
             exit 1
           fi
 
@@ -278,12 +279,6 @@ jobs:
             echo "publish-example.yml is dispatched by release.yml once the upload is verified."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "release_runs=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml" >> "$GITHUB_OUTPUT"
-
-      - name: Remove the tag if the dispatch failed
-        if: failure() && steps.tag.outcome == 'success' && steps.dispatch.outcome == 'failure'
-        run: |
-          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}"
-          echo "::warning::Dispatching release.yml failed; deleted tag ${VERSION}"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: always()
