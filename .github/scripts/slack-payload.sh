@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 #
-# Prints the Slack message payload (JSON) for an example app publish result.
+# Prints the Slack message payload (JSON) for an example app or SDK publish result.
 # Every value arrives through the environment and is encoded by jq, so
 # newlines, quotes and Slack markup in a value cannot break the request.
 #
 # Usage: slack-payload.sh > payload.json
 #
 # Env:
-#   RESULT         success | failure | warning
+#   RESULT         success | failure | warning | pending | stopped
 #   OS             iOS | Android
 #   PLATFORM       store label, e.g. "TestFlight", "Play internal"
+#   TITLE          headline subject (optional, replaces the OS/PLATFORM headline)
 #   VERSION_LABEL  full version with build number
+#   VERSION_HEADING  label for VERSION_LABEL (default "Build")
+#   RELEASE_URL    GitHub release page (optional)
 #   SDK_INFO       pre-formatted SDK line
 #   SOURCE_LABEL   sanitized source label
 #   EVENT_NAME     github.event_name
 #   COMMIT_SHA     commit to link
 #   COMMIT_SHORT   7-char sha
-#   FAILED_STEP    step name for failure and warning messages
+#   FAILED_STEP    step name for failure and warning messages; stop reason for stopped
 #   ACCESS_URL     link testers must sign in to reach (optional)
 #   ACCESS_LABEL   link text for ACCESS_URL
 #   INSTALL_NOTES  install guidance (optional)
@@ -28,7 +31,10 @@ jq -n \
   --arg result "${RESULT:?RESULT is required}" \
   --arg os "${OS:-}" \
   --arg platform "${PLATFORM:-}" \
+  --arg title "${TITLE:-}" \
   --arg version "${VERSION_LABEL:-}" \
+  --arg versionheading "${VERSION_HEADING:-Build}" \
+  --arg release "${RELEASE_URL:-}" \
   --arg sdks "${SDK_INFO:-}" \
   --arg source "${SOURCE_LABEL:-}" \
   --arg event "${EVENT_NAME:-}" \
@@ -46,16 +52,19 @@ jq -n \
   # comes from one is escaped before it is placed in the message. The links built below are markup on
   # purpose and are not escaped; only their text is.
   def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
-  def icon: if $result == "success" then "✅" elif $result == "warning" then "⚠️" else "❌" end;
+  def icon: if $result == "success" then "✅" elif $result == "warning" then "⚠️" elif $result == "pending" then "⏳" elif $result == "stopped" then "⏹" else "❌" end;
   def headline:
-    "\(icon) Flutter Example (\($os | esc)) → \($platform | esc)"
+    "\(icon) "
+    + (if $title != "" then ($title | esc) else "Flutter Example (\($os | esc)) → \($platform | esc)" end)
     + (if $result == "failure" then " deploy failed at \($step | esc)"
-       elif $result == "warning" then " uploaded, but \($step | esc) failed" else "" end);
+       elif $result == "warning" then " uploaded, but \($step | esc) failed"
+       elif $result == "stopped" then " stopped: \($step | esc)" else "" end);
   def runlink: "<\($server)/\($repo)/actions/runs/\($run)|CI run>";
   def commit:
     if $short == "" then runlink
     else "<\($server)/\($repo)/commit/\($sha)|\($short | esc)> · " + runlink end;
-  ([ (if $version != "" then "*Build:* \($version | esc)" else empty end),
+  ([ (if $version != "" then "*\($versionheading | esc):* \($version | esc)" else empty end),
+     (if $release != "" then "*Release:* <\($release)|GitHub release>" else empty end),
      (if $sdks != "" then "*SDKs:* \($sdks | esc)" else empty end),
      (if $source != "" then "*Source:* \($source | esc) (\($event | esc))" else empty end),
      "*Commit:* " + commit,
@@ -63,5 +72,5 @@ jq -n \
      (if $notes != "" then ($notes | esc) else empty end) ] | join("\n")) as $body
   | { text: headline,
       blocks: [
-        { type: "header", text: { type: "plain_text", text: headline } },
+        { type: "header", text: { type: "plain_text", text: (headline | .[0:150]) } },
         { type: "section", text: { type: "mrkdwn", text: $body } } ] }'
