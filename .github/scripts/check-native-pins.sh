@@ -29,8 +29,9 @@ done < <(grep -nE "^[[:space:]]*s\.dependency[[:space:](]+['\"]Klaviyo[A-Za-z]*[
 while IFS= read -r line; do
   errors+=("${podfile}: Klaviyo pod not from a release: ${line}")
 done < <(awk '
-  /^[[:space:]]*pod[[:space:](]+['\''"]Klaviyo/ { decl = $0; start = NR; if ($0 !~ /,[[:space:]]*$/) { print start ":" decl; decl = "" }; next }
-  decl != "" { decl = decl " " $0; if ($0 !~ /,[[:space:]]*$/) { print start ":" decl; decl = "" } }
+  { code = $0; sub(/[[:space:]]*#.*$/, "", code) }
+  /^[[:space:]]*pod[[:space:](]+['\''"]Klaviyo/ { decl = $0; start = NR; if (code !~ /,[[:space:]]*$/) { print start ":" decl; decl = "" }; next }
+  decl != "" { decl = decl " " $0; if (code !~ /,[[:space:]]*$/) { print start ":" decl; decl = "" } }
 ' "$root/$podfile" | grep -E "(:(git|branch|commit|path|tag)[[:space:]]*=>|[[:space:],](git|branch|commit|path|tag):[[:space:]])" || true)
 
 if [ -f "$root/$package" ]; then
