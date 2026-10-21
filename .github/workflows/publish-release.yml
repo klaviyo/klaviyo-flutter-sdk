@@ -55,6 +55,7 @@ jobs:
     permissions:
       contents: write
       checks: read
+      pull-requests: read
     outputs:
       sha: ${{ steps.ref.outputs.sha }}
       release_url: ${{ steps.draft.outputs.url }}
