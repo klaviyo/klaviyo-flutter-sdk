@@ -57,7 +57,7 @@ jq -n \
     "\(icon) "
     + (if $title != "" then ($title | esc) else "Flutter Example (\($os | esc)) → \($platform | esc)" end)
     + (if $result == "failure" then " deploy failed at \($step | esc)"
-       elif $result == "warning" then " notes failed at \($step | esc)"
+       elif $result == "warning" then " uploaded, but \($step | esc) failed"
        elif $result == "stopped" then " stopped: \($step | esc)" else "" end);
   def runlink: "<\($server)/\($repo)/actions/runs/\($run)|CI run>";
   def commit:

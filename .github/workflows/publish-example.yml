@@ -24,6 +24,11 @@ on:
     branches:
       - master
       - 'rel/**'
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.coderabbit.yaml'
   release:
     types: [published]
   workflow_dispatch:
@@ -50,7 +55,6 @@ permissions:
 
 env:
   FLUTTER_VERSION: 3.38.7
-  MOBILE_SLACK_CHANNEL: '#mobile-push-team'
   GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
 
 jobs:
@@ -158,8 +162,9 @@ jobs:
     timeout-minutes: 45
     environment: android-internal-track
     concurrency:
-      group: publish-example-android-${{ github.event_name == 'push' && github.ref || github.run_id }}
-      cancel-in-progress: ${{ github.event_name == 'push' }}
+      group: publish-example-android
+      cancel-in-progress: false
+      queue: max
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -262,15 +267,6 @@ jobs:
           (cd .. && flutter pub get)
           bundle exec fastlane android release
 
-      - name: Upload to Internal App Sharing
-        if: success() && inputs.check_credentials != true
-        id: internal_sharing
-        continue-on-error: true
-        working-directory: example/android
-        env:
-          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
-        run: bundle exec fastlane android share
-
       - name: Clean up signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks" example/android/key.properties example/android/app/google-services.json
@@ -290,9 +286,9 @@ jobs:
           event_name: ${{ github.event_name }}
           commit_sha: ${{ steps.buildinfo.outputs.commit_sha }}
           commit_short: ${{ steps.buildinfo.outputs.commit_short }}
-          access_url: ${{ steps.internal_sharing.outputs.url }}
-          access_label: Internal App Sharing link
-          install_notes: ${{ steps.internal_sharing.outputs.url == '' && format('Install {0} ({1}) from the Play Store with a Google account on the internal testers list; ask in {2} to be added.', env.APP_VERSION, env.VERSION_CODE, env.MOBILE_SLACK_CHANNEL) || '' }}
+          access_url: https://play.google.com/apps/test/com.klaviyo.flutterexample/${{ env.VERSION_CODE }}
+          access_label: Install Klaviyo Flutter Example from Google Play
+          install_notes: Installs for anyone who has done the internal-track opt-in, once Play has finished processing the release.
 
 
       - name: Notify Slack on failure
@@ -333,8 +329,9 @@ jobs:
       name: testflight
       url: ${{ steps.result.outputs.testflight_url }}
     concurrency:
-      group: publish-example-ios-${{ github.event_name == 'push' && github.ref || github.run_id }}
-      cancel-in-progress: ${{ github.event_name == 'push' }}
+      group: publish-example-ios
+      cancel-in-progress: false
+      queue: max
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     outputs:
@@ -509,7 +506,7 @@ jobs:
           # Requires an App Store Connect login; testers install via the TestFlight app.
           access_url: https://appstoreconnect.apple.com/apps/${{ env.ASC_APP_ID }}/testflight/ios
           access_label: TestFlight in App Store Connect
-          install_notes: Install from the TestFlight app once Apple finishes processing it, usually in 5 to 30 minutes. Not a tester yet? Ask in #mobile-push-team to be added, and give them your Apple ID email.
+          install_notes: Install from the TestFlight app once Apple finishes processing it, usually in 5 to 30 minutes.
 
       - name: Notify Slack on failure
         if: failure()

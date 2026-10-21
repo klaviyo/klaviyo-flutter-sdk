@@ -128,6 +128,8 @@ platform :ios do
   desc "Build and upload to TestFlight, retrying once with a fresh build number"
   lane :release do |options|
     version = options.fetch(:version)
+    expected = ENV["IOS_MARKETING_VERSION"].to_s
+    UI.user_error!("version '#{version}' does not match IOS_MARKETING_VERSION '#{expected}'") unless version == expected
     number = next_build_number(version: version)
     built = nil
     attempts = 0
