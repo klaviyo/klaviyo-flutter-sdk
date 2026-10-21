@@ -27,7 +27,10 @@ done < <(grep -nE "^[[:space:]]*s\.dependency[[:space:]]+['\"]Klaviyo[A-Za-z]*['
 
 while IFS= read -r line; do
   errors+=("${podfile}: Klaviyo pod not from a release: ${line}")
-done < <(grep -nE "^[[:space:]]*pod[[:space:]]+['\"]Klaviyo[A-Za-z]*['\"].*:(git|branch|commit|path|tag)[[:space:]]*=>" "$root/$podfile" || true)
+done < <(awk '
+  /^[[:space:]]*pod[[:space:]]+['\''"]Klaviyo/ { decl = $0; start = NR; if ($0 !~ /,[[:space:]]*$/) { print start ":" decl; decl = "" }; next }
+  decl != "" { decl = decl " " $0; if ($0 !~ /,[[:space:]]*$/) { print start ":" decl; decl = "" } }
+' "$root/$podfile" | grep -E "(:(git|branch|commit|path|tag)[[:space:]]*=>|[[:space:],](git|branch|commit|path|tag):[[:space:]])" || true)
 
 if [ -f "$root/$package" ]; then
   swift_pin=$(awk '/klaviyo-swift-sdk/ { grab = 1 } grab { print; if (/\)/) exit }' "$root/$package" | tr -d '\n')
