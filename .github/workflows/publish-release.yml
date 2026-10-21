@@ -122,6 +122,9 @@ jobs:
             exit 1
           fi
 
+      - name: Check native SDK pins
+        run: ./.github/scripts/check-native-pins.sh
+
       - name: Check synced version files
         run: |
           ./scripts/sync_version.sh

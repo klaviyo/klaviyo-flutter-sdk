@@ -32,6 +32,9 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      - name: Check native SDK pins
+        run: ./.github/scripts/check-native-pins.sh
+
       - name: Check version and CHANGELOG match the tag
         env:
           TAG: ${{ github.ref_name }}
