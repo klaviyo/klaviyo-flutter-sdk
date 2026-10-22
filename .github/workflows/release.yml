@@ -97,6 +97,35 @@ jobs:
           echo "::error::klaviyo_flutter_sdk ${VERSION} did not appear on pub.dev within 5 minutes"
           exit 1
 
+  linear-release:
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync release to Linear
+        continue-on-error: true
+        uses: linear/linear-release-action@30f9ae77461ec29f07fffe0c52edd1909bfbb6f5 # v0.18.1
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          command: sync
+          base_ref: HEAD
+          version: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+
+      - name: Complete release in Linear
+        continue-on-error: true
+        uses: linear/linear-release-action@30f9ae77461ec29f07fffe0c52edd1909bfbb6f5 # v0.18.1
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          command: complete
+          version: ${{ github.ref_name }}
+
   # Publishes the GitHub release after pub.dev has the version, then
   # dispatches publish-example.yml. The dispatch path leaves the release a
   # draft (a GITHUB_TOKEN publish fires no events, so the example deploy is
