@@ -289,6 +289,14 @@ final GoRouter _router = GoRouter(
         );
         return state.matchedLocation;
       }
+
+      // Start a draft in-app forms preview from the form editor's QR code or
+      // copied preview link, then stay on the current page.
+      if (state.uri.queryParameters.containsKey(formsPreviewTokenKey)) {
+        final started = await klaviyo.handleFormsPreviewLink(state.uri);
+        _logger.info('Forms preview link handled: $started');
+        if (started) return state.matchedLocation;
+      }
     }
 
     // Parse the path from custom scheme or universal link

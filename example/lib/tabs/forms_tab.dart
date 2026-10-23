@@ -17,6 +17,10 @@ class FormsTab extends StatefulWidget {
 class _FormsTabState extends State<FormsTab> {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
   final TextEditingController _durationController = TextEditingController();
+
+  // Forms preview: the pasted token is held in memory only and never logged.
+  final TextEditingController _previewTokenController = TextEditingController();
+  bool _previewEnabled = false;
   String _status = 'Manage in-app forms here';
 
   // Use a static variable to persist state across widget rebuilds
@@ -103,6 +107,33 @@ class _FormsTabState extends State<FormsTab> {
       setState(() {
         _status = 'Failed to register for forms: $e';
       });
+    }
+  }
+
+  Future<void> _applyPreviewToken() async {
+    if (!_klaviyo.isInitialized) {
+      setState(() {
+        _status =
+            'SDK not initialized. Please initialize in Profile tab first.';
+      });
+      return;
+    }
+    // An empty field clears the preview and returns to published forms.
+    final token = _previewTokenController.text.trim();
+    await _klaviyo.setFormsPreviewToken(token.isEmpty ? null : token);
+    setState(() {
+      _status =
+          token.isEmpty ? 'Forms preview cleared' : 'Forms preview token set';
+    });
+  }
+
+  Future<void> _setPreviewEnabled(bool enabled) async {
+    setState(() => _previewEnabled = enabled);
+    if (!enabled) {
+      _previewTokenController.clear();
+      if (_klaviyo.isInitialized) {
+        await _klaviyo.setFormsPreviewToken(null);
+      }
     }
   }
 
@@ -201,6 +232,37 @@ class _FormsTabState extends State<FormsTab> {
             ],
 
             const SizedBox(height: 20),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Forms preview'),
+              value: _previewEnabled,
+              onChanged: _setPreviewEnabled,
+            ),
+            if (_previewEnabled)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _previewTokenController,
+                      decoration: const InputDecoration(
+                        labelText: 'Forms preview token',
+                        hintText: 'Paste a token from Preview on device',
+                        border: OutlineInputBorder(),
+                      ),
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      onSubmitted: (_) => _applyPreviewToken(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _applyPreviewToken,
+                    child: const Text('Set'),
+                  ),
+                ],
+              ),
+
+            const SizedBox(height: 20),
             const Text(
               'Note: In-app forms will be displayed automatically based on your Klaviyo account configuration.',
               style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
@@ -267,6 +329,7 @@ class _FormsTabState extends State<FormsTab> {
   void dispose() {
     _lifecycleSubscription?.cancel();
     _durationController.dispose();
+    _previewTokenController.dispose();
     super.dispose();
   }
 }

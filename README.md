@@ -24,6 +24,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Badge Count (iOS)](#badge-count-ios-only)
 - [In-App Forms](#in-app-forms)
   - [Personalized Forms Authentication](#personalized-forms-authentication)
+  - [Previewing Draft Forms on a Device](#previewing-draft-forms-on-a-device)
   - [Monitoring Form Lifecycle Events](#monitoring-form-lifecycle-events)
 - [Deep Linking](#deep-linking)
 - [Geofencing](#geofencing)
@@ -638,6 +639,29 @@ The SDK does not time out your provider, so your code must:
 
 For the equivalent native integration guides, see [Android Personalized Forms Authentication](https://github.com/klaviyo/klaviyo-android-sdk#personalized-forms-authentication) and [iOS Personalized Forms Authentication](https://github.com/klaviyo/klaviyo-swift-sdk#personalized-forms-authentication).
 
+### Previewing Draft Forms on a Device
+
+The Klaviyo form editor's **Preview on device** button gives you a short-lived preview token, a QR code, and a preview link for the draft form. Set a pasted token with `setFormsPreviewToken`, and pass `null` to return to published forms. You can also pass it as `InAppFormConfig(previewToken: token)`.
+
+```dart
+await KlaviyoSDK().setFormsPreviewToken(token); // start a draft preview
+await KlaviyoSDK().setFormsPreviewToken(null); // back to published forms
+```
+
+The preview link is a deep link into your app with a `klaviyo-forms-preview` query parameter. Pass deep links to `handleFormsPreviewLink` before your own routing: it starts the preview and returns `true` for a preview link, and returns `false`, changing nothing, for every other link. With go_router, check it in your `redirect`:
+
+```dart
+redirect: (context, state) async {
+  if (await KlaviyoSDK().handleFormsPreviewLink(state.uri)) {
+    return state.matchedLocation; // stay put
+  }
+  // Your own deep link handling
+  return null;
+},
+```
+
+Both work before or after `registerForInAppForms()`. Preview tokens only read a saved draft and expire after 30 minutes. The native SDKs keep them in memory only and never log them.
+
 ### Monitoring Form Lifecycle Events
 
 > Available in Flutter SDK 0.2.0 and higher. For the equivalent API on other platforms, see the [Android SDK](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) and [iOS SDK](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages) documentation.
@@ -1013,6 +1037,8 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 |--------|-------------|
 | `registerForInAppForms({InAppFormConfig? configuration})` | Register for in-app forms |
 | `unregisterFromInAppForms()` | Unregister from in-app forms |
+| `setFormsPreviewToken(String? token)` | Set or clear (`null`) a draft forms preview token |
+| `handleFormsPreviewLink(Uri url)` | Start a forms preview from a `klaviyo-forms-preview` deep link; returns `true` if handled |
 
 #### Geofencing
 

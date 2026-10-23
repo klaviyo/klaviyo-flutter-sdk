@@ -269,6 +269,16 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Set or clear (null) the forms preview token in the native SDK
+  Future<void> setFormsPreviewToken(String? token) async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('setFormsPreviewToken', {'token': token});
+    } catch (e) {
+      throw const KlaviyoException('Failed to set the forms preview token');
+    }
+  }
+
   /// Unregister from in-app forms using native SDK
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
