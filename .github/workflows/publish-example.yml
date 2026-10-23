@@ -95,7 +95,7 @@ jobs:
     outputs:
       ready: ${{ steps.check.outputs.ready }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -126,7 +126,7 @@ jobs:
     outputs:
       ready: ${{ steps.check.outputs.ready }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -166,7 +166,7 @@ jobs:
       cancel-in-progress: false
       queue: max
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
@@ -192,7 +192,7 @@ jobs:
             echo "sdk_info=$(jq -r '"Flutter \(.sdkVersion)\(if .flutterSdkRef == .sdkVersion then "" else " · \(.flutterSdkRef)" end) | Android \(.androidSdkVersion)\(if .androidSdkRef == .androidSdkVersion then "" else " · \(.androidSdkRef)" end)"' example/build-info.json)"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -232,7 +232,7 @@ jobs:
             -storepass "$KEY_STORE_PASSWORD" -keypass "$KEY_PASSWORD" >/dev/null
           echo "Keystore opens and contains the '$ALIAS' alias"
 
-      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+      - uses: ruby/setup-ruby@824c0e29fdfc7d689c191c27acc969d2d04b7dd8 # v1.331.0
         with:
           ruby-version: '3.3'
           bundler-cache: true
@@ -349,7 +349,7 @@ jobs:
       ios_sdk_version: ${{ steps.result.outputs.ios_sdk_version }}
       ios_sdk_ref: ${{ steps.result.outputs.ios_sdk_ref }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
@@ -399,7 +399,7 @@ jobs:
             --build-name="$IOS_MARKETING_VERSION" --build-number=1 \
             --dart-define-from-file=build-info.json
 
-      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+      - uses: ruby/setup-ruby@824c0e29fdfc7d689c191c27acc969d2d04b7dd8 # v1.331.0
         with:
           ruby-version: '3.3'
           bundler-cache: true
@@ -540,11 +540,11 @@ jobs:
     # The build already shipped; a notes problem warns in Slack and leaves the run green.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+      - uses: ruby/setup-ruby@824c0e29fdfc7d689c191c27acc969d2d04b7dd8 # v1.331.0
         with:
           ruby-version: '3.3'
           bundler-cache: true
@@ -628,7 +628,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Remove label
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v7
         env:
           LABEL_NAME: ${{ github.event.label.name }}
         with:
