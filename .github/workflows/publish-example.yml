@@ -27,8 +27,18 @@ on:
     paths-ignore:
       - '**.md'
       - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
       - '.coderabbit.yaml'
+      - '.cursor/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/CODEOWNERS'
+      - '.github/dependabot.yml'
+      - '.github/pull_request_template.md'
+      - '.github/workflows/pr-target-check.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/stale.yml'
+      - '.github/workflows/version-check.yml'
+      - 'test/**'
+      - 'example/test/**'
   release:
     types: [published]
   workflow_dispatch:
