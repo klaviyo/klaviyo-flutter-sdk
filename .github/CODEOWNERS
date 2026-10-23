@@ -4,3 +4,5 @@
 
 # Mobile App Growth team owns the entire repository
 * @klaviyo/mobile-app-growth
+# Example app: no code owner, so example-only PRs need no review
+/example/
