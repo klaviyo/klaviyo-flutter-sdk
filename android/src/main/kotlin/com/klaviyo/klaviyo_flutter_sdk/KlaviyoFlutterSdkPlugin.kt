@@ -41,7 +41,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import java.io.IOException
+import java.net.SocketException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.Volatile
@@ -683,12 +683,9 @@ class KlaviyoFlutterSdkPlugin :
                 } else {
                     val message = call.argument<String>("error") ?: "Auth token provider returned no token"
                     val isConnectivityError = call.argument<Boolean>("isConnectivityError") ?: false
-                    // Surface connectivity failures as an IOException so the SDK's
-                    // connectivity-driven retry classifier recognizes them; other
-                    // failures use a generic Throwable, which the SDK treats as
-                    // non-retryable.
+                    // The native SDK classifies SocketException as a connectivity failure.
                     if (isConnectivityError) {
-                        callback.onFailure(IOException(message))
+                        callback.onFailure(SocketException(message))
                     } else {
                         callback.onFailure(Throwable(message))
                     }

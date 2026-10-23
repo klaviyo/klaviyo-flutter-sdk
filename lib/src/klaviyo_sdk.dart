@@ -370,10 +370,10 @@ class KlaviyoSDK {
   /// Registers a provider that the native SDK invokes when it needs to acquire
   /// or refresh an authentication token (JWT) for the current end-user.
   ///
-  /// The Flutter SDK is a thin bridge: all token state management (caching,
-  /// proactive refresh, timeouts, WebView injection, and token logging) lives
-  /// in the native iOS and Android SDKs. This wrapper only relays [provider]
-  /// invocations across the platform channel.
+  /// The Flutter SDK is a thin bridge: token state management (caching,
+  /// proactive refresh, WebView injection, and token logging) lives in the
+  /// native iOS and Android SDKs. A native caller's timeout does not cancel the
+  /// Future returned by [provider]; the provider must bound its own work.
   ///
   /// Calling this replaces any previously-registered provider. See
   /// [AuthTokenProvider] for the provider contract, including how to signal a
@@ -407,7 +407,8 @@ class KlaviyoSDK {
     }
   }
 
-  /// Detaches a previously-registered auth token provider — e.g. on logout.
+  /// Detaches the auth token provider and turns personalization off.
+  /// This is not a logout; use [resetProfile] to clear the current profile.
   ///
   /// Clears the active provider (so any further native request is ignored) and
   /// forwards to the native SDK's `unregisterAuthTokenProvider()`, which clears
@@ -436,61 +437,52 @@ class KlaviyoSDK {
       return;
     }
 
-    // Gate on the currently-registered provider. An event that races an
-    // unregister (or otherwise arrives with no provider) is answered with a
-    // failure so the native side resolves immediately instead of waiting for
-    // its timeout — and is never replayed into a later provider.
     final provider = _authTokenProvider;
+    String? jwt;
+    String? responseError;
+    var isConnectivityError = false;
+
     if (provider == null) {
       _logger.info('Auth token request received with no active provider');
-      await _nativeWrapper.respondToAuthTokenRequest(
-        id,
-        error: 'No auth token provider registered',
-      );
-      return;
+      responseError = 'No auth token provider registered';
+    } else {
+      _logger.info('Auth token provider event received');
+      try {
+        final token = await provider();
+        if (!identical(_authTokenProvider, provider)) {
+          _logger.info(
+            'Auth token provider changed during fetch; discarding result for $id',
+          );
+          responseError = 'Auth token provider changed during fetch';
+        } else if (token.isEmpty) {
+          throw const KlaviyoException(
+            'Auth token provider resolved without a token',
+          );
+        } else {
+          jwt = token;
+        }
+      } catch (error) {
+        final classified = classifyAuthTokenProviderError(error);
+        responseError = classified.message;
+        isConnectivityError = classified.isConnectivityError;
+        _logger.warning(
+          'Auth token provider failed for request $id: ${classified.message}',
+        );
+      }
     }
-    _logger.info('Auth token provider event received');
 
     try {
-      final jwt = await provider();
-      // The host fetch can take a while; if the provider was unregistered or
-      // replaced while it was in flight (e.g. logout), do NOT deliver a token
-      // acquired for a now-inactive provider — that could hand the previous
-      // user's token to the native SDK after logout. Answer with a failure so
-      // native resolves instead of hanging.
-      if (!identical(_authTokenProvider, provider)) {
-        _logger.info(
-          'Auth token provider changed during fetch; discarding result for $id',
-        );
-        await _nativeWrapper.respondToAuthTokenRequest(
-          id,
-          error: 'Auth token provider changed during fetch',
-        );
-        return;
-      }
-      if (jwt.isEmpty) {
-        // Route an empty resolution through the failure path so native gets a
-        // clear signal rather than a bogus "success".
-        throw const KlaviyoException(
-          'Auth token provider resolved without a token',
-        );
-      }
-      await _nativeWrapper.respondToAuthTokenRequest(id, jwt: jwt);
-      _logger.info('Auth token response sent to native');
-    } catch (error) {
-      final classified = classifyAuthTokenProviderError(error);
-      _logger.warning(
-        'Auth token provider failed for request $id: ${classified.message}',
+      await _nativeWrapper.respondToAuthTokenRequest(
+        id,
+        jwt: jwt,
+        error: responseError,
+        isConnectivityError: isConnectivityError,
       );
-      try {
-        await _nativeWrapper.respondToAuthTokenRequest(
-          id,
-          error: classified.message,
-          isConnectivityError: classified.isConnectivityError,
-        );
-      } catch (e) {
-        _logger.warning('Failed to send auth token failure to native: $e');
+      if (jwt != null) {
+        _logger.info('Auth token response sent to native');
       }
+    } catch (error) {
+      _logger.warning('Failed to send auth token response to native: $error');
     }
   }
 

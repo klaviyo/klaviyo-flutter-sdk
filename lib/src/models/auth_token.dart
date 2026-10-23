@@ -5,15 +5,14 @@ import 'dart:io';
 /// Personalized In-App Forms require the SDK to present a user-identifying JWT
 /// to the Klaviyo backend. The Flutter SDK is a thin wrapper: the underlying
 /// native iOS and Android SDKs own all token state management (caching,
-/// proactive refresh, timeouts, WebView injection, and all token-related
+/// proactive refresh, WebView injection, and all token-related
 /// logging). The wrapper's sole responsibility is to bridge this provider to
 /// the native SDK.
 ///
 /// The provider is invoked by the native SDK when it needs a token. It should
-/// return the current end-user's JWT, by whatever mechanism the host uses to
-/// obtain one (calling its auth server, exchanging an OAuth refresh token,
-/// reading from a session cache). It should read the current user fresh on
-/// each invocation rather than capturing identity at registration.
+/// fetch a fresh JWT from the host's backend on every invocation rather than
+/// returning a cached token. Read the current user on each invocation rather
+/// than capturing identity at registration.
 ///
 /// **Connectivity failures:** if the provider throws because the device is
 /// offline, the native SDK can wait for connectivity to return and retry — but
@@ -32,7 +31,7 @@ class ClassifiedProviderError {
 
   /// Whether the failure is a connectivity error. When `true`, the native
   /// bridge reconstitutes a typed network error (`URLError` on iOS,
-  /// `IOException` on Android) that the SDK's connectivity-driven refresh
+  /// `SocketException` on Android) that the SDK's connectivity-driven refresh
   /// retry recognizes.
   final bool isConnectivityError;
 

@@ -31,8 +31,15 @@ JwtClaims? inspectJwt(String token) {
     final decoded = jsonDecode(payloadJson);
     if (decoded is! Map<String, dynamic>) return null;
 
+    final exp = _readNumericClaim(decoded['exp']);
+    // DateTime supports at most 100,000,000 days from the Unix epoch.
+    const maxExpirationSeconds = 8640000000000;
     return JwtClaims(
-      exp: _readNumericClaim(decoded['exp']),
+      exp: exp != null &&
+              exp >= -maxExpirationSeconds &&
+              exp <= maxExpirationSeconds
+          ? exp
+          : null,
       iat: _readNumericClaim(decoded['iat']),
     );
   } catch (_) {

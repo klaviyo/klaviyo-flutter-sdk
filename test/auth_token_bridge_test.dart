@@ -20,6 +20,7 @@ void main() {
 
   final List<MethodCall> log = [];
   MockStreamHandlerEventSink? capturedSink;
+  final failedResponseIds = <String>{};
 
   setUp(() {
     log.clear();
@@ -27,6 +28,10 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(methodChannel, (call) async {
       log.add(call);
+      if (call.method == 'respondToAuthTokenRequest' &&
+          failedResponseIds.contains(call.arguments['id'])) {
+        throw PlatformException(code: 'channel-unavailable');
+      }
       return null;
     });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -183,6 +188,59 @@ void main() {
       logMessages.every((m) => !m.contains('jwt-after-logout')),
       isTrue,
       reason: 'a token fetched after logout must never be delivered or logged',
+    );
+
+    failedResponseIds.addAll({
+      'req-channel-success',
+      'req-channel-changed',
+      'req-channel-orphan',
+    });
+    await sdk.registerAuthTokenProvider(() async => 'jwt-channel-success');
+    capturedSink!.success({
+      'type': 'auth_token_requested',
+      'data': {'id': 'req-channel-success'},
+    });
+    await pumpEventQueue();
+    expect(
+      log.where(
+        (call) =>
+            call.method == 'respondToAuthTokenRequest' &&
+            call.arguments['id'] == 'req-channel-success',
+      ),
+      hasLength(1),
+    );
+
+    final replacedProvider = Completer<String>();
+    await sdk.registerAuthTokenProvider(() => replacedProvider.future);
+    capturedSink!.success({
+      'type': 'auth_token_requested',
+      'data': {'id': 'req-channel-changed'},
+    });
+    await pumpEventQueue();
+    await sdk.unregisterAuthTokenProvider();
+    replacedProvider.complete('jwt-channel-changed');
+    await pumpEventQueue();
+    expect(
+      log.where(
+        (call) =>
+            call.method == 'respondToAuthTokenRequest' &&
+            call.arguments['id'] == 'req-channel-changed',
+      ),
+      hasLength(1),
+    );
+
+    capturedSink!.success({
+      'type': 'auth_token_requested',
+      'data': {'id': 'req-channel-orphan'},
+    });
+    await pumpEventQueue();
+    expect(
+      log.where(
+        (call) =>
+            call.method == 'respondToAuthTokenRequest' &&
+            call.arguments['id'] == 'req-channel-orphan',
+      ),
+      hasLength(1),
     );
 
     // --- dispose() tears down a registered native auth provider ------------
