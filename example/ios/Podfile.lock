@@ -1,18 +1,18 @@
 PODS:
   - AnyCodable-FlightSchool (0.6.7)
-  - Firebase/CoreOnly (12.19.0):
-    - FirebaseCore (~> 12.19.0)
-  - Firebase/Messaging (12.19.0):
+  - Firebase/CoreOnly (12.19.3):
+    - FirebaseCore (~> 12.19.3)
+  - Firebase/Messaging (12.19.3):
     - Firebase/CoreOnly
     - FirebaseMessaging (~> 12.19.0)
-  - firebase_core (4.15.0):
-    - Firebase/CoreOnly (= 12.19.0)
+  - firebase_core (4.15.1):
+    - Firebase/CoreOnly (= 12.19.3)
     - Flutter
-  - firebase_messaging (16.7.0):
-    - Firebase/Messaging (= 12.19.0)
+  - firebase_messaging (16.7.1):
+    - Firebase/Messaging (= 12.19.3)
     - firebase_core
     - Flutter
-  - FirebaseCore (12.19.0):
+  - FirebaseCore (12.19.3):
     - FirebaseCoreInternal (~> 12.19.0)
     - GoogleUtilities/Environment (~> 8.1)
     - GoogleUtilities/Logger (~> 8.1)
@@ -135,10 +135,10 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   AnyCodable-FlightSchool: 261cbe76757802b17d471b9059b21e6fa5edf57b
-  Firebase: 7ca191e43724142f79fae653547b3382c45413cc
-  firebase_core: 55de508663ceda7d1dc369a32b327a5655019ae2
-  firebase_messaging: df68cb5feefa02766144a50fa5348362a0127008
-  FirebaseCore: c990214798d7c568ad436a15ba7da25c7a278c9a
+  Firebase: e3c5ab38229ae085490d02398d97b9f5374bbe6e
+  firebase_core: 7a55377761a8e210c2d95459fe1392248faa023f
+  firebase_messaging: d66dd9b68ca259955678628aa4f3e4294d055790
+  FirebaseCore: ab948de5d99e69aeed3cd6f5ace263ce795b2559
   FirebaseCoreInternal: 656b1c2fd5a1c5976183dc54b73deda78fb26ee3
   FirebaseInstallations: f70a49eed611f5602f373e40974b3b01556ac217
   FirebaseMessaging: c15f48126adbe8b4d3238a5e1fa24bab3ad3e472
