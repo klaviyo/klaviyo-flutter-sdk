@@ -29,59 +29,15 @@ void main() {
   List<MethodCall> previewCalls() =>
       log.where((c) => c.method == 'setFormsPreviewToken').toList();
 
-  group('InAppFormConfig previewToken', () {
-    test('is serialized when set', () {
-      expect(
-        const InAppFormConfig(previewToken: _token).toJson(),
-        {'sessionTimeoutDuration': null, 'previewToken': _token},
-      );
-      expect(
-        const InAppFormConfig.infinite(previewToken: _token)
-            .toJson()['previewToken'],
-        _token,
-      );
-    });
-
-    test('is omitted when null or empty', () {
-      expect(
-        const InAppFormConfig().toJson().containsKey('previewToken'),
-        isFalse,
-      );
-      expect(
-        const InAppFormConfig(previewToken: '')
-            .toJson()
-            .containsKey('previewToken'),
-        isFalse,
-      );
-    });
-
-    test('round-trips through fromJson and copyWith', () {
-      final config = InAppFormConfig.fromJson({
-        'sessionTimeoutDuration': 30,
-        'previewToken': _token,
-      });
-      expect(config.previewToken, _token);
-      expect(config.sessionTimeoutDuration, const Duration(seconds: 30));
-      expect(config.copyWith(isInfinite: true).previewToken, _token);
-    });
-
-    test('toString redacts the token', () {
-      expect(
-        const InAppFormConfig(previewToken: _token).toString(),
-        isNot(contains(_token)),
-      );
-    });
-
-    test('registerForInAppForms sends the token over the channel', () async {
-      await KlaviyoSDK().registerForInAppForms(
-        configuration: const InAppFormConfig(previewToken: _token),
-      );
-      final call = log.singleWhere((c) => c.method == 'registerForInAppForms');
-      expect(
-        (call.arguments['configuration'] as Map)['previewToken'],
-        _token,
-      );
-    });
+  test('registerForInAppForms sends no preview token', () async {
+    await KlaviyoSDK().registerForInAppForms(
+      configuration: const InAppFormConfig(),
+    );
+    final call = log.singleWhere((c) => c.method == 'registerForInAppForms');
+    expect(
+      (call.arguments['configuration'] as Map).containsKey('previewToken'),
+      isFalse,
+    );
   });
 
   group('setFormsPreviewToken', () {

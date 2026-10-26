@@ -641,7 +641,7 @@ For the equivalent native integration guides, see [Android Personalized Forms Au
 
 ### Previewing Draft Forms on a Device
 
-The Klaviyo form editor's **Preview on device** button gives you a short-lived preview token, a QR code, and a preview link for the draft form. Set a pasted token with `setFormsPreviewToken`, and pass `null` to return to published forms. You can also pass it as `InAppFormConfig(previewToken: token)`.
+The Klaviyo form editor's **Preview on device** button gives you a short-lived preview token, a QR code, and a preview link for the draft form. Set a pasted token with `setFormsPreviewToken`, and pass `null` to return to published forms.
 
 ```dart
 await KlaviyoSDK().setFormsPreviewToken(token); // start a draft preview

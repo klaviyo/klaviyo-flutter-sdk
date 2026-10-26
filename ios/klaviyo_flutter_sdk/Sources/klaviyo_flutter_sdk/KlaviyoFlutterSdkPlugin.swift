@@ -242,14 +242,9 @@ extension KlaviyoFlutterSdkPlugin {
                 sessionTimeout = 3600 // default: 1 hour
             }
 
-            let previewToken = configuration?["previewToken"] as? String
-
             DispatchQueue.main.async {
                 KlaviyoSDK().registerForInAppForms(
-                    configuration: InAppFormsConfig(
-                        sessionTimeoutDuration: sessionTimeout,
-                        previewToken: previewToken
-                    )
+                    configuration: InAppFormsConfig(sessionTimeoutDuration: sessionTimeout)
                 )
                 self.subscribeToFormLifecycleEvents()
             }

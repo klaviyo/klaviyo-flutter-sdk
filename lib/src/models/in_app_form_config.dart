@@ -8,52 +8,34 @@ class InAppFormConfig {
   final Duration? sessionTimeoutDuration;
   final bool isInfinite;
 
-  /// Optional short-lived credential, generated from the Klaviyo form editor,
-  /// that loads draft forms for on-device testing instead of your published
-  /// forms. Never ship a preview token in a production build. Null or empty
-  /// leaves any token set with `KlaviyoSDK().setFormsPreviewToken` unchanged.
-  final String? previewToken;
-
   const InAppFormConfig._({
     this.sessionTimeoutDuration,
     required this.isInfinite,
-    this.previewToken,
   });
 
   /// Platform default (1hr) or custom timeout
-  const InAppFormConfig({
-    Duration? sessionTimeoutDuration,
-    String? previewToken,
-  }) : this._(
+  const InAppFormConfig({Duration? sessionTimeoutDuration})
+      : this._(
           sessionTimeoutDuration: sessionTimeoutDuration,
           isInfinite: false,
-          previewToken: previewToken,
         );
 
   /// No timeout (infinite)
-  const InAppFormConfig.infinite({String? previewToken})
-      : this._(
-          sessionTimeoutDuration: null,
-          isInfinite: true,
-          previewToken: previewToken,
-        );
+  const InAppFormConfig.infinite()
+      : this._(sessionTimeoutDuration: null, isInfinite: true);
 
   factory InAppFormConfig.fromJson(Map<String, dynamic> json) {
     final raw = json['sessionTimeoutDuration'];
-    final previewToken = json['previewToken'] as String?;
 
     if (raw == _infiniteTimeoutSentinel) {
-      return InAppFormConfig.infinite(previewToken: previewToken);
+      return const InAppFormConfig.infinite();
     }
 
     if (raw is int) {
-      return InAppFormConfig(
-        sessionTimeoutDuration: Duration(seconds: raw),
-        previewToken: previewToken,
-      );
+      return InAppFormConfig(sessionTimeoutDuration: Duration(seconds: raw));
     }
 
-    return InAppFormConfig(previewToken: previewToken);
+    return const InAppFormConfig();
   }
 
   Map<String, dynamic> toJson() {
@@ -61,35 +43,28 @@ class InAppFormConfig {
       'sessionTimeoutDuration': isInfinite
           ? _infiniteTimeoutSentinel
           : sessionTimeoutDuration?.inSeconds,
-      if (previewToken != null && previewToken!.isNotEmpty)
-        'previewToken': previewToken,
     };
   }
 
   InAppFormConfig copyWith({
     Duration? sessionTimeoutDuration,
     bool? isInfinite,
-    String? previewToken,
   }) {
-    final token = previewToken ?? this.previewToken;
     if (isInfinite == true) {
-      return InAppFormConfig.infinite(previewToken: token);
+      return const InAppFormConfig.infinite();
     }
 
     return InAppFormConfig(
       sessionTimeoutDuration:
           sessionTimeoutDuration ?? this.sessionTimeoutDuration,
-      previewToken: token,
     );
   }
 
-  // Returns IAF config in H:MM:SS.uuuuuu format. Redacts the preview token so
-  // the credential never reaches logs.
+  // Returns IAF config in H:MM:SS.uuuuuu format
   @override
   String toString() {
-    final timeout = isInfinite ? 'infinite' : '$sessionTimeoutDuration';
-    final token =
-        (previewToken == null || previewToken!.isEmpty) ? 'null' : '<redacted>';
-    return 'InAppFormConfig(sessionTimeoutDuration: $timeout, previewToken: $token)';
+    return isInfinite
+        ? 'InAppFormConfig(sessionTimeoutDuration: infinite)'
+        : 'InAppFormConfig(sessionTimeoutDuration: $sessionTimeoutDuration)';
   }
 }

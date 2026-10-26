@@ -454,13 +454,8 @@ class KlaviyoFlutterSdkPlugin :
                             }
                         }
 
-                    val previewToken = configuration?.get("previewToken") as? String
-
                     Klaviyo.registerForInAppForms(
-                        InAppFormsConfig(
-                            sessionTimeoutDuration = sessionTimeout,
-                            previewToken = previewToken,
-                        ),
+                        InAppFormsConfig(sessionTimeoutDuration = sessionTimeout),
                     )
 
                     // Unregister any existing handler to prevent duplicates
