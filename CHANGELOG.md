@@ -1,15 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Bug Fixes
-
-- **Geofencing unavailable in Swift Package Manager apps (iOS)**: The plugin's `Package.swift` didn't link `KlaviyoLocation`, so every geofencing method returned `GEOFENCING_NOT_AVAILABLE` in apps that resolve the plugin through Swift Package Manager, the default for Flutter 3.44+. The Swift package now always links `KlaviyoLocation`. CocoaPods apps still opt in with `KLAVIYO_INCLUDE_LOCATION`.
-
-### Documentation
-
-- Geofencing setup now says iOS apps need `location` in `UIBackgroundModes` in `Info.plist`. Without it, the app crashes when geofencing starts.
-
 ## 0.4.0
 
 ### What's New

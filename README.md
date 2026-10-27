@@ -919,7 +919,7 @@ With either dependency manager, add location permission descriptions and the `lo
 </array>
 ```
 
-> ⚠️ **`UIBackgroundModes` must include `location`.** The native location module turns on background location updates when geofencing starts, and iOS raises an `NSInternalInconsistencyException` (the app crashes) if the `location` background mode is missing. If your app already declares `UIBackgroundModes` (for example `remote-notification` for push), add `location` to the existing array.
+> **Note:** Geofencing needs `location` under `UIBackgroundModes`. The native location module turns on background location updates when geofencing starts. Without the `location` background mode, iOS won't allow background location updates (it raises `NSInternalInconsistencyException`), so geofencing won't start. If your app already declares `UIBackgroundModes` (for example `remote-notification` for push), add `location` to the existing array.
 
 ### Disabling In-App Forms
 
