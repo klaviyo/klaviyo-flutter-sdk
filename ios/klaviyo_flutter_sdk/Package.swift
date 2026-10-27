@@ -22,7 +22,8 @@ let package = Package(
             dependencies: [
                 .product(name: "FlutterFramework", package: "FlutterFramework"),
                 .product(name: "KlaviyoSwift", package: "klaviyo-swift-sdk"),
-                .product(name: "KlaviyoForms", package: "klaviyo-swift-sdk")
+                .product(name: "KlaviyoForms", package: "klaviyo-swift-sdk"),
+                .product(name: "KlaviyoLocation", package: "klaviyo-swift-sdk")
             ],
             resources: [
                 .process("klaviyo-sdk-configuration.plist")
