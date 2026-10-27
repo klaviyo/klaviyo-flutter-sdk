@@ -82,7 +82,7 @@ Geofencing methods will return "UNAVAILABLE" errors.
    ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
    ```
 
-2. Add location permission descriptions and the `location` background mode to `ios/Runner/Info.plist`. The app crashes when geofencing starts if `UIBackgroundModes` lacks `location`:
+2. Add location permission descriptions and the `location` background mode to `ios/Runner/Info.plist`. Without `location` under `UIBackgroundModes`, iOS won't allow background location updates, so geofencing won't start:
    ```xml
    <key>NSLocationWhenInUseUsageDescription</key>
    <string>We use your location for geofencing features.</string>
