@@ -145,7 +145,7 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleUtilities: db34c1c11c6f2eccb6fab2340cb8ceb1451299dc
-  klaviyo_flutter_sdk: 67f97e1a99b5c22f7077dd2c60f354c56d39eaa8
+  klaviyo_flutter_sdk: cfb9a948c513edda51828223ff68a6d0ad9d281d
   KlaviyoCore: 291eb345b586fc0c26e33ca91ee859d4e7632477
   KlaviyoForms: 6b94788a0dc5ae2cee44613aa4c32769702db855
   KlaviyoLocation: dc85b434d212f98e9f7186306d8507f541cacd3f
@@ -157,6 +157,6 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
 
-PODFILE CHECKSUM: eba8ef2b0bd6c67dd1a0297f378da63db942c3f5
+PODFILE CHECKSUM: f39fced5caa386d9d4fd15eaf00437b620a632a3
 
 COCOAPODS: 1.16.2
