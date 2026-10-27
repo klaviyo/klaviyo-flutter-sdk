@@ -864,7 +864,7 @@ void main() async {
 
 ## Geofencing
 
-The Klaviyo Flutter SDK supports geofencing for location-based event tracking. On Android, and on iOS apps that use CocoaPods, the full location module is **not included by default**. iOS apps that use Swift Package Manager include it automatically. See [Enabling Geofencing](#enabling-geofencing) for setup.
+The Klaviyo Flutter SDK supports geofencing for location-based event tracking. On Android, the full location module is **not included by default**. On iOS, it depends on how the app pulls in the plugin: Swift Package Manager builds include it automatically, and CocoaPods builds need to opt in. See [Enabling Geofencing](#enabling-geofencing) for setup.
 
 ```dart
 // Start monitoring geofences (requires location permissions)
@@ -875,7 +875,7 @@ await KlaviyoSDK().registerGeofencing();
 await KlaviyoSDK().unregisterGeofencing();
 ```
 
-Without the full location module (Android, or iOS with CocoaPods and no opt-in), geofencing methods return error code `GEOFENCING_NOT_AVAILABLE` with instructions to enable it.
+If the app doesn't include the full location module, geofencing methods return error code `GEOFENCING_NOT_AVAILABLE` with instructions to enable it.
 
 ## Optional Module Configuration
 
