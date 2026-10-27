@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.1 - YYYY-MM-DD
+## 0.4.1
 
 ### Bug Fixes
 
