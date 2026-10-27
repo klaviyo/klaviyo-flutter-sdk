@@ -77,18 +77,23 @@ Geofencing methods will return "UNAVAILABLE" errors.
 
 #### iOS
 
-1. Add to `ios/Podfile` (before `flutter_install_all_ios_pods`):
+1. If the app builds with CocoaPods, add to `ios/Podfile` (before `flutter_install_all_ios_pods`). Swift Package Manager builds always link `KlaviyoLocation`, so skip this step for them:
    ```ruby
    ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
    ```
 
-2. Add location permission descriptions to `ios/Runner/Info.plist`:
+2. Add location permission descriptions and the `location` background mode to `ios/Runner/Info.plist`. The app crashes when geofencing starts if `UIBackgroundModes` lacks `location`:
    ```xml
    <key>NSLocationWhenInUseUsageDescription</key>
    <string>We use your location for geofencing features.</string>
 
    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
    <string>We need background location for geofence monitoring.</string>
+
+   <key>UIBackgroundModes</key>
+   <array>
+       <string>location</string>
+   </array>
    ```
 
 3. Rebuild:
