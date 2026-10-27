@@ -74,7 +74,7 @@ PODS:
   - KlaviyoSwift (5.5.1):
     - AnyCodable-FlightSchool
     - KlaviyoCore (~> 5.5.1)
-  - KlaviyoSwiftExtension (5.5.0)
+  - KlaviyoSwiftExtension (5.5.1)
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -94,7 +94,7 @@ DEPENDENCIES:
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
   - klaviyo_flutter_sdk (from `.symlinks/plugins/klaviyo_flutter_sdk/ios`)
-  - KlaviyoSwiftExtension (~> 5.5.0)
+  - KlaviyoSwiftExtension (~> 5.5.1)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -150,7 +150,7 @@ SPEC CHECKSUMS:
   KlaviyoForms: 6b94788a0dc5ae2cee44613aa4c32769702db855
   KlaviyoLocation: dc85b434d212f98e9f7186306d8507f541cacd3f
   KlaviyoSwift: 40144002a6f60d5f3219555d391c1b9ccc6db49a
-  KlaviyoSwiftExtension: a37b45143f0bf795044206e0dbb6ceda19b0e382
+  KlaviyoSwiftExtension: b9412155161e15b31419097b1563df82a5bf1803
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
