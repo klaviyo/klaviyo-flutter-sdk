@@ -4,8 +4,8 @@
 
 ### Bug Fixes
 
-- **In-app forms displayed incorrectly over SwiftUI sheets (iOS)** — Forms now present over full screen, so they show correctly over sheets and don't disrupt the host app's content behind them. Fixed in [klaviyo-swift-sdk 5.5.1](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.5.1). ([#PRNUM](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/PRNUM))
-- **Visual artifact at the top of flyout forms on iOS 26+** — The WKWebView top edge effect is now hidden. Fixed in [klaviyo-swift-sdk 5.5.1](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.5.1). ([#PRNUM](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/PRNUM))
+- **In-app forms displayed incorrectly over SwiftUI sheets (iOS)** — Forms now present over full screen, so they show correctly over sheets and don't disrupt the host app's content behind them. Fixed in [klaviyo-swift-sdk 5.5.1](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.5.1). ([#161](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/161))
+- **Visual artifact at the top of flyout forms on iOS 26+** — The WKWebView top edge effect is now hidden. Fixed in [klaviyo-swift-sdk 5.5.1](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.5.1). ([#161](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/161))
 
 ### Platform Support
 
