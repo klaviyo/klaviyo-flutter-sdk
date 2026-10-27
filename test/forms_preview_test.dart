@@ -27,7 +27,7 @@ void main() {
   });
 
   List<MethodCall> previewCalls() =>
-      log.where((c) => c.method == 'setFormsPreviewToken').toList();
+      log.where((c) => c.method == 'startFormsPreview').toList();
 
   test('registerForInAppForms sends no preview token', () async {
     await KlaviyoSDK().registerForInAppForms(
@@ -40,14 +40,14 @@ void main() {
     );
   });
 
-  group('setFormsPreviewToken', () {
-    test('sends the token, and null to clear', () async {
-      await KlaviyoSDK().setFormsPreviewToken(_token);
-      await KlaviyoSDK().setFormsPreviewToken(null);
-      await KlaviyoSDK().setFormsPreviewToken('');
+  group('startFormsPreview and endFormsPreview', () {
+    test('send the token to start and no arguments to end', () async {
+      await KlaviyoSDK().startFormsPreview(_token);
+      await KlaviyoSDK().endFormsPreview();
 
-      final calls = previewCalls();
-      expect(calls.map((c) => c.arguments['token']), [_token, null, null]);
+      expect(previewCalls().map((c) => c.arguments['token']), [_token]);
+      final end = log.singleWhere((c) => c.method == 'endFormsPreview');
+      expect(end.arguments, isNull);
     });
   });
 

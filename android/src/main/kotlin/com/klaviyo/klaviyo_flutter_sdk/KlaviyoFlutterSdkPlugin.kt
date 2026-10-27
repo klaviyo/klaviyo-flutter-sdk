@@ -25,9 +25,10 @@ import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
+import com.klaviyo.forms.endFormsPreview
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.registerFormLifecycleHandler
-import com.klaviyo.forms.setFormsPreviewToken
+import com.klaviyo.forms.startFormsPreview
 import com.klaviyo.forms.unregisterFormLifecycleHandler
 import com.klaviyo.forms.unregisterFromInAppForms
 import com.klaviyo.location.LocationManager
@@ -504,15 +505,32 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
-            "setFormsPreviewToken" -> {
+            "startFormsPreview" -> {
                 try {
-                    Klaviyo.setFormsPreviewToken(call.argument<String>("token"))
+                    val token = call.argument<String>("token")
+                    if (token == null) {
+                        result.error("INVALID_ARGUMENTS", "A forms preview token is required", null)
+                    } else {
+                        Klaviyo.startFormsPreview(token)
+                        result.success(null)
+                    }
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to start the forms preview", null)
+                }
+            }
+
+            "endFormsPreview" -> {
+                try {
+                    Klaviyo.endFormsPreview()
                     result.success(null)
                 } catch (e: MissingKlaviyoModule) {
                     Registry.log.error("Forms not available: forms module not included", e)
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
-                    result.error("FORMS_ERROR", "Failed to set the forms preview token", null)
+                    result.error("FORMS_ERROR", "Failed to end the forms preview", null)
                 }
             }
 

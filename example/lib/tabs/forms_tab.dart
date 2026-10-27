@@ -118,12 +118,15 @@ class _FormsTabState extends State<FormsTab> {
       });
       return;
     }
-    // An empty field clears the preview and returns to published forms.
+    // An empty field ends the preview and returns to published forms.
     final token = _previewTokenController.text.trim();
-    await _klaviyo.setFormsPreviewToken(token.isEmpty ? null : token);
+    if (token.isEmpty) {
+      await _klaviyo.endFormsPreview();
+    } else {
+      await _klaviyo.startFormsPreview(token);
+    }
     setState(() {
-      _status =
-          token.isEmpty ? 'Forms preview cleared' : 'Forms preview token set';
+      _status = token.isEmpty ? 'Forms preview ended' : 'Forms preview started';
     });
   }
 
@@ -132,7 +135,7 @@ class _FormsTabState extends State<FormsTab> {
     if (!enabled) {
       _previewTokenController.clear();
       if (_klaviyo.isInitialized) {
-        await _klaviyo.setFormsPreviewToken(null);
+        await _klaviyo.endFormsPreview();
       }
     }
   }

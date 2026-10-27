@@ -306,30 +306,39 @@ class KlaviyoSDK {
     }
   }
 
-  /// Set a forms preview token to load draft forms instead of your published
-  /// forms, or pass null (or an empty string) to clear it and return to
-  /// published forms without restarting.
+  /// Start a draft in-app forms preview session with a preview token from the
+  /// Klaviyo form editor.
   ///
-  /// A preview token is a short-lived credential generated from the Klaviyo
-  /// form editor for on-device testing of draft forms. Never ship one in a
-  /// production build. The native SDKs keep it in memory only, never persist
-  /// or log it, and clear it when the preview ends or expires. A malformed
-  /// token is ignored and clears any previous token.
+  /// Starting a preview is like unregistering and registering again: if forms
+  /// are registered, the current session is torn down, dismissing any form on
+  /// screen, and a new session starts that loads draft forms. If
+  /// [registerForInAppForms] hasn't been called yet, the token is held and the
+  /// preview starts when forms register; no forms are shown before then.
   ///
-  /// May be called before or after [registerForInAppForms].
-  Future<void> setFormsPreviewToken(String? token) async {
+  /// A preview token is a short-lived credential for on-device testing of
+  /// draft forms. Never ship one in a production build. The native SDKs keep
+  /// it in memory only and never persist or log it. A malformed token is
+  /// ignored and changes nothing. [unregisterFromInAppForms] also ends the
+  /// preview.
+  Future<void> startFormsPreview(String token) async {
     _ensureInitialized();
     try {
-      await _nativeWrapper.setFormsPreviewToken(
-        (token == null || token.isEmpty) ? null : token,
-      );
-      _logger.info(
-        token == null || token.isEmpty
-            ? 'Cleared forms preview token'
-            : 'Set forms preview token',
-      );
+      await _nativeWrapper.startFormsPreview(token);
+      _logger.info('Started forms preview');
     } on KlaviyoException catch (e) {
-      _logger.warning('Failed to set the forms preview token: ${e.message}');
+      _logger.warning('Failed to start the forms preview: ${e.message}');
+    }
+  }
+
+  /// End the draft in-app forms preview session. If forms are registered, they
+  /// restart with published forms.
+  Future<void> endFormsPreview() async {
+    _ensureInitialized();
+    try {
+      await _nativeWrapper.endFormsPreview();
+      _logger.info('Ended forms preview');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to end the forms preview: ${e.message}');
     }
   }
 
@@ -337,8 +346,8 @@ class KlaviyoSDK {
   /// the Klaviyo form editor's **Preview on device** button.
   ///
   /// If [url] has a `klaviyo-forms-preview` query parameter holding a
-  /// well-formed preview token, the token is set as if passed to
-  /// [setFormsPreviewToken] and this returns true. Otherwise this returns
+  /// well-formed preview token, a preview starts as if the token were passed
+  /// to [startFormsPreview] and this returns true. Otherwise this returns
   /// false and changes nothing, so call it first from your deep link handling
   /// and fall through when it returns false.
   Future<bool> handleFormsPreviewLink(Uri url) async {
@@ -348,7 +357,7 @@ class KlaviyoSDK {
       _logger.warning('Ignoring forms preview link with a malformed token');
       return false;
     }
-    await setFormsPreviewToken(token);
+    await startFormsPreview(token);
     return true;
   }
 

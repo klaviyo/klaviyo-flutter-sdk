@@ -258,11 +258,33 @@ extension KlaviyoFlutterSdkPlugin {
             ))
             #endif
 
-        case "setFormsPreviewToken":
+        case "startFormsPreview":
             #if canImport(KlaviyoForms)
-            let token = (call.arguments as? [String: Any])?["token"] as? String
+            guard let token = (call.arguments as? [String: Any])?["token"] as? String else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "A forms preview token is required",
+                    details: nil
+                ))
+                return
+            }
             Task { @MainActor in
-                KlaviyoSDK().setFormsPreviewToken(token)
+                KlaviyoSDK().startFormsPreview(token)
+            }
+            result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
+
+        case "endFormsPreview":
+            #if canImport(KlaviyoForms)
+            Task { @MainActor in
+                KlaviyoSDK().endFormsPreview()
             }
             result(nil)
             #else

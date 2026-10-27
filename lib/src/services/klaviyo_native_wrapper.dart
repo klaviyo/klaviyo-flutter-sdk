@@ -269,13 +269,23 @@ class KlaviyoNativeWrapper {
     }
   }
 
-  /// Set or clear (null) the forms preview token in the native SDK
-  Future<void> setFormsPreviewToken(String? token) async {
+  /// Start a forms preview session in the native SDK
+  Future<void> startFormsPreview(String token) async {
     _ensureInitialized();
     try {
-      await _channel.invokeMethod('setFormsPreviewToken', {'token': token});
+      await _channel.invokeMethod('startFormsPreview', {'token': token});
     } catch (e) {
-      throw const KlaviyoException('Failed to set the forms preview token');
+      throw const KlaviyoException('Failed to start the forms preview');
+    }
+  }
+
+  /// End the forms preview session in the native SDK
+  Future<void> endFormsPreview() async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('endFormsPreview');
+    } catch (e) {
+      throw KlaviyoException('Failed to end the forms preview: $e');
     }
   }
 

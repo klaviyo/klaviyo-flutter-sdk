@@ -641,14 +641,14 @@ For the equivalent native integration guides, see [Android Personalized Forms Au
 
 ### Previewing Draft Forms on a Device
 
-The Klaviyo form editor's **Preview on device** button gives you a short-lived preview token, a QR code, and a preview link for the draft form. Set a pasted token with `setFormsPreviewToken`, and pass `null` to return to published forms.
+The Klaviyo form editor's **Preview on device** button gives you a short-lived preview token, a QR code, and a preview link for the draft form. Start a preview from a pasted token with `startFormsPreview`, and call `endFormsPreview` to return to published forms. Starting or ending a preview restarts in-app forms, like unregistering and registering again. If you haven't called `registerForInAppForms` yet, the preview starts when you do.
 
 ```dart
-await KlaviyoSDK().setFormsPreviewToken(token); // start a draft preview
-await KlaviyoSDK().setFormsPreviewToken(null); // back to published forms
+await KlaviyoSDK().startFormsPreview(token); // start a draft preview
+await KlaviyoSDK().endFormsPreview(); // back to published forms
 ```
 
-The preview link is a deep link into your app with a `klaviyo-forms-preview` query parameter. Pass deep links to `handleFormsPreviewLink` before your own routing: it starts the preview and returns `true` for a preview link, and returns `false`, changing nothing, for every other link. With go_router, check it in your `redirect`:
+The preview link is a deep link into your app with a `klaviyo-forms-preview` query parameter. Pass deep links to `handleFormsPreviewLink` before your own routing: it starts a preview session and returns `true` for a preview link, and returns `false`, changing nothing, for every other link. With go_router, check it in your `redirect`:
 
 ```dart
 redirect: (context, state) async {
@@ -1037,7 +1037,8 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 |--------|-------------|
 | `registerForInAppForms({InAppFormConfig? configuration})` | Register for in-app forms |
 | `unregisterFromInAppForms()` | Unregister from in-app forms |
-| `setFormsPreviewToken(String? token)` | Set or clear (`null`) a draft forms preview token |
+| `startFormsPreview(String token)` | Start a draft forms preview session, restarting forms if registered |
+| `endFormsPreview()` | End the forms preview session, restarting forms with published forms |
 | `handleFormsPreviewLink(Uri url)` | Start a forms preview from a `klaviyo-forms-preview` deep link; returns `true` if handled |
 
 #### Geofencing
