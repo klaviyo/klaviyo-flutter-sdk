@@ -26,6 +26,7 @@ import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.InAppFormsFailureHandler
+import com.klaviyo.forms.openForm
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.registerFormLifecycleHandler
 import com.klaviyo.forms.unregisterFormLifecycleHandler
@@ -542,6 +543,23 @@ class KlaviyoFlutterSdkPlugin :
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
+                }
+            }
+
+            "openForm" -> {
+                val formId = call.argument<String>("formId")
+                if (formId == null) {
+                    result.error("INVALID_ARGUMENT", "formId is required", null)
+                    return
+                }
+                try {
+                    Klaviyo.openForm(formId)
+                    result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to request form opening", e.message)
                 }
             }
 

@@ -312,6 +312,20 @@ class KlaviyoSDK {
     }
   }
 
+  /// Requests native presentation of [formId] after [registerForInAppForms].
+  ///
+  /// Completion does not confirm native acceptance, readiness, or presentation.
+  /// Platform-channel errors are logged. Native SDKs validate [formId].
+  Future<void> openForm(String formId) async {
+    _ensureInitialized();
+    try {
+      await _nativeWrapper.openForm(formId);
+      _logger.info('Form open requested: $formId');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to request form opening: ${e.message}');
+    }
+  }
+
   /// Unregister from in-app forms
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();

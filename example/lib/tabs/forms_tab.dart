@@ -16,6 +16,7 @@ class FormsTab extends StatefulWidget {
 
 class _FormsTabState extends State<FormsTab> {
   final KlaviyoSDK _klaviyo = KlaviyoSDK();
+  final TextEditingController _formIdController = TextEditingController();
   final TextEditingController _durationController = TextEditingController();
   final TextEditingController _loadTimeoutController = TextEditingController();
   final TextEditingController _replayWindowController =
@@ -162,6 +163,25 @@ class _FormsTabState extends State<FormsTab> {
     );
   }
 
+  Future<void> _openForm() async {
+    if (!_klaviyo.isInitialized) {
+      setState(() {
+        _status = 'SDK not initialized.';
+      });
+      return;
+    }
+    final formId = _formIdController.text;
+    await _klaviyo.openForm(formId);
+    if (!mounted) return;
+    setState(() {
+      _status =
+          'Open command handled; presentation is reported by lifecycle events.';
+      _lifecycleEvents.add(
+        '[${DateTime.now().toIso8601String().substring(11, 19)}] Open requested: $formId',
+      );
+    });
+  }
+
   Future<void> _unregisterFromForms() async {
     if (!_klaviyo.isInitialized) {
       setState(() {
@@ -278,6 +298,20 @@ class _FormsTabState extends State<FormsTab> {
             ],
 
             const SizedBox(height: 20),
+            TextField(
+              controller: _formIdController,
+              decoration: const InputDecoration(
+                labelText: 'Form ID',
+                border: OutlineInputBorder(),
+                helperText: 'Register for forms before requesting a form.',
+              ),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _openForm,
+              child: const Text('Open'),
+            ),
+            const SizedBox(height: 20),
             const Text(
               'Note: In-app forms will be displayed automatically based on your Klaviyo account configuration.',
               style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
@@ -292,7 +326,7 @@ class _FormsTabState extends State<FormsTab> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Lifecycle Events',
+                    'Form Activity',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   IconButton(
@@ -343,6 +377,7 @@ class _FormsTabState extends State<FormsTab> {
   @override
   void dispose() {
     _lifecycleSubscription?.cancel();
+    _formIdController.dispose();
     _durationController.dispose();
     _loadTimeoutController.dispose();
     _replayWindowController.dispose();
