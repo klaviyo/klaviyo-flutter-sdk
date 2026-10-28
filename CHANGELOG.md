@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.1
+
+### Bug Fixes
+
+- **In-app forms displayed incorrectly over SwiftUI sheets (iOS)** — Forms now present over full screen, so they show correctly over sheets and don't disrupt the host app's content behind them. Fixed in [klaviyo-swift-sdk 5.5.1](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.5.1). ([#161](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/161))
+- **Visual artifact at the top of flyout forms on iOS 26+** — The WKWebView top edge effect is now hidden. Fixed in [klaviyo-swift-sdk 5.5.1](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.5.1). ([#161](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/161))
+- **Geofencing now works in Swift Package Manager apps (iOS)** — The plugin's `Package.swift` didn't link `KlaviyoLocation`, so every geofencing method returned `GEOFENCING_NOT_AVAILABLE` in apps that resolve the plugin through Swift Package Manager, the default for Flutter 3.44+. The Swift package now always links `KlaviyoLocation`. CocoaPods apps still opt in with `KLAVIYO_INCLUDE_LOCATION`. ([#160](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/160))
+
+### Documentation
+
+- Geofencing setup now says iOS apps need `location` under `UIBackgroundModes` in `Info.plist`. Without it, iOS won't allow background location updates, so geofencing won't start. ([#160](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/160))
+
+### Platform Support
+
+- **iOS**: Minimum deployment target 13.0, wraps [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk) ~> 5.5.1
+- **Android**: Minimum SDK version 23, wraps [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk) 4.6.0
+- **Flutter**: Minimum Flutter 3.27.0, Dart 3.0.0+
+
+[Full Changelog](https://github.com/klaviyo/klaviyo-flutter-sdk/compare/0.4.0...0.4.1)
+
 ## 0.4.0
 
 ### What's New
