@@ -34,6 +34,8 @@ class KlaviyoNativeWrapper {
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _formEventController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
+  final _authTokenRequestController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _pushActionController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
 
@@ -42,6 +44,14 @@ class KlaviyoNativeWrapper {
       _pushNotificationController.stream;
 
   Stream<Map<String, dynamic>> get onFormEvent => _formEventController.stream;
+
+  /// Stream of native `auth_token_requested` events. Each event carries a
+  /// correlation `id` under its `data` field; the Dart side responds via
+  /// [respondToAuthTokenRequest]. This is internal bridge plumbing, not a
+  /// user-facing stream — host apps drive auth tokens via [KlaviyoSDK].
+  @internal
+  Stream<Map<String, dynamic>> get onAuthTokenRequested =>
+      _authTokenRequestController.stream;
 
   /// Raw push-action events (`push_open_web_url`,
   /// `push_action_button_tapped`). Kept on a dedicated stream so they do not
@@ -273,6 +283,59 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Register a wrapper-owned auth token provider with the native SDK.
+  ///
+  /// After this call the native SDK may emit `auth_token_requested` events
+  /// (see [onAuthTokenRequested]) whenever it needs a token; the Dart side
+  /// responds via [respondToAuthTokenRequest].
+  @internal
+  Future<void> registerAuthTokenProvider() async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('registerAuthTokenProvider');
+    } catch (e) {
+      throw KlaviyoException('Failed to register auth token provider: $e');
+    }
+  }
+
+  /// Detach the wrapper-owned auth token provider from the native SDK.
+  ///
+  /// Forwards to the native SDK's `unregisterAuthTokenProvider()`, which clears
+  /// the provider reference and tears down its token state; the native side
+  /// also drains any requests still awaiting a Dart response.
+  @internal
+  Future<void> unregisterAuthTokenProvider() async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('unregisterAuthTokenProvider');
+    } catch (e) {
+      throw KlaviyoException('Failed to unregister auth token provider: $e');
+    }
+  }
+
+  /// Send the outcome of a host provider invocation back to native, correlated
+  /// by [id]. Provide [jwt] on success, or [error] plus [isConnectivityError]
+  /// on failure. The token is never logged on the Dart side.
+  @internal
+  Future<void> respondToAuthTokenRequest(
+    String id, {
+    String? jwt,
+    String? error,
+    bool isConnectivityError = false,
+  }) async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('respondToAuthTokenRequest', {
+        'id': id,
+        'jwt': jwt,
+        'error': error,
+        'isConnectivityError': isConnectivityError,
+      });
+    } catch (e) {
+      throw KlaviyoException('Failed to respond to auth token request: $e');
+    }
+  }
+
   /// Register for geofencing using native SDK
   Future<void> registerGeofencing() async {
     _ensureInitialized();
@@ -442,6 +505,12 @@ class KlaviyoNativeWrapper {
           _logger.info('Native form event: $eventData');
           _formEventController.add(eventData);
           break;
+        case 'auth_token_requested':
+          // Bridge diagnostic only — the request payload carries a correlation
+          // id, never a token, so this is safe to log.
+          _logger.info('Native auth token request event received');
+          _authTokenRequestController.add(eventData);
+          break;
         case 'push_open_web_url':
         case 'push_action_button_tapped':
           // Log the type only; the payload carries CTA URLs (possible PII), so
@@ -500,6 +569,7 @@ class KlaviyoNativeWrapper {
   void dispose() {
     _pushNotificationController.close();
     _formEventController.close();
+    _authTokenRequestController.close();
     _pushActionController.close();
     _formWillDisplayController.close();
   }

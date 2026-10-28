@@ -1,0 +1,194 @@
+PODS:
+  - AnyCodable-FlightSchool (0.6.7)
+  - Firebase/CoreOnly (12.19.3):
+    - FirebaseCore (~> 12.19.3)
+  - Firebase/Messaging (12.19.3):
+    - Firebase/CoreOnly
+    - FirebaseMessaging (~> 12.19.0)
+  - firebase_core (4.15.1):
+    - Firebase/CoreOnly (= 12.19.3)
+    - Flutter
+  - firebase_messaging (16.7.1):
+    - Firebase/Messaging (= 12.19.3)
+    - firebase_core
+    - Flutter
+  - FirebaseCore (12.19.3):
+    - FirebaseCoreInternal (~> 12.19.0)
+    - GoogleUtilities/Environment (~> 8.1)
+    - GoogleUtilities/Logger (~> 8.1)
+  - FirebaseCoreInternal (12.19.0):
+    - "GoogleUtilities/NSData+zlib (~> 8.1)"
+  - FirebaseInstallations (12.19.0):
+    - FirebaseCore (~> 12.19.0)
+    - GoogleUtilities/Environment (~> 8.1)
+    - GoogleUtilities/UserDefaults (~> 8.1)
+    - PromisesObjC (~> 2.4)
+  - FirebaseMessaging (12.19.0):
+    - FirebaseCore (~> 12.19.0)
+    - FirebaseInstallations (~> 12.19.0)
+    - GoogleDataTransport (~> 10.1)
+    - GoogleUtilities/AppDelegateSwizzler (~> 8.1)
+    - GoogleUtilities/Environment (~> 8.1)
+    - GoogleUtilities/Reachability (~> 8.1)
+    - GoogleUtilities/UserDefaults (~> 8.1)
+    - nanopb (~> 3.30910.0)
+  - Flutter (1.0.0)
+  - GoogleDataTransport (10.1.1):
+    - nanopb (~> 3.30910.0)
+    - PromisesObjC (~> 2.4)
+  - GoogleUtilities/AppDelegateSwizzler (8.1.4):
+    - GoogleUtilities/Environment
+    - GoogleUtilities/Logger
+    - GoogleUtilities/Network
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Environment (8.1.4):
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Logger (8.1.4):
+    - GoogleUtilities/Environment
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Network (8.1.4):
+    - GoogleUtilities/Logger
+    - "GoogleUtilities/NSData+zlib"
+    - GoogleUtilities/Privacy
+    - GoogleUtilities/Reachability
+  - "GoogleUtilities/NSData+zlib (8.1.4)":
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Privacy (8.1.4)
+  - GoogleUtilities/Reachability (8.1.4):
+    - GoogleUtilities/Logger
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/UserDefaults (8.1.4):
+    - GoogleUtilities/Logger
+    - GoogleUtilities/Privacy
+  - klaviyo_flutter_sdk (0.4.0):
+    - Flutter
+    - KlaviyoCore
+    - KlaviyoForms
+    - KlaviyoLocation
+    - KlaviyoSwift
+  - KlaviyoCore (5.5.0):
+    - AnyCodable-FlightSchool
+  - KlaviyoForms (5.5.0):
+    - KlaviyoCore (~> 5.5.0)
+  - KlaviyoLocation (5.5.0):
+    - KlaviyoSwift (~> 5.5.0)
+  - KlaviyoSwift (5.5.0):
+    - AnyCodable-FlightSchool
+    - KlaviyoCore (~> 5.5.0)
+  - KlaviyoSwiftExtension (5.5.0)
+  - nanopb (3.30910.0):
+    - nanopb/decode (= 3.30910.0)
+    - nanopb/encode (= 3.30910.0)
+  - nanopb/decode (3.30910.0)
+  - nanopb/encode (3.30910.0)
+  - package_info_plus (0.4.5):
+    - Flutter
+  - permission_handler_apple (9.4.8):
+    - Flutter
+  - PromisesObjC (2.4.1)
+  - shared_preferences_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
+  - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
+  - Flutter (from `Flutter`)
+  - klaviyo_flutter_sdk (from `.symlinks/plugins/klaviyo_flutter_sdk/ios`)
+  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
+  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
+  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
+  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
+  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
+  - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
+  - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
+  - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
+
+SPEC REPOS:
+  trunk:
+    - AnyCodable-FlightSchool
+    - Firebase
+    - FirebaseCore
+    - FirebaseCoreInternal
+    - FirebaseInstallations
+    - FirebaseMessaging
+    - GoogleDataTransport
+    - GoogleUtilities
+    - nanopb
+    - PromisesObjC
+
+EXTERNAL SOURCES:
+  firebase_core:
+    :path: ".symlinks/plugins/firebase_core/ios"
+  firebase_messaging:
+    :path: ".symlinks/plugins/firebase_messaging/ios"
+  Flutter:
+    :path: Flutter
+  klaviyo_flutter_sdk:
+    :path: ".symlinks/plugins/klaviyo_flutter_sdk/ios"
+  KlaviyoCore:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoForms:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoLocation:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoSwift:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoSwiftExtension:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  package_info_plus:
+    :path: ".symlinks/plugins/package_info_plus/ios"
+  permission_handler_apple:
+    :path: ".symlinks/plugins/permission_handler_apple/ios"
+  shared_preferences_foundation:
+    :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
+
+CHECKOUT OPTIONS:
+  KlaviyoCore:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoForms:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoLocation:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoSwift:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoSwiftExtension:
+    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+
+SPEC CHECKSUMS:
+  AnyCodable-FlightSchool: 261cbe76757802b17d471b9059b21e6fa5edf57b
+  Firebase: e3c5ab38229ae085490d02398d97b9f5374bbe6e
+  firebase_core: 7a55377761a8e210c2d95459fe1392248faa023f
+  firebase_messaging: d66dd9b68ca259955678628aa4f3e4294d055790
+  FirebaseCore: ab948de5d99e69aeed3cd6f5ace263ce795b2559
+  FirebaseCoreInternal: 656b1c2fd5a1c5976183dc54b73deda78fb26ee3
+  FirebaseInstallations: f70a49eed611f5602f373e40974b3b01556ac217
+  FirebaseMessaging: c15f48126adbe8b4d3238a5e1fa24bab3ad3e472
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
+  GoogleUtilities: db34c1c11c6f2eccb6fab2340cb8ceb1451299dc
+  klaviyo_flutter_sdk: 61757a821722c6a827b1fb5f971f819e074fa888
+  KlaviyoCore: c3be5c088eff49b920f6393fb70a6a9386744a45
+  KlaviyoForms: e5e3138223616a007c86e43b1e3fe816a4527a42
+  KlaviyoLocation: 7fb35c1c13bd49d5dd51c817d2f150a473e7ac24
+  KlaviyoSwift: 96da76dba4571b3cf39fdc542f1aeae5d1ebe115
+  KlaviyoSwiftExtension: a37b45143f0bf795044206e0dbb6ceda19b0e382
+  nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
+  package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
+  permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
+  PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
+  shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
+
+PODFILE CHECKSUM: 35c2bdaf2e6d0dd38a9bd86a37b45b5ba7923689
+
+COCOAPODS: 1.16.2

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0
+
+### What's New
+
+- **Personalized Forms authentication** — Register an `AuthTokenProvider` with `registerAuthTokenProvider` to supply a fresh JWT for the signed-in user. The native SDKs manage token caching, refresh, and injection into personalized in-app forms. Use `resetProfile` on logout and `unregisterAuthTokenProvider` to turn personalization off. ([#112](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/112))
+- **Native SDK upgrade** — Now consuming `KlaviyoSwift ~> 5.5.0` and `klaviyo-android-sdk 4.6.0`, including native support for Personalized Forms authentication. See [iOS 5.5.0](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.5.0) and [Android 4.6.0](https://github.com/klaviyo/klaviyo-android-sdk/releases/tag/4.6.0) for the native release notes. ([#140](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/140))
+
+### Documentation
+
+- Adds Flutter integration guidance for backend JWT setup, provider requirements, connectivity failures, profile changes, and logout. ([#142](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/142))
+
+### Platform Support
+
+- **iOS**: Minimum deployment target 13.0, wraps [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk) ~> 5.5.0
+- **Android**: Minimum SDK version 23, wraps [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk) 4.6.0
+- **Flutter**: Minimum Flutter 3.27.0, Dart 3.0.0+
+
 ## 0.3.1 - 2026-09-04
 
 ### Bug Fixes

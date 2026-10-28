@@ -9,6 +9,8 @@ on:
 jobs:
   validate:
     runs-on: macos-15
+    outputs:
+      already_live: ${{ steps.pubdev.outputs.already_live }}
     steps:
       - name: Verify running from a tag
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
@@ -30,34 +32,234 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      - name: Validate release files exist
+      - name: Check native SDK pins
+        run: ./.github/scripts/check-native-pins.sh
+
+      - name: Check version and CHANGELOG match the tag
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          if [ ! -f "CHANGELOG.md" ]; then
-            echo "Error: CHANGELOG.md not found"
+          raw=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          if [ "$raw" != "$TAG" ]; then
+            echo "::error::pubspec.yaml version is '${raw}', but the tag is ${TAG}"
             exit 1
+          fi
+          if ! grep -Eq "^## \[?${TAG//./\\.}\]?([[:space:]]|$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## ${TAG}' entry"
+            exit 1
+          fi
+
+      - name: Check if the version is already on pub.dev
+        id: pubdev
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://pub.dev/api/packages/klaviyo_flutter_sdk/versions/${TAG}" || true)
+          if [ "$status" = "200" ]; then
+            echo "::notice::klaviyo_flutter_sdk ${TAG} is already live on pub.dev; the upload will be skipped"
+            echo "already_live=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_live=false" >> "$GITHUB_OUTPUT"
           fi
 
   publish:
     needs: validate
+    if: needs.validate.outputs.already_live != 'true'
     permissions:
       id-token: write
     uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
     with:
       environment: pub.dev
 
-  github-release:
-    needs: publish
-    if: startsWith(github.ref, 'refs/tags/')
+  verify:
+    needs: [validate, publish]
+    if: "!cancelled() && (needs.validate.outputs.already_live == 'true' || needs.publish.result == 'success')"
+    runs-on: ubuntu-latest
+    permissions: {}
+    timeout-minutes: 10
+    steps:
+      - name: Wait for the version on pub.dev
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          url="https://pub.dev/api/packages/klaviyo_flutter_sdk/versions/${VERSION}"
+          for attempt in $(seq 1 20); do
+            status=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
+            if [ "$status" = "200" ]; then
+              echo "klaviyo_flutter_sdk ${VERSION} is live on pub.dev"
+              exit 0
+            fi
+            echo "Attempt ${attempt}/20: pub.dev returned ${status}"
+            if [ "$attempt" -lt 20 ]; then
+              sleep 15
+            fi
+          done
+          echo "::error::klaviyo_flutter_sdk ${VERSION} did not appear on pub.dev within 5 minutes"
+          exit 1
+
+  linear-release:
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
+    continue-on-error: true
     runs-on: ubuntu-latest
     permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Sync release to Linear
+        id: linear-sync
+        continue-on-error: true
+        uses: linear/linear-release-action@30f9ae77461ec29f07fffe0c52edd1909bfbb6f5 # v0.18.1
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          command: sync
+          version: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+
+      - name: Complete release in Linear
+        if: steps.linear-sync.outcome == 'success'
+        continue-on-error: true
+        uses: linear/linear-release-action@30f9ae77461ec29f07fffe0c52edd1909bfbb6f5 # v0.18.1
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          command: complete
+          version: ${{ github.ref_name }}
+
+  # Publishes the GitHub release after pub.dev has the version, then
+  # dispatches publish-example.yml. The dispatch path leaves the release a
+  # draft (a GITHUB_TOKEN publish fires no events, so the example deploy is
+  # dispatched); a release published in the UI fires release: published
+  # itself, so nothing here runs.
+  finalize:
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
       contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Publish the GitHub release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ contains(github.ref_name, '-') }}
+        run: |
+          latest=true
+          if [ "$PRERELEASE" = "true" ]; then
+            latest=false
+          fi
+          state=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq 'if .isDraft then "draft" else "published" end' 2>/dev/null || echo "missing")
+          case "$state" in
+            missing)
+              echo "No release for ${TAG}; creating one"
+              flags=(--title "$TAG" --generate-notes "--latest=${latest}")
+              if [ "$PRERELEASE" = "true" ]; then
+                flags+=(--prerelease)
+              fi
+              gh release create "$TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}" CHANGELOG.md
+              echo "action=created" >> "$GITHUB_OUTPUT"
+              ;;
+            draft)
+              gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false "--prerelease=${PRERELEASE}" "--latest=${latest}"
+              echo "action=published-draft" >> "$GITHUB_OUTPUT"
+              ;;
+            published)
+              echo "::notice::Release ${TAG} is already published (UI path); nothing to do"
+              echo "action=already-published" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      # A release published with GITHUB_TOKEN does not fire
+      # release: published, so the example deploy is dispatched explicitly.
+      # On the UI path the release: published event already started it.
+      - name: Dispatch the example app deploy
+        if: steps.release.outputs.action != 'already-published'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f platform=both
+
+  notify:
+    needs: [validate, publish, verify, finalize]
+    if: always() && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Summarize result
+        id: result
+        env:
+          VALIDATE: ${{ needs.validate.result }}
+          PUBLISH: ${{ needs.publish.result }}
+          VERIFY: ${{ needs.verify.result }}
+          FINALIZE: ${{ needs.finalize.result }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          result=""
+          failed=""
+          if [ "$VALIDATE" != "success" ]; then
+            result=failure
+            failed="validate (${VALIDATE})"
+          elif [ "$PUBLISH" = "cancelled" ]; then
+            result=stopped
+            failed="pub.dev approval cancelled"
+          elif [ "$PUBLISH" != "success" ] && [ "$PUBLISH" != "skipped" ]; then
+            # A rejected environment approval fails the job before its steps run.
+            steps=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs" \
+              --jq '[.jobs[] | select(.name == "publish" or (.name | startswith("publish / "))) | .steps | length] | add // 0' || echo "unknown")
+            if [ "$steps" = "0" ]; then
+              result=stopped
+              failed="pub.dev approval rejected"
+            else
+              result=failure
+              failed="publish (${PUBLISH})"
+            fi
+          elif [ "$VERIFY" != "success" ] && { [ "$VERIFY" != "skipped" ] || [ "$PUBLISH" = "success" ]; }; then
+            result=failure
+            failed="pub.dev verify (${VERIFY})"
+          elif [ "$FINALIZE" != "success" ] && [ "$FINALIZE" != "skipped" ]; then
+            result=failure
+            failed="finalize (${FINALIZE})"
+          else
+            result=success
+          fi
+          if [ "$result" != "success" ]; then
+            failed="${failed}; tag ${TAG} kept, run release.yml at the tag to retry"
+          fi
+          {
+            echo "result=${result}"
+            echo "failed_step=${failed}"
+            echo "commit_short=${GITHUB_SHA::7}"
+          } >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "release_url=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack
+        uses: ./.github/actions/notify-slack-publish
         with:
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: |
-            CHANGELOG.md
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: ${{ steps.result.outputs.result }}
+          title: klaviyo_flutter_sdk ${{ github.ref_name }} → pub.dev
+          release_url: ${{ steps.result.outputs.release_url }}
+          access_url: ${{ steps.result.outputs.result == 'success' && format('https://pub.dev/packages/klaviyo_flutter_sdk/versions/{0}', github.ref_name) || '' }}
+          access_label: pub.dev
+          event_name: ${{ github.event_name }}
+          commit_sha: ${{ github.sha }}
+          commit_short: ${{ steps.result.outputs.commit_short }}
+          failed_step: ${{ steps.result.outputs.failed_step }}
