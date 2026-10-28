@@ -4,6 +4,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
 void main() {
+  test('large integer JSON cannot wrap into a short load timeout', () {
+    for (final (raw, replay) in [
+      ('18446744073710', const Duration(seconds: 30)),
+      ('9223372036854775807', const Duration(seconds: 30)),
+      ('-18446744073710', Duration.zero),
+      ('-9223372036854775808', Duration.zero),
+    ]) {
+      final config = InAppFormConfig.fromJson(
+        jsonDecode('{"loadTimeout":$raw,"eventReplayWindow":$raw}'),
+      );
+      expect(config.loadTimeout, isNull, reason: raw);
+      expect(config.eventReplayWindow, replay, reason: raw);
+    }
+  });
+
   test('JSON normalizes recovery durations before numeric conversion', () {
     final oversized = InAppFormConfig.fromJson({
       'loadTimeout': 1e308,

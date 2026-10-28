@@ -15,6 +15,8 @@ class InAppFormConfig {
 
   /// Recent analytics history replayed after loading (default 10 seconds,
   /// capped at 30 seconds). Zero disables history while retaining live events.
+  /// History holds at most 10 events and can cause forms to appear after the
+  /// original trigger. Replay does not guarantee trigger recovery.
   final Duration? eventReplayWindow;
 
   /// Called on terminal loading failure, independently of form lifecycle events.
@@ -72,6 +74,11 @@ class InAppFormConfig {
   static Duration? _durationFromSeconds(dynamic value, {int? maxSeconds}) {
     if (value is! num || !value.isFinite) return null;
     final seconds = maxSeconds == null ? value : value.clamp(0, maxSeconds);
+    final maxDurationSeconds =
+        0x7fffffffffffffff / Duration.microsecondsPerSecond;
+    if (seconds >= maxDurationSeconds || seconds <= -maxDurationSeconds) {
+      return null;
+    }
     final microseconds = seconds * Duration.microsecondsPerSecond;
     if (!microseconds.isFinite || microseconds.abs() >= 0x7fffffffffffffff) {
       return null;
