@@ -1,11 +1,15 @@
+import 'dart:async';
+
 /// Represents a lifecycle event of an in-app form, carrying contextual metadata
 /// about the form and event-specific data.
 ///
 /// Use [formId] and [formName] to identify the form associated with any event.
 /// For CTA-specific data, match on [FormCtaClicked] to access
 /// [FormCtaClicked.buttonLabel] and [FormCtaClicked.deepLinkUrl].
+/// For gating form display, subscribe to [KlaviyoSDK.onFormWillDisplay] and call
+/// [FormWillDisplay.accept] or [FormWillDisplay.reject].
 ///
-/// Example usage with exhaustive pattern matching:
+/// Example usage for ordinary lifecycle events:
 /// ```dart
 /// klaviyo.onFormLifecycleEvent.listen((event) {
 ///   switch (event) {
@@ -15,6 +19,8 @@
 ///       print('Form dismissed: ${event.formId}');
 ///     case FormCtaClicked():
 ///       print('CTA clicked: ${event.buttonLabel}');
+///     default:
+///       break;
 ///   }
 /// });
 /// ```
@@ -29,6 +35,10 @@ sealed class FormLifecycleEvent {
 
   /// Create the appropriate [FormLifecycleEvent] subtype from a map received
   /// from the platform event channel.
+  ///
+  /// **Note:** [FormWillDisplay] is NOT handled here — it uses a dedicated
+  /// stream ([KlaviyoSDK.onFormWillDisplay]) and is never emitted on the
+  /// raw event channel. Passing `'formWillDisplay'` will throw.
   ///
   /// The expected shape is:
   /// ```json
@@ -193,4 +203,58 @@ class FormCtaClicked extends FormLifecycleEvent {
   @override
   int get hashCode =>
       Object.hash(runtimeType, formId, formName, buttonLabel, deepLinkUrl);
+}
+
+/// Triggered when a form is about to be displayed, allowing the host app
+/// to accept or reject the display.
+///
+/// Call [accept] to allow the form to display, or [reject] to block it.
+/// Only the first call takes effect; subsequent calls are ignored.
+/// If neither is called, the native SDK's timeout will fail-open and allow
+/// the form to display.
+class FormWillDisplay extends FormLifecycleEvent {
+  /// The type of form (e.g. "POPUP", "FLYOUT", "FULLSCREEN").
+  final String formType;
+
+  final Completer<bool> _completer;
+  bool _responded = false;
+
+  FormWillDisplay({
+    required super.formId,
+    required super.formName,
+    required this.formType,
+    required Completer<bool> completer,
+  }) : _completer = completer;
+
+  /// Allow the form to display.
+  void accept() => _respond(true);
+
+  /// Block the form from displaying.
+  void reject() => _respond(false);
+
+  void _respond(bool allowed) {
+    if (_responded) return;
+    _responded = true;
+    _completer.complete(allowed);
+  }
+
+  @override
+  String get eventName => 'formWillDisplay';
+
+  @override
+  String toString() => 'FormWillDisplay(formId: $formId, formName: $formName, '
+      'formType: $formType)';
+
+  /// The [Completer] is intentionally excluded from equality comparison,
+  /// since each continuation instance is unique and identity-based.
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FormWillDisplay &&
+          other.formId == formId &&
+          other.formName == formName &&
+          other.formType == formType;
+
+  @override
+  int get hashCode => Object.hash(runtimeType, formId, formName, formType);
 }

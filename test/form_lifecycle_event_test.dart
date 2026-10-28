@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
@@ -488,6 +489,12 @@ void main() {
           buttonLabel: 'Go',
           deepLinkUrl: 'app://go',
         ),
+        FormWillDisplay(
+          formId: '4',
+          formName: 'Test',
+          formType: 'POPUP',
+          completer: Completer<bool>(),
+        ),
       ];
 
       final names = events.map((event) {
@@ -496,10 +503,187 @@ void main() {
           FormShown() => 'shown',
           FormDismissed() => 'dismissed',
           FormCtaClicked() => 'cta',
+          FormWillDisplay() => 'willDisplay',
         };
       }).toList();
 
-      expect(names, ['shown', 'dismissed', 'cta']);
+      expect(names, ['shown', 'dismissed', 'cta', 'willDisplay']);
+    });
+  });
+
+  group('FormWillDisplay', () {
+    test('accept completes with true', () async {
+      final completer = Completer<bool>();
+      final event = FormWillDisplay(
+        formId: 'gate1',
+        formName: 'Gated Form',
+        formType: 'POPUP',
+        completer: completer,
+      );
+
+      event.accept();
+
+      expect(await completer.future, isTrue);
+    });
+
+    test('reject completes with false', () async {
+      final completer = Completer<bool>();
+      final event = FormWillDisplay(
+        formId: 'gate1',
+        formName: 'Gated Form',
+        formType: 'FLYOUT',
+        completer: completer,
+      );
+
+      event.reject();
+
+      expect(await completer.future, isFalse);
+    });
+
+    test('double call is ignored — first call wins', () async {
+      final completer = Completer<bool>();
+      final event = FormWillDisplay(
+        formId: 'gate1',
+        formName: 'Gated Form',
+        formType: 'POPUP',
+        completer: completer,
+      );
+
+      event.reject();
+      event.accept(); // should be ignored
+
+      expect(await completer.future, isFalse);
+    });
+
+    test('accept then reject — first call wins', () async {
+      final completer = Completer<bool>();
+      final event = FormWillDisplay(
+        formId: 'gate1',
+        formName: 'Gated Form',
+        formType: 'POPUP',
+        completer: completer,
+      );
+
+      event.accept();
+      event.reject(); // should be ignored
+
+      expect(await completer.future, isTrue);
+    });
+
+    test('eventName returns formWillDisplay', () {
+      final event = FormWillDisplay(
+        formId: 'abc',
+        formName: 'Test',
+        formType: 'POPUP',
+        completer: Completer<bool>(),
+      );
+      expect(event.eventName, 'formWillDisplay');
+    });
+
+    test('toString includes formType', () {
+      final event = FormWillDisplay(
+        formId: 'abc',
+        formName: 'Test',
+        formType: 'FULLSCREEN',
+        completer: Completer<bool>(),
+      );
+      expect(
+        event.toString(),
+        'FormWillDisplay(formId: abc, formName: Test, formType: FULLSCREEN)',
+      );
+    });
+
+    test('equality ignores completer', () {
+      final a = FormWillDisplay(
+        formId: 'abc',
+        formName: 'Form',
+        formType: 'POPUP',
+        completer: Completer<bool>(),
+      );
+      final b = FormWillDisplay(
+        formId: 'abc',
+        formName: 'Form',
+        formType: 'POPUP',
+        completer: Completer<bool>(),
+      );
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('inequality by formType', () {
+      final popup = FormWillDisplay(
+        formId: 'abc',
+        formName: 'Form',
+        formType: 'POPUP',
+        completer: Completer<bool>(),
+      );
+      final flyout = FormWillDisplay(
+        formId: 'abc',
+        formName: 'Form',
+        formType: 'FLYOUT',
+        completer: Completer<bool>(),
+      );
+      expect(popup, isNot(equals(flyout)));
+    });
+
+    test('FormWillDisplay not equal to FormShown', () {
+      final willDisplay = FormWillDisplay(
+        formId: 'abc',
+        formName: 'Form',
+        formType: 'POPUP',
+        completer: Completer<bool>(),
+      );
+      const shown = FormShown(formId: 'abc', formName: 'Form');
+      expect(willDisplay, isNot(equals(shown)));
+    });
+  });
+
+  group('FormLifecycleEvent.fromMap crash safety', () {
+    test(
+        'fromMap throws on formWillDisplay — confirming it must not be '
+        'emitted on the raw event stream', () {
+      expect(
+        () => FormLifecycleEvent.fromMap({
+          'type': 'form_lifecycle_event',
+          'data': {
+            'event': 'formWillDisplay',
+            'formId': 'abc',
+            'formName': 'Form',
+            'formType': 'POPUP',
+          },
+        }),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('formWillDisplay'),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('FormWillDisplay timeout', () {
+    test(
+        'completer times out and returns true (fail-open) when nobody '
+        'calls accept/reject', () async {
+      final completer = Completer<bool>();
+      // ignore: unused_local_variable — we just need the event to exist
+      final event = FormWillDisplay(
+        formId: 'timeout1',
+        formName: 'Timeout Form',
+        formType: 'POPUP',
+        completer: completer,
+      );
+
+      // Simulate the SDK timeout logic: if nobody calls accept/reject,
+      // the completer future should time out and fail-open
+      final result = await completer.future.timeout(
+        const Duration(milliseconds: 50),
+        onTimeout: () => true, // fail-open
+      );
+
+      expect(result, isTrue);
     });
   });
 }

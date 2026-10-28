@@ -36,10 +36,10 @@ target 'Runner' do
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   # KLAVIYO-SDK-OVERRIDE-START
-  pod 'KlaviyoCore', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '2a6cf04fcc19d8076c06e88339d51626dc7664e6'
-  pod 'KlaviyoSwift', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '2a6cf04fcc19d8076c06e88339d51626dc7664e6'
-  pod 'KlaviyoForms', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '2a6cf04fcc19d8076c06e88339d51626dc7664e6'
-  pod 'KlaviyoLocation', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '2a6cf04fcc19d8076c06e88339d51626dc7664e6'
+  pod 'KlaviyoCore', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '078022a24123dd05d61850f48f10d6fb1d1414c9'
+  pod 'KlaviyoSwift', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '078022a24123dd05d61850f48f10d6fb1d1414c9'
+  pod 'KlaviyoForms', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '078022a24123dd05d61850f48f10d6fb1d1414c9'
+  pod 'KlaviyoLocation', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '078022a24123dd05d61850f48f10d6fb1d1414c9'
   # KLAVIYO-SDK-OVERRIDE-END
   target 'RunnerTests' do
     inherit! :search_paths
@@ -49,7 +49,7 @@ end
 # Notification Service Extension target for rich push and badge count support
 target 'NotificationServiceExtension' do
   use_frameworks!
-  pod 'KlaviyoSwiftExtension', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '2a6cf04fcc19d8076c06e88339d51626dc7664e6'
+  pod 'KlaviyoSwiftExtension', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '078022a24123dd05d61850f48f10d6fb1d1414c9'
 end
 
 post_install do |installer|

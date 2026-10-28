@@ -125,6 +125,55 @@ void main() {
     await subscription.cancel();
   });
 
+  test('gating, latest failure callback and manual commands coexist', () async {
+    int previousFailures = 0;
+    int latestFailures = 0;
+    final publicEvents = <FormLifecycleEvent>[];
+    final lifecycle = sdk.onFormLifecycleEvent.listen(publicEvents.add);
+    final gate = Completer<FormWillDisplay>();
+    final gating = sdk.onFormWillDisplay.listen(gate.complete);
+    addTearDown(lifecycle.cancel);
+    addTearDown(gating.cancel);
+
+    await sdk.registerForInAppForms(
+      configuration: InAppFormConfig(onFailure: () => previousFailures++),
+    );
+    final registrationEpoch = epoch();
+    await sdk.registerForInAppForms(
+      configuration: InAppFormConfig(onFailure: () => latestFailures++),
+    );
+
+    const codec = StandardMethodCodec();
+    final decision = Completer<dynamic>();
+    messenger.handlePlatformMessage(
+      methods.name,
+      codec.encodeMethodCall(
+        const MethodCall('formWillDisplay', {
+          'formId': 'manual-form',
+          'formName': 'Manual form',
+          'formType': 'POPUP',
+        }),
+      ),
+      (response) => decision.complete(codec.decodeEnvelope(response!)),
+    );
+    final event = await gate.future;
+    failure('stale-$registrationEpoch');
+    failure(registrationEpoch);
+    await sdk.openForm('manual-form');
+    await flush();
+
+    expect(previousFailures, 0);
+    expect(latestFailures, 1);
+    expect(epoch(), registrationEpoch);
+    expect(calls.last.method, 'openForm');
+    expect(calls.last.arguments, {'formId': 'manual-form'});
+    expect(publicEvents, isEmpty);
+    expect(event.formId, 'manual-form');
+    expect(decision.isCompleted, isFalse);
+    event.reject();
+    expect(await decision.future, isFalse);
+  });
+
   test('unregister rejects queued old epoch and retry remains active',
       () async {
     int old = 0;

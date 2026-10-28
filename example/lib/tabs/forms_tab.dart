@@ -30,6 +30,7 @@ class _FormsTabState extends State<FormsTab> {
 
   // Lifecycle event tracking
   StreamSubscription<FormLifecycleEvent>? _lifecycleSubscription;
+  StreamSubscription<FormWillDisplay>? _willDisplaySubscription;
   final List<String> _lifecycleEvents = [];
 
   /// Reset the static state (called when SDK is reset)
@@ -63,6 +64,23 @@ class _FormsTabState extends State<FormsTab> {
           '[$timestamp] ${event.eventName}$formIdInfo$formNameInfo$extra',
         );
       });
+    });
+
+    _willDisplaySubscription = _klaviyo.onFormWillDisplay.listen((event) {
+      setState(() {
+        final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+        _lifecycleEvents.add(
+          '[$timestamp] ${event.eventName} (${event.formId}) '
+          '[${event.formName}] type=${event.formType}',
+        );
+      });
+
+      // Uncomment to block a specific form.
+      // if (event.formId == 'FORM_ID_TO_BLOCK') {
+      //   event.reject();
+      //   return;
+      // }
+      event.accept();
     });
   }
 
@@ -378,6 +396,7 @@ class _FormsTabState extends State<FormsTab> {
   void dispose() {
     _lifecycleSubscription?.cancel();
     _formIdController.dispose();
+    _willDisplaySubscription?.cancel();
     _durationController.dispose();
     _loadTimeoutController.dispose();
     _replayWindowController.dispose();
