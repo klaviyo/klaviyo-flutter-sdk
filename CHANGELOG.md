@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+### Changes
+
+- **Updated native iOS SDK to 5.6.0** — Under-the-hood refactor that removes the vendored TCA dependency and rebuilds the request queue and flush engine. No API or default behavior changes. See [klaviyo-swift-sdk 5.6.0](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.6.0).
+
+### Platform Support
+
+- **iOS**: Minimum deployment target 13.0, wraps [Klaviyo Swift SDK](https://github.com/klaviyo/klaviyo-swift-sdk) ~> 5.6.0
+- **Android**: Minimum SDK version 23, wraps [Klaviyo Android SDK](https://github.com/klaviyo/klaviyo-android-sdk) 4.6.0
+- **Flutter**: Minimum Flutter 3.27.0, Dart 3.0.0+
+
 ## 0.4.1
 
 ### Bug Fixes
