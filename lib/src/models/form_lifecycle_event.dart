@@ -6,10 +6,10 @@ import 'dart:async';
 /// Use [formId] and [formName] to identify the form associated with any event.
 /// For CTA-specific data, match on [FormCtaClicked] to access
 /// [FormCtaClicked.buttonLabel] and [FormCtaClicked.deepLinkUrl].
-/// For gating form display, match on [FormWillDisplay] and call
+/// For gating form display, subscribe to [KlaviyoSDK.onFormWillDisplay] and call
 /// [FormWillDisplay.accept] or [FormWillDisplay.reject].
 ///
-/// Example usage with exhaustive pattern matching:
+/// Example usage for ordinary lifecycle events:
 /// ```dart
 /// klaviyo.onFormLifecycleEvent.listen((event) {
 ///   switch (event) {
@@ -19,12 +19,8 @@ import 'dart:async';
 ///       print('Form dismissed: ${event.formId}');
 ///     case FormCtaClicked():
 ///       print('CTA clicked: ${event.buttonLabel}');
-///     case FormWillDisplay():
-///       if (shouldBlock(event.formId)) {
-///         event.reject();
-///       } else {
-///         event.accept();
-///       }
+///     default:
+///       break;
 ///   }
 /// });
 /// ```
