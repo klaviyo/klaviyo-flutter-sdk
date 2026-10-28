@@ -89,6 +89,16 @@ void main() {
       );
       expect(previewCalls(), isEmpty);
     });
+
+    test('returns false for a link with a badly encoded query value', () async {
+      expect(
+        await KlaviyoSDK().handleFormsPreviewLink(
+          Uri.parse('myapp://home?utm=%FF&klaviyo-forms-preview=$_token'),
+        ),
+        isFalse,
+      );
+      expect(previewCalls(), isEmpty);
+    });
   });
 
   test('isValidFormsPreviewToken checks the format', () {

@@ -350,7 +350,12 @@ class KlaviyoSDK {
   /// false and changes nothing, so call it first from your deep link handling
   /// and fall through when it returns false.
   Future<bool> handleFormsPreviewLink(Uri url) async {
-    final token = url.queryParameters[formsPreviewTokenKey];
+    final String? token;
+    try {
+      token = url.queryParameters[formsPreviewTokenKey];
+    } on FormatException {
+      return false;
+    }
     if (token == null) return false;
     if (!isValidFormsPreviewToken(token)) {
       _logger.warning('Ignoring forms preview link with a malformed token');
