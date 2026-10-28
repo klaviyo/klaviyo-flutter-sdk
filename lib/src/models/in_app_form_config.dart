@@ -19,7 +19,8 @@ class InAppFormConfig {
   /// original trigger. Replay does not guarantee trigger recovery.
   final Duration? eventReplayWindow;
 
-  /// Called on terminal loading failure, independently of form lifecycle events.
+  /// Called on terminal native loading failure after native teardown,
+  /// independently of form lifecycle events.
   /// Retry is host-controlled. This callback is never serialized.
   final void Function()? onFailure;
 

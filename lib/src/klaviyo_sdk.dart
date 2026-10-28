@@ -294,10 +294,11 @@ class KlaviyoSDK {
 
   /// Register for in-app forms
   ///
-  /// Completion confirms command handling, not forms readiness. Repeated calls
-  /// replace [InAppFormConfig.onFailure] immediately (omission clears it).
-  /// Scalar configuration applies to the next native load; an active load is
-  /// not restarted. Failures require an explicit host retry.
+  /// Requests native Forms registration. Completion does not confirm native
+  /// acceptance or forms readiness; platform-channel errors are logged.
+  /// Repeated calls replace [InAppFormConfig.onFailure] immediately (omission
+  /// clears it). Scalar configuration applies to the next native load; an active
+  /// load is not restarted. Failures require an explicit host retry.
   Future<void> registerForInAppForms({InAppFormConfig? configuration}) async {
     _ensureInitialized();
     try {
