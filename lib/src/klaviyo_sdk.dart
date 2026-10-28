@@ -316,10 +316,9 @@ class KlaviyoSDK {
   /// preview starts when forms register; no forms are shown before then.
   ///
   /// A preview token is a short-lived credential for on-device testing of
-  /// draft forms. Never ship one in a production build. The native SDKs keep
-  /// it in memory only and never persist or log it. A malformed token is
-  /// ignored and changes nothing. [unregisterFromInAppForms] also ends the
-  /// preview.
+  /// draft forms. The native SDKs keep it in memory only and never persist or
+  /// log it. A malformed token is ignored and changes nothing.
+  /// [unregisterFromInAppForms] also ends the preview.
   Future<void> startFormsPreview(String token) async {
     _ensureInitialized();
     try {
