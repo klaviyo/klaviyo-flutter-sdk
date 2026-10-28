@@ -63,7 +63,7 @@ Add `klaviyo_flutter_sdk` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  klaviyo_flutter_sdk: ^0.4.0
+  klaviyo_flutter_sdk: ^0.5.0
 ```
 
 A complete working example is available in the [`example/`](example/) directory.
@@ -888,7 +888,7 @@ void main() async {
 
 ## Geofencing
 
-The Klaviyo Flutter SDK supports geofencing for location-based event tracking. The full location module is **not included by default** — see [Enabling Geofencing](#enabling-geofencing) to opt in.
+The Klaviyo Flutter SDK supports geofencing for location-based event tracking. On Android, the full location module is **not included by default**. On iOS, it depends on how the app pulls in the plugin: Swift Package Manager builds include it automatically, and CocoaPods builds need to opt in. See [Enabling Geofencing](#enabling-geofencing) for setup.
 
 ```dart
 // Start monitoring geofences (requires location permissions)
@@ -899,7 +899,7 @@ await KlaviyoSDK().registerGeofencing();
 await KlaviyoSDK().unregisterGeofencing();
 ```
 
-Without the full location module enabled, geofencing methods return error code `GEOFENCING_NOT_AVAILABLE` with instructions to enable it.
+If the app doesn't include the full location module, geofencing methods return error code `GEOFENCING_NOT_AVAILABLE` with instructions to enable it.
 
 ## Optional Module Configuration
 
@@ -918,13 +918,17 @@ This includes the full `location` module with Google Play Services and adds the 
 - `android.permission.ACCESS_COARSE_LOCATION`
 - `android.permission.ACCESS_BACKGROUND_LOCATION`
 
-**iOS** — add to `ios/Podfile` before `flutter_install_all_ios_pods`:
+**iOS (Swift Package Manager)** — no flag is needed. The plugin's Swift package always links `KlaviyoLocation`. Swift Package Manager is the default for Flutter 3.44+ apps that have no `ios/Podfile`.
+
+**iOS (CocoaPods)** — add to `ios/Podfile` before `flutter_install_all_ios_pods`:
 
 ```ruby
 ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
 ```
 
-This includes the `KlaviyoLocation` pod. You'll also need location permission descriptions in `Info.plist`:
+This includes the `KlaviyoLocation` pod.
+
+With either dependency manager, add location permission descriptions and the `location` background mode to `Info.plist`:
 
 ```xml
 <key>NSLocationWhenInUseUsageDescription</key>
@@ -932,7 +936,14 @@ This includes the `KlaviyoLocation` pod. You'll also need location permission de
 
 <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 <string>We need background location for geofence monitoring.</string>
+
+<key>UIBackgroundModes</key>
+<array>
+    <string>location</string>
+</array>
 ```
+
+> **Note:** Geofencing needs `location` under `UIBackgroundModes`. The native location module turns on background location updates when geofencing starts. Without the `location` background mode, iOS won't allow background location updates (it raises `NSInternalInconsistencyException`), so geofencing won't start. If your app already declares `UIBackgroundModes` (for example `remote-notification` for push), add `location` to the existing array.
 
 ### Disabling In-App Forms
 

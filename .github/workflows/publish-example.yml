@@ -27,8 +27,18 @@ on:
     paths-ignore:
       - '**.md'
       - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
       - '.coderabbit.yaml'
+      - '.cursor/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/CODEOWNERS'
+      - '.github/dependabot.yml'
+      - '.github/pull_request_template.md'
+      - '.github/workflows/pr-target-check.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/stale.yml'
+      - '.github/workflows/version-check.yml'
+      - 'test/**'
+      - 'example/test/**'
   release:
     types: [published]
   workflow_dispatch:
@@ -58,11 +68,92 @@ env:
   GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
 
 jobs:
+  # On a default-branch push, outputs skip=true when the commit's tree matches
+  # the tag for the pubspec.yaml version: release.yml's tag-dispatched run
+  # already deploys that content. The match alone decides, whether or not the
+  # release deploy succeeded; retry a failed release deploy from the release
+  # run. A missing tag or failed lookup outputs skip=false.
+  release-merge-check:
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Compare tree with the release tag
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          head_tree=$(git rev-parse 'HEAD^{tree}')
+          if ! tag_tree=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${version}" --jq .commit.tree.sha 2>/dev/null); then
+            echo "No tag ${version} (or the lookup failed); deploying"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ "$head_tree" = "$tag_tree" ]; then
+            echo "::notice::Tree matches tag ${version}; the release run deploys this content, skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tree differs from tag ${version}; deploying"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # On a release, or a tag dispatch for both platforms, cancels queued or
+  # in-progress push runs of this workflow whose commit has the same tree as
+  # the released commit,
+  # unless one of their "Publish to ..." deploy jobs is already in progress.
+  # Never touches tag or release runs. Failures here never block the deploy.
+  cancel-superseded-push-runs:
+    if: |
+      inputs.check_credentials != true
+      && (github.event_name == 'release'
+        || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.platform == 'both'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Cancel push runs with the released content
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          tree_of() { gh api "repos/${GITHUB_REPOSITORY}/commits/$1" --jq .commit.tree.sha; }
+          release_tree=$(tree_of "$RELEASE_SHA")
+          for status in queued in_progress waiting pending requested; do
+            gh run list --repo "$GITHUB_REPOSITORY" --workflow publish-example.yml \
+              --event push --status "$status" --limit 50 \
+              --json databaseId,headSha,headBranch --jq '.[] | "\(.databaseId) \(.headSha) \(.headBranch)"'
+          done | sort -u | while read -r run_id sha branch; do
+            if [ "$(tree_of "$sha")" != "$release_tree" ]; then
+              echo "Keeping push run ${run_id} (${branch} @ ${sha:0:7}); its content differs from the release"
+              continue
+            fi
+            deploying=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs" \
+              --jq '[.jobs[] | select((.name | startswith("Publish to")) and .status == "in_progress")] | length')
+            if [ "$deploying" != "0" ]; then
+              echo "::notice::Keeping push run ${run_id} (${branch} @ ${sha:0:7}); a deploy is already running, the release deploys queue behind it"
+              continue
+            fi
+            echo "::notice::Cancelling push run ${run_id} (${branch} @ ${sha:0:7}); this release deploys the same content"
+            gh run cancel "$run_id" --repo "$GITHUB_REPOSITORY" || echo "::warning::Could not cancel run ${run_id}"
+          done
+
   gate-test:
     # Tests and lint gate every deploy; check-credentials runs need neither,
     # and a pull_request label event only runs them for a deploy label.
+    # Skipped when release-merge-check outputs skip=true.
+    needs: release-merge-check
     if: |
-      inputs.check_credentials != true
+      !cancelled()
+      && needs.release-merge-check.outputs.skip != 'true'
+      && inputs.check_credentials != true
       && (github.event_name != 'pull_request'
         || (github.event.pull_request.head.repo.full_name == github.repository
           && startsWith(github.event.label.name, 'deploy-example-app')))
@@ -71,8 +162,11 @@ jobs:
       contents: read
 
   gate-lint:
+    needs: release-merge-check
     if: |
-      inputs.check_credentials != true
+      !cancelled()
+      && needs.release-merge-check.outputs.skip != 'true'
+      && inputs.check_credentials != true
       && (github.event_name != 'pull_request'
         || (github.event.pull_request.head.repo.full_name == github.repository
           && startsWith(github.event.label.name, 'deploy-example-app')))
@@ -83,9 +177,13 @@ jobs:
   preflight-android:
     # Only for the platform that was asked for: a manual ios-only run or a
     # ios label must not fail on android's missing secrets, and an unrelated
-    # label must not start anything.
+    # label must not start anything. Skipped when release-merge-check
+    # outputs skip=true, which skips the deploy too.
+    needs: release-merge-check
     if: |
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      !cancelled()
+      && needs.release-merge-check.outputs.skip != 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name == 'push'
         || github.event_name == 'release'
         || (github.event_name == 'workflow_dispatch' && inputs.platform != 'ios')
@@ -114,9 +212,13 @@ jobs:
   preflight-ios:
     # Only for the platform that was asked for: a manual android-only run or a
     # android label must not fail on ios's missing secrets, and an unrelated
-    # label must not start anything.
+    # label must not start anything. Skipped when release-merge-check
+    # outputs skip=true, which skips the deploy too.
+    needs: release-merge-check
     if: |
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      !cancelled()
+      && needs.release-merge-check.outputs.skip != 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
       && (github.event_name == 'push'
         || github.event_name == 'release'
         || (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
