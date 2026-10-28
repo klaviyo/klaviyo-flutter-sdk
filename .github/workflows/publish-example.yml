@@ -102,15 +102,16 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # On a release or tag dispatch, cancels queued or in-progress push runs of
-  # this workflow whose commit has the same tree as the released commit,
+  # On a release, or a tag dispatch for both platforms, cancels queued or
+  # in-progress push runs of this workflow whose commit has the same tree as
+  # the released commit,
   # unless one of their "Publish to ..." deploy jobs is already in progress.
   # Never touches tag or release runs. Failures here never block the deploy.
   cancel-superseded-push-runs:
     if: |
       inputs.check_credentials != true
       && (github.event_name == 'release'
-        || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag'))
+        || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.platform == 'both'))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     continue-on-error: true
