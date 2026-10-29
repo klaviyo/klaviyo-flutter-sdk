@@ -23,7 +23,7 @@ reviews:
       enabled: true
       config_file: "ios/.swiftlint.yml"
   path_instructions:
-    - path: "lib/**,android/**,ios/**"
+    - path: "{lib,android,ios}/**"
       instructions: >
         This is public SDK source code (Dart with Kotlin/Swift platform code). Prioritize:
         - Crashes and unhandled errors on realistic inputs.
