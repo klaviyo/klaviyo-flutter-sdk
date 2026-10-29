@@ -47,7 +47,7 @@ android {
     }
 }
 
-def klaviyoSdkVersion = "d9db70a7dd017fc46bd002dad8b1adaec027d1b7"
+def klaviyoSdkVersion = "ae02b0edd8c1330189150f316e73cc54917a73ae"
 
 // Whether to include the full forms module (in-app forms rendering).
 // Set klaviyoIncludeForms=false in your host app's gradle.properties to exclude forms.
