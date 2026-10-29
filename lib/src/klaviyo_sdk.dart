@@ -7,7 +7,6 @@ import 'models/klaviyo_profile.dart';
 import 'models/klaviyo_event.dart';
 import 'models/klaviyo_subscription.dart';
 import 'models/in_app_form_config.dart';
-import 'models/forms_preview.dart';
 import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
@@ -344,25 +343,22 @@ class KlaviyoSDK {
   /// Start a forms preview from a deep link, such as the link or QR code from
   /// the Klaviyo form editor's **Preview on device** button.
   ///
-  /// If [url] has a `klaviyo-forms-preview` query parameter holding a
-  /// well-formed preview token, a preview starts as if the token were passed
-  /// to [startFormsPreview] and this returns true. Otherwise this returns
-  /// false and changes nothing, so call it first from your deep link handling
-  /// and fall through when it returns false.
+  /// Forwards [url] to the native SDK and returns true only when the native
+  /// SDK started a preview — that is, the link carries a well-formed
+  /// `klaviyo-forms-preview` token. Returns false, changing nothing, for
+  /// every other link and on any failure, so call it first from your deep
+  /// link handling and fall through when it returns false.
+  ///
+  /// Never throws: a badly encoded query or an unreachable native side
+  /// returns false. Safe to call before [initialize] for cold-start links;
+  /// the native SDKs hold the token until forms register.
   Future<bool> handleFormsPreviewLink(Uri url) async {
-    final String? token;
     try {
-      token = url.queryParameters[formsPreviewTokenKey];
+      if (url.queryParameters.isEmpty) return false;
     } on FormatException {
       return false;
     }
-    if (token == null) return false;
-    if (!isValidFormsPreviewToken(token)) {
-      _logger.warning('Ignoring forms preview link with a malformed token');
-      return false;
-    }
-    await startFormsPreview(token);
-    return true;
+    return _nativeWrapper.handleFormsPreviewLink(url.toString());
   }
 
   /// Unregister from in-app forms

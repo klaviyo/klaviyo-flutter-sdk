@@ -648,7 +648,7 @@ await KlaviyoSDK().startFormsPreview(token); // start a draft preview
 await KlaviyoSDK().endFormsPreview(); // back to published forms
 ```
 
-The preview link is a deep link into your app with a `klaviyo-forms-preview` query parameter. Pass deep links to `handleFormsPreviewLink` before your own routing: it starts a preview session and returns `true` for a preview link, and returns `false`, changing nothing, for every other link. With go_router, check it in your `redirect`:
+The preview link is a deep link into your app with a `klaviyo-forms-preview` query parameter. Pass deep links to `handleFormsPreviewLink` before your own routing: it returns `true` only when the native SDK started a preview, and returns `false`, changing nothing, for every other link and on any failure. It never throws, so it is safe to call before `initialize()` for cold-start links. With go_router, check it in your `redirect`:
 
 ```dart
 redirect: (context, state) async {
@@ -1050,7 +1050,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `unregisterFromInAppForms()` | Unregister from in-app forms |
 | `startFormsPreview(String token)` | Start a draft forms preview session, restarting forms if registered |
 | `endFormsPreview()` | End the forms preview session, restarting forms with published forms |
-| `handleFormsPreviewLink(Uri url)` | Start a forms preview from a `klaviyo-forms-preview` deep link; returns `true` if handled |
+| `handleFormsPreviewLink(Uri url)` | Start a forms preview from a `klaviyo-forms-preview` deep link; returns `true` only when the native SDK started the preview, never throws |
 
 #### Geofencing
 

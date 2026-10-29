@@ -279,6 +279,23 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Start a forms preview from a deep link in the native SDK.
+  ///
+  /// Never throws and has no initialize guard — the native SDKs hold a
+  /// preview token until forms register, so this must work for cold-start
+  /// links. Returns false on any failure.
+  Future<bool> handleFormsPreviewLink(String url) async {
+    try {
+      return await _channel.invokeMethod<bool>('handleFormsPreviewLink', {
+            'url': url,
+          }) ??
+          false;
+    } catch (e) {
+      _logger.warning('Failed to handle the forms preview link: $e');
+      return false;
+    }
+  }
+
   /// End the forms preview session in the native SDK
   Future<void> endFormsPreview() async {
     _ensureInitialized();
