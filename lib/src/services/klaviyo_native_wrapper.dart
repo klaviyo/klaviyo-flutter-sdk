@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 import '../models/klaviyo_profile.dart';
@@ -21,7 +24,16 @@ class KlaviyoNativeWrapper {
 
   final Logger _logger = Logger('KlaviyoSDK');
   bool _isInitialized = false;
-  bool _eventListenerAttached = false;
+  StreamSubscription<dynamic>? _eventSubscription;
+  Completer<void>? _eventListenerReady;
+  String? _eventListenerEpoch;
+  bool _isDisposed = false;
+  int _formsEpoch = 0;
+  final String _formsEpochPrefix =
+      '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
+  String get _formsRegistrationEpoch => '$_formsEpochPrefix-$_formsEpoch';
+  bool _formsRegistered = false;
+  void Function()? _onFormsFailure;
   String? _apiKey;
 
   // Stream controllers for native events – buffer events that arrive
@@ -61,13 +73,7 @@ class KlaviyoNativeWrapper {
     required String apiKey,
   }) async {
     try {
-      // Set up event listener only once — re-subscribing would cause duplicate
-      // events or orphaned subscriptions. Use a dedicated flag rather than
-      // _isInitialized so a failed first init doesn't re-subscribe on retry.
-      if (!_eventListenerAttached) {
-        _eventChannel.receiveBroadcastStream().listen(_handleNativeEvent);
-        _eventListenerAttached = true;
-      }
+      _attachEventListener();
 
       // Always forward to native — allows re-initialization with a new API key
       await _channel.invokeMethod('initialize', {
@@ -258,11 +264,35 @@ class KlaviyoNativeWrapper {
   /// Register for in-app forms using native SDK
   Future<void> registerForInAppForms({
     Map<String, dynamic>? configuration,
+    void Function()? onFailure,
   }) async {
     _ensureInitialized();
+    _onFormsFailure = onFailure;
+    if (!_formsRegistered) {
+      _formsRegistered = true;
+      _formsEpoch++;
+    }
+    final epoch = _formsRegistrationEpoch;
     try {
+      _attachEventListener();
+      await _eventListenerReady!.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          final error =
+              TimeoutException('Native event listener did not attach');
+          _endEventListener(error);
+          throw error;
+        },
+      );
+      if (_isDisposed ||
+          !_formsRegistered ||
+          epoch != _formsRegistrationEpoch) {
+        throw const KlaviyoException('Forms registration was cancelled');
+      }
       await _channel.invokeMethod('registerForInAppForms', {
         'configuration': configuration,
+        'formsEpoch': epoch,
+        'listenerEpoch': _eventListenerEpoch,
       });
     } catch (e) {
       throw KlaviyoException('Failed to register for in-app forms: $e');
@@ -272,6 +302,7 @@ class KlaviyoNativeWrapper {
   /// Unregister from in-app forms using native SDK
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
+    _clearFormsRegistration();
     try {
       await _channel.invokeMethod('unregisterFromInAppForms');
     } catch (e) {
@@ -440,6 +471,20 @@ class KlaviyoNativeWrapper {
       final String eventType = eventData['type'] as String? ?? '';
 
       switch (eventType) {
+        case '_forms_listener_ready':
+          final ready = _eventListenerReady;
+          if (ready != null &&
+              !ready.isCompleted &&
+              eventData['listenerEpoch'] == _eventListenerEpoch) {
+            ready.complete();
+          }
+          break;
+        case '_forms_failure':
+          if (_formsRegistered &&
+              eventData['formsEpoch'] == _formsRegistrationEpoch) {
+            _onFormsFailure?.call();
+          }
+          break;
         case 'push_notification_received':
         case 'push_notification_opened':
         case 'silent_push_received':
@@ -502,7 +547,7 @@ class KlaviyoNativeWrapper {
 
   /// Ensure SDK is initialized
   void _ensureInitialized() {
-    if (!_isInitialized) {
+    if (!_isInitialized || _isDisposed) {
       throw const KlaviyoNotInitializedException();
     }
   }
@@ -513,8 +558,48 @@ class KlaviyoNativeWrapper {
   /// Get current API key
   String? get apiKey => _apiKey;
 
+  void _attachEventListener() {
+    if (_isDisposed) {
+      throw const KlaviyoException('SDK wrapper is disposed');
+    }
+    if (_eventSubscription != null) return;
+    _eventListenerReady = Completer<void>();
+    _eventListenerEpoch =
+        '$_formsEpochPrefix-listener-${Random().nextInt(1 << 32)}';
+    _eventListenerReady!.future.ignore();
+    _eventSubscription = _eventChannel.receiveBroadcastStream({
+      'listenerEpoch': _eventListenerEpoch,
+    }).listen(
+      _handleNativeEvent,
+      onError: (Object error) => _endEventListener(error),
+      onDone: () => _endEventListener(
+        const KlaviyoException('Native event listener ended'),
+      ),
+    );
+  }
+
+  void _clearFormsRegistration() {
+    _onFormsFailure = null;
+    _formsRegistered = false;
+    _formsEpoch++;
+  }
+
+  void _endEventListener(Object error) {
+    _clearFormsRegistration();
+    final ready = _eventListenerReady;
+    _eventListenerEpoch = null;
+    if (ready != null && !ready.isCompleted) ready.completeError(error);
+    final subscription = _eventSubscription;
+    _eventSubscription = null;
+    unawaited(subscription?.cancel());
+    _logger.warning('Native event listener ended: $error');
+  }
+
   /// Dispose resources
   void dispose() {
+    _isDisposed = true;
+    _isInitialized = false;
+    _endEventListener(const KlaviyoException('SDK wrapper is disposed'));
     _pushNotificationController.close();
     _formEventController.close();
     _authTokenRequestController.close();
