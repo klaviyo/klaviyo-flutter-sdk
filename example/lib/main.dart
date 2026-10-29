@@ -20,6 +20,12 @@ import 'screens/configure_auth_response.dart';
 
 final _logger = Logger('KlaviyoExample');
 
+final RegExp _formsPreviewTokenLogPattern =
+    RegExp('([?&#]$formsPreviewTokenKey=)[^&#]*');
+
+String _redactFormsPreviewToken(String url) =>
+    url.replaceAll(_formsPreviewTokenLogPattern, '\$1REDACTED');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -269,13 +275,20 @@ final GoRouter _router = GoRouter(
   ],
   redirect: (context, state) async {
     final url = state.uri.toString();
-    _logger.info('Redirect called with URL: $url');
+    _logger.info('Redirect called with URL: ${_redactFormsPreviewToken(url)}');
     _logger.fine(
       'URI scheme: ${state.uri.scheme}, path: ${state.uri.path}',
     );
 
-    // Handle Klaviyo universal tracking links
     final klaviyo = KlaviyoSDK();
+
+    // Start a draft in-app forms preview from the form editor's QR code or
+    // copied preview link, then stay on the current page.
+    final previewStarted = await klaviyo.handleFormsPreviewLink(state.uri);
+    _logger.info('Forms preview link handled: $previewStarted');
+    if (previewStarted) return state.matchedLocation;
+
+    // Handle Klaviyo universal tracking links
     if (klaviyo.isInitialized) {
       _logger.fine('Checking if tracking link...');
       final isTrackingLink = klaviyo.handleUniversalTrackingLink(url);

@@ -62,9 +62,9 @@ PODS:
     - GoogleUtilities/Privacy
   - klaviyo_flutter_sdk (0.5.0):
     - Flutter
-    - KlaviyoForms (~> 5.6.0)
-    - KlaviyoLocation (~> 5.6.0)
-    - KlaviyoSwift (~> 5.6.0)
+    - KlaviyoForms
+    - KlaviyoLocation
+    - KlaviyoSwift
   - KlaviyoCore (5.6.0):
     - AnyCodable-FlightSchool
   - KlaviyoForms (5.6.0):
@@ -94,7 +94,11 @@ DEPENDENCIES:
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
   - klaviyo_flutter_sdk (from `.symlinks/plugins/klaviyo_flutter_sdk/ios`)
-  - KlaviyoSwiftExtension (~> 5.6.0)
+  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
+  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
+  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
+  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
+  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -109,11 +113,6 @@ SPEC REPOS:
     - FirebaseMessaging
     - GoogleDataTransport
     - GoogleUtilities
-    - KlaviyoCore
-    - KlaviyoForms
-    - KlaviyoLocation
-    - KlaviyoSwift
-    - KlaviyoSwiftExtension
     - nanopb
     - PromisesObjC
 
@@ -126,12 +125,44 @@ EXTERNAL SOURCES:
     :path: Flutter
   klaviyo_flutter_sdk:
     :path: ".symlinks/plugins/klaviyo_flutter_sdk/ios"
+  KlaviyoCore:
+    :branch: ecm/MAGE-1449/forms-preview-link
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoForms:
+    :branch: ecm/MAGE-1449/forms-preview-link
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoLocation:
+    :branch: ecm/MAGE-1449/forms-preview-link
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoSwift:
+    :branch: ecm/MAGE-1449/forms-preview-link
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoSwiftExtension:
+    :branch: ecm/MAGE-1449/forms-preview-link
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
+
+CHECKOUT OPTIONS:
+  KlaviyoCore:
+    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoForms:
+    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoLocation:
+    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoSwift:
+    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
+  KlaviyoSwiftExtension:
+    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
 
 SPEC CHECKSUMS:
   AnyCodable-FlightSchool: 261cbe76757802b17d471b9059b21e6fa5edf57b
@@ -145,7 +176,7 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleUtilities: db34c1c11c6f2eccb6fab2340cb8ceb1451299dc
-  klaviyo_flutter_sdk: 85a8f4a014bac46082dcc6ffdd670fa45beee16d
+  klaviyo_flutter_sdk: a4f1e48c5aacfffd69a7eadd559e3b28dbd96d2c
   KlaviyoCore: 164331e6fdd6deec7f88f915475f173db49c6b34
   KlaviyoForms: 6769bc3310335554b12ad3c2b33ddf4a1fd27fac
   KlaviyoLocation: 0ec7510cf6af4e4b08729065234a9059991fd54a
@@ -157,6 +188,6 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
 
-PODFILE CHECKSUM: 30254f7a26fcdc021b1d2f5edbaf96ca4eafbe2d
+PODFILE CHECKSUM: fd292bbfe635d0d4fcd29241ef6f01708b850002
 
 COCOAPODS: 1.16.2

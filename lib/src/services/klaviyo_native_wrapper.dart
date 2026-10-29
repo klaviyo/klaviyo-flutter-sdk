@@ -269,6 +269,43 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Start a forms preview session in the native SDK
+  Future<void> startFormsPreview(String token) async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('startFormsPreview', {'token': token});
+    } catch (e) {
+      throw const KlaviyoException('Failed to start the forms preview');
+    }
+  }
+
+  /// Start a forms preview from a deep link in the native SDK.
+  ///
+  /// Never throws and has no initialize guard — the native SDKs hold a
+  /// preview token until forms register, so this must work for cold-start
+  /// links. Returns false on any failure.
+  Future<bool> handleFormsPreviewLink(String url) async {
+    try {
+      return await _channel.invokeMethod<bool>('handleFormsPreviewLink', {
+            'url': url,
+          }) ??
+          false;
+    } catch (e) {
+      _logger.warning('Failed to handle the forms preview link: $e');
+      return false;
+    }
+  }
+
+  /// End the forms preview session in the native SDK
+  Future<void> endFormsPreview() async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('endFormsPreview');
+    } catch (e) {
+      throw KlaviyoException('Failed to end the forms preview: $e');
+    }
+  }
+
   /// Unregister from in-app forms using native SDK
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
