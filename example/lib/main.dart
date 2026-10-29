@@ -280,8 +280,15 @@ final GoRouter _router = GoRouter(
       'URI scheme: ${state.uri.scheme}, path: ${state.uri.path}',
     );
 
-    // Handle Klaviyo universal tracking links
     final klaviyo = KlaviyoSDK();
+
+    // Start a draft in-app forms preview from the form editor's QR code or
+    // copied preview link, then stay on the current page.
+    final previewStarted = await klaviyo.handleFormsPreviewLink(state.uri);
+    _logger.info('Forms preview link handled: $previewStarted');
+    if (previewStarted) return state.matchedLocation;
+
+    // Handle Klaviyo universal tracking links
     if (klaviyo.isInitialized) {
       _logger.fine('Checking if tracking link...');
       final isTrackingLink = klaviyo.handleUniversalTrackingLink(url);
@@ -294,14 +301,6 @@ final GoRouter _router = GoRouter(
           'Tracking link - staying on current location: ${state.matchedLocation}',
         );
         return state.matchedLocation;
-      }
-
-      // Start a draft in-app forms preview from the form editor's QR code or
-      // copied preview link, then stay on the current page.
-      if (state.uri.queryParameters.containsKey(formsPreviewTokenKey)) {
-        final started = await klaviyo.handleFormsPreviewLink(state.uri);
-        _logger.info('Forms preview link handled: $started');
-        if (started) return state.matchedLocation;
       }
     }
 
