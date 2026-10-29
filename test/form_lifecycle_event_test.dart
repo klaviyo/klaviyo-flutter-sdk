@@ -479,7 +479,7 @@ void main() {
   });
 
   group('FormLifecycleEvent exhaustive pattern matching', () {
-    test('switch covers all subtypes', () {
+    test('ordinary lifecycle switch remains exhaustive with three cases', () {
       final events = <FormLifecycleEvent>[
         const FormShown(formId: '1', formName: 'Test'),
         const FormDismissed(formId: '2', formName: 'Test'),
@@ -489,25 +489,17 @@ void main() {
           buttonLabel: 'Go',
           deepLinkUrl: 'app://go',
         ),
-        FormWillDisplay(
-          formId: '4',
-          formName: 'Test',
-          formType: 'POPUP',
-          completer: Completer<bool>(),
-        ),
       ];
 
       final names = events.map((event) {
-        // This switch is exhaustive thanks to the sealed class
         return switch (event) {
           FormShown() => 'shown',
           FormDismissed() => 'dismissed',
           FormCtaClicked() => 'cta',
-          FormWillDisplay() => 'willDisplay',
         };
       }).toList();
 
-      expect(names, ['shown', 'dismissed', 'cta', 'willDisplay']);
+      expect(names, ['shown', 'dismissed', 'cta']);
     });
   });
 

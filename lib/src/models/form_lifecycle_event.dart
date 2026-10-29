@@ -9,7 +9,7 @@ import 'dart:async';
 /// For gating form display, subscribe to [KlaviyoSDK.onFormWillDisplay] and call
 /// [FormWillDisplay.accept] or [FormWillDisplay.reject].
 ///
-/// Example usage for ordinary lifecycle events:
+/// Example usage with exhaustive pattern matching:
 /// ```dart
 /// klaviyo.onFormLifecycleEvent.listen((event) {
 ///   switch (event) {
@@ -19,8 +19,6 @@ import 'dart:async';
 ///       print('Form dismissed: ${event.formId}');
 ///     case FormCtaClicked():
 ///       print('CTA clicked: ${event.buttonLabel}');
-///     default:
-///       break;
 ///   }
 /// });
 /// ```
@@ -212,7 +210,13 @@ class FormCtaClicked extends FormLifecycleEvent {
 /// Only the first call takes effect; subsequent calls are ignored.
 /// If neither is called, the native SDK's timeout will fail-open and allow
 /// the form to display.
-class FormWillDisplay extends FormLifecycleEvent {
+class FormWillDisplay {
+  /// The form ID of the form associated with this event.
+  final String formId;
+
+  /// The display name of the form associated with this event.
+  final String formName;
+
   /// The type of form (e.g. "POPUP", "FLYOUT", "FULLSCREEN").
   final String formType;
 
@@ -220,8 +224,8 @@ class FormWillDisplay extends FormLifecycleEvent {
   bool _responded = false;
 
   FormWillDisplay({
-    required super.formId,
-    required super.formName,
+    required this.formId,
+    required this.formName,
     required this.formType,
     required Completer<bool> completer,
   }) : _completer = completer;
@@ -238,7 +242,7 @@ class FormWillDisplay extends FormLifecycleEvent {
     _completer.complete(allowed);
   }
 
-  @override
+  /// A string identifier for the event type, suitable for logging.
   String get eventName => 'formWillDisplay';
 
   @override
