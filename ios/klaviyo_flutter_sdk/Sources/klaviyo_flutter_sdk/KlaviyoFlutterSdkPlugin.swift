@@ -251,6 +251,27 @@ extension KlaviyoFlutterSdkPlugin {
             ))
             #endif
 
+        case "openForm":
+            guard let args = call.arguments as? [String: Any],
+                  let formId = args["formId"] as? String
+            else {
+                result(FlutterError(code: "INVALID_ARGUMENT", message: "formId is required", details: nil))
+                return
+            }
+            #if canImport(KlaviyoForms)
+            DispatchQueue.main.async {
+                KlaviyoSDK().openForm(formId)
+                result(nil)
+            }
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
+
         case "unregisterFromInAppForms":
             formsEpoch = nil
             #if canImport(KlaviyoForms)

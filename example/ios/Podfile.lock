@@ -95,11 +95,11 @@ DEPENDENCIES:
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
   - klaviyo_flutter_sdk (from `.symlinks/plugins/klaviyo_flutter_sdk/ios`)
-  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `884daa4fb877e823325dbdfb50b8062135168b60`)
-  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `884daa4fb877e823325dbdfb50b8062135168b60`)
-  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `884daa4fb877e823325dbdfb50b8062135168b60`)
-  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `884daa4fb877e823325dbdfb50b8062135168b60`)
-  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `884daa4fb877e823325dbdfb50b8062135168b60`)
+  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `2a6cf04fcc19d8076c06e88339d51626dc7664e6`)
+  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `2a6cf04fcc19d8076c06e88339d51626dc7664e6`)
+  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `2a6cf04fcc19d8076c06e88339d51626dc7664e6`)
+  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `2a6cf04fcc19d8076c06e88339d51626dc7664e6`)
+  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `2a6cf04fcc19d8076c06e88339d51626dc7664e6`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -127,19 +127,19 @@ EXTERNAL SOURCES:
   klaviyo_flutter_sdk:
     :path: ".symlinks/plugins/klaviyo_flutter_sdk/ios"
   KlaviyoCore:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
@@ -150,19 +150,19 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   KlaviyoCore:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :commit: 884daa4fb877e823325dbdfb50b8062135168b60
+    :commit: 2a6cf04fcc19d8076c06e88339d51626dc7664e6
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
 
 SPEC CHECKSUMS:
@@ -189,6 +189,6 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
 
-PODFILE CHECKSUM: d268a057155fc0ea04c0b1ca0e6ca8f6cab3b8e3
+PODFILE CHECKSUM: f1f53aeba467ee874f8758db76aad8b172fe78bb
 
 COCOAPODS: 1.16.2

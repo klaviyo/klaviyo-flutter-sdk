@@ -299,6 +299,16 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Request manual form opening using the native SDK.
+  Future<void> openForm(String formId) async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('openForm', {'formId': formId});
+    } catch (e) {
+      throw KlaviyoException('Failed to request form opening: $e');
+    }
+  }
+
   /// Unregister from in-app forms using native SDK
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
