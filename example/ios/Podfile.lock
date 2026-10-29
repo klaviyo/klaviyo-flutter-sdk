@@ -62,7 +62,6 @@ PODS:
     - GoogleUtilities/Privacy
   - klaviyo_flutter_sdk (0.4.0):
     - Flutter
-    - KlaviyoCore
     - KlaviyoForms
     - KlaviyoLocation
     - KlaviyoSwift
@@ -95,11 +94,11 @@ DEPENDENCIES:
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
   - klaviyo_flutter_sdk (from `.symlinks/plugins/klaviyo_flutter_sdk/ios`)
-  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
-  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
-  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
-  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
-  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `078022a24123dd05d61850f48f10d6fb1d1414c9`)
+  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `88303c731342e931e1d3212611841a2c73f74a40`)
+  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `88303c731342e931e1d3212611841a2c73f74a40`)
+  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `88303c731342e931e1d3212611841a2c73f74a40`)
+  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `88303c731342e931e1d3212611841a2c73f74a40`)
+  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, commit `88303c731342e931e1d3212611841a2c73f74a40`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -127,19 +126,19 @@ EXTERNAL SOURCES:
   klaviyo_flutter_sdk:
     :path: ".symlinks/plugins/klaviyo_flutter_sdk/ios"
   KlaviyoCore:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
@@ -150,19 +149,19 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   KlaviyoCore:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :commit: 078022a24123dd05d61850f48f10d6fb1d1414c9
+    :commit: 88303c731342e931e1d3212611841a2c73f74a40
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
 
 SPEC CHECKSUMS:
@@ -177,7 +176,7 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleUtilities: db34c1c11c6f2eccb6fab2340cb8ceb1451299dc
-  klaviyo_flutter_sdk: 61757a821722c6a827b1fb5f971f819e074fa888
+  klaviyo_flutter_sdk: 4301bd12618057cda764b589493ccc75c9e4d89f
   KlaviyoCore: c3be5c088eff49b920f6393fb70a6a9386744a45
   KlaviyoForms: e5e3138223616a007c86e43b1e3fe816a4527a42
   KlaviyoLocation: 7fb35c1c13bd49d5dd51c817d2f150a473e7ac24
@@ -189,6 +188,6 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
 
-PODFILE CHECKSUM: 35c2bdaf2e6d0dd38a9bd86a37b45b5ba7923689
+PODFILE CHECKSUM: 6b6ac89b2e8013991aba5983f4c7f939cfe50b36
 
 COCOAPODS: 1.16.2
