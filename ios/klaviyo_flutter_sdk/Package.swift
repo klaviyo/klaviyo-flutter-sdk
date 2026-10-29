@@ -13,7 +13,7 @@ let package = Package(
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
         .package(
             url: "https://github.com/klaviyo/klaviyo-swift-sdk",
-            .upToNextMinor(from: "5.5.0")
+            revision: "88303c731342e931e1d3212611841a2c73f74a40"
         )
     ],
     targets: [
