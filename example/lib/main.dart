@@ -20,6 +20,12 @@ import 'screens/configure_auth_response.dart';
 
 final _logger = Logger('KlaviyoExample');
 
+final RegExp _formsPreviewTokenLogPattern =
+    RegExp('([?&#]$formsPreviewTokenKey=)[^&#]*');
+
+String _redactFormsPreviewToken(String url) =>
+    url.replaceAll(_formsPreviewTokenLogPattern, '\$1REDACTED');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -269,7 +275,7 @@ final GoRouter _router = GoRouter(
   ],
   redirect: (context, state) async {
     final url = state.uri.toString();
-    _logger.info('Redirect called with URL: $url');
+    _logger.info('Redirect called with URL: ${_redactFormsPreviewToken(url)}');
     _logger.fine(
       'URI scheme: ${state.uri.scheme}, path: ${state.uri.path}',
     );
