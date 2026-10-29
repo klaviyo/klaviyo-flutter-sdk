@@ -438,7 +438,7 @@ class KlaviyoNativeWrapper {
   }
 
   /// Handle reverse method calls from native (native → Dart).
-  /// Used for form gating where native needs a synchronous response.
+  /// Used for bounded asynchronous form-display decisions.
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'formWillDisplay':
@@ -469,7 +469,7 @@ class KlaviyoNativeWrapper {
 
     try {
       return await completer.future.timeout(
-        const Duration(seconds: 30),
+        const Duration(seconds: 3),
         onTimeout: () => true, // fail-open on Dart-side timeout
       );
     } catch (_) {
@@ -479,6 +479,7 @@ class KlaviyoNativeWrapper {
 
   /// Stream of [FormWillDisplay] events for form gating.
   /// Subscribe to this to receive gating events and call accept()/reject().
+  /// Respond within three seconds; unanswered decisions fail open.
   final _formWillDisplayController =
       BufferedBroadcastStreamController<FormWillDisplay>();
 
