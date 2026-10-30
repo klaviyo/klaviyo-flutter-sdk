@@ -9,14 +9,11 @@ import 'test_id.dart';
 class BuildInfoButton extends StatelessWidget {
   const BuildInfoButton({super.key});
 
-  static const buttonKey = Key('build-info-button');
-
   @override
   Widget build(BuildContext context) {
     return TestId(
-      'profile_build_info_button',
+      'build_info_button',
       child: IconButton(
-        key: buttonKey,
         icon: const Icon(Icons.info_outline),
         tooltip: 'Build info',
         onPressed: () async {
@@ -55,9 +52,8 @@ class BuildInfoSheet extends StatelessWidget {
               children: [
                 Text('Build info', style: theme.textTheme.titleMedium),
                 TestId(
-                  'build_info_copy_button',
+                  'build_info_copy',
                   child: IconButton(
-                    key: const Key('copy-build-info'),
                     icon: const Icon(Icons.copy, size: 18),
                     tooltip: 'Copy build info',
                     onPressed: () {

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:klaviyo_flutter_sdk_example/build_info.dart';
 import 'package:klaviyo_flutter_sdk_example/main.dart';
 import 'package:klaviyo_flutter_sdk_example/tabs/auth_tab.dart';
 import 'package:klaviyo_flutter_sdk_example/tabs/events_tab.dart';
+import 'package:klaviyo_flutter_sdk_example/widgets/build_info_button.dart';
 
 /// Each ID must surface exactly once as a semantics identifier (what native
 /// drivers like Maestro and Appium see) and as a widget key.
@@ -27,7 +29,7 @@ void main() {
       'nav_push_tab',
       'nav_geofencing_tab',
       'nav_auth_tab',
-      'profile_build_info_button',
+      'build_info_button',
       'profile_status_text',
       'profile_api_key_field',
       'profile_initialize_button',
@@ -68,5 +70,34 @@ void main() {
     ]);
     semantics.dispose();
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('build info sheet exposes test IDs', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: BuildInfoSheet(
+            info: BuildInfo.forTesting(
+              flutterVersion: '0.0.0',
+              flutterSdkRef: '0.0.0',
+              iosSdkVersion: '0.0.0',
+              iosSdkRef: '0.0.0',
+              androidSdkVersion: '0.0.0',
+              androidSdkRef: '0.0.0',
+              commitShort: 'abc1234',
+              sourceLabel: 'master',
+              event: 'push',
+              appVersion: '0.0.0',
+              buildNumber: '1',
+              buildDate: '2026-10-30',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    _expectTestIds(['build_info_copy']);
+    semantics.dispose();
   });
 }
