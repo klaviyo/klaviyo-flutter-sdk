@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
+import '../widgets/test_id.dart';
+
 class FormsTab extends StatefulWidget {
   const FormsTab({super.key});
 
@@ -160,43 +162,55 @@ class _FormsTabState extends State<FormsTab> {
                     : Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                _status,
-                style: TextStyle(
-                  color: _isRegistered
-                      ? Colors.green.shade900
-                      : Colors.grey.shade800,
+              child: TestId(
+                'forms_status_text',
+                child: Text(
+                  _status,
+                  style: TextStyle(
+                    color: _isRegistered
+                        ? Colors.green.shade900
+                        : Colors.grey.shade800,
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 20),
 
             if (!_isRegistered) ...[
-              TextField(
-                controller: _durationController,
-                decoration: const InputDecoration(
-                  labelText: 'Session Timeout (seconds)',
-                  hintText: 'Leave empty for default (3600s)',
-                  border: OutlineInputBorder(),
-                  helperText:
-                      'Enter -1 for infinite timeout, or number of seconds',
+              TestId(
+                'forms_session_timeout_field',
+                child: TextField(
+                  controller: _durationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Session Timeout (seconds)',
+                    hintText: 'Leave empty for default (3600s)',
+                    border: OutlineInputBorder(),
+                    helperText:
+                        'Enter -1 for infinite timeout, or number of seconds',
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(signed: true),
                 ),
-                keyboardType:
-                    const TextInputType.numberWithOptions(signed: true),
               ),
               const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _registerForForms,
-                child: const Text('Register for In-App Forms'),
+              TestId(
+                'forms_register_button',
+                child: ElevatedButton(
+                  onPressed: _registerForForms,
+                  child: const Text('Register for In-App Forms'),
+                ),
               ),
             ] else ...[
-              ElevatedButton(
-                onPressed: _unregisterFromForms,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+              TestId(
+                'forms_unregister_button',
+                child: ElevatedButton(
+                  onPressed: _unregisterFromForms,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Unregister from In-App Forms'),
                 ),
-                child: const Text('Unregister from In-App Forms'),
               ),
             ],
 
@@ -218,40 +232,47 @@ class _FormsTabState extends State<FormsTab> {
                     'Lifecycle Events',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.clear_all),
-                    onPressed: () {
-                      setState(() {
-                        _lifecycleEvents.clear();
-                      });
-                    },
-                    tooltip: 'Clear events',
+                  TestId(
+                    'forms_clear_events_button',
+                    child: IconButton(
+                      icon: const Icon(Icons.clear_all),
+                      onPressed: () {
+                        setState(() {
+                          _lifecycleEvents.clear();
+                        });
+                      },
+                      tooltip: 'Clear events',
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                constraints: const BoxConstraints(maxHeight: 200),
-                child: ListView.builder(
-                  itemCount: _lifecycleEvents.length,
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Text(
-                        _lifecycleEvents[index],
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'monospace',
+              TestId(
+                'forms_lifecycle_events_list',
+                merge: false,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  child: ListView.builder(
+                    itemCount: _lifecycleEvents.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text(
+                          _lifecycleEvents[index],
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../build_info.dart';
+import 'test_id.dart';
 
 /// App-bar button that opens the build-info sheet. Only the Profile tab has
 /// it; the sheet is the single copy of the content.
@@ -12,19 +13,22 @@ class BuildInfoButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      key: buttonKey,
-      icon: const Icon(Icons.info_outline),
-      tooltip: 'Build info',
-      onPressed: () async {
-        final info = await BuildInfo.load();
-        if (!context.mounted) return;
-        showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          builder: (context) => BuildInfoSheet(info: info),
-        );
-      },
+    return TestId(
+      'profile_build_info_button',
+      child: IconButton(
+        key: buttonKey,
+        icon: const Icon(Icons.info_outline),
+        tooltip: 'Build info',
+        onPressed: () async {
+          final info = await BuildInfo.load();
+          if (!context.mounted) return;
+          showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            builder: (context) => BuildInfoSheet(info: info),
+          );
+        },
+      ),
     );
   }
 }
@@ -50,15 +54,18 @@ class BuildInfoSheet extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Build info', style: theme.textTheme.titleMedium),
-                IconButton(
-                  key: const Key('copy-build-info'),
-                  icon: const Icon(Icons.copy, size: 18),
-                  tooltip: 'Copy build info',
-                  onPressed: () {
-                    Clipboard.setData(
-                      ClipboardData(text: info.toHeaderBlock()),
-                    );
-                  },
+                TestId(
+                  'build_info_copy_button',
+                  child: IconButton(
+                    key: const Key('copy-build-info'),
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: 'Copy build info',
+                    onPressed: () {
+                      Clipboard.setData(
+                        ClipboardData(text: info.toHeaderBlock()),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),

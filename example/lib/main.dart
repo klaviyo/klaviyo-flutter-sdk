@@ -17,6 +17,7 @@ import 'tabs/push_tab.dart';
 import 'tabs/geofencing_tab.dart';
 import 'tabs/auth_tab.dart';
 import 'screens/configure_auth_response.dart';
+import 'widgets/test_id.dart';
 
 final _logger = Logger('KlaviyoExample');
 
@@ -178,9 +179,12 @@ void _showSilentPushAlert(Map<String, dynamic> userInfo) {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+          TestId(
+            'silent_push_ok_button',
+            child: TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
           ),
         ],
       );
@@ -365,29 +369,53 @@ class ScaffoldWithNavBar extends StatelessWidget {
         type: BottomNavigationBarType.fixed,
         currentIndex: _calculateSelectedIndex(context),
         onTap: (index) => _onItemTapped(index, context),
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: TestId(
+              'nav_profile_tab',
+              merge: false,
+              child: const Icon(Icons.person),
+            ),
             label: 'Profile',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.send),
+            icon: TestId(
+              'nav_events_tab',
+              merge: false,
+              child: const Icon(Icons.send),
+            ),
             label: 'Events',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.list_alt),
+            icon: TestId(
+              'nav_forms_tab',
+              merge: false,
+              child: const Icon(Icons.list_alt),
+            ),
             label: 'Forms',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
+            icon: TestId(
+              'nav_push_tab',
+              merge: false,
+              child: const Icon(Icons.notifications),
+            ),
             label: 'Push',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.location_on),
+            icon: TestId(
+              'nav_geofencing_tab',
+              merge: false,
+              child: const Icon(Icons.location_on),
+            ),
             label: 'Geofencing',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.vpn_key),
+            icon: TestId(
+              'nav_auth_tab',
+              merge: false,
+              child: const Icon(Icons.vpn_key),
+            ),
             label: 'Auth',
           ),
         ],

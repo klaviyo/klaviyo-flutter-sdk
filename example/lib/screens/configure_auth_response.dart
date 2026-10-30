@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../auth/auth_models.dart';
 import '../auth/jwt_inspector.dart';
 import '../auth/scripted_provider.dart';
+import '../widgets/test_id.dart';
 
 /// Screen 2 (MAGE-794): edits a single scripted response. Changes are held in
 /// local working state and only written back to the shared response — where the
@@ -112,9 +113,12 @@ class _ConfigureAuthResponseScreenState
       appBar: AppBar(
         title: const Text('Configure Response'),
         actions: [
-          TextButton(
-            onPressed: _commit,
-            child: const Text('Done'),
+          TestId(
+            'auth_response_done_button',
+            child: TextButton(
+              onPressed: _commit,
+              child: const Text('Done'),
+            ),
           ),
         ],
       ),
@@ -128,10 +132,13 @@ class _ConfigureAuthResponseScreenState
             child: Column(
               children: [
                 for (final outcome in AuthOutcome.values)
-                  RadioListTile<AuthOutcome>(
-                    title: Text(outcome.label),
-                    value: outcome,
-                    contentPadding: EdgeInsets.zero,
+                  TestId(
+                    'auth_response_outcome_${outcome.name}_radio',
+                    child: RadioListTile<AuthOutcome>(
+                      title: Text(outcome.label),
+                      value: outcome,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
               ],
             ),
@@ -173,21 +180,32 @@ class _ConfigureAuthResponseScreenState
     final status = tokenStatusOf(_tokenController.text);
     return [
       _sectionTitle('Custom token'),
-      TextField(
-        controller: _tokenController,
-        obscureText: _obscureToken,
-        autocorrect: false,
-        enableSuggestions: false,
-        style: _obscureToken ? null : const TextStyle(fontFamily: 'monospace'),
-        decoration: InputDecoration(
-          labelText: 'JWT',
-          border: const OutlineInputBorder(),
-          suffixIcon: IconButton(
-            icon: Icon(_obscureToken ? Icons.visibility : Icons.visibility_off),
-            onPressed: () => setState(() => _obscureToken = !_obscureToken),
+      TestId(
+        'auth_response_custom_token_field',
+        merge: false,
+        child: TextField(
+          controller: _tokenController,
+          obscureText: _obscureToken,
+          autocorrect: false,
+          enableSuggestions: false,
+          style:
+              _obscureToken ? null : const TextStyle(fontFamily: 'monospace'),
+          decoration: InputDecoration(
+            labelText: 'JWT',
+            border: const OutlineInputBorder(),
+            suffixIcon: TestId(
+              'auth_response_toggle_token_visibility_button',
+              child: IconButton(
+                icon: Icon(
+                  _obscureToken ? Icons.visibility : Icons.visibility_off,
+                ),
+                tooltip: _obscureToken ? 'Show token' : 'Hide token',
+                onPressed: () => setState(() => _obscureToken = !_obscureToken),
+              ),
+            ),
           ),
+          onChanged: (_) => setState(() {}),
         ),
-        onChanged: (_) => setState(() {}),
       ),
       const SizedBox(height: 8),
       _statusRow(status),
@@ -203,11 +221,20 @@ class _ConfigureAuthResponseScreenState
     return [
       _sectionTitle('Mock token'),
       SegmentedButton<MockTokenKind>(
-        segments: const [
-          ButtonSegment(value: MockTokenKind.valid, label: Text('Valid')),
+        segments: [
+          ButtonSegment(
+            value: MockTokenKind.valid,
+            label: TestId(
+              'auth_response_mock_valid_segment',
+              child: const Text('Valid'),
+            ),
+          ),
           ButtonSegment(
             value: MockTokenKind.malformed,
-            label: Text('Malformed'),
+            label: TestId(
+              'auth_response_mock_malformed_segment',
+              child: const Text('Malformed'),
+            ),
           ),
         ],
         selected: {_mockKind},
@@ -223,12 +250,21 @@ class _ConfigureAuthResponseScreenState
   List<Widget> _validMockConfig() {
     return [
       SegmentedButton<MockExpirationMode>(
-        segments: const [
+        segments: [
           ButtonSegment(
             value: MockExpirationMode.duration,
-            label: Text('Duration'),
+            label: TestId(
+              'auth_response_expiration_duration_segment',
+              child: const Text('Duration'),
+            ),
           ),
-          ButtonSegment(value: MockExpirationMode.date, label: Text('Date')),
+          ButtonSegment(
+            value: MockExpirationMode.date,
+            label: TestId(
+              'auth_response_expiration_date_segment',
+              child: const Text('Date'),
+            ),
+          ),
         ],
         selected: {_expirationMode},
         onSelectionChanged: (s) => setState(() {
@@ -257,12 +293,15 @@ class _ConfigureAuthResponseScreenState
       spacing: 8,
       children: [
         for (final preset in mockDurationPresets)
-          ChoiceChip(
-            label: Text(_durationLabel(preset)),
-            selected: _duration == preset,
-            labelStyle:
-                preset.isNegative ? const TextStyle(color: Colors.red) : null,
-            onSelected: (_) => setState(() => _duration = preset),
+          TestId(
+            'auth_response_duration_${_durationTestIdSuffix(preset)}_chip',
+            child: ChoiceChip(
+              label: Text(_durationLabel(preset)),
+              selected: _duration == preset,
+              labelStyle:
+                  preset.isNegative ? const TextStyle(color: Colors.red) : null,
+              onSelected: (_) => setState(() => _duration = preset),
+            ),
           ),
       ],
     );
@@ -278,9 +317,12 @@ class _ConfigureAuthResponseScreenState
                 : 'Expires: ${_expiryDate!.toLocal()}',
           ),
         ),
-        TextButton(
-          onPressed: _pickExpiryDate,
-          child: const Text('Pick date/time'),
+        TestId(
+          'auth_response_pick_date_button',
+          child: TextButton(
+            onPressed: _pickExpiryDate,
+            child: const Text('Pick date/time'),
+          ),
         ),
       ],
     );
@@ -338,24 +380,32 @@ class _ConfigureAuthResponseScreenState
   Widget _delayStepper() {
     return Row(
       children: [
-        IconButton(
-          icon: const Icon(Icons.remove_circle_outline),
-          onPressed: _delaySeconds <= 0
-              ? null
-              : () => setState(
-                    () => _delaySeconds =
-                        (_delaySeconds - 0.25).clamp(0, 10).toDouble(),
-                  ),
+        TestId(
+          'auth_response_delay_decrease_button',
+          child: IconButton(
+            icon: const Icon(Icons.remove_circle_outline),
+            tooltip: 'Decrease delay',
+            onPressed: _delaySeconds <= 0
+                ? null
+                : () => setState(
+                      () => _delaySeconds =
+                          (_delaySeconds - 0.25).clamp(0, 10).toDouble(),
+                    ),
+          ),
         ),
         Text('${_delaySeconds.toStringAsFixed(2)}s'),
-        IconButton(
-          icon: const Icon(Icons.add_circle_outline),
-          onPressed: _delaySeconds >= 10
-              ? null
-              : () => setState(
-                    () => _delaySeconds =
-                        (_delaySeconds + 0.25).clamp(0, 10).toDouble(),
-                  ),
+        TestId(
+          'auth_response_delay_increase_button',
+          child: IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Increase delay',
+            onPressed: _delaySeconds >= 10
+                ? null
+                : () => setState(
+                      () => _delaySeconds =
+                          (_delaySeconds + 0.25).clamp(0, 10).toDouble(),
+                    ),
+          ),
         ),
         const Expanded(
           child: Text(
@@ -394,6 +444,10 @@ class _ConfigureAuthResponseScreenState
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(text, style: Theme.of(context).textTheme.titleMedium),
       );
+
+  /// `45s`, `90s`, `300s`, `minus_60s` — stable across label wording.
+  String _durationTestIdSuffix(Duration d) =>
+      d.isNegative ? 'minus_${-d.inSeconds}s' : '${d.inSeconds}s';
 
   String _durationLabel(Duration d) {
     if (d.isNegative) return 'Expired (${d.inMinutes}m)';
