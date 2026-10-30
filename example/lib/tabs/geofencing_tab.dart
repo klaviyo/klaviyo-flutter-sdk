@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../widgets/test_id.dart';
+
 class GeofencingTab extends StatefulWidget {
   const GeofencingTab({super.key});
 
@@ -219,12 +221,15 @@ class _GeofencingTabState extends State<GeofencingTab>
                     : Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                _status,
-                style: TextStyle(
-                  color: _isRegistered
-                      ? Colors.green.shade900
-                      : Colors.grey.shade800,
+              child: TestId(
+                'geofencing_status_text',
+                child: Text(
+                  _status,
+                  style: TextStyle(
+                    color: _isRegistered
+                        ? Colors.green.shade900
+                        : Colors.grey.shade800,
+                  ),
                 ),
               ),
             ),
@@ -237,20 +242,29 @@ class _GeofencingTabState extends State<GeofencingTab>
             ),
             const SizedBox(height: 10),
 
-            Text(
-              'Status: ${_locationPermissionState ?? "Not granted"}',
+            TestId(
+              'geofencing_permission_status_text',
+              child: Text(
+                'Status: ${_locationPermissionState ?? "Not granted"}',
+              ),
             ),
             const SizedBox(height: 10),
 
-            ElevatedButton(
-              onPressed: () => _requestLocationPermission(false),
-              child: const Text('Request "When In Use" Permission'),
+            TestId(
+              'geofencing_request_when_in_use_button',
+              child: ElevatedButton(
+                onPressed: () => _requestLocationPermission(false),
+                child: const Text('Request "When In Use" Permission'),
+              ),
             ),
             const SizedBox(height: 8),
 
-            ElevatedButton(
-              onPressed: () => _requestLocationPermission(true),
-              child: const Text('Request "Always" Permission'),
+            TestId(
+              'geofencing_request_always_button',
+              child: ElevatedButton(
+                onPressed: () => _requestLocationPermission(true),
+                child: const Text('Request "Always" Permission'),
+              ),
             ),
             const SizedBox(height: 20),
 
@@ -265,9 +279,12 @@ class _GeofencingTabState extends State<GeofencingTab>
             const SizedBox(height: 10),
 
             if (!_isRegistered) ...[
-              ElevatedButton(
-                onPressed: _registerGeofencing,
-                child: const Text('Register Geofencing'),
+              TestId(
+                'geofencing_register_button',
+                child: ElevatedButton(
+                  onPressed: _registerGeofencing,
+                  child: const Text('Register Geofencing'),
+                ),
               ),
               const SizedBox(height: 10),
               const Text(
@@ -275,18 +292,24 @@ class _GeofencingTabState extends State<GeofencingTab>
                 style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ] else ...[
-              ElevatedButton(
-                onPressed: _unregisterGeofencing,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+              TestId(
+                'geofencing_unregister_button',
+                child: ElevatedButton(
+                  onPressed: _unregisterGeofencing,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Unregister Geofencing'),
                 ),
-                child: const Text('Unregister Geofencing'),
               ),
               const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _loadGeofences,
-                child: const Text('Refresh Geofences'),
+              TestId(
+                'geofencing_refresh_button',
+                child: ElevatedButton(
+                  onPressed: _loadGeofences,
+                  child: const Text('Refresh Geofences'),
+                ),
               ),
             ],
 
@@ -300,17 +323,22 @@ class _GeofencingTabState extends State<GeofencingTab>
               ),
               const SizedBox(height: 10),
               ..._currentGeofences.map(
-                (geofence) => Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    title: Text('ID: ${geofence.identifier}'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Lat: ${geofence.latitude.toStringAsFixed(6)}'),
-                        Text('Lng: ${geofence.longitude.toStringAsFixed(6)}'),
-                        Text('Radius: ${geofence.radius.toStringAsFixed(0)}m'),
-                      ],
+                (geofence) => TestId(
+                  'geofencing_geofence_row_${geofence.identifier}',
+                  child: Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      title: Text('ID: ${geofence.identifier}'),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Lat: ${geofence.latitude.toStringAsFixed(6)}'),
+                          Text('Lng: ${geofence.longitude.toStringAsFixed(6)}'),
+                          Text(
+                            'Radius: ${geofence.radius.toStringAsFixed(0)}m',
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
