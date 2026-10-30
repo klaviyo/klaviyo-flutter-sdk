@@ -15,7 +15,6 @@ reviews:
     - "!**/pubspec.lock"
     - "!**/Pods/**"
   auto_review:
-    drafts: false
     base_branches:
       - ".*"
   tools:
