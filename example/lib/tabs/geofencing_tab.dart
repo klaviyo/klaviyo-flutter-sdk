@@ -322,9 +322,9 @@ class _GeofencingTabState extends State<GeofencingTab>
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
-              ..._currentGeofences.map(
-                (geofence) => TestId(
-                  'geofencing_geofence_row_${geofence.identifier}',
+              for (final (index, geofence) in _currentGeofences.indexed)
+                TestId(
+                  'geofencing_geofence_row_${index + 1}',
                   child: Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
@@ -342,7 +342,6 @@ class _GeofencingTabState extends State<GeofencingTab>
                     ),
                   ),
                 ),
-              ),
             ],
           ],
         ),

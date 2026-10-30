@@ -74,6 +74,12 @@ To test against a local native SDK build:
 
 `.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**`, published releases, `workflow_dispatch`, and same-repo PRs labeled `deploy-example-app[:android|:ios]`. Unit tests and lint gate every deploy. Deploys skip until the store secrets exist. Uploads go through fastlane lanes in `example/ios/fastlane` and `example/android/fastlane`. Setup and secrets: `.github/scripts/README.md`.
 
+### UI test IDs
+
+- Every new interactive or asserted-on control in the example app gets a snake_case test ID via `TestId` (`example/lib/widgets/test_id.dart`), which sets `Semantics(identifier:)` and a `ValueKey`.
+- Check the existing names before adding an ID. If the control also exists in the other Klaviyo SDK example apps, reuse its shared name (e.g. `push_request_permission_button`, `build_info_button`).
+- When you rename or remove a control, update its ID and every test or automation that references it (e.g. `example/test/test_ids_test.dart`).
+
 ## Code Review
 
 CodeRabbit is active on this repo and auto-reviews PRs. It reads this file as a code guidelines

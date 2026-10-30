@@ -133,7 +133,7 @@ class _ConfigureAuthResponseScreenState
               children: [
                 for (final outcome in AuthOutcome.values)
                   TestId(
-                    'auth_response_outcome_${outcome.name}_radio',
+                    'auth_response_outcome_${_outcomeTestIdSuffix(outcome)}_radio',
                     child: RadioListTile<AuthOutcome>(
                       title: Text(outcome.label),
                       value: outcome,
@@ -444,6 +444,13 @@ class _ConfigureAuthResponseScreenState
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(text, style: Theme.of(context).textTheme.titleMedium),
       );
+
+  String _outcomeTestIdSuffix(AuthOutcome outcome) => switch (outcome) {
+        AuthOutcome.customToken => 'custom_token',
+        AuthOutcome.mockToken => 'mock_token',
+        AuthOutcome.throwNetworkError => 'throw_network_error',
+        AuthOutcome.throwOtherError => 'throw_other_error',
+      };
 
   /// `45s`, `90s`, `300s`, `minus_60s` — stable across label wording.
   String _durationTestIdSuffix(Duration d) =>
