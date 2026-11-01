@@ -100,7 +100,7 @@ jobs:
           echo "ref=${ref}" >> "$GITHUB_OUTPUT"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.ref.outputs.sha }}
           fetch-depth: 0
@@ -231,7 +231,7 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: failure()
         with:
           persist-credentials: false
@@ -285,7 +285,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           echo "release_runs=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: always()
         with:
           persist-credentials: false
