@@ -149,19 +149,19 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   KlaviyoCore:
-    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :commit: a1505961d29b1363ee38529a67bd0638953800f4
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :commit: a1505961d29b1363ee38529a67bd0638953800f4
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :commit: a1505961d29b1363ee38529a67bd0638953800f4
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :commit: a1505961d29b1363ee38529a67bd0638953800f4
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :commit: 8445065dbc6b71cd238128ede2a13d54204b5407
+    :commit: a1505961d29b1363ee38529a67bd0638953800f4
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
 
 SPEC CHECKSUMS:
@@ -176,11 +176,11 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleUtilities: db34c1c11c6f2eccb6fab2340cb8ceb1451299dc
-  klaviyo_flutter_sdk: a4f1e48c5aacfffd69a7eadd559e3b28dbd96d2c
-  KlaviyoCore: 164331e6fdd6deec7f88f915475f173db49c6b34
+  klaviyo_flutter_sdk: 5803a5c556bd9c628cd3c3d741b37fe96bb02fc8
+  KlaviyoCore: 2d37d5031e800ffa56c995878c228c27c1c99c29
   KlaviyoForms: 6769bc3310335554b12ad3c2b33ddf4a1fd27fac
   KlaviyoLocation: 0ec7510cf6af4e4b08729065234a9059991fd54a
-  KlaviyoSwift: 5dd413e8bdbce43b84d158c71d1c83f12e2b2965
+  KlaviyoSwift: c070c026f441d6a69ec129b9e6afb500fc523049
   KlaviyoSwiftExtension: cf82382fcc70a1077387b40c0327dd665823c946
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
