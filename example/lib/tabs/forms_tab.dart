@@ -120,11 +120,16 @@ class _FormsTabState extends State<FormsTab> {
     }
     // An empty field ends the preview and returns to published forms.
     final token = _previewTokenController.text.trim();
+    if (token.isNotEmpty && !isValidFormsPreviewToken(token)) {
+      setState(() => _status = 'Malformed forms preview token');
+      return;
+    }
     if (token.isEmpty) {
       await _klaviyo.endFormsPreview();
     } else {
       await _klaviyo.startFormsPreview(token);
     }
+    if (!mounted) return;
     setState(() {
       _status = token.isEmpty ? 'Forms preview ended' : 'Forms preview started';
     });
