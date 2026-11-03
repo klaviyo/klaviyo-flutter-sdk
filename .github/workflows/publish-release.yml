@@ -367,8 +367,7 @@ jobs:
           SLACK_TS: ${{ steps.slack_pending.outputs.ts }}
         run: |
           if [ -n "$SLACK_TS" ]; then
-            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f "slack_ts=$SLACK_TS" \
-              || gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
+            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f "slack_ts=$SLACK_TS"
           else
             gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
           fi

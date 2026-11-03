@@ -200,8 +200,7 @@ jobs:
           SLACK_TS: ${{ inputs.slack_ts }}
         run: |
           if [ -n "$SLACK_TS" ]; then
-            gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f platform=both -f "slack_thread_ts=$SLACK_TS" \
-              || gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f platform=both
+            gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f platform=both -f "slack_thread_ts=$SLACK_TS"
           else
             gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f platform=both
           fi
