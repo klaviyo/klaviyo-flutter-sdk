@@ -94,11 +94,11 @@ DEPENDENCIES:
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
   - klaviyo_flutter_sdk (from `.symlinks/plugins/klaviyo_flutter_sdk/ios`)
-  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
-  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
-  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
-  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
-  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `ecm/MAGE-1449/forms-preview-link`)
+  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews-5.6.0`)
+  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews-5.6.0`)
+  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews-5.6.0`)
+  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews-5.6.0`)
+  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews-5.6.0`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -126,19 +126,19 @@ EXTERNAL SOURCES:
   klaviyo_flutter_sdk:
     :path: ".symlinks/plugins/klaviyo_flutter_sdk/ios"
   KlaviyoCore:
-    :branch: ecm/MAGE-1449/forms-preview-link
+    :branch: feat/in-app-forms-previews-5.6.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :branch: ecm/MAGE-1449/forms-preview-link
+    :branch: feat/in-app-forms-previews-5.6.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :branch: ecm/MAGE-1449/forms-preview-link
+    :branch: feat/in-app-forms-previews-5.6.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :branch: ecm/MAGE-1449/forms-preview-link
+    :branch: feat/in-app-forms-previews-5.6.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :branch: ecm/MAGE-1449/forms-preview-link
+    :branch: feat/in-app-forms-previews-5.6.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
@@ -149,19 +149,19 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   KlaviyoCore:
-    :commit: a1505961d29b1363ee38529a67bd0638953800f4
+    :commit: 794af8377846340663161cde7b4cc5a0bee5645e
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :commit: a1505961d29b1363ee38529a67bd0638953800f4
+    :commit: 794af8377846340663161cde7b4cc5a0bee5645e
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :commit: a1505961d29b1363ee38529a67bd0638953800f4
+    :commit: 794af8377846340663161cde7b4cc5a0bee5645e
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :commit: a1505961d29b1363ee38529a67bd0638953800f4
+    :commit: 794af8377846340663161cde7b4cc5a0bee5645e
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :commit: a1505961d29b1363ee38529a67bd0638953800f4
+    :commit: 794af8377846340663161cde7b4cc5a0bee5645e
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
 
 SPEC CHECKSUMS:
@@ -188,6 +188,6 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
 
-PODFILE CHECKSUM: fd292bbfe635d0d4fcd29241ef6f01708b850002
+PODFILE CHECKSUM: 0311a727839d1cf51573731d453d7061035373f9
 
 COCOAPODS: 1.16.2
