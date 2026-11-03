@@ -48,6 +48,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  SLACK_USERNAME: Flutter SDK
+  SLACK_ICON_EMOJI: ':merlin-orb-flutter:'
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -68,6 +72,7 @@ jobs:
       FLUTTER_VERSION: 3.38.7
     steps:
       - name: Validate version and tag
+        id: validate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -101,12 +106,14 @@ jobs:
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        id: checkout
         with:
           ref: ${{ steps.ref.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Require a commit on master or rel/*
+        id: branch
         env:
           SHA: ${{ steps.ref.outputs.sha }}
         run: |
@@ -117,6 +124,7 @@ jobs:
           fi
 
       - name: Check pubspec version
+        id: pubspec
         run: |
           raw=$(grep '^version:' pubspec.yaml | awk '{print $2}')
           if [ "$raw" != "$VERSION" ]; then
@@ -125,9 +133,11 @@ jobs:
           fi
 
       - name: Check native SDK pins
+        id: pins
         run: ./.github/scripts/check-native-pins.sh
 
       - name: Check synced version files
+        id: synced
         run: |
           ./scripts/sync_version.sh
           files=(
@@ -141,6 +151,7 @@ jobs:
           fi
 
       - name: Check CHANGELOG entry
+        id: changelog
         run: |
           if ! grep -Eq "^## \[?${VERSION//./\\.}\]?([[:space:]]|$)" CHANGELOG.md; then
             echo "::error::CHANGELOG.md has no '## ${VERSION}' entry"
@@ -152,6 +163,7 @@ jobs:
         run: echo "::warning::CI check skipped by request; the commit's CI was not verified"
 
       - name: Check CI on the commit
+        id: ci
         if: inputs.skip_ci_check != true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -176,11 +188,13 @@ jobs:
           fi
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        id: flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
       - name: Dry-run the pub.dev publish
+        id: dryrun
         run: |
           flutter pub get
           dart pub publish --dry-run
@@ -210,6 +224,7 @@ jobs:
           echo "url=${url}" >> "$GITHUB_OUTPUT"
 
       - name: Write summary
+        id: summary
         env:
           SHA: ${{ steps.ref.outputs.sha }}
           RELEASE_URL: ${{ steps.draft.outputs.url }}
@@ -231,22 +246,69 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        if: failure()
-        with:
-          persist-credentials: false
-
-      - name: Notify Slack on failure
+      - name: Checkout Slack action
         if: failure()
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-publish
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: failure
-          title: klaviyo_flutter_sdk ${{ inputs.version }} release
-          failed_step: ${{ (steps.ref.outputs.sha == '' && 'validate version and tag or resolve commit') || 'prepare checks' }}
-          event_name: ${{ github.event_name }}
-          commit_sha: ${{ steps.ref.outputs.sha || github.sha }}
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Find failed step
+        id: failed
+        if: failure()
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          step=$(jq -r '
+            {
+              validate: "Validate version and tag",
+              ref: "Resolve commit",
+              checkout: "Checkout",
+              branch: "Require a commit on master or rel/*",
+              pubspec: "Check pubspec version",
+              pins: "Check native SDK pins",
+              synced: "Check synced version files",
+              changelog: "Check CHANGELOG entry",
+              ci: "Check CI on the commit",
+              flutter: "Set up Flutter",
+              dryrun: "Dry-run the pub.dev publish",
+              draft: "Find or create draft release",
+              summary: "Write summary",
+              tag: "Create the tag",
+              dispatch: "Dispatch release.yml at the tag"
+            } as $names
+            | ([to_entries[] | select(.value.conclusion == "failure")][0].key) as $key
+            | if $key == null then "unknown step" else ($names[$key] // $key) end
+          ' <<<"$STEPS_JSON")
+          echo "step=$step" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack on failure
+        id: slack_failure
+        if: failure()
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          status: failure
+          title: klaviyo_flutter_sdk ${{ inputs.version }} release failed${{ inputs.dry_run && ' (dry run)' || '' }}
+          fields: |
+            Version: ${{ inputs.version }}
+            Commit: ${{ steps.ref.outputs.sha || github.sha }}
+            Stage: Prepare
+            Requested by: ${{ github.actor }}
+
+      - name: Reply with failure details
+        if: failure() && steps.slack_failure.outputs.ts != ''
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ steps.slack_failure.outputs.ts }}
+          status: failure
+          title: Failed at ${{ steps.failed.outputs.step }}
 
   publish:
     needs: prepare
@@ -262,6 +324,15 @@ jobs:
       SHA: ${{ needs.prepare.outputs.sha }}
       SKIP_CI: ${{ needs.prepare.outputs.ci_skipped }}
     steps:
+      - name: Checkout Slack action
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
       - name: Create the tag
         id: tag
         run: |
@@ -273,46 +344,92 @@ jobs:
           fi
           echo "Tag ${VERSION} created at ${SHA}; the draft release stays a draft until the upload is verified"
 
+      - name: Notify Slack release awaiting approval
+        id: slack_pending
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          status: pending
+          title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting pub.dev approval${{ needs.prepare.outputs.ci_skipped == 'true' && ' (CI check skipped)' || '' }}
+          body: Approve the `pub.dev` environment on the release.yml run. This message updates with the result.
+          fields: |
+            Version: ${{ inputs.version }}
+            Commit: ${{ needs.prepare.outputs.sha }}
+            Requested by: ${{ github.actor }}
+          links: |
+            Draft release|${{ needs.prepare.outputs.release_url }}
+            Approve here|${{ github.server_url }}/${{ github.repository }}/actions/workflows/release.yml
+
       - name: Dispatch release.yml at the tag
         id: dispatch
+        env:
+          SLACK_TS: ${{ steps.slack_pending.outputs.ts }}
         run: |
-          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
+          if [ -n "$SLACK_TS" ]; then
+            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f "slack_ts=$SLACK_TS" \
+              || gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
+          else
+            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
+          fi
           {
             echo "### klaviyo_flutter_sdk ${VERSION} tagged"
             echo
             echo "Dispatched [release.yml](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml) at tag \`${VERSION}\` (pub.dev, waits for \`pub.dev\` approval)."
             echo "publish-example.yml is dispatched by release.yml once the upload is verified."
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "release_runs=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/release.yml" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        if: always()
-        with:
-          persist-credentials: false
-
-      - name: Notify Slack
-        if: success()
-        continue-on-error: true
-        uses: ./.github/actions/notify-slack-publish
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: pending
-          title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting pub.dev approval${{ needs.prepare.outputs.ci_skipped == 'true' && ' (CI check skipped)' || '' }}
-          release_url: ${{ needs.prepare.outputs.release_url }}
-          event_name: ${{ github.event_name }}
-          commit_sha: ${{ needs.prepare.outputs.sha }}
-          access_url: ${{ steps.dispatch.outputs.release_runs }}
-          access_label: Approve the pub.dev deployment
+      - name: Find failed step
+        id: failed
+        if: failure()
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          step=$(jq -r '
+            {
+              validate: "Validate version and tag",
+              ref: "Resolve commit",
+              checkout: "Checkout",
+              branch: "Require a commit on master or rel/*",
+              pubspec: "Check pubspec version",
+              pins: "Check native SDK pins",
+              synced: "Check synced version files",
+              changelog: "Check CHANGELOG entry",
+              ci: "Check CI on the commit",
+              flutter: "Set up Flutter",
+              dryrun: "Dry-run the pub.dev publish",
+              draft: "Find or create draft release",
+              summary: "Write summary",
+              tag: "Create the tag",
+              dispatch: "Dispatch release.yml at the tag"
+            } as $names
+            | ([to_entries[] | select(.value.conclusion == "failure")][0].key) as $key
+            | if $key == null then "unknown step" else ($names[$key] // $key) end
+          ' <<<"$STEPS_JSON")
+          echo "step=$step" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack on failure
+        id: slack_failure
         if: failure()
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-publish
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: failure
-          title: klaviyo_flutter_sdk ${{ inputs.version }} release
-          failed_step: publish
-          release_url: ${{ needs.prepare.outputs.release_url }}
-          event_name: ${{ github.event_name }}
-          commit_sha: ${{ needs.prepare.outputs.sha }}
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ steps.slack_pending.outputs.ts }}
+          status: failure
+          title: klaviyo_flutter_sdk ${{ inputs.version }} release failed
+          fields: |
+            Version: ${{ inputs.version }}
+            Commit: ${{ needs.prepare.outputs.sha }}
+            Stage: Publish
+          links: Release|${{ needs.prepare.outputs.release_url }}
+
+      - name: Reply with failure details
+        if: failure() && steps.slack_failure.outputs.ts != ''
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ steps.slack_failure.outputs.ts }}
+          status: failure
+          title: Failed at ${{ steps.failed.outputs.step }}
