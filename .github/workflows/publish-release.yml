@@ -366,7 +366,12 @@ jobs:
         env:
           SLACK_TS: ${{ steps.slack_pending.outputs.ts }}
         run: |
-          if [ -n "$SLACK_TS" ]; then
+          # True when the workflow file at $VERSION declares slack_ts.
+          takes_slack_ts() {
+            gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$VERSION" \
+              -H "Accept: application/vnd.github.raw" | grep -q '^[[:space:]]*slack_ts:'
+          }
+          if [ -n "$SLACK_TS" ] && takes_slack_ts; then
             gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f "slack_ts=$SLACK_TS"
           else
             gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
