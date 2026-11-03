@@ -305,6 +305,62 @@ class KlaviyoSDK {
     }
   }
 
+  /// Start a draft in-app forms preview session with a preview token from the
+  /// Klaviyo form editor.
+  ///
+  /// Starting a preview is like unregistering and registering again: if forms
+  /// are registered, the current session is torn down, dismissing any form on
+  /// screen, and a new session starts that loads draft forms. If
+  /// [registerForInAppForms] hasn't been called yet, the token is held and the
+  /// preview starts when forms register; no forms are shown before then.
+  ///
+  /// A preview token is a short-lived credential for on-device testing of
+  /// draft forms. The native SDKs keep it in memory only and never persist or
+  /// log it. A malformed token is ignored and changes nothing.
+  /// [unregisterFromInAppForms] also ends the preview.
+  Future<void> startFormsPreview(String token) async {
+    _ensureInitialized();
+    try {
+      await _nativeWrapper.startFormsPreview(token);
+      _logger.info('Started forms preview');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to start the forms preview: ${e.message}');
+    }
+  }
+
+  /// End the draft in-app forms preview session. If forms are registered, they
+  /// restart with published forms.
+  Future<void> endFormsPreview() async {
+    _ensureInitialized();
+    try {
+      await _nativeWrapper.endFormsPreview();
+      _logger.info('Ended forms preview');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to end the forms preview: ${e.message}');
+    }
+  }
+
+  /// Start a forms preview from a deep link, such as the link or QR code from
+  /// the Klaviyo form editor's **Preview on device** button.
+  ///
+  /// Forwards [url] to the native SDK and returns true only when the native
+  /// SDK started a preview — that is, the link carries a well-formed
+  /// `klaviyo-forms-preview` token. Returns false, changing nothing, for
+  /// every other link and on any failure, so call it first from your deep
+  /// link handling and fall through when it returns false.
+  ///
+  /// Never throws: a badly encoded query or an unreachable native side
+  /// returns false. Safe to call before [initialize] for cold-start links;
+  /// the native SDKs hold the token until forms register.
+  Future<bool> handleFormsPreviewLink(Uri url) async {
+    try {
+      if (url.queryParameters.isEmpty) return false;
+    } on FormatException {
+      return false;
+    }
+    return _nativeWrapper.handleFormsPreviewLink(url.toString());
+  }
+
   /// Unregister from in-app forms
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
@@ -25,8 +26,11 @@ import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
+import com.klaviyo.forms.endFormsPreview
+import com.klaviyo.forms.handleFormsPreviewLink
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.registerFormLifecycleHandler
+import com.klaviyo.forms.startFormsPreview
 import com.klaviyo.forms.unregisterFormLifecycleHandler
 import com.klaviyo.forms.unregisterFromInAppForms
 import com.klaviyo.location.LocationManager
@@ -500,6 +504,51 @@ class KlaviyoFlutterSdkPlugin :
                     result.error("FORMS_NOT_AVAILABLE", e.message, null)
                 } catch (e: Exception) {
                     result.error("FORMS_ERROR", "Failed to register for in-app forms", e.message)
+                }
+            }
+
+            "startFormsPreview" -> {
+                try {
+                    val token = call.argument<String>("token")
+                    if (token == null) {
+                        result.error("INVALID_ARGUMENTS", "A forms preview token is required", null)
+                    } else {
+                        Klaviyo.startFormsPreview(token)
+                        result.success(null)
+                    }
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to start the forms preview", null)
+                }
+            }
+
+            "handleFormsPreviewLink" -> {
+                try {
+                    val url = call.argument<String>("url")
+                    if (url == null) {
+                        result.error("INVALID_ARGUMENTS", "A forms preview link URL is required", null)
+                    } else {
+                        result.success(Klaviyo.handleFormsPreviewLink(Uri.parse(url)))
+                    }
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to handle the forms preview link", null)
+                }
+            }
+
+            "endFormsPreview" -> {
+                try {
+                    Klaviyo.endFormsPreview()
+                    result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to end the forms preview", null)
                 }
             }
 
