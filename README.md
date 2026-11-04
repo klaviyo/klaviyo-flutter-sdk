@@ -862,7 +862,7 @@ void main() async {
 
 **Note**: `handleUniversalTrackingLink()` is synchronous - it validates the URL and returns a bool immediately, while the native tracking happens asynchronously in the background.
 
-`handleUniversalTrackingLink()` is safe to call before `initialize()` and never throws. If your app delays `initialize()` until login or consent, a universal link that opens the app from a cold start is still tracked and resolved.
+`handleUniversalTrackingLink()` is safe to call before `initialize()` and never throws, so a universal link that opens the app from a cold start is tracked and resolved even if `initialize()` hasn't run yet. The click is tracked as soon as you call it, before any profile is identified, which can create an anonymous profile in Klaviyo. If your app must wait for consent before tracking, keep the URL and call `handleUniversalTrackingLink()` once consent is given.
 
 ## Geofencing
 
