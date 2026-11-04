@@ -59,6 +59,22 @@ class KlaviyoFlutterSdkPlugin :
     private var activity: Activity? = null
 
     /**
+     * True when this instance belongs to the headless engine started by
+     * [BackgroundSilentPushExecutor]. A headless instance never claims [instance]
+     * and never consumes [cachedSilentPush].
+     */
+    private var isHeadless = false
+    private var backgroundChannel: MethodChannel? = null
+
+    /** Set once Dart calls `registerBackgroundSilentPushHandler` on this engine. */
+    @Volatile
+    private var isBackgroundHandlerAttached = false
+
+    /** True when Dart on this engine has registered a background silent push handler. */
+    internal val hasBackgroundHandler: Boolean
+        get() = isBackgroundHandlerAttached
+
+    /**
      * Pending auth token requests keyed by correlation ID. The native SDK
      * invokes the provider on a background dispatcher and hands us an
      * [AuthTokenProvider.Callback] to complete once the Dart side responds via
@@ -117,10 +133,14 @@ class KlaviyoFlutterSdkPlugin :
         // second FlutterEngine for the background isolate, which auto-registers
         // this plugin; that instance never subscribes to the EventChannel, so
         // letting it claim `instance` would strand every event.
-        if (instance?.eventSink == null) {
+        isHeadless = BackgroundSilentPushExecutor.isCreatingEngine
+        if (!isHeadless && instance?.eventSink == null) {
             instance = this
         }
         applicationContext = flutterPluginBinding.applicationContext
+        if (!isHeadless) {
+            backgroundChannel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk_background")
+        }
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
 
@@ -132,6 +152,7 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
+                    if (isHeadless) return
                     // Whichever engine has a live Dart listener owns event delivery.
                     instance = this@KlaviyoFlutterSdkPlugin
                     // Replay a silent push that arrived before Flutter subscribed.
@@ -162,6 +183,7 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     // Initialize Klaviyo SDK
                     Klaviyo.initialize(apiKey!!, applicationContext)
+                    BackgroundSilentPushStore.saveApiKey(applicationContext, apiKey)
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("INIT_ERROR", "Failed to initialize Klaviyo", e.message)
@@ -713,6 +735,18 @@ class KlaviyoFlutterSdkPlugin :
                 result.success(null)
             }
 
+            "registerBackgroundSilentPushHandler" -> {
+                val dispatcherHandle = call.argument<Number>("dispatcherHandle")?.toLong()
+                val handlerHandle = call.argument<Number>("handlerHandle")?.toLong()
+                if (dispatcherHandle == null || handlerHandle == null) {
+                    result.error("INVALID_ARGUMENTS", "Missing background silent push callback handles", null)
+                    return
+                }
+                BackgroundSilentPushStore.saveHandles(applicationContext, dispatcherHandle, handlerHandle)
+                isBackgroundHandlerAttached = !isHeadless
+                result.success(null)
+            }
+
             "handleUniversalTrackingLink" -> {
                 val url = call.argument<String>("url")
 
@@ -809,6 +843,8 @@ class KlaviyoFlutterSdkPlugin :
             instance = null
         }
         eventSink = null
+        backgroundChannel = null
+        isBackgroundHandlerAttached = false
         // Unregister the auth token provider so the Klaviyo singleton stops
         // retaining (and invoking) this now-detached plugin instance's bridge
         // lambda after the engine is gone, and drain pending callbacks.
@@ -844,6 +880,29 @@ class KlaviyoFlutterSdkPlugin :
                 Registry.log.verbose("Flutter not ready. Caching silent push event.")
                 cachedSilentPush = payload
             }
+        }
+    }
+
+    /**
+     * Sends a background silent push to the Dart handler on this plugin's engine.
+     * [onComplete] runs on the main thread when the handler finishes or fails,
+     * or right away if the engine detached in the meantime.
+     */
+    internal fun dispatchBackgroundSilentPush(
+        data: Map<String, Any?>,
+        onComplete: () -> Unit,
+    ) {
+        Handler(Looper.getMainLooper()).post {
+            val activeChannel = backgroundChannel
+            if (activeChannel == null || !isBackgroundHandlerAttached) {
+                onComplete()
+                return@post
+            }
+            activeChannel.invokeMethod(
+                "handleBackgroundSilentPush",
+                mapOf("data" to data),
+                CompletionResult(onComplete),
+            )
         }
     }
 
