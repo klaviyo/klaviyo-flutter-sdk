@@ -110,6 +110,16 @@ void main() {
       });
     });
 
+    test('fromJson keeps a legacy scalar property named properties', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'properties': 'rental',
+        'age': 25,
+      });
+
+      expect(profile.properties, {'properties': 'rental', 'age': 25});
+    });
+
     test('fromJson ignores top-level keys when nested properties exist', () {
       final profile = KlaviyoProfile.fromJson({
         'email': 'test@example.com',

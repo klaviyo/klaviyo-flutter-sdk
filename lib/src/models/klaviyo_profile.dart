@@ -142,7 +142,6 @@ class KlaviyoProfile {
     'title',
     'image',
     'location',
-    'properties',
   };
 
   /// Create from JSON
@@ -163,8 +162,9 @@ class KlaviyoProfile {
     }
 
     final Map<String, dynamic>? properties;
-    if (json['properties'] != null) {
-      properties = Map<String, dynamic>.from(json['properties'] as Map);
+    final nestedProperties = json['properties'];
+    if (nestedProperties is Map) {
+      properties = Map<String, dynamic>.from(nestedProperties);
     } else {
       // Pre-0.6.0 toJson wrote custom properties at the top level.
       final legacy = Map<String, dynamic>.from(json)
