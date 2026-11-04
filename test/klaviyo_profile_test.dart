@@ -65,9 +65,44 @@ void main() {
 
       final json = profile.toJson();
 
-      expect(json['email'], 'test@example.com');
-      expect(json['custom_field'], 'custom_value');
-      expect(json['age'], 25);
+      expect(json, {
+        'email': 'test@example.com',
+        'properties': {'custom_field': 'custom_value', 'age': 25},
+      });
+    });
+
+    test('toJson omits properties when null', () {
+      final json = KlaviyoProfile(email: 'test@example.com').toJson();
+
+      expect(json.containsKey('properties'), isFalse);
+    });
+
+    test('fromJson reads nested properties', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'properties': {'custom_field': 'custom_value', 'age': 25},
+      });
+
+      expect(profile.email, 'test@example.com');
+      expect(profile.properties, {'custom_field': 'custom_value', 'age': 25});
+    });
+
+    test('fromJson leaves properties null when absent', () {
+      final profile = KlaviyoProfile.fromJson({'email': 'test@example.com'});
+
+      expect(profile.properties, isNull);
+    });
+
+    test('toJson and fromJson round-trip properties', () {
+      final original = KlaviyoProfile(
+        email: 'test@example.com',
+        properties: {'custom_field': 'custom_value', 'age': 25},
+      );
+
+      final restored = KlaviyoProfile.fromJson(original.toJson());
+
+      expect(restored, original);
+      expect(restored.properties, original.properties);
     });
   });
 }

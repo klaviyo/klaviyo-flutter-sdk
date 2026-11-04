@@ -125,9 +125,8 @@ class KlaviyoProfile {
     if (image != null) data['image'] = image;
     if (location != null) data['location'] = location!.toJson();
 
-    // Merge custom properties
     if (properties != null) {
-      data.addAll(properties!);
+      data['properties'] = Map<String, dynamic>.from(properties!);
     }
 
     return data;
@@ -150,21 +149,9 @@ class KlaviyoProfile {
       location = KlaviyoLocation.fromJson(json['location']);
     }
 
-    // Extract custom properties (exclude known fields)
-    final Map<String, dynamic> properties = Map.from(json);
-    properties.removeWhere(
-      (key, value) => [
-        'email',
-        'phone_number',
-        'external_id',
-        'first_name',
-        'last_name',
-        'organization',
-        'title',
-        'image',
-        'location',
-      ].contains(key),
-    );
+    final properties = json['properties'] != null
+        ? Map<String, dynamic>.from(json['properties'] as Map)
+        : null;
 
     return KlaviyoProfile(
       email: email,
@@ -176,7 +163,7 @@ class KlaviyoProfile {
       title: title,
       image: image,
       location: location,
-      properties: properties.isNotEmpty ? properties : null,
+      properties: properties,
     );
   }
 

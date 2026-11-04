@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- **`setProfile` dropped custom properties on iOS and Android** — `KlaviyoProfile.toJson` merged `properties` into the top level of the profile map, but both native plugins read them from a nested `properties` key, so custom properties passed to `setProfile` never reached Klaviyo. They are now sent under `properties`. `KlaviyoProfile.fromJson` reads them from the same nested key. (MAGE-1645)
+
 ## 0.5.0
 
 ### Changes
