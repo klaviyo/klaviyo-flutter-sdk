@@ -93,6 +93,33 @@ void main() {
       expect(profile.properties, isNull);
     });
 
+    test('fromJson reads top-level properties from the pre-0.6.0 shape', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'first_name': 'Jane',
+        'custom_field': 'custom_value',
+        'age': 25,
+      });
+
+      expect(profile.email, 'test@example.com');
+      expect(profile.firstName, 'Jane');
+      expect(profile.properties, {'custom_field': 'custom_value', 'age': 25});
+      expect(profile.toJson()['properties'], {
+        'custom_field': 'custom_value',
+        'age': 25,
+      });
+    });
+
+    test('fromJson ignores top-level keys when nested properties exist', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'stray': 'value',
+        'properties': {'custom_field': 'custom_value'},
+      });
+
+      expect(profile.properties, {'custom_field': 'custom_value'});
+    });
+
     test('toJson and fromJson round-trip properties', () {
       final original = KlaviyoProfile(
         email: 'test@example.com',

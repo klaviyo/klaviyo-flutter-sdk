@@ -132,6 +132,19 @@ class KlaviyoProfile {
     return data;
   }
 
+  static const _knownJsonKeys = {
+    'email',
+    'phone_number',
+    'external_id',
+    'first_name',
+    'last_name',
+    'organization',
+    'title',
+    'image',
+    'location',
+    'properties',
+  };
+
   /// Create from JSON
   factory KlaviyoProfile.fromJson(Map<String, dynamic> json) {
     // Extract known fields
@@ -149,9 +162,15 @@ class KlaviyoProfile {
       location = KlaviyoLocation.fromJson(json['location']);
     }
 
-    final properties = json['properties'] != null
-        ? Map<String, dynamic>.from(json['properties'] as Map)
-        : null;
+    final Map<String, dynamic>? properties;
+    if (json['properties'] != null) {
+      properties = Map<String, dynamic>.from(json['properties'] as Map);
+    } else {
+      // Pre-0.6.0 toJson wrote custom properties at the top level.
+      final legacy = Map<String, dynamic>.from(json)
+        ..removeWhere((key, value) => _knownJsonKeys.contains(key));
+      properties = legacy.isNotEmpty ? legacy : null;
+    }
 
     return KlaviyoProfile(
       email: email,
