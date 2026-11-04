@@ -15,7 +15,7 @@ These APIs still work and will be removed in 1.0.
 ### Changed
 
 - **`dispose()` no longer closes the SDK's event streams.** Calling it used to leave the SDK broken until the app restarted: push, form, and auth-token streams were closed for good and `initialize()` didn't reopen them. It now only unregisters the auth token provider, if one is registered.
-- **`setLoggingEnabled(bool)` now controls Dart-side logging as well as the native SDK's logging.** The plugin also logs less: push token values, full push payloads, and per-call profile identifiers (email, phone number, external ID) are no longer logged, and a few duplicate bridge messages were dropped.
+- **`setLoggingEnabled(bool)` now controls Dart-side logging and the iOS plugin's own logs as well as the native SDK's logging.** The plugin also logs less: push token values, full push payloads, and per-call profile identifiers (email, phone number, external ID) are no longer logged, and a few duplicate bridge messages were dropped.
 
 ## 0.5.0
 
