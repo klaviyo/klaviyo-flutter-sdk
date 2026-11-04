@@ -367,6 +367,7 @@ jobs:
           links: |
             Draft release|${{ needs.prepare.outputs.release_url }}
             Approve here|${{ github.server_url }}/${{ github.repository }}/actions/workflows/release.yml
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
 
       - name: Dispatch release.yml at the tag
         id: dispatch
@@ -433,7 +434,9 @@ jobs:
             Version: `${{ inputs.version }}`
             Commit: `${{ needs.prepare.outputs.sha_short }}`
             Stage: Publish
-          links: Release|${{ needs.prepare.outputs.release_url }}
+          links: |
+            Release|${{ needs.prepare.outputs.release_url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
 
       - name: Reply with failure details
         if: failure() && steps.slack_failure.outputs.ts != ''
@@ -460,4 +463,6 @@ jobs:
             Commit: `${{ needs.prepare.outputs.sha_short }}`
             Stage: Publish
             Requested by: ${{ github.actor }}
-          links: Release|${{ needs.prepare.outputs.release_url }}
+          links: |
+            Release|${{ needs.prepare.outputs.release_url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
