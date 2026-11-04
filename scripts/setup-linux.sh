@@ -8,7 +8,7 @@
 #
 # Env:
 #   KLAVIYO_TOOLS_DIR (default: $HOME/.cache/klaviyo-flutter-sdk-tools)
-#   GITHUB_PATH       when set (GitHub Actions), installed bin dirs are appended to it
+#   GITHUB_PATH       when set (GitHub Actions), installed bin dirs (tools, flutter, jdk) are appended to it
 #
 # After running, load the toolchain into the current shell with:
 #   source "$KLAVIYO_TOOLS_DIR/env.sh"
@@ -160,6 +160,9 @@ write_env
 
 if [ -n "${GITHUB_PATH:-}" ]; then
   echo "$TOOLS_DIR/bin" >>"$GITHUB_PATH"
+  for dir in "$TOOLS_DIR/flutter/bin" "$TOOLS_DIR/jdk/bin"; do
+    if [ -d "$dir" ]; then echo "$dir" >>"$GITHUB_PATH"; fi
+  done
 fi
 
 log "done; run: source \"$TOOLS_DIR/env.sh\""

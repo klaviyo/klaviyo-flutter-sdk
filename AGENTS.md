@@ -19,7 +19,7 @@ Use `--no-codesign` for iOS: `cd example && flutter build ios --no-codesign`
 The `Makefile` mirrors the CI gates; `make help` lists targets.
 
 - `make setup` installs Flutter, JDK 17, the Android SDK, ktlint and SwiftLint into `~/.cache/klaviyo-flutter-sdk-tools` (Linux x86_64, no root). The Makefile puts them on `PATH`.
-- `make check` runs every Linux CI gate: Dart format, `flutter analyze`, ktlint, SwiftLint, Dart unit tests and Kotlin unit tests.
+- `make check` runs every Linux CI gate except the example APK build (`make build-android`): Dart format, `flutter analyze`, ktlint, SwiftLint, Dart unit tests and Kotlin unit tests.
 - `make test-android` runs the plugin's Kotlin JVM unit tests (`android/src/test/kotlin`) through the example app's Gradle project.
 - `make build-android` builds the example debug APK; it needs `example/android/app/google-services.json` (CI writes a dummy one).
 
