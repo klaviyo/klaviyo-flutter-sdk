@@ -30,7 +30,16 @@ String normalizeProfileKey(String key) =>
 
 /// Returns a copy of [properties] with every key passed through
 /// [normalizeProfileKey].
+///
+/// When several keys normalize to the same key, the last non-null value wins.
 Map<String, dynamic> normalizeProfileProperties(
   Map<String, dynamic> properties,
-) =>
-    properties.map((key, value) => MapEntry(normalizeProfileKey(key), value));
+) {
+  final normalized = <String, dynamic>{};
+  properties.forEach((key, value) {
+    final normalizedKey = normalizeProfileKey(key);
+    if (value == null && normalized[normalizedKey] != null) return;
+    normalized[normalizedKey] = value;
+  });
+  return normalized;
+}

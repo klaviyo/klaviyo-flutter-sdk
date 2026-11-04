@@ -51,11 +51,34 @@ void main() {
         'latitude': 40.7,
         'preferences': nested,
       }),
-      {
-        'first_name': 'Ada',
-        'latitude': 40.7,
-        'preferences': nested,
-      },
+      {'first_name': 'Ada', 'latitude': 40.7, 'preferences': nested},
     );
+  });
+
+  test(
+    'normalizeProfileProperties keeps a non-null value over a null alias',
+    () {
+      expect(
+        normalizeProfileProperties({'firstName': 'Ada', 'first_name': null}),
+        {'first_name': 'Ada'},
+      );
+      expect(
+        normalizeProfileProperties({'first_name': null, 'firstName': 'Ada'}),
+        {'first_name': 'Ada'},
+      );
+    },
+  );
+
+  test('normalizeProfileProperties uses the last non-null alias value', () {
+    expect(
+      normalizeProfileProperties({'firstName': 'Ada', 'first_name': 'Grace'}),
+      {'first_name': 'Grace'},
+    );
+  });
+
+  test('normalizeProfileProperties keeps a lone null value', () {
+    expect(normalizeProfileProperties({'firstName': null}), {
+      'first_name': null,
+    });
   });
 }
