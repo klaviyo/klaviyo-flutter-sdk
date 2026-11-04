@@ -4,7 +4,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import '../main.dart' show setupSilentPushListener, setupPushActionListener;
+import '../main.dart' show setupPushDataListener, setupPushActionListener;
 import '../widgets/build_info_button.dart';
 import '../widgets/test_id.dart';
 import 'forms_tab.dart';
@@ -117,8 +117,8 @@ class _ProfileTabState extends State<ProfileTab> {
         }
       }
 
-      // Set up silent push listener now that SDK is initialized
-      setupSilentPushListener();
+      // Set up push data listener now that SDK is initialized
+      setupPushDataListener();
 
       // Set up push action (open_url / action button) listener
       setupPushActionListener();

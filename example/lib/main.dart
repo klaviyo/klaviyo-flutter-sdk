@@ -10,6 +10,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 
 import 'firebase_background_handler.dart';
+import 'klaviyo_background_handler.dart';
 import 'tabs/profile_tab.dart';
 import 'tabs/events_tab.dart';
 import 'tabs/forms_tab.dart';
@@ -35,6 +36,12 @@ void main() async {
     );
   });
 
+  try {
+    await KlaviyoSDK.onBackgroundPushData(klaviyoBackgroundPushDataHandler);
+  } catch (e) {
+    _logger.warning('Failed to register background push data handler: $e');
+  }
+
   // Initialize Firebase for FCM (Android only)
   if (Platform.isAndroid) {
     try {
@@ -51,8 +58,8 @@ void main() async {
 /// Set up Firebase Cloud Messaging for Android
 Future<void> _setupFCM() async {
   try {
-    // Silent pushes delivered while the app is terminated never reach the plugin's
-    // event stream — this handles them. See firebase_background_handler.dart.
+    // Runs alongside the Klaviyo background handler to cover a second
+    // background engine. See firebase_background_handler.dart.
     FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
 
     // Note: Permission is requested from the Push tab via permission_handler when
@@ -90,9 +97,9 @@ Future<void> _setupFCM() async {
   }
 }
 
-/// Subscription for silent push notifications.
+/// Subscription for foreground push data.
 /// Tracked to prevent duplicate subscriptions on SDK re-initialization.
-StreamSubscription<Map<String, dynamic>>? _silentPushSubscription;
+StreamSubscription<KlaviyoPushData>? _pushDataSubscription;
 
 /// Subscription for push action (open_url / action button) events.
 /// Tracked to prevent duplicate subscriptions on SDK re-initialization.
@@ -125,35 +132,28 @@ void setupPushActionListener() {
   });
 }
 
-/// Set up listener for silent push notifications.
+/// Set up listener for push data received in the foreground.
+/// Background push data goes to klaviyoBackgroundPushDataHandler instead.
 /// Called from ProfileTab after SDK initialization.
-void setupSilentPushListener() {
+void setupPushDataListener() {
   final klaviyo = KlaviyoSDK();
   if (!klaviyo.isInitialized) {
     _logger.warning(
-      'Cannot set up silent push listener: SDK not initialized',
+      'Cannot set up push data listener: SDK not initialized',
     );
     return;
   }
 
   // Cancel any existing subscription to prevent duplicates
-  _silentPushSubscription?.cancel();
+  _pushDataSubscription?.cancel();
 
-  _silentPushSubscription = klaviyo.onPushNotification.listen((eventData) {
-    final eventType = eventData['type'] as String? ?? '';
-
-    if (eventType == 'silent_push_received') {
-      final data = eventData['data'];
-      final userInfo =
-          data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-
-      _logger.info('Silent push received: $userInfo');
-      _showSilentPushAlert(userInfo);
-    }
+  _pushDataSubscription = klaviyo.onPushData.listen((pushData) {
+    _logger.info('Push data received: ${pushData.payload}');
+    _showPushDataAlert(pushData.payload);
   });
 }
 
-void _showSilentPushAlert(Map<String, dynamic> userInfo) {
+void _showPushDataAlert(Map<String, dynamic> userInfo) {
   final context = _router.routerDelegate.navigatorKey.currentContext;
   if (context == null) {
     _logger.warning('Cannot show alert: context not available');
@@ -164,7 +164,7 @@ void _showSilentPushAlert(Map<String, dynamic> userInfo) {
     context: context,
     builder: (BuildContext context) {
       return AlertDialog.adaptive(
-        title: const Text('Silent Push Received'),
+        title: const Text('Push Data Received'),
         content: SingleChildScrollView(
           child: Align(
             alignment: Alignment.centerLeft,
