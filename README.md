@@ -244,7 +244,7 @@ Android delivers `MESSAGING_EVENT` to exactly one service, so the plugin also re
 
 FCM delivers each `MESSAGING_EVENT` to exactly one service: the one with the highest `android:priority`, then the first in merged-manifest order. `firebase_messaging` registers its own service, and Flutter merges its manifest before this plugin's, so it wins every message. If your app uses `firebase_messaging` and skips the step below, Klaviyo pushes never display and silent pushes never reach Dart.
 
-Declare `KlaviyoFlutterPushService` in your app's `android/app/src/main/AndroidManifest.xml`, inside `<application>`, with `android:priority="1"` on its intent filter:
+Declare `KlaviyoFlutterPushService` in your app's `android/app/src/main/AndroidManifest.xml`, inside `<application>`, with `android:priority="1"` on its intent filter. `firebase_messaging` declares its service with the default priority (0), so `1` is enough; if another library declares its own priority, use a higher value than that one:
 
 ```xml
 <service
@@ -557,7 +557,7 @@ The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM se
 
 Your listener fires for every Klaviyo silent push, with the full payload and its JSON object values decoded to maps on both platforms. Delivery needs a live Flutter engine: foreground **and backgrounded** apps both receive events, a terminated one does not. Nothing is cached or replayed on a later launch, matching both native SDKs — a missed push is gone.
 
-> **Known limitation (Android)**: while your app isn't running — swiped away, force-stopped, or evicted — there's no Flutter engine to receive silent pushes, and nothing is queued for the next launch. The native Android SDK has no such gap, and we plan to close it. Until then, use [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage`, which runs its own engine and receives messages through a broadcast receiver rather than the `MESSAGING_EVENT` service. Adding `firebase_messaging` means you must also declare `KlaviyoFlutterPushService` in your app manifest, as described in [Using with firebase_messaging (or another FCM library)](#using-with-firebase_messaging-or-another-fcm-library). `onBackgroundMessage` also fires while your app is running, so guard against handling a push twice. iOS is unaffected: the system relaunches your app, so the `AppDelegate` path still runs.
+> **Known limitation (Android)**: while your app isn't running — swiped away, force-stopped, or evicted — there's no Flutter engine to receive silent pushes, and nothing is queued for the next launch. The native Android SDK has no such gap, and we plan to close it. Until then, use [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage` for the swiped-away and evicted cases. It can't help after a force stop: Android delivers no messages to a force-stopped app until the user opens it again. `onBackgroundMessage` runs its own engine and receives messages through a broadcast receiver rather than the `MESSAGING_EVENT` service. Adding `firebase_messaging` means you must also declare `KlaviyoFlutterPushService` in your app manifest, as described in [Using with firebase_messaging (or another FCM library)](#using-with-firebase_messaging-or-another-fcm-library). `onBackgroundMessage` also fires while your app is running, so guard against handling a push twice. iOS is unaffected: the system relaunches your app, so the `AppDelegate` path still runs.
 
 #### Dart-Side Listener
 
