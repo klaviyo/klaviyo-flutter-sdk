@@ -117,7 +117,7 @@ class _ProfileTabState extends State<ProfileTab> {
         }
       }
 
-      // Set up silent push listener now that SDK is initialized
+      // Set up push data listener now that SDK is initialized
       setupPushDataListener();
 
       // Set up push action (open_url / action button) listener

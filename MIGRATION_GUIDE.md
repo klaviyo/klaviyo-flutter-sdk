@@ -8,43 +8,50 @@ This guide outlines how developers can migrate from older versions of the
 
 ## Migrating to v0.6.0
 
-### Background silent pushes moved to `onBackgroundSilentPush`
+### Silent push is now push data, split into `onPushData` and `onBackgroundPushData`
 
-`silent_push_received` on `onPushNotification` now fires only while the app is in the foreground.
-Silent pushes that arrive in the background, or while the app isn't running, go to a handler you
-register with the experimental `KlaviyoSDK.onBackgroundSilentPush`. Each push goes to one or the
-other, never both. Without a handler, background silent pushes are dropped.
+Push data covers every silent push and every visible push that carries key/value pairs. Each
+push reaches Dart in exactly one place, chosen by app state when it arrives: the experimental
+`onPushData` stream in the foreground, or a handler you register with the experimental
+`KlaviyoSDK.onBackgroundPushData` in the background or while the app isn't running. Without a
+handler, background push data is dropped.
+
+`silent_push_received` on `onPushNotification` still fires for the same foreground pushes, so
+existing listeners keep working, but it no longer fires in the background. It now also fires for
+visible pushes with key/value pairs.
 
 1. Move background work into a top-level function annotated with `@pragma('vm:entry-point')` and
    register it in `main()` before `runApp`:
 
    ```dart
    @pragma('vm:entry-point')
-   Future<void> onKlaviyoSilentPush(Map<String, dynamic> data) async {
+   Future<void> onKlaviyoPushData(KlaviyoPushData data) async {
      // Background work. No UI.
    }
 
    void main() async {
      WidgetsFlutterBinding.ensureInitialized();
-     await KlaviyoSDK.onBackgroundSilentPush(onKlaviyoSilentPush);
+     await KlaviyoSDK.onBackgroundPushData(onKlaviyoPushData);
      runApp(const MyApp());
    }
    ```
 
-2. **iOS**: in `AppDelegate.swift`, replace `handleSilentPush(userInfo:)` and your own
-   `completionHandler(.newData)` call with
-   `handleSilentPush(userInfo:fetchCompletionHandler:)`, passing the system completion handler, for
-   pure silent pushes (no `alert`). The plugin calls it once your Dart handler finishes. Keep
-   calling the completion handler yourself for every other push. If another provider also sends
-   silent pushes, handle its payloads before the Klaviyo call, because the plugin doesn't check
-   where a push came from and takes over the completion handler. See
-   [iOS Setup](README.md#ios-setup).
-   `handleSilentPush(userInfo:)` still compiles but is deprecated.
+2. **iOS**: in `AppDelegate.swift`, replace the body of
+   `application(_:didReceiveRemoteNotification:fetchCompletionHandler:)` with a single call to
+   `KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo:fetchCompletionHandler:)`, passing the
+   system completion handler, for every push. Remove your own `aps.alert` check and your own
+   `completionHandler` call: the plugin now decides which pushes are push data and calls the
+   completion handler for every push. If another provider also handles this callback, branch on its
+   payload before the Klaviyo call and complete those pushes yourself. See
+   [iOS Setup](README.md#ios-setup). `handleSilentPush(userInfo:)` still compiles but is deprecated.
 
-3. **Android**: if you used `firebase_messaging`'s `onBackgroundMessage` only to catch Klaviyo
-   silent pushes while the app was killed, you can remove it. If you keep it, skip Klaviyo silent
-   pushes there (they carry `_k` and have no `title` or `body`), since both handlers run for the same
-   push. Visible Klaviyo pushes also carry `_k` and still reach only Firebase, so don't skip those.
+   Until you update, the old snippet keeps filtering out pushes with an `alert`, so visible pushes
+   with key/value pairs never reach Dart.
+
+3. **Android**: no setup change. If you used `firebase_messaging`'s `onBackgroundMessage` only to
+   catch Klaviyo silent pushes while the app was killed, you can remove it. If you keep it, skip
+   Klaviyo pushes that deliver push data there (they carry `_k` and either have no `title`/`body` or
+   carry `key_value_pairs`), since both handlers run for the same push.
 
 ## Migrating to v0.3.0
 
