@@ -253,6 +253,65 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
         run: .github/scripts/check-secrets.sh ios
 
+  blocked:
+    name: Report a blocked deploy
+    needs: [gate-test, gate-lint, preflight-android, preflight-ios]
+    if: always() && contains(needs.*.result, 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Name the failed jobs
+        id: failed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          failed=$(jq -r '
+            {
+              "gate-test": "tests",
+              "gate-lint": "lint",
+              "preflight-android": "the Android preflight",
+              "preflight-ios": "the iOS preflight"
+            } as $names
+            | [to_entries[] | select(.value.result == "failure") | ($names[.key] // .key)]
+            | join(", ")
+          ' <<<"$NEEDS")
+          echo "failed=${failed}" >> "$GITHUB_OUTPUT"
+          # check_credentials skips both gates, so a failure there is a preflight.
+          credential_failed=$(jq -r '
+            {
+              "preflight-android": "Android",
+              "preflight-ios": "iOS"
+            } as $names
+            | [to_entries[] | select(.value.result == "failure") | ($names[.key] // .key)]
+            | join(" and ")
+          ' <<<"$NEEDS")
+          echo "credential_failed=${credential_failed}" >> "$GITHUB_OUTPUT"
+          echo "commit_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Slack action
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Notify Slack that the deploy is blocked
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
+          status: failure
+          title: ${{ inputs.check_credentials == true && format('Flutter Example App credential check failed ({0} preflight)', steps.failed.outputs.credential_failed) || format('Flutter Example App deploy blocked, {0} failed', steps.failed.outputs.failed) }}
+          body: ${{ inputs.check_credentials == true && 'Fix the credential issue, then re-run the credential check.' || 'Fix the failing job, then re-run to deploy.' }}
+          fields: |
+            Source: `${{ github.event_name }}`
+            Commit: `${{ steps.failed.outputs.commit_short }}`
+            Requested by: ${{ github.actor }}
+          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+
   deploy-android:
     name: Publish to Play internal track
     needs: [gate-test, gate-lint, preflight-android]
@@ -416,10 +475,10 @@ jobs:
           title: Flutter Example (Android) deployed to Play internal
           body: Installs for anyone who has done the internal-track opt-in, once Play has finished processing the release.
           fields: |
-            Build: ${{ env.APP_VERSION }} (${{ env.VERSION_CODE }})
-            SDKs: ${{ steps.buildinfo.outputs.sdk_info }}
-            Source: ${{ steps.buildinfo.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ steps.buildinfo.outputs.commit_short }}
+            Build: `${{ env.APP_VERSION }}` (`${{ env.VERSION_CODE }}`)
+            SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
+            Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ steps.buildinfo.outputs.commit_short }}`
           links: |
             Install|https://play.google.com/apps/test/com.klaviyo.flutterexample/${{ env.VERSION_CODE }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.buildinfo.outputs.commit_sha }}
@@ -434,11 +493,11 @@ jobs:
           status: ${{ job.status == 'cancelled' && 'stopped' || 'failure' }}
           title: Flutter Example (Android) deploy to Play internal ${{ job.status == 'cancelled' && 'timed out' || 'failed' }}
           fields: |
-            Build: ${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.VERSION_CODE || '?' }})
-            SDKs: ${{ steps.buildinfo.outputs.sdk_info }}
-            Source: ${{ steps.buildinfo.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ steps.buildinfo.outputs.commit_short }}
-            Failed at: ${{ job.status == 'cancelled' && 'timeout' || steps.buildinfo.outcome == 'failure' && 'generate build info' || steps.signing.outcome == 'failure' && 'write signing material' || steps.build.outcome == 'failure' && 'build and upload' || 'an unknown step' }}
+            Build: `${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }}` (`${{ env.VERSION_CODE || '?' }}`)
+            SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
+            Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ steps.buildinfo.outputs.commit_short }}`
+            Failed at: ${{ job.status == 'cancelled' && '`timeout`' || steps.buildinfo.outcome == 'failure' && '`generate build info`' || steps.signing.outcome == 'failure' && '`write signing material`' || steps.build.outcome == 'failure' && '`build and upload`' || 'an unknown step' }}
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.buildinfo.outputs.commit_sha || github.sha }}
 
   deploy-ios:
@@ -656,10 +715,10 @@ jobs:
           title: Flutter Example (iOS) deployed to TestFlight
           body: Install from the TestFlight app once Apple finishes processing it, usually in 5 to 30 minutes.
           fields: |
-            Build: ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
-            SDKs: ${{ steps.buildinfo.outputs.sdk_info }}
-            Source: ${{ steps.buildinfo.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ steps.buildinfo.outputs.commit_short }}
+            Build: `${{ env.APP_VERSION }}` (`${{ env.BUILD_NUMBER }}`)
+            SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
+            Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ steps.buildinfo.outputs.commit_short }}`
           # The App Store Connect link needs a login; testers install via the TestFlight app.
           links: |
             TestFlight in App Store Connect|https://appstoreconnect.apple.com/apps/${{ env.ASC_APP_ID }}/testflight/ios
@@ -675,11 +734,11 @@ jobs:
           status: ${{ job.status == 'cancelled' && 'stopped' || 'failure' }}
           title: Flutter Example (iOS) deploy to TestFlight ${{ job.status == 'cancelled' && 'timed out' || 'failed' }}
           fields: |
-            Build: ${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.BUILD_NUMBER || '?' }}, attempted)
-            SDKs: ${{ steps.buildinfo.outputs.sdk_info }}
-            Source: ${{ steps.buildinfo.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ steps.buildinfo.outputs.commit_short }}
-            Failed at: ${{ job.status == 'cancelled' && 'timeout' || steps.buildinfo.outcome == 'failure' && 'generate build info' || steps.flutterconfig.outcome == 'failure' && 'generate Flutter config' || steps.build.outcome == 'failure' && 'sign, build and upload' || 'an unknown step' }}
+            Build: `${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }}` (`${{ env.BUILD_NUMBER || '?' }}`, attempted)
+            SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
+            Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ steps.buildinfo.outputs.commit_short }}`
+            Failed at: ${{ job.status == 'cancelled' && '`timeout`' || steps.buildinfo.outcome == 'failure' && '`generate build info`' || steps.flutterconfig.outcome == 'failure' && '`generate Flutter config`' || steps.build.outcome == 'failure' && '`sign, build and upload`' || 'an unknown step' }}
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.buildinfo.outputs.commit_sha || github.sha }}
 
   what-to-test:
@@ -762,10 +821,10 @@ jobs:
           status: warning
           title: Flutter Example (iOS) uploaded to TestFlight, but saving What to Test failed
           fields: |
-            Build: ${{ needs.deploy-ios.outputs.app_version }} (${{ needs.deploy-ios.outputs.build_number }})
-            SDKs: ${{ needs.deploy-ios.outputs.sdk_info }}
-            Source: ${{ needs.deploy-ios.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ needs.deploy-ios.outputs.commit_short }}
+            Build: `${{ needs.deploy-ios.outputs.app_version }}` (`${{ needs.deploy-ios.outputs.build_number }}`)
+            SDKs: `${{ needs.deploy-ios.outputs.sdk_info }}`
+            Source: `${{ needs.deploy-ios.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ needs.deploy-ios.outputs.commit_short }}`
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.deploy-ios.outputs.commit_sha }}
 
   # Remove the deploy-example-app[:platform] label after the run so
