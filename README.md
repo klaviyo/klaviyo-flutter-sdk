@@ -265,7 +265,31 @@ await KlaviyoSDK().setExternalId('user123');
 await KlaviyoSDK().setProfileProperties({
   'preferences': {'notifications': true},
 });
+await KlaviyoSDK().setProfileAttribute('first_name', 'John');
 ```
+
+### Standard Profile Attributes
+
+`setProfileProperties` and `setProfileAttribute` send these keys to Klaviyo's standard profile fields. Matching ignores case and accepts camelCase or snake_case, so `firstName`, `first_name` and `FIRST_NAME` all set the first name. Any other key is stored as a custom property under the key you passed.
+
+| Standard field | Accepted keys |
+|----------------|---------------|
+| First name | `first_name`, `firstName` |
+| Last name | `last_name`, `lastName` |
+| Organization | `organization` |
+| Title | `title` |
+| Image URL | `image` |
+| Address line 1 | `address1`, `address_1` |
+| Address line 2 | `address2`, `address_2` |
+| City | `city` |
+| Country | `country` |
+| Region | `region` |
+| Zip | `zip` |
+| Latitude | `latitude` |
+| Longitude | `longitude` |
+| Timezone | `timezone`, `timeZone`, `time_zone` (Android only, see below) |
+
+**Timezone on iOS:** the native iOS SDK can't set the timezone as a single attribute, so on iOS `timezone` is stored as a custom property. Both native SDKs already send the device timezone with the profile automatically. To set a timezone explicitly on both platforms, pass it in `KlaviyoProfile.location` through `setProfile`.
 
 ## Event Tracking
 
@@ -993,7 +1017,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `getEmail()` | Get user email |
 | `getPhoneNumber()` | Get user phone number |
 | `getExternalId()` | Get external user ID |
-| `setProfileProperties(Map<String, dynamic> properties)` | Set custom profile properties |
+| `setProfileProperties(Map<String, dynamic> properties)` | Set profile properties. [Standard attribute keys](#standard-profile-attributes) map to standard fields; other keys are custom |
 | `setProfileAttribute(String propertyKey, dynamic value)` | Set a single profile attribute |
 | `resetProfile()` | Reset user profile (logout) |
 
