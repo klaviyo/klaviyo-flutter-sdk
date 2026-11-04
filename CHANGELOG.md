@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Documentation
+
+- **Silent push is experimental.** The `silent_push_received` event on `onPushNotification` and the iOS `handleSilentPush` method may change before or after 1.0. The README now lists the platform limits: iOS needs `AppDelegate` forwarding and doesn't deliver after the user swipes the app away, and Android doesn't deliver while the app is killed. No behavior change.
+
 ## 0.5.0
 
 ### Changes

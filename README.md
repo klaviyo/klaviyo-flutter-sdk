@@ -518,7 +518,14 @@ void handlePushPayload(Map<String, dynamic> payload) {
 
 ### Silent Push
 
+> **Experimental**: silent push support, including the `silent_push_received` event on `onPushNotification` and the iOS `handleSilentPush` method, may change before or after 1.0.
+
 Silent push notifications (`content-available: 1`) deliver data to your app in the background without showing a banner. They are commonly used to prefetch content, sync state, or trigger background tasks.
+
+#### Known Limitations
+
+- **iOS**: your `AppDelegate` must forward `didReceiveRemoteNotification:fetchCompletionHandler:` to `KlaviyoFlutterSdkPlugin.shared.handleSilentPush` ([flutter/flutter#155479](https://github.com/flutter/flutter/issues/155479)). The [iOS Setup](#ios-setup) example calls `completionHandler` right away, so background Dart work isn't guaranteed to finish. iOS doesn't deliver silent pushes after the user swipes the app away.
+- **Android**: silent pushes reach Dart only while the app is in the foreground or background. When the app is killed, there's no Flutter engine and the push is dropped. See the workarounds under [Delivery Guarantees](#delivery-guarantees).
 
 > **iOS requirement**: Enable "Remote notifications" under **Background Modes** in Xcode (covered in [iOS Setup](#ios-setup)).
 

@@ -616,6 +616,18 @@ class KlaviyoSDK {
   }
 
   /// Get push notification events stream
+  ///
+  /// Events of type `silent_push_received` are experimental and may change
+  /// before or after 1.0. Known limits:
+  /// - **iOS**: the host `AppDelegate` must forward
+  ///   `didReceiveRemoteNotification` to
+  ///   `KlaviyoFlutterSdkPlugin.shared.handleSilentPush`. The example app calls
+  ///   `completionHandler` right away, so background Dart work isn't
+  ///   guaranteed to finish. Not delivered after the user swipes the app away.
+  /// - **Android**: not delivered while the app is killed, because no Flutter
+  ///   engine is running.
+  ///
+  /// See the README's Silent Push section for workarounds.
   Stream<Map<String, dynamic>> get onPushNotification =>
       _nativeWrapper.onPushNotification;
 
