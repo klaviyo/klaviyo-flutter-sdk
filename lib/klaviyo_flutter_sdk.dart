@@ -13,6 +13,8 @@ export 'src/models/auth_token.dart';
 export 'src/models/klaviyo_push_action.dart';
 export 'src/enums/klaviyo_log_level.dart';
 export 'src/services/klaviyo_native_wrapper.dart';
+export 'src/services/background_silent_push.dart'
+    show KlaviyoBackgroundSilentPushHandler;
 export 'src/exceptions/klaviyo_exception.dart';
 export 'src/extensions/map_extensions.dart';
 export 'src/compat/klaviyo_compat.dart';

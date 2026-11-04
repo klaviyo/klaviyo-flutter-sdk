@@ -417,6 +417,24 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Stores the callback handles native code uses to run a background silent
+  /// push handler. Callable before initialize().
+  Future<void> registerBackgroundSilentPushHandler({
+    required int dispatcherHandle,
+    required int handlerHandle,
+  }) async {
+    try {
+      await _channel.invokeMethod('registerBackgroundSilentPushHandler', {
+        'dispatcherHandle': dispatcherHandle,
+        'handlerHandle': handlerHandle,
+      });
+    } catch (e) {
+      throw KlaviyoException(
+        'Failed to register background silent push handler: $e',
+      );
+    }
+  }
+
   /// Handle a Klaviyo universal tracking link URL
   /// Returns true if the URL is a valid Klaviyo tracking link, false otherwise
   Future<bool> handleUniversalTrackingLink(String url) async {

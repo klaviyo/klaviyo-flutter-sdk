@@ -12,6 +12,7 @@ import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
 import 'models/klaviyo_push_action.dart';
 import 'enums/klaviyo_log_level.dart';
+import 'services/background_silent_push.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
 
@@ -615,7 +616,44 @@ class KlaviyoSDK {
     }
   }
 
+  /// Registers [handler] to receive Klaviyo silent pushes that arrive while
+  /// the app is in the background or not running.
+  ///
+  /// Each silent push goes to exactly one place, chosen natively from the app
+  /// state when it arrives: while the app is in the foreground it is emitted on
+  /// [onPushNotification] as a `silent_push_received` event; otherwise it is
+  /// passed to [handler]. With no handler registered, background silent pushes
+  /// are dropped.
+  ///
+  /// [handler] must be a top-level or static function annotated with
+  /// `@pragma('vm:entry-point')`. On Android it can run in a separate isolate
+  /// with no UI, so it must not touch widgets or in-memory app state. It should
+  /// complete within about 20 seconds on Android and 25 seconds on iOS; the
+  /// platform may suspend or kill the app after that.
+  ///
+  /// Call it in `main()` before `runApp`, on every launch. It can be called
+  /// before [initialize]. On Android, if the handler runs in a process with no
+  /// Flutter engine, the SDK is initialized with the last API key passed to
+  /// [initialize] before [handler] runs.
+  ///
+  /// Throws an [ArgumentError] if [handler] is not a top-level or static
+  /// function, and a [KlaviyoException] if the native registration fails.
+  @experimental
+  static Future<void> onBackgroundSilentPush(
+    KlaviyoBackgroundSilentPushHandler handler,
+  ) async {
+    final handles = attachBackgroundSilentPushHandler(handler);
+    await KlaviyoNativeWrapper().registerBackgroundSilentPushHandler(
+      dispatcherHandle: handles['dispatcherHandle']!,
+      handlerHandle: handles['handlerHandle']!,
+    );
+  }
+
   /// Get push notification events stream
+  ///
+  /// `silent_push_received` events fire only while the app is in the
+  /// foreground. Use [onBackgroundSilentPush] for silent pushes that arrive in
+  /// the background or while the app is not running.
   Stream<Map<String, dynamic>> get onPushNotification =>
       _nativeWrapper.onPushNotification;
 
