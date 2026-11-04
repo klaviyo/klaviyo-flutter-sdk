@@ -4,7 +4,7 @@
 
 ### Documentation
 
-- **Using the SDK alongside `firebase_messaging` on Android** — FCM delivers each message to one service, and `firebase_messaging`'s service wins by default, so Klaviyo pushes never displayed in apps that also use it. The README now has a "Using with firebase_messaging (or another FCM library)" section: declare `KlaviyoFlutterPushService` in your app manifest with `android:priority="1"` on its `MESSAGING_EVENT` intent filter. It also removes advice to subclass `KlaviyoFlutterPushService`, which isn't an open class. The example app's manifest now includes the declaration.
+- **Using the SDK alongside `firebase_messaging` on Android** — FCM delivers each message to one service, and `firebase_messaging`'s service wins by default, so Klaviyo pushes never displayed in apps that also use it. The README now has a "Using with firebase_messaging (or another FCM library)" section: declare `KlaviyoFlutterPushService` in your app manifest with `android:priority="1"` on its `MESSAGING_EVENT` intent filter. The example app's manifest now includes the declaration.
 
 ## 0.5.0
 
