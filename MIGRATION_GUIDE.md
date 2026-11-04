@@ -6,6 +6,41 @@ This guide outlines how developers can migrate from older versions of the
 > Migrating from the community [`klaviyo_flutter`](https://pub.dev/packages/klaviyo_flutter)
 > package to the official SDK? See [MIGRATION.md](./MIGRATION.md) instead.
 
+## Migrating to v0.6.0
+
+### Background silent pushes moved to `onBackgroundSilentPush`
+
+`silent_push_received` on `onPushNotification` now fires only while the app is in the foreground.
+Silent pushes that arrive in the background, or while the app isn't running, go to a handler you
+register with the experimental `KlaviyoSDK.onBackgroundSilentPush`. Each push goes to one or the
+other, never both. Without a handler, background silent pushes are dropped.
+
+1. Move background work into a top-level function annotated with `@pragma('vm:entry-point')` and
+   register it in `main()` before `runApp`:
+
+   ```dart
+   @pragma('vm:entry-point')
+   Future<void> onKlaviyoSilentPush(Map<String, dynamic> data) async {
+     // Background work. No UI.
+   }
+
+   void main() async {
+     WidgetsFlutterBinding.ensureInitialized();
+     await KlaviyoSDK.onBackgroundSilentPush(onKlaviyoSilentPush);
+     runApp(const MyApp());
+   }
+   ```
+
+2. **iOS**: in `AppDelegate.swift`, replace `handleSilentPush(userInfo:)` and your own
+   `completionHandler(.newData)` call with
+   `handleSilentPush(userInfo:fetchCompletionHandler:)`, passing the system completion handler. The
+   plugin calls it once your Dart handler finishes. See [iOS Setup](README.md#ios-setup).
+   `handleSilentPush(userInfo:)` still compiles but is deprecated.
+
+3. **Android**: if you used `firebase_messaging`'s `onBackgroundMessage` only to catch Klaviyo
+   silent pushes while the app was killed, you can remove it. If you keep it, skip Klaviyo pushes
+   there (they carry `_k`), since both handlers run for the same push.
+
 ## Migrating to v0.3.0
 
 ### Android's `automatic_push_token_forwarding` flag is now three-valued

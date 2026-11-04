@@ -10,6 +10,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 
 import 'firebase_background_handler.dart';
+import 'klaviyo_background_handler.dart';
 import 'tabs/profile_tab.dart';
 import 'tabs/events_tab.dart';
 import 'tabs/forms_tab.dart';
@@ -35,6 +36,12 @@ void main() async {
     );
   });
 
+  try {
+    await KlaviyoSDK.onBackgroundSilentPush(klaviyoBackgroundSilentPushHandler);
+  } catch (e) {
+    _logger.warning('Failed to register background silent push handler: $e');
+  }
+
   // Initialize Firebase for FCM (Android only)
   if (Platform.isAndroid) {
     try {
@@ -51,8 +58,8 @@ void main() async {
 /// Set up Firebase Cloud Messaging for Android
 Future<void> _setupFCM() async {
   try {
-    // Silent pushes delivered while the app is terminated never reach the plugin's
-    // event stream — this handles them. See firebase_background_handler.dart.
+    // Runs alongside the Klaviyo background handler to cover a second
+    // background engine. See firebase_background_handler.dart.
     FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
 
     // Note: Permission is requested from the Push tab via permission_handler when
@@ -125,7 +132,8 @@ void setupPushActionListener() {
   });
 }
 
-/// Set up listener for silent push notifications.
+/// Set up listener for silent push notifications received in the foreground.
+/// Background silent pushes go to klaviyoBackgroundSilentPushHandler instead.
 /// Called from ProfileTab after SDK initialization.
 void setupSilentPushListener() {
   final klaviyo = KlaviyoSDK();
