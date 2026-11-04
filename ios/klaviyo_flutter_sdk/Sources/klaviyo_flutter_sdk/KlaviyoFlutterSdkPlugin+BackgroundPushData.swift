@@ -52,9 +52,12 @@ final class BackgroundPushDataDelivery {
 // MARK: - Background Push Data
 
 extension KlaviyoFlutterSdkPlugin {
-    /// Delivers a silent push to Dart, routed by app state. Call it from the Host App's AppDelegate
-    /// in `didReceiveRemoteNotification:fetchCompletionHandler:` and pass the system completion
-    /// handler.
+    /// Delivers push data to Dart, routed by app state. Call it from the Host App's AppDelegate in
+    /// `didReceiveRemoteNotification:fetchCompletionHandler:` for every push, and pass the system
+    /// completion handler.
+    ///
+    /// Push data is a push with no `aps.alert` (silent), or any push with `key_value_pairs`. For any
+    /// other push, `completionHandler(.noData)` is called and nothing reaches Dart.
     ///
     /// - Foreground or inactive: emitted on `KlaviyoSDK.onPushData`, and on `onPushNotification` as
     ///   `silent_push_received`; `completionHandler` is called right away.
@@ -72,6 +75,11 @@ extension KlaviyoFlutterSdkPlugin {
             DispatchQueue.main.async {
                 self.handleSilentPush(userInfo: userInfo, fetchCompletionHandler: completionHandler)
             }
+            return
+        }
+
+        guard Self.isPushData(userInfo) else {
+            completionHandler(.noData)
             return
         }
 
@@ -106,6 +114,12 @@ extension KlaviyoFlutterSdkPlugin {
             pendingBackgroundPushData?.finish(.noData)
             pendingBackgroundPushData = delivery
         }
+    }
+
+    /// True for a push with no `aps.alert`, or any push carrying `key_value_pairs`.
+    static func isPushData(_ userInfo: [AnyHashable: Any]) -> Bool {
+        let aps = userInfo["aps"] as? [String: Any]
+        return aps?["alert"] == nil || userInfo["key_value_pairs"] != nil
     }
 
     /// Marks the Dart background handler as registered and delivers a held push, if any.

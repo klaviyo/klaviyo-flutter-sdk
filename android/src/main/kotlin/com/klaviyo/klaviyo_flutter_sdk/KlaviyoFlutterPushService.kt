@@ -14,9 +14,10 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * FCM service that forwards Klaviyo silent pushes (data-only messages, with or
- * without `key_value_pairs`) to Dart, routed by app state like the iOS
- * `handleSilentPush(userInfo:fetchCompletionHandler:)` path:
+ * FCM service that forwards Klaviyo push data to Dart: every silent push (no
+ * title/body) and every visible push that carries `key_value_pairs`. Routed by
+ * app state like the iOS `handleSilentPush(userInfo:fetchCompletionHandler:)`
+ * path:
  *
  * - Foreground: emitted on the Flutter `EventChannel` as
  *   `{type: 'silent_push_received', data: <RemoteMessage.data>}`, which backs
@@ -37,7 +38,12 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
-        if (message.isKlaviyoMessage && !message.isKlaviyoNotification) {
+        if (isPushData(
+                isKlaviyoMessage = message.isKlaviyoMessage,
+                isKlaviyoNotification = message.isKlaviyoNotification,
+                hasKeyValuePairs = message.keyValuePairs != null,
+            )
+        ) {
             forwardPushData(message)
         }
     }
@@ -96,8 +102,18 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
             state.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
     }
 
-    private companion object {
-        const val BACKGROUND_HANDLER_TIMEOUT_SECONDS = 19L
+    internal companion object {
+        private const val BACKGROUND_HANDLER_TIMEOUT_SECONDS = 19L
+
+        /**
+         * True for a Klaviyo push that is silent (no title/body), or visible with
+         * key/value pairs.
+         */
+        internal fun isPushData(
+            isKlaviyoMessage: Boolean,
+            isKlaviyoNotification: Boolean,
+            hasKeyValuePairs: Boolean,
+        ): Boolean = isKlaviyoMessage && (!isKlaviyoNotification || hasKeyValuePairs)
     }
 
     /**
