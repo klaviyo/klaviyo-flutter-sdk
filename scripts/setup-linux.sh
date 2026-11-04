@@ -28,7 +28,7 @@ JDK_SHA256="8b9b611d917e3dfd8419d3566b5949226f69b052fed7e109c1368add1dfe8711"
 
 ANDROID_CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip"
 ANDROID_CMDLINE_TOOLS_SHA256="7ec965280a073311c339e571cd5de778b9975026cfcbe79f2b1cdcb1e15317ee"
-# The ndkVersion Flutter's Gradle plugin requests for FLUTTER_VERSION.
+# Mirrors flutter.ndkVersion from the Flutter Gradle plugin.
 ANDROID_NDK_VERSION="28.2.13676358"
 ANDROID_PACKAGES=("platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;$ANDROID_NDK_VERSION")
 
