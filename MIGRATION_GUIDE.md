@@ -35,7 +35,9 @@ other, never both. Without a handler, background silent pushes are dropped.
    `completionHandler(.newData)` call with
    `handleSilentPush(userInfo:fetchCompletionHandler:)`, passing the system completion handler, for
    pure silent pushes (no `alert`). The plugin calls it once your Dart handler finishes. Keep
-   calling the completion handler yourself for every other push. See
+   calling the completion handler yourself for every other push. If another provider also sends
+   silent pushes, handle its payloads before the Klaviyo call, because the plugin doesn't check
+   where a push came from and takes over the completion handler. See
    [iOS Setup](README.md#ios-setup).
    `handleSilentPush(userInfo:)` still compiles but is deprecated.
 
