@@ -13,7 +13,7 @@ import io.flutter.view.FlutterCallbackInformation
 import kotlin.concurrent.Volatile
 
 /**
- * Runs the Dart background silent push handler in a headless [FlutterEngine] when the process has
+ * Runs the Dart background push data handler in a headless [FlutterEngine] when the process has
  * no engine of its own, e.g. after FCM starts a killed app to deliver a push.
  *
  * The engine starts on the first [dispatch] and stays alive for the life of the process. Pushes
@@ -23,10 +23,10 @@ import kotlin.concurrent.Volatile
  * Follows the approach of firebase_messaging's `FlutterFirebaseMessagingBackgroundExecutor`
  * (BSD-3-Clause, Copyright 2020 The Chromium Authors).
  */
-internal object BackgroundSilentPushExecutor {
+internal object BackgroundPushDataExecutor {
     private const val CHANNEL_NAME = "klaviyo_sdk_background"
     private const val METHOD_INITIALIZED = "backgroundDispatcherInitialized"
-    private const val METHOD_HANDLE = "handleBackgroundSilentPush"
+    private const val METHOD_HANDLE = "handleBackgroundPushData"
 
     private class PendingPush(
         val data: Map<String, Any?>,
@@ -73,9 +73,9 @@ internal object BackgroundSilentPushExecutor {
     }
 
     private fun startEngine(context: Context) {
-        val dispatcherHandle = BackgroundSilentPushStore.dispatcherHandle(context)
+        val dispatcherHandle = BackgroundPushDataStore.dispatcherHandle(context)
         if (dispatcherHandle == 0L) {
-            Registry.log.warning("No background silent push dispatcher registered")
+            Registry.log.warning("No background push data dispatcher registered")
             failPending()
             return
         }
@@ -85,7 +85,7 @@ internal object BackgroundSilentPushExecutor {
         loader.startInitialization(context)
         loader.ensureInitializationCompleteAsync(context, null, mainHandler) {
             isStarting = false
-            Registry.log.info("Starting headless FlutterEngine for background silent push")
+            Registry.log.info("Starting headless FlutterEngine for background push data")
             val newEngine =
                 try {
                     isCreatingEngine = true
@@ -96,7 +96,7 @@ internal object BackgroundSilentPushExecutor {
 
             val callbackInfo = FlutterCallbackInformation.lookupCallbackInformation(dispatcherHandle)
             if (callbackInfo == null) {
-                Registry.log.error("Background silent push dispatcher not found for stored handle")
+                Registry.log.error("Background push data dispatcher not found for stored handle")
                 newEngine.destroy()
                 failPending()
                 return@ensureInitializationCompleteAsync
@@ -141,8 +141,8 @@ internal object BackgroundSilentPushExecutor {
         val arguments =
             buildMap<String, Any?> {
                 put("data", push.data)
-                put("handlerHandle", BackgroundSilentPushStore.handlerHandle(context))
-                BackgroundSilentPushStore.apiKey(context)?.let { put("apiKey", it) }
+                put("handlerHandle", BackgroundPushDataStore.handlerHandle(context))
+                BackgroundPushDataStore.apiKey(context)?.let { put("apiKey", it) }
             }
         activeChannel.invokeMethod(METHOD_HANDLE, arguments, CompletionResult(push.onComplete))
     }
@@ -165,12 +165,12 @@ internal class CompletionResult(
         errorMessage: String?,
         errorDetails: Any?,
     ) {
-        Registry.log.warning("Background silent push handler failed: $errorCode $errorMessage")
+        Registry.log.warning("Background push data handler failed: $errorCode $errorMessage")
         onComplete()
     }
 
     override fun notImplemented() {
-        Registry.log.warning("Background silent push handler is not listening")
+        Registry.log.warning("Background push data handler is not listening")
         onComplete()
     }
 }

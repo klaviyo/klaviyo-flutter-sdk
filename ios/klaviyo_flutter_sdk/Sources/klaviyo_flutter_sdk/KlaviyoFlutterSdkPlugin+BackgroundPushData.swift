@@ -2,9 +2,9 @@ import Flutter
 import os
 import UIKit
 
-/// A background silent push waiting for the Dart handler, with the system completion handler
+/// A background push waiting for the Dart handler, with the system completion handler
 /// that must be called exactly once.
-final class BackgroundSilentPushDelivery {
+final class BackgroundPushDataDelivery {
     let userInfo: [AnyHashable: Any]
     private var completionHandler: ((UIBackgroundFetchResult) -> Void)?
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
@@ -24,14 +24,14 @@ final class BackgroundSilentPushDelivery {
     /// Starts a background task and schedules `finish(.failed)` after `timeout` seconds.
     func start() {
         backgroundTask = UIApplication.shared.beginBackgroundTask(
-            withName: "KlaviyoSilentPush"
+            withName: "KlaviyoPushData"
         ) { [weak self] in
             self?.finish(.failed)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.timeout) { [weak self] in
             guard let self, !self.isFinished else { return }
             if #available(iOS 14.0, *) {
-                Logger.klaviyoFlutterSDK.warning("Background silent push handler timed out")
+                Logger.klaviyoFlutterSDK.warning("Background push data handler timed out")
             }
             self.finish(.failed)
         }
@@ -49,16 +49,17 @@ final class BackgroundSilentPushDelivery {
     }
 }
 
-// MARK: - Background Silent Push
+// MARK: - Background Push Data
 
 extension KlaviyoFlutterSdkPlugin {
-    /// Routes a silent push by app state. Call it from the Host App's AppDelegate in
-    /// `didReceiveRemoteNotification:fetchCompletionHandler:` and pass the system completion handler.
+    /// Delivers a silent push to Dart, routed by app state. Call it from the Host App's AppDelegate
+    /// in `didReceiveRemoteNotification:fetchCompletionHandler:` and pass the system completion
+    /// handler.
     ///
-    /// - Foreground or inactive: emitted on the `onPushNotification` stream as
+    /// - Foreground or inactive: emitted on `KlaviyoSDK.onPushData`, and on `onPushNotification` as
     ///   `silent_push_received`; `completionHandler` is called right away.
     /// - Background, including a relaunch from killed: passed to the Dart handler registered with
-    ///   `KlaviyoSDK.onBackgroundSilentPush`. `completionHandler` is called when the handler finishes,
+    ///   `KlaviyoSDK.onBackgroundPushData`. `completionHandler` is called when the handler finishes,
     ///   or after 25 seconds. If Dart isn't running yet, the most recent push waits in memory for
     ///   registration until that timeout. If Dart is running with no handler, the push is dropped.
     ///
@@ -75,16 +76,16 @@ extension KlaviyoFlutterSdkPlugin {
         }
 
         if UIApplication.shared.applicationState != .background {
-            emitSilentPushToStream(userInfo: userInfo)
+            emitPushDataToStream(userInfo: userInfo)
             completionHandler(.newData)
             return
         }
 
         if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("Silent push received in background")
+            Logger.klaviyoFlutterSDK.info("Push data received in background")
         }
 
-        let delivery = BackgroundSilentPushDelivery(userInfo: userInfo, completionHandler: completionHandler)
+        let delivery = BackgroundPushDataDelivery(userInfo: userInfo, completionHandler: completionHandler)
         delivery.start()
 
         if isBackgroundHandlerRegistered {
@@ -92,45 +93,45 @@ extension KlaviyoFlutterSdkPlugin {
         } else if hasStreamListener {
             if #available(iOS 14.0, *) {
                 Logger.klaviyoFlutterSDK.notice(
-                    "No background silent push handler registered. Dropping silent push."
+                    "No background push data handler registered. Dropping push data."
                 )
             }
             delivery.finish(.noData)
         } else {
             if #available(iOS 14.0, *) {
                 Logger.klaviyoFlutterSDK.notice(
-                    "Background silent push handler not registered yet. Holding silent push."
+                    "Background push data handler not registered yet. Holding push data."
                 )
             }
-            pendingBackgroundSilentPush?.finish(.noData)
-            pendingBackgroundSilentPush = delivery
+            pendingBackgroundPushData?.finish(.noData)
+            pendingBackgroundPushData = delivery
         }
     }
 
     /// Marks the Dart background handler as registered and delivers a held push, if any.
-    func registerBackgroundSilentPushHandler() {
+    func registerBackgroundPushDataHandler() {
         isBackgroundHandlerRegistered = true
-        if let pending = pendingBackgroundSilentPush {
-            pendingBackgroundSilentPush = nil
+        if let pending = pendingBackgroundPushData {
+            pendingBackgroundPushData = nil
             if !pending.isFinished {
                 invokeBackgroundHandler(pending)
             }
         }
     }
 
-    private func invokeBackgroundHandler(_ delivery: BackgroundSilentPushDelivery) {
+    private func invokeBackgroundHandler(_ delivery: BackgroundPushDataDelivery) {
         guard let backgroundChannel else {
             delivery.finish(.failed)
             return
         }
         backgroundChannel.invokeMethod(
-            "handleBackgroundSilentPush",
+            "handleBackgroundPushData",
             arguments: ["data": delivery.userInfo]
         ) { result in
             if let error = result as? FlutterError {
                 if #available(iOS 14.0, *) {
                     Logger.klaviyoFlutterSDK.error(
-                        "Background silent push handler failed: \(error.code, privacy: .public)"
+                        "Background push data handler failed: \(error.code, privacy: .public)"
                     )
                 }
                 delivery.finish(.failed)

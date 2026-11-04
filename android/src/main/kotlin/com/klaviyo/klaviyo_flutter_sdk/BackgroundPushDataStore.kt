@@ -4,12 +4,12 @@ import android.content.Context
 import android.content.SharedPreferences
 
 /**
- * Persists what a process with no Flutter engine needs to run the Dart background silent push
- * handler: the raw callback handles registered by `KlaviyoSDK.onBackgroundSilentPush` and the last
+ * Persists what a process with no Flutter engine needs to run the Dart background push data
+ * handler: the raw callback handles registered by `KlaviyoSDK.onBackgroundPushData` and the last
  * API key passed to `KlaviyoSDK.initialize`.
  */
-internal object BackgroundSilentPushStore {
-    private const val PREFS_NAME = "com.klaviyo.klaviyo_flutter_sdk.background_silent_push"
+internal object BackgroundPushDataStore {
+    private const val PREFS_NAME = "com.klaviyo.klaviyo_flutter_sdk.background_push_data"
     private const val KEY_DISPATCHER_HANDLE = "dispatcher_handle"
     private const val KEY_HANDLER_HANDLE = "handler_handle"
     private const val KEY_API_KEY = "api_key"

@@ -12,7 +12,8 @@ import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
 import 'models/klaviyo_push_action.dart';
 import 'enums/klaviyo_log_level.dart';
-import 'services/background_silent_push.dart';
+import 'models/klaviyo_push_data.dart';
+import 'services/background_push_data.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
 
@@ -616,14 +617,14 @@ class KlaviyoSDK {
     }
   }
 
-  /// Registers [handler] to receive Klaviyo silent pushes that arrive while
-  /// the app is in the background or not running.
+  /// Registers [handler] to receive Klaviyo push data that arrives while the
+  /// app is in the background or not running.
   ///
-  /// Each silent push goes to exactly one place, chosen natively from the app
-  /// state when it arrives: while the app is in the foreground it is emitted on
-  /// [onPushNotification] as a `silent_push_received` event; otherwise it is
-  /// passed to [handler]. With no handler registered, background silent pushes
-  /// are dropped.
+  /// Push data is delivered for every silent push, and for every visible push
+  /// that carries key/value pairs. Each push goes to exactly one place, chosen
+  /// natively from the app state when it arrives: while the app is in the
+  /// foreground it is emitted on [onPushData]; otherwise it is passed to
+  /// [handler]. With no handler registered, background push data is dropped.
   ///
   /// [handler] must be a top-level or static function annotated with
   /// `@pragma('vm:entry-point')`. On Android it can run in a separate isolate
@@ -639,21 +640,39 @@ class KlaviyoSDK {
   /// Throws an [ArgumentError] if [handler] is not a top-level or static
   /// function, and a [KlaviyoException] if the native registration fails.
   @experimental
-  static Future<void> onBackgroundSilentPush(
-    KlaviyoBackgroundSilentPushHandler handler,
+  static Future<void> onBackgroundPushData(
+    KlaviyoBackgroundPushDataHandler handler,
   ) async {
-    final handles = attachBackgroundSilentPushHandler(handler);
-    await KlaviyoNativeWrapper().registerBackgroundSilentPushHandler(
+    final handles = attachBackgroundPushDataHandler(handler);
+    await KlaviyoNativeWrapper().registerBackgroundPushDataHandler(
       dispatcherHandle: handles['dispatcherHandle']!,
       handlerHandle: handles['handlerHandle']!,
     );
   }
 
+  /// Klaviyo push data received while the app is in the foreground.
+  ///
+  /// Emits for every silent push, and for every visible push that carries
+  /// key/value pairs. Push data that arrives in the background or while the
+  /// app is not running goes to the handler registered with
+  /// [onBackgroundPushData] instead.
+  ///
+  /// The same pushes are also emitted on [onPushNotification] as raw
+  /// `silent_push_received` maps.
+  @experimental
+  Stream<KlaviyoPushData> get onPushData => _nativeWrapper.onPushNotification
+          .where((event) => event['type'] == 'silent_push_received')
+          .map((event) {
+        final data = event['data'];
+        return KlaviyoPushData(
+          data is Map<String, dynamic> ? data : <String, dynamic>{},
+        );
+      });
+
   /// Get push notification events stream
   ///
-  /// `silent_push_received` events fire only while the app is in the
-  /// foreground. Use [onBackgroundSilentPush] for silent pushes that arrive in
-  /// the background or while the app is not running.
+  /// `silent_push_received` events carry the same pushes as [onPushData] and
+  /// fire only while the app is in the foreground.
   Stream<Map<String, dynamic>> get onPushNotification =>
       _nativeWrapper.onPushNotification;
 

@@ -19,12 +19,13 @@ import java.util.concurrent.TimeUnit
  * `handleSilentPush(userInfo:fetchCompletionHandler:)` path:
  *
  * - Foreground: emitted on the Flutter `EventChannel` as
- *   `{type: 'silent_push_received', data: <RemoteMessage.data>}`.
+ *   `{type: 'silent_push_received', data: <RemoteMessage.data>}`, which backs
+ *   `KlaviyoSDK.onPushData`.
  * - Background with a live engine: passed to the Dart handler registered with
- *   `KlaviyoSDK.onBackgroundSilentPush` on that engine.
+ *   `KlaviyoSDK.onBackgroundPushData` on that engine.
  * - Otherwise (no engine, e.g. app killed, or an engine that never registered
  *   the handler): passed to the stored handler in a headless engine started by
- *   [BackgroundSilentPushExecutor].
+ *   [BackgroundPushDataExecutor].
  *
  * Background paths block this FCM worker thread until the handler finishes, for
  * at most [BACKGROUND_HANDLER_TIMEOUT_SECONDS].
@@ -36,15 +37,12 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
-        // A Klaviyo push is "silent" when it carries the tracking parameter (_k)
-        // but has no title/body — i.e. isKlaviyoMessage && !isKlaviyoNotification.
-        // This covers silent pushes both with and without `key_value_pairs`.
         if (message.isKlaviyoMessage && !message.isKlaviyoNotification) {
-            forwardSilentPush(message)
+            forwardPushData(message)
         }
     }
 
-    private fun forwardSilentPush(message: RemoteMessage) {
+    private fun forwardPushData(message: RemoteMessage) {
         // RemoteMessage.data is Map<String, String>, so JSON object values arrive as raw
         // strings. Decode them so Dart sees the maps iOS gets free from the APNs payload.
         val data =
@@ -59,24 +57,24 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
         val plugin = KlaviyoFlutterSdkPlugin.instance
         when {
             plugin != null && isAppInForeground() -> {
-                Registry.log.info("Silent push received in foreground: forwarding to Flutter event stream.")
+                Registry.log.info("Push data received in foreground: forwarding to Flutter event stream.")
                 plugin.handleSilentPush(data)
             }
 
             plugin != null && plugin.hasBackgroundHandler -> {
-                Registry.log.info("Silent push received in background: forwarding to Dart handler.")
-                awaitBackgroundHandler { onComplete -> plugin.dispatchBackgroundSilentPush(data, onComplete) }
+                Registry.log.info("Push data received in background: forwarding to Dart handler.")
+                awaitBackgroundHandler { onComplete -> plugin.dispatchBackgroundPushData(data, onComplete) }
             }
 
-            BackgroundSilentPushStore.hasHandler(this) -> {
-                Registry.log.info("Silent push received with no engine running the handler: using headless engine.")
+            BackgroundPushDataStore.hasHandler(this) -> {
+                Registry.log.info("Push data received with no engine running the handler: using headless engine.")
                 awaitBackgroundHandler { onComplete ->
-                    BackgroundSilentPushExecutor.dispatch(this, data, onComplete)
+                    BackgroundPushDataExecutor.dispatch(this, data, onComplete)
                 }
             }
 
             else -> {
-                Registry.log.info("No background silent push handler registered; dropping silent push.")
+                Registry.log.info("No background push data handler registered; dropping push data.")
             }
         }
     }
@@ -86,7 +84,7 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
         dispatch { latch.countDown() }
         if (!latch.await(BACKGROUND_HANDLER_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             Registry.log.warning(
-                "Background silent push handler did not finish within $BACKGROUND_HANDLER_TIMEOUT_SECONDS seconds",
+                "Background push data handler did not finish within $BACKGROUND_HANDLER_TIMEOUT_SECONDS seconds",
             )
         }
     }

@@ -37,10 +37,10 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedSilentPush: [String: Any]?
     private var cachedPushAction: [String: Any]?
 
-    // Background silent push state, used by KlaviyoFlutterSdkPlugin+BackgroundSilentPush.swift.
+    // Background push data state, used by KlaviyoFlutterSdkPlugin+BackgroundPushData.swift.
     var backgroundChannel: FlutterMethodChannel?
     var isBackgroundHandlerRegistered = false
-    var pendingBackgroundSilentPush: BackgroundSilentPushDelivery?
+    var pendingBackgroundPushData: BackgroundPushDataDelivery?
 
     var hasStreamListener: Bool { eventSink != nil }
 
@@ -58,7 +58,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
         eventChannel.setStreamHandler(instance)
 
-        // 3. Setup Background Channel (For running the Dart background silent push handler)
+        // 3. Setup Background Channel (For running the Dart background push data handler)
         instance.backgroundChannel = FlutterMethodChannel(
             name: "klaviyo_sdk_background",
             binaryMessenger: registrar.messenger()
@@ -377,8 +377,8 @@ extension KlaviyoFlutterSdkPlugin {
             KlaviyoSDK().setBadgeCount(count)
             result(nil)
 
-        case "registerBackgroundSilentPushHandler":
-            registerBackgroundSilentPushHandler()
+        case "registerBackgroundPushDataHandler":
+            registerBackgroundPushDataHandler()
             result(nil)
 
         case "handleUniversalTrackingLink":
@@ -640,7 +640,7 @@ extension KlaviyoFlutterSdkPlugin {
         }
     }
 
-    /// Routes a silent push by app state, like `handleSilentPush(userInfo:fetchCompletionHandler:)`,
+    /// Routes push data by app state, like `handleSilentPush(userInfo:fetchCompletionHandler:)`,
     /// but cannot delay the system completion handler, so iOS may suspend the app before the
     /// Dart background handler finishes.
     @available(*, deprecated, message: "Use handleSilentPush(userInfo:fetchCompletionHandler:)")
@@ -648,9 +648,9 @@ extension KlaviyoFlutterSdkPlugin {
         handleSilentPush(userInfo: userInfo, fetchCompletionHandler: { _ in })
     }
 
-    func emitSilentPushToStream(userInfo: [AnyHashable: Any]) {
+    func emitPushDataToStream(userInfo: [AnyHashable: Any]) {
         if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("Silent push received")
+            Logger.klaviyoFlutterSDK.info("Push data received")
         }
 
         // Prepare payload
@@ -664,7 +664,7 @@ extension KlaviyoFlutterSdkPlugin {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
-                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching silent push event.")
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push data event.")
             }
             cachedSilentPush = eventPayload
         }

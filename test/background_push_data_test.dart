@@ -4,26 +4,26 @@ import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
-import 'package:klaviyo_flutter_sdk/src/services/background_silent_push.dart';
+import 'package:klaviyo_flutter_sdk/src/services/background_push_data.dart';
 
-final List<Map<String, dynamic>> _received = [];
+final List<KlaviyoPushData> _received = [];
 Completer<void>? _gate;
 
 @pragma('vm:entry-point')
-Future<void> _recordingHandler(Map<String, dynamic> data) async {
+Future<void> _recordingHandler(KlaviyoPushData data) async {
   _received.add(data);
   await _gate?.future;
 }
 
 @pragma('vm:entry-point')
-Future<void> _throwingHandler(Map<String, dynamic> data) async {
+Future<void> _throwingHandler(KlaviyoPushData data) async {
   throw StateError('boom');
 }
 
 class _Handlers {
   @pragma('vm:entry-point')
-  static Future<void> staticHandler(Map<String, dynamic> data) async {
-    _received.add({'static': true, ...data});
+  static Future<void> staticHandler(KlaviyoPushData data) async {
+    _received.add(data);
   }
 }
 
@@ -63,17 +63,17 @@ void main() {
   });
 
   tearDown(() {
-    resetBackgroundSilentPushHandler();
+    resetBackgroundPushDataHandler();
     messenger.setMockMethodCallHandler(methodChannel, null);
     messenger.setMockStreamHandler(eventChannel, null);
   });
 
-  group('KlaviyoSDK.onBackgroundSilentPush registration', () {
+  group('KlaviyoSDK.onBackgroundPushData registration', () {
     test('sends both callback handles to native', () async {
-      await KlaviyoSDK.onBackgroundSilentPush(_recordingHandler);
+      await KlaviyoSDK.onBackgroundPushData(_recordingHandler);
 
       final call = log.singleWhere(
-        (c) => c.method == 'registerBackgroundSilentPushHandler',
+        (c) => c.method == 'registerBackgroundPushDataHandler',
       );
       final args = call.arguments as Map;
       expect(
@@ -83,25 +83,25 @@ void main() {
       expect(
         args['dispatcherHandle'],
         PluginUtilities.getCallbackHandle(
-          klaviyoBackgroundSilentPushDispatcher,
+          klaviyoBackgroundPushDataDispatcher,
         )!
             .toRawHandle(),
       );
     });
 
     test('accepts a static method', () async {
-      await KlaviyoSDK.onBackgroundSilentPush(_Handlers.staticHandler);
+      await KlaviyoSDK.onBackgroundPushData(_Handlers.staticHandler);
       expect(
-        log.where((c) => c.method == 'registerBackgroundSilentPushHandler'),
+        log.where((c) => c.method == 'registerBackgroundPushDataHandler'),
         hasLength(1),
       );
     });
 
     test('rejects a closure without calling native', () async {
-      Future<void> closure(Map<String, dynamic> data) async {}
+      Future<void> closure(KlaviyoPushData data) async {}
 
       await expectLater(
-        KlaviyoSDK.onBackgroundSilentPush(closure),
+        KlaviyoSDK.onBackgroundPushData(closure),
         throwsArgumentError,
       );
       expect(log, isEmpty);
@@ -109,8 +109,8 @@ void main() {
 
     test('does not require initialize()', () async {
       expect(KlaviyoSDK().isInitialized, isFalse);
-      await KlaviyoSDK.onBackgroundSilentPush(_recordingHandler);
-      expect(log.map((c) => c.method), ['registerBackgroundSilentPushHandler']);
+      await KlaviyoSDK.onBackgroundPushData(_recordingHandler);
+      expect(log.map((c) => c.method), ['registerBackgroundPushDataHandler']);
     });
 
     test('wraps a native failure in KlaviyoException', () async {
@@ -119,7 +119,7 @@ void main() {
       });
 
       await expectLater(
-        KlaviyoSDK.onBackgroundSilentPush(_recordingHandler),
+        KlaviyoSDK.onBackgroundPushData(_recordingHandler),
         throwsA(isA<KlaviyoException>()),
       );
     });
@@ -127,10 +127,10 @@ void main() {
 
   group('background channel dispatch', () {
     test('passes the payload to the registered handler', () async {
-      await KlaviyoSDK.onBackgroundSilentPush(_recordingHandler);
+      await KlaviyoSDK.onBackgroundPushData(_recordingHandler);
 
       final result = await invokeFromNative(
-        const MethodCall('handleBackgroundSilentPush', {
+        const MethodCall('handleBackgroundPushData', {
           'data': {
             '_k': {'c': 'abc'},
             'key_value_pairs': {'foo': 'bar'},
@@ -144,20 +144,20 @@ void main() {
       expect(result, isNull);
       expect(_received, hasLength(1));
       final data = _received.single;
-      expect(data['_k'], {'c': 'abc'});
-      expect(data['key_value_pairs'], isA<Map<String, dynamic>>());
-      expect(data['list'], [
+      expect(data.payload['_k'], {'c': 'abc'});
+      expect(data.keyValuePairs, {'foo': 'bar'});
+      expect(data.payload['list'], [
         {'nested': 1},
       ]);
     });
 
     test('replies only after the handler future completes', () async {
-      await KlaviyoSDK.onBackgroundSilentPush(_recordingHandler);
+      await KlaviyoSDK.onBackgroundPushData(_recordingHandler);
       _gate = Completer<void>();
 
       var replied = false;
       final reply = invokeFromNative(
-        const MethodCall('handleBackgroundSilentPush', {'data': {}}),
+        const MethodCall('handleBackgroundPushData', {'data': {}}),
       ).then((_) => replied = true);
 
       await Future<void>.delayed(Duration.zero);
@@ -177,15 +177,13 @@ void main() {
           PluginUtilities.getCallbackHandle(_recordingHandler)!.toRawHandle();
 
       await invokeFromNative(
-        MethodCall('handleBackgroundSilentPush', {
+        MethodCall('handleBackgroundPushData', {
           'data': {'a': '1'},
           'handlerHandle': rawHandle,
         }),
       );
 
-      expect(_received, [
-        {'a': '1'},
-      ]);
+      expect(_received.single.payload, {'a': '1'});
     });
 
     test('reports NO_HANDLER when nothing can be resolved', () async {
@@ -194,7 +192,7 @@ void main() {
 
       await expectLater(
         invokeFromNative(
-          const MethodCall('handleBackgroundSilentPush', {'data': {}}),
+          const MethodCall('handleBackgroundPushData', {'data': {}}),
         ),
         throwsA(
           isA<PlatformException>().having((e) => e.code, 'code', 'NO_HANDLER'),
@@ -203,11 +201,11 @@ void main() {
     });
 
     test('reports HANDLER_ERROR when the handler throws', () async {
-      await KlaviyoSDK.onBackgroundSilentPush(_throwingHandler);
+      await KlaviyoSDK.onBackgroundPushData(_throwingHandler);
 
       await expectLater(
         invokeFromNative(
-          const MethodCall('handleBackgroundSilentPush', {'data': {}}),
+          const MethodCall('handleBackgroundPushData', {'data': {}}),
         ),
         throwsA(
           isA<PlatformException>()
@@ -218,11 +216,11 @@ void main() {
 
     test('initializes the SDK with apiKey before running the handler',
         () async {
-      await KlaviyoSDK.onBackgroundSilentPush(_recordingHandler);
+      await KlaviyoSDK.onBackgroundPushData(_recordingHandler);
       log.clear();
 
       await invokeFromNative(
-        const MethodCall('handleBackgroundSilentPush', {
+        const MethodCall('handleBackgroundPushData', {
           'data': {},
           'apiKey': 'ABC123',
         }),
@@ -239,7 +237,7 @@ void main() {
     });
 
     test('rejects unknown methods', () async {
-      await KlaviyoSDK.onBackgroundSilentPush(_recordingHandler);
+      await KlaviyoSDK.onBackgroundPushData(_recordingHandler);
 
       final codec = const StandardMethodCodec();
       final reply = await messenger.handlePlatformMessage(
@@ -252,13 +250,16 @@ void main() {
   });
 
   group('routing contract', () {
-    test('a background push never reaches onPushNotification', () async {
-      await KlaviyoSDK.onBackgroundSilentPush(_recordingHandler);
+    test('a background push never reaches onPushNotification or onPushData',
+        () async {
+      await KlaviyoSDK.onBackgroundPushData(_recordingHandler);
       final streamEvents = <Map<String, dynamic>>[];
+      final typedEvents = <KlaviyoPushData>[];
       final sub = KlaviyoSDK().onPushNotification.listen(streamEvents.add);
+      final typedSub = KlaviyoSDK().onPushData.listen(typedEvents.add);
 
       await invokeFromNative(
-        const MethodCall('handleBackgroundSilentPush', {
+        const MethodCall('handleBackgroundPushData', {
           'data': {'k': 'v'},
         }),
       );
@@ -266,7 +267,9 @@ void main() {
 
       expect(_received, hasLength(1));
       expect(streamEvents, isEmpty);
+      expect(typedEvents, isEmpty);
       await sub.cancel();
+      await typedSub.cancel();
     });
 
     test('the dispatcher announces itself on the background channel', () async {
@@ -277,7 +280,7 @@ void main() {
         return null;
       });
 
-      klaviyoBackgroundSilentPushDispatcher();
+      klaviyoBackgroundPushDataDispatcher();
       await Future<void>.delayed(Duration.zero);
 
       expect(calls.map((c) => c.method), ['backgroundDispatcherInitialized']);
