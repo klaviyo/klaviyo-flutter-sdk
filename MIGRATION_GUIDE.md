@@ -49,9 +49,9 @@ visible pushes with key/value pairs.
    with key/value pairs never reach Dart.
 
 3. **Android**: no setup change. If you used `firebase_messaging`'s `onBackgroundMessage` only to
-   catch Klaviyo silent pushes while the app was killed, you can remove it. If you keep it, skip
-   Klaviyo pushes that deliver push data there (they carry `_k` and either have no `title`/`body` or
-   carry `key_value_pairs`), since both handlers run for the same push.
+   catch Klaviyo silent pushes while the app was killed, you can remove it. If you keep it, see
+   [Push Data > Android](README.md#android) before skipping Klaviyo pushes there: that is only safe
+   once your merged manifest routes `MESSAGING_EVENT` to `KlaviyoFlutterPushService`.
 
 ## Migrating to v0.3.0
 
