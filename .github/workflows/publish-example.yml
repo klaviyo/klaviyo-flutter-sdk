@@ -276,6 +276,16 @@ jobs:
             | join(", ")
           ' <<<"$NEEDS")
           echo "failed=${failed}" >> "$GITHUB_OUTPUT"
+          # check_credentials skips both gates, so a failure there is a preflight.
+          credential_failed=$(jq -r '
+            {
+              "preflight-android": "Android",
+              "preflight-ios": "iOS"
+            } as $names
+            | [to_entries[] | select(.value.result == "failure") | ($names[.key] // .key)]
+            | join(" and ")
+          ' <<<"$NEEDS")
+          echo "credential_failed=${credential_failed}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout Slack action
         continue-on-error: true
@@ -293,8 +303,8 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts }}
           status: failure
-          title: Flutter Example App deploy blocked, ${{ steps.failed.outputs.failed }} failed
-          body: Fix the failing job, then re-run to deploy.
+          title: ${{ inputs.check_credentials == true && format('Flutter Example App credential check failed ({0} preflight)', steps.failed.outputs.credential_failed) || format('Flutter Example App deploy blocked, {0} failed', steps.failed.outputs.failed) }}
+          body: ${{ inputs.check_credentials == true && 'Fix the credential issue, then re-run the credential check.' || 'Fix the failing job, then re-run to deploy.' }}
           fields: |
             Source: ${{ github.event_name }}
             Commit: ${{ github.sha }}
