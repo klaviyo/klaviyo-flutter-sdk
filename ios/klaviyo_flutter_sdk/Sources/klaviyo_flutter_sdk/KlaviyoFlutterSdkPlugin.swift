@@ -15,10 +15,15 @@ import UserNotifications
 
 @available(iOS 14.0, *)
 extension Logger {
-    static let klaviyoFlutterSDK = Logger(
+    private static let enabledKlaviyoFlutterSDK = Logger(
         subsystem: "com.klaviyo.flutter",
         category: "KlaviyoFlutterSDK"
     )
+
+    /// The plugin's logger, or a disabled logger while `KlaviyoSDK().isLoggingEnabled` is false.
+    static var klaviyoFlutterSDK: Logger {
+        KlaviyoSDK().isLoggingEnabled ? enabledKlaviyoFlutterSDK : Logger(OSLog.disabled)
+    }
 }
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
