@@ -47,10 +47,15 @@ class AppDelegate: FlutterAppDelegate {
         let apsPayload = userInfo["aps"] as? [String: Any]
         let hasVisibleContent = apsPayload?["alert"] != nil
 
-        if !hasVisibleContent {
-            KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo: userInfo)
+        guard !hasVisibleContent else {
+            completionHandler(.noData)
+            return
         }
 
-        completionHandler(.newData)
+        // The plugin calls completionHandler once the Dart background handler finishes.
+        KlaviyoFlutterSdkPlugin.shared.handleSilentPush(
+            userInfo: userInfo,
+            fetchCompletionHandler: completionHandler
+        )
     }
 }
