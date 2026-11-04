@@ -632,18 +632,6 @@ Future<String> initialRoute() async {
 
 It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. On Android, the value belongs to the Flutter engine that captured the launch tap; if your app runs more than one engine, the others return `null`. Reset does not clear notification opens still queued on the native side. It clears pending push actions on Android but leaves them queued on iOS.
 
-#### Identifying Klaviyo Notifications
-
-Use the `isKlaviyoNotification` extension to check whether a push notification payload originated from Klaviyo:
-
-```dart
-void handlePushPayload(Map<String, dynamic> payload) {
-  if (payload.isKlaviyoNotification) {
-    // This is a Klaviyo notification
-  }
-}
-```
-
 ### Push Data
 
 Push data lets your Dart code run when a Klaviyo push arrives, before anyone taps it. It is delivered for:
@@ -1417,14 +1405,6 @@ Custom metrics:
 Applies to the SMS and WhatsApp channels.
 
 `marketing` | `transactional`
-
-### Extensions
-
-#### KlaviyoNotificationMap (on `Map<String, dynamic>`)
-
-| Property | Description |
-|----------|-------------|
-| `isKlaviyoNotification` | `bool` — whether the map is a Klaviyo push notification payload |
 
 ### Exceptions
 
