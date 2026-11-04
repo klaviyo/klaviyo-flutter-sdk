@@ -253,6 +253,53 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
         run: .github/scripts/check-secrets.sh ios
 
+  blocked:
+    name: Report a blocked deploy
+    needs: [gate-test, gate-lint, preflight-android, preflight-ios]
+    if: always() && contains(needs.*.result, 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Name the failed jobs
+        id: failed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          failed=$(jq -r '
+            {
+              "gate-test": "tests",
+              "gate-lint": "lint",
+              "preflight-android": "the Android preflight",
+              "preflight-ios": "the iOS preflight"
+            } as $names
+            | [to_entries[] | select(.value.result == "failure") | ($names[.key] // .key)]
+            | join(", ")
+          ' <<<"$NEEDS")
+          echo "failed=${failed}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Slack action
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Notify Slack that the deploy is blocked
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
+          status: failure
+          title: Flutter Example App deploy blocked, ${{ steps.failed.outputs.failed }} failed
+          body: Fix the failing job, then re-run to deploy.
+          fields: |
+            Source: ${{ github.event_name }}
+            Commit: ${{ github.sha }}
+            Requested by: ${{ github.actor }}
+
   deploy-android:
     name: Publish to Play internal track
     needs: [gate-test, gate-lint, preflight-android]

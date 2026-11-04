@@ -437,3 +437,20 @@ jobs:
           thread_ts: ${{ steps.slack_failure.outputs.ts }}
           status: failure
           title: Failed at ${{ steps.failed.outputs.step }}
+
+      - name: Notify Slack that the release stopped
+        if: cancelled() && steps.slack_pending.outputs.ts != ''
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ steps.slack_pending.outputs.ts }}
+          status: stopped
+          title: klaviyo_flutter_sdk ${{ inputs.version }} release stopped, run cancelled
+          body: The run was cancelled before it finished. If release.yml did not start, run it at the tag to retry.
+          fields: |
+            Version: ${{ inputs.version }}
+            Commit: ${{ needs.prepare.outputs.sha }}
+            Stage: Publish
+            Requested by: ${{ github.actor }}
+          links: Release|${{ needs.prepare.outputs.release_url }}
