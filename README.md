@@ -962,14 +962,6 @@ Platform notes:
 - **iOS**: The toggle does not affect `KlaviyoSwiftExtension` (used for rich push), which runs in a separate app-extension process.
 - **Android**: The native SDK uses log levels rather than a boolean toggle. Disabling sets the level to `None`; re-enabling restores the level that was in effect before it was disabled (or the SDK default if it was never enabled at runtime). For finer-grained control of native log verbosity, use the [`com.klaviyo.core.log_level` manifest tag](#android).
 
-To adjust the verbosity of the plugin's Dart-side logs (native logs are unaffected):
-
-```dart
-KlaviyoSDK().setLogLevel(KlaviyoLogLevel.debug);
-```
-
-While logging is disabled via `setLoggingEnabled(false)`, the level passed to `setLogLevel` is stored and takes effect once logging is re-enabled.
-
 ## API Reference
 
 ### KlaviyoSDK
@@ -1044,8 +1036,6 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 |--------|-------------|
 | `setLoggingEnabled(bool enabled)` | Enable/disable SDK logging (native + Dart), callable before `initialize()`; does not affect iOS `KlaviyoSwiftExtension` — see [SDK Logging](#sdk-logging) |
 | `isLoggingEnabled()` | Whether native SDK logging is enabled, returns `Future<bool>` |
-| `setLogLevel(KlaviyoLogLevel logLevel)` | Set logging level (Flutter-side only) |
-| `dispose()` | Clean up resources |
 
 #### Properties
 
@@ -1168,10 +1158,6 @@ class FormCtaClicked extends FormLifecycleEvent {
 ```
 
 ### Enums
-
-#### KlaviyoLogLevel
-
-`none` | `error` | `warning` | `info` | `debug` | `verbose`
 
 #### EventMetric
 

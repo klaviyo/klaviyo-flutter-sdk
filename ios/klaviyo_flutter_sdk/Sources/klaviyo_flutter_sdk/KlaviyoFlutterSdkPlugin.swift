@@ -222,13 +222,7 @@ extension KlaviyoFlutterSdkPlugin {
             result(nil)
 
         case "getPushToken":
-            let token = KlaviyoSDK().pushToken
-            if let token {
-                if #available(iOS 14.0, *) {
-                    Logger.klaviyoFlutterSDK.info("Retrieved push token from SDK: \(token, privacy: .public)")
-                }
-            }
-            result(token)
+            result(KlaviyoSDK().pushToken)
 
         case "registerForInAppForms":
             #if canImport(KlaviyoForms)
