@@ -118,8 +118,8 @@ extension KlaviyoFlutterSdkPlugin {
 
     /// True for a push with no `aps.alert`, or any push carrying `key_value_pairs`.
     static func isPushData(_ userInfo: [AnyHashable: Any]) -> Bool {
-        let aps = userInfo["aps"] as? [String: Any]
-        return aps?["alert"] == nil || userInfo["key_value_pairs"] != nil
+        let apsPayload = userInfo["aps"] as? [String: Any]
+        return apsPayload?["alert"] == nil || userInfo["key_value_pairs"] != nil
     }
 
     /// Marks the Dart background handler as registered and delivers a held push, if any.
