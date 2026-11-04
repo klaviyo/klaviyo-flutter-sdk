@@ -12,6 +12,9 @@ import 'package:logging/logging.dart';
 
 const _maxBufferedPushEvents = 50;
 
+@Deprecated(
+  'Use KlaviyoSDK instead. This class becomes internal in 1.0.',
+)
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
   static const EventChannel _eventChannel = EventChannel('klaviyo_events');
@@ -601,13 +604,12 @@ class KlaviyoNativeWrapper {
       final String eventType = eventData['type'] as String? ?? '';
 
       switch (eventType) {
-        case 'push_notification_received':
         case 'push_notification_opened':
         case 'silent_push_received':
         case 'push_token_received':
         case 'push_token_error':
           final action = eventData.remove('action');
-          _logger.info('Native push notification event: $eventData');
+          _logger.info('Native push notification event: $eventType');
           _pushNotificationController.add(eventData);
           switch (eventType) {
             case 'push_notification_opened':
@@ -624,15 +626,11 @@ class KlaviyoNativeWrapper {
               _pushDataController.add(eventData);
           }
           break;
-        case 'form_event':
         case 'form_lifecycle_event':
-          _logger.info('Native form event: $eventData');
+          _logger.info('Native form event: $eventType');
           _formEventController.add(eventData);
           break;
         case 'auth_token_requested':
-          // Bridge diagnostic only — the request payload carries a correlation
-          // id, never a token, so this is safe to log.
-          _logger.info('Native auth token request event received');
           _authTokenRequestController.add(eventData);
           break;
         case 'push_open_web_url':
@@ -689,14 +687,7 @@ class KlaviyoNativeWrapper {
   /// Get current API key
   String? get apiKey => _apiKey;
 
-  /// Dispose resources
-  void dispose() {
-    _pushNotificationController.close();
-    _formEventController.close();
-    _authTokenRequestController.close();
-    _pushActionController.close();
-    _pushTokenController.close();
-    _pushOpenedController.close();
-    _pushDataController.close();
-  }
+  /// No-op. Event streams stay open for the life of the app.
+  @Deprecated('No longer needed; will be removed in 1.0.')
+  void dispose() {}
 }

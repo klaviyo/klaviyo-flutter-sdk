@@ -13,6 +13,12 @@
   - `KlaviyoSDK.onPushAction`: use `onPushOpened`, which carries the tapped button or web URL.
   - `KlaviyoPushAction`, `OpenWebUrl` and `ActionButtonTapped`: use `KlaviyoPushOpened`, with `tap` set to `KlaviyoPushTap.webUrl` (read `webUrl`) or `KlaviyoPushTap.actionButton` (read `button`).
 
+- **`KlaviyoSDK.onFormEvent`**: use `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s.
+- **`KlaviyoSDK.handlePushNotificationReceived` and `KlaviyoSDK.handlePushNotificationOpened`**: these only logged a message. Remove the calls; push tracking is automatic.
+- **`KlaviyoNativeWrapper`**: use `KlaviyoSDK`. The class becomes internal in 1.0.
+- **`KlaviyoSDK.dispose()` and `KlaviyoNativeWrapper.dispose()`**: no longer needed. Remove the calls.
+- **`KlaviyoSDK.setLogLevel` and the `KlaviyoLogLevel` enum**: use `setLoggingEnabled(bool)`.
+
 ### Breaking Changes
 
 - **Silent push is now push data, routed by app state**: Klaviyo push data reaches Dart in exactly one place: the new `onPushData` stream (`Stream<KlaviyoPushData>`) while the app is in the foreground, or the handler registered with the new `KlaviyoSDK.onBackgroundPushData` while it is in the background or not running. On Android a killed app now runs the handler in a headless engine instead of dropping the push. Without a handler, background push data is dropped; `silent_push_received` on `onPushNotification` still fires in the foreground. See [Push Data](README.md#push-data) and the [migration guide](MIGRATION_GUIDE.md#migrating-to-v060).
@@ -50,6 +56,8 @@
 
 ### Changes
 
+- **`dispose()` no longer closes the SDK's event streams.** Calling it used to leave the SDK broken until the app restarted: push, form, and auth-token streams were closed for good and `initialize()` didn't reopen them. It now only unregisters the auth token provider, if one is registered.
+- **`setLoggingEnabled(bool)` now controls Dart-side logging as well as native logging.** One toggle turns all Klaviyo SDK logs on or off. The plugin also logs less: push tokens, full push payloads, and per-call profile identifiers (email, phone number, external ID) are no longer logged, and a few duplicate bridge messages were dropped.
 - **Cold-start push opens and actions go to the first subscriber once.** A push open or push action that arrives before anyone subscribes is buffered, one of each, newest wins, and a new open clears a buffered action. The first `onPushNotification` / `onPushAction` subscriber receives it once, then the buffer is cleared. Later subscribers don't receive it; use `getInitialPushNotification()` to read the launch tap whenever you need it. `resetProfile()` drops a buffered open and action.
 
 ### Documentation

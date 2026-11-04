@@ -399,7 +399,7 @@ After migrating, you gain access to features that were not available in the
 community SDK:
 
 - **In-App Forms:** `registerForInAppForms()`, `unregisterFromInAppForms()`,
-  and the `onFormEvent` stream.
+  and the `onFormLifecycleEvent` stream.
 - **Geofencing:** `registerGeofencing()`, `unregisterGeofencing()` (opt-in via
   build configuration).
 - **Deep Linking:** `handleUniversalTrackingLink()` with `go_router`
@@ -408,7 +408,8 @@ community SDK:
   without needing `firebase_messaging` as a dependency.
 - **Push event stream:** `onPushNotification` for token events, open events,
   and errors.
-- **Log level control:** `setLogLevel(KlaviyoLogLevel)` with granular levels.
+- **Logging toggle:** `setLoggingEnabled(bool)` turns native and Dart-side
+  logging on or off.
 
 See the [README](https://pub.dev/packages/klaviyo_flutter_sdk) for full
 documentation on these features.
