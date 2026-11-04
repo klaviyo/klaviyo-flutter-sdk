@@ -385,7 +385,7 @@ class KlaviyoFlutterSdkPlugin :
                         .getInstance()
                         .token
                         .addOnSuccessListener { token ->
-                            Registry.log.verbose("FCM token received: $token")
+                            Registry.log.verbose("FCM token received")
 
                             // Set the token in Klaviyo SDK
                             Klaviyo.setPushToken(token)

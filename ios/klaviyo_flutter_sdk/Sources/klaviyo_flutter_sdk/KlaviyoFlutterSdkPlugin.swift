@@ -439,7 +439,7 @@ extension KlaviyoFlutterSdkPlugin {
     ) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
         if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString, privacy: .public)")
+            Logger.klaviyoFlutterSDK.info("APNs token received")
         }
 
         // Respect `klaviyo_automatic_push_token_forwarding` in Info.plist when explicitly set:
