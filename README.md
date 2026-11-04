@@ -185,18 +185,25 @@ import klaviyo_flutter_sdk
         // all visible-content cases.
         let apsPayload = userInfo["aps"] as? [String: Any]
         let hasVisibleContent = apsPayload?["alert"] != nil
-        guard !hasVisibleContent else {
-            // ... Your custom logic (if any) ...
-            completionHandler(.noData)
+
+        if !hasVisibleContent {
+            // The plugin calls completionHandler once your Dart background handler
+            // finishes, or after 25 seconds. Don't call it yourself on this path.
+            KlaviyoFlutterSdkPlugin.shared.handleSilentPush(
+                userInfo: userInfo,
+                fetchCompletionHandler: completionHandler
+            )
             return
         }
 
-        // The plugin calls completionHandler once your Dart background handler
-        // finishes, or after 25 seconds. Don't call it yourself on this path.
-        KlaviyoFlutterSdkPlugin.shared.handleSilentPush(
-            userInfo: userInfo,
-            fetchCompletionHandler: completionHandler
-        )
+        // ... Your custom logic for pushes with visible content (if any) ...
+        // If another provider also sends silent pushes, branch on its payload
+        // before the Klaviyo call above, since the plugin then owns completionHandler.
+
+        // You MUST call the completion handler within ~30 seconds.
+        // Failing to do so will cause iOS to throttle or stop delivering
+        // silent push notifications to your app.
+        completionHandler(.noData)
     }
 }
 ```
@@ -564,13 +571,13 @@ With no handler registered, background silent pushes are dropped. On iOS, a push
 
 #### iOS
 
-iOS delivers silent pushes via `didReceiveRemoteNotification:fetchCompletionHandler:` in your `AppDelegate.swift`. The setup in [iOS Setup](#ios-setup) forwards pure silent pushes to `KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo:fetchCompletionHandler:)` and hands the plugin the completion handler. This forwarding step is required: `FlutterAppDelegate` doesn't pass this callback to plugins ([flutter/flutter#155479](https://github.com/flutter/flutter/issues/155479)).
+iOS delivers silent pushes via `didReceiveRemoteNotification:fetchCompletionHandler:` in your `AppDelegate.swift`. The setup in [iOS Setup](#ios-setup) forwards pure silent pushes (no `alert`) to `KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo:fetchCompletionHandler:)` and hands the plugin the completion handler. This forwarding step is required: `FlutterAppDelegate` doesn't pass this callback to plugins ([flutter/flutter#155479](https://github.com/flutter/flutter/issues/155479)).
 
 #### Android
 
 The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM service that routes Klaviyo silent pushes as described above. No host configuration is required.
 
-If you also use `firebase_messaging`'s `onBackgroundMessage`, both handlers run for the same Klaviyo push, each in its own engine, in no set order. Filter Klaviyo pushes (they carry `_k`) out of your Firebase handler to avoid handling them twice.
+If you also use `firebase_messaging`'s `onBackgroundMessage`, both handlers run for the same Klaviyo silent push, each in its own engine, in no set order. Skip Klaviyo silent pushes in your Firebase handler (they carry `_k` and have no `title` or `body`) to avoid handling them twice. Visible Klaviyo pushes also carry `_k` but never reach the Klaviyo handler.
 
 #### Foreground listener
 
@@ -583,7 +590,7 @@ KlaviyoSDK().onPushNotification.listen((event) {
 });
 ```
 
-Both paths receive the full payload, with JSON object values decoded to maps on both platforms.
+Both paths receive the full payload. On Android, FCM data values are strings, so the plugin decodes `_k` and `key_value_pairs` into maps to match iOS; any other JSON-valued field arrives as a string on Android.
 
 > **Note**: Only pure silent pushes (no visible content) reach either path. Standard notifications that include `content-available` are handled by `willPresent`/`didReceive`.
 

@@ -33,13 +33,16 @@ other, never both. Without a handler, background silent pushes are dropped.
 
 2. **iOS**: in `AppDelegate.swift`, replace `handleSilentPush(userInfo:)` and your own
    `completionHandler(.newData)` call with
-   `handleSilentPush(userInfo:fetchCompletionHandler:)`, passing the system completion handler. The
-   plugin calls it once your Dart handler finishes. See [iOS Setup](README.md#ios-setup).
+   `handleSilentPush(userInfo:fetchCompletionHandler:)`, passing the system completion handler, for
+   pure silent pushes (no `alert`). The plugin calls it once your Dart handler finishes. Keep
+   calling the completion handler yourself for every other push. See
+   [iOS Setup](README.md#ios-setup).
    `handleSilentPush(userInfo:)` still compiles but is deprecated.
 
 3. **Android**: if you used `firebase_messaging`'s `onBackgroundMessage` only to catch Klaviyo
-   silent pushes while the app was killed, you can remove it. If you keep it, skip Klaviyo pushes
-   there (they carry `_k`), since both handlers run for the same push.
+   silent pushes while the app was killed, you can remove it. If you keep it, skip Klaviyo silent
+   pushes there (they carry `_k` and have no `title` or `body`), since both handlers run for the same
+   push. Visible Klaviyo pushes also carry `_k` and still reach only Firebase, so don't skip those.
 
 ## Migrating to v0.3.0
 

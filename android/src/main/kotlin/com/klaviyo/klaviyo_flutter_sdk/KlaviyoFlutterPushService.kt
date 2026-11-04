@@ -22,8 +22,9 @@ import java.util.concurrent.TimeUnit
  *   `{type: 'silent_push_received', data: <RemoteMessage.data>}`.
  * - Background with a live engine: passed to the Dart handler registered with
  *   `KlaviyoSDK.onBackgroundSilentPush` on that engine.
- * - No engine (app killed): passed to that handler in a headless engine started
- *   by [BackgroundSilentPushExecutor].
+ * - Otherwise (no engine, e.g. app killed, or an engine that never registered
+ *   the handler): passed to the stored handler in a headless engine started by
+ *   [BackgroundSilentPushExecutor].
  *
  * Background paths block this FCM worker thread until the handler finishes, for
  * at most [BACKGROUND_HANDLER_TIMEOUT_SECONDS].
@@ -62,24 +63,20 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
                 plugin.handleSilentPush(data)
             }
 
-            plugin != null -> {
-                if (!plugin.hasBackgroundHandler) {
-                    Registry.log.info("No background silent push handler registered; dropping silent push.")
-                    return
-                }
+            plugin != null && plugin.hasBackgroundHandler -> {
                 Registry.log.info("Silent push received in background: forwarding to Dart handler.")
                 awaitBackgroundHandler { onComplete -> plugin.dispatchBackgroundSilentPush(data, onComplete) }
             }
 
             BackgroundSilentPushStore.hasHandler(this) -> {
-                Registry.log.info("Silent push received with no Flutter engine: starting headless engine.")
+                Registry.log.info("Silent push received with no engine running the handler: using headless engine.")
                 awaitBackgroundHandler { onComplete ->
                     BackgroundSilentPushExecutor.dispatch(this, data, onComplete)
                 }
             }
 
             else -> {
-                Registry.log.info("No Flutter engine or background handler; dropping silent push.")
+                Registry.log.info("No background silent push handler registered; dropping silent push.")
             }
         }
     }
