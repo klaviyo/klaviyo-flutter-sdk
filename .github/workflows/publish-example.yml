@@ -37,9 +37,11 @@ on:
       - '.github/scripts/**'
       - '.github/actions/**'
       - 'scripts/**'
+      - 'Makefile'
       - 'AGENTS.md'
       - 'test/**'
       - 'example/test/**'
+      - 'android/src/test/**'
   release:
     types: [published]
   workflow_dispatch:
