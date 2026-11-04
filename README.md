@@ -504,18 +504,6 @@ KlaviyoSDK().onPushNotification.listen((event) {
 
 > **Known limitation (Android)**: on a cold start — app fully killed, then relaunched by tapping a notification — this event (and `ActionButtonTapped` under [Push Action Events](#push-action-events), which fires from the same code path) can be dropped if the tap is processed before your Dart listener subscribes. Native "Opened Push" backend tracking to Klaviyo is unaffected — this only affects the Dart-facing stream in your Flutter app. We plan to close this gap in a follow-up release. iOS is unaffected: its native caching mechanism replays the event once your listener attaches.
 
-#### Identifying Klaviyo Notifications
-
-Use the `isKlaviyoNotification` extension to check whether a push notification payload originated from Klaviyo:
-
-```dart
-void handlePushPayload(Map<String, dynamic> payload) {
-  if (payload.isKlaviyoNotification) {
-    // This is a Klaviyo notification
-  }
-}
-```
-
 ### Silent Push
 
 Silent push notifications (`content-available: 1`) deliver data to your app in the background without showing a banner. They are commonly used to prefetch content, sync state, or trigger background tasks.
@@ -1179,14 +1167,6 @@ Custom metrics:
 Applies to the SMS and WhatsApp channels.
 
 `marketing` | `transactional`
-
-### Extensions
-
-#### KlaviyoNotificationMap (on `Map<String, dynamic>`)
-
-| Property | Description |
-|----------|-------------|
-| `isKlaviyoNotification` | `bool` — whether the map is a Klaviyo push notification payload |
 
 ### Exceptions
 

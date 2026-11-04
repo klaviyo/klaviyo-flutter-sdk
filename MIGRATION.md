@@ -203,8 +203,11 @@ Future<void> _handler(RemoteMessage message) async {
 // Before
 if (Klaviyo.instance.isKlaviyoPush(message.data)) { ... }
 
-// After — use the extension
-if (message.data.isKlaviyoNotification) { ... }
+// After — remove the check
+// Klaviyo push events arrive on KlaviyoSDK's own streams, such as
+// onPushNotification and onPushAction, so there is no raw payload to inspect.
+// The isKlaviyoNotification extension still exists but is deprecated and
+// will be removed in 1.0.
 ```
 
 ### Profile management — `updateProfile`
@@ -426,7 +429,7 @@ documentation on these features.
 | `.logEvent(name, meta)` | `.createEvent(KlaviyoEvent.custom(metric: name, properties: meta))` |
 | `.sendTokenToKlaviyo(token)` | `.setPushToken(token)` |
 | `.handlePush(data)` | Remove — handled automatically by native layer |
-| `.isKlaviyoPush(data)` | `data.isKlaviyoNotification` |
+| `.isKlaviyoPush(data)` | Remove — Klaviyo push events arrive on `KlaviyoSDK`'s streams |
 | `.updateProfile(profile)` | `.setProfile(profile)` |
 | `.setFirstName(name)` | `.setProfileAttribute('first_name', name)` |
 | `.setLastName(name)` | `.setProfileAttribute('last_name', name)` |
