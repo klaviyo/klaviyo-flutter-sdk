@@ -120,6 +120,52 @@ void main() {
     await laterSub.cancel();
   });
 
+  test('a natively replayed open is held even with a listener attached',
+      () async {
+    final sdk = KlaviyoSDK();
+    final early = <Map<String, dynamic>>[];
+    final earlySub = sdk.onPushNotification.listen(early.add);
+    await pumpEventQueue();
+
+    sink!.success({...opened('replayed'), 'replayed': true});
+    await pumpEventQueue();
+
+    final later = <Map<String, dynamic>>[];
+    final laterSub = sdk.onPushNotification.listen(later.add);
+    await pumpEventQueue();
+
+    expect(early.map((e) => e['data']['id']), ['replayed']);
+    expect(later.map((e) => e['data']['id']), ['replayed']);
+    expect(later.single.containsKey('replayed'), isFalse);
+
+    await earlySub.cancel();
+    await laterSub.cancel();
+  });
+
+  test('resetProfile drops the held open and action', () async {
+    sink!
+      ..success(opened('before-reset'))
+      ..success(buttonTap('btn-reset'));
+    await pumpEventQueue();
+
+    final sdk = KlaviyoSDK();
+    await sdk.resetProfile();
+
+    final opens = <Map<String, dynamic>>[];
+    final actions = <KlaviyoPushAction>[];
+    final subs = [
+      sdk.onPushNotification.listen(opens.add),
+      sdk.onPushAction.listen(actions.add),
+    ];
+    await pumpEventQueue();
+
+    expect(opens, isEmpty);
+    expect(actions, isEmpty);
+    for (final sub in subs) {
+      await sub.cancel();
+    }
+  });
+
   test('token events still flush to the first subscriber only', () async {
     sink!.success({
       'type': 'push_token_received',

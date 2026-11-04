@@ -395,6 +395,8 @@ class KlaviyoNativeWrapper {
 
     try {
       await _channel.invokeMethod('resetProfile');
+      _pushNotificationController.clearHeld();
+      _pushActionController.clearHeld();
     } catch (e) {
       throw KlaviyoException('Failed to reset profile: $e');
     }
@@ -456,6 +458,9 @@ class KlaviyoNativeWrapper {
     try {
       final Map<String, dynamic> eventData = _deepConvertMap(event);
       final String eventType = eventData['type'] as String? ?? '';
+      // Native sets `replayed` on events it cached before the channel listener
+      // attached.
+      final bool replayed = eventData.remove('replayed') == true;
 
       switch (eventType) {
         case 'push_notification_received':
@@ -467,7 +472,7 @@ class KlaviyoNativeWrapper {
           if (eventType == 'push_notification_opened') {
             _pushActionController.clearHeld();
           }
-          _pushNotificationController.add(eventData);
+          _pushNotificationController.add(eventData, hold: replayed);
           break;
         case 'form_event':
         case 'form_lifecycle_event':
@@ -485,7 +490,7 @@ class KlaviyoNativeWrapper {
           // Log the type only; the payload carries CTA URLs (possible PII), so
           // keep the full payload out of INFO logs.
           _logger.info('Native push action event: $eventType');
-          _pushActionController.add(eventData);
+          _pushActionController.add(eventData, hold: replayed);
           break;
         default:
           // Handle unknown event types

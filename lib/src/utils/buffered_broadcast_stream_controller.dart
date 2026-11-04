@@ -6,8 +6,8 @@ import 'dart:async';
 /// Events for which [holdKey] returns a non-null key are held in one slot per
 /// key. A held event is replayed to every subscriber when it subscribes, and
 /// stays held until another event with the same key arrives. That newer event
-/// replaces the held one if no listener is subscribed, or clears the slot if
-/// it is delivered live.
+/// replaces the held one if no listener is subscribed or it is added with
+/// `hold: true`, and otherwise clears the slot when it is delivered live.
 ///
 /// All other events are queued and flushed to the first subscriber, then
 /// cleared.
@@ -27,14 +27,16 @@ class BufferedBroadcastStreamController<T> {
 
   bool get hasListener => _controller.hasListener;
 
-  void add(T event) {
+  /// Adds [event]. With [hold], an event that has a hold key is delivered to
+  /// current listeners and also held for later subscribers.
+  void add(T event, {bool hold = false}) {
     final key = _holdKey?.call(event);
     if (key != null) {
       _held.remove(key);
-      if (!_controller.hasListener) {
+      if (hold || !_controller.hasListener) {
         _held[key] = event;
-        return;
       }
+      if (!_controller.hasListener) return;
     }
     _controller.hasListener ? _controller.add(event) : _buffer.add(event);
   }

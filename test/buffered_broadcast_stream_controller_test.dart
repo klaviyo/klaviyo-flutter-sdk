@@ -117,6 +117,25 @@ void main() {
       await sub.cancel();
     });
 
+    test('added with hold reach current listeners and later subscribers',
+        () async {
+      final early = <String>[];
+      final earlySub = controller.stream.listen(early.add);
+      await pumpEventQueue();
+
+      controller.add('held:1', hold: true);
+      await pumpEventQueue();
+
+      final later = <String>[];
+      final laterSub = controller.stream.listen(later.add);
+      await pumpEventQueue();
+
+      expect(early, ['held:1']);
+      expect(later, ['held:1']);
+      await earlySub.cancel();
+      await laterSub.cancel();
+    });
+
     test('arrive before live events added after subscribing', () async {
       controller.add('held:1');
 

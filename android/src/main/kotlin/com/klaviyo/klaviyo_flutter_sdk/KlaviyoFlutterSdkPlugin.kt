@@ -144,9 +144,9 @@ class KlaviyoFlutterSdkPlugin :
                     cachedSilentPush?.let { events?.success(it) }
                     cachedSilentPush = null
                     // Replay a push open and push action that arrived before Flutter subscribed.
-                    cachedOpenedNotification?.let { events?.success(it) }
+                    cachedOpenedNotification?.let { events?.success(it + ("replayed" to true)) }
                     cachedOpenedNotification = null
-                    cachedPushAction?.let { events?.success(it) }
+                    cachedPushAction?.let { events?.success(it + ("replayed" to true)) }
                     cachedPushAction = null
                 }
 
