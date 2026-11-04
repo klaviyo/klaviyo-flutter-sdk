@@ -862,6 +862,8 @@ void main() async {
 
 **Note**: `handleUniversalTrackingLink()` is synchronous - it validates the URL and returns a bool immediately, while the native tracking happens asynchronously in the background.
 
+`handleUniversalTrackingLink()` is safe to call before `initialize()` and never throws. If your app delays `initialize()` until login or consent, a universal link that opens the app from a cold start is still tracked and resolved.
+
 ## Geofencing
 
 The Klaviyo Flutter SDK supports geofencing for location-based event tracking. On Android, the full location module is **not included by default**. On iOS, it depends on how the app pulls in the plugin: Swift Package Manager builds include it automatically, and CocoaPods builds need to opt in. See [Enabling Geofencing](#enabling-geofencing) for setup.
