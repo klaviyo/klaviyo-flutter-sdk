@@ -62,6 +62,7 @@ jobs:
       pull-requests: read
     outputs:
       sha: ${{ steps.ref.outputs.sha }}
+      sha_short: ${{ steps.ref.outputs.sha_short }}
       release_url: ${{ steps.draft.outputs.url }}
       ci_skipped: ${{ inputs.skip_ci_check == true }}
     env:
@@ -102,8 +103,11 @@ jobs:
           fi
           sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${ref}" --jq .sha)
           echo "Releasing ${ref} at ${sha}"
-          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
-          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          {
+            echo "ref=${ref}"
+            echo "sha=${sha}"
+            echo "sha_short=${sha::7}"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         id: checkout
@@ -261,6 +265,7 @@ jobs:
         if: failure()
         env:
           STEPS_JSON: ${{ toJSON(steps) }}
+          COMMIT_SHA: ${{ steps.ref.outputs.sha || github.sha }}
         run: |
           step=$(jq -r '
             {
@@ -284,6 +289,7 @@ jobs:
             | if $key == null then "unknown step" else ($names[$key] // $key) end
           ' <<<"$STEPS_JSON")
           echo "step=$step" >> "$GITHUB_OUTPUT"
+          echo "commit_short=${COMMIT_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack on failure
         id: slack_failure
@@ -293,12 +299,13 @@ jobs:
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: failure
-          title: klaviyo_flutter_sdk ${{ inputs.version }} release failed${{ inputs.dry_run && ' (dry run)' || '' }}
+          title: Flutter SDK `${{ inputs.version }}` release failed${{ inputs.dry_run && ' (dry run)' || '' }}
           fields: |
-            Version: ${{ inputs.version }}
-            Commit: ${{ steps.ref.outputs.sha || github.sha }}
+            Version: `${{ inputs.version }}`
+            Commit: `${{ steps.failed.outputs.commit_short }}`
             Stage: Prepare
             Requested by: ${{ github.actor }}
+          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.ref.outputs.sha || github.sha }}
 
       - name: Reply with failure details
         if: failure() && steps.slack_failure.outputs.ts != ''
@@ -308,7 +315,7 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ steps.slack_failure.outputs.ts }}
           status: failure
-          title: Failed at ${{ steps.failed.outputs.step }}
+          title: Failed at `${{ steps.failed.outputs.step }}`
 
   publish:
     needs: prepare
@@ -351,11 +358,11 @@ jobs:
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: pending
-          title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting pub.dev approval${{ needs.prepare.outputs.ci_skipped == 'true' && ' (CI check skipped)' || '' }}
-          body: Approve the `pub.dev` environment on the release.yml run. This message updates with the result.
+          title: Flutter SDK `${{ inputs.version }}` awaiting `pub.dev` approval${{ needs.prepare.outputs.ci_skipped == 'true' && ' (CI check skipped)' || '' }}
+          body: Approve the `pub.dev` environment on the `release.yml` run. This message updates with the result.
           fields: |
-            Version: ${{ inputs.version }}
-            Commit: ${{ needs.prepare.outputs.sha }}
+            Version: `${{ inputs.version }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
             Requested by: ${{ github.actor }}
           links: |
             Draft release|${{ needs.prepare.outputs.release_url }}
@@ -421,10 +428,10 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ steps.slack_pending.outputs.ts }}
           status: failure
-          title: klaviyo_flutter_sdk ${{ inputs.version }} release failed
+          title: Flutter SDK `${{ inputs.version }}` release failed
           fields: |
-            Version: ${{ inputs.version }}
-            Commit: ${{ needs.prepare.outputs.sha }}
+            Version: `${{ inputs.version }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
             Stage: Publish
           links: Release|${{ needs.prepare.outputs.release_url }}
 
@@ -436,7 +443,7 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ steps.slack_failure.outputs.ts }}
           status: failure
-          title: Failed at ${{ steps.failed.outputs.step }}
+          title: Failed at `${{ steps.failed.outputs.step }}`
 
       - name: Notify Slack that the release stopped
         if: cancelled() && steps.slack_pending.outputs.ts != ''
@@ -446,11 +453,11 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ steps.slack_pending.outputs.ts }}
           status: stopped
-          title: klaviyo_flutter_sdk ${{ inputs.version }} release stopped, run cancelled
-          body: The run was cancelled before it finished. If release.yml did not start, run it at the tag to retry.
+          title: Flutter SDK `${{ inputs.version }}` release stopped, run cancelled
+          body: The run was cancelled before it finished. If `release.yml` did not start, run it at the tag to retry.
           fields: |
-            Version: ${{ inputs.version }}
-            Commit: ${{ needs.prepare.outputs.sha }}
+            Version: `${{ inputs.version }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
             Stage: Publish
             Requested by: ${{ github.actor }}
           links: Release|${{ needs.prepare.outputs.release_url }}

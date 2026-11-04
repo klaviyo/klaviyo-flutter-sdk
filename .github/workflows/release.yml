@@ -283,12 +283,12 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ inputs.slack_ts }}
           status: ${{ steps.result.outputs.result }}
-          title: klaviyo_flutter_sdk ${{ github.ref_name }} ${{ steps.result.outputs.result == 'success' && 'published to pub.dev' || steps.result.outputs.result == 'stopped' && 'release stopped' || 'release failed' }}
+          title: Flutter SDK `${{ github.ref_name }}` ${{ steps.result.outputs.result == 'success' && 'published to `pub.dev`' || steps.result.outputs.result == 'stopped' && 'release stopped' || 'release failed' }}
           body: ${{ steps.result.outputs.result == 'success' && inputs.slack_ts != '' && 'The example app deploy replies in this thread.' || '' }}
           fields: |
-            Version: ${{ github.ref_name }}
-            Commit: ${{ steps.result.outputs.commit_short }}
-            Event: ${{ github.event_name }}
+            Version: `${{ github.ref_name }}`
+            Commit: `${{ steps.result.outputs.commit_short }}`
+            Event: `${{ github.event_name }}`
           links: |
             Release|${{ steps.result.outputs.release_url }}
             pub.dev|${{ steps.result.outputs.result == 'success' && format('https://pub.dev/packages/klaviyo_flutter_sdk/versions/{0}', github.ref_name) || '' }}
@@ -302,5 +302,5 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ steps.slack.outputs.ts }}
           status: ${{ steps.result.outputs.result }}
-          title: ${{ steps.result.outputs.result == 'stopped' && 'Stopped:' || 'Failed at' }} ${{ steps.result.outputs.failed_step }}
-          body: Tag `${{ github.ref_name }}` kept. Run release.yml at the tag to retry.
+          title: ${{ steps.result.outputs.result == 'stopped' && 'Stopped:' || 'Failed at' }} `${{ steps.result.outputs.failed_step }}`
+          body: Tag `${{ github.ref_name }}` kept. Run `release.yml` at the tag to retry.
