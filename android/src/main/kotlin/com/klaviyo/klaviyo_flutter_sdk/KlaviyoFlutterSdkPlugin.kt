@@ -55,6 +55,12 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
     private var eventSink: EventChannel.EventSink? = null
+
+    // Most recent push open and push action emitted before Flutter subscribed;
+    // replayed on the next onListen. One slot each, matching iOS.
+    private var cachedOpenedNotification: Map<String, Any?>? = null
+    private var cachedPushAction: Map<String, Any?>? = null
+
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
@@ -137,6 +143,11 @@ class KlaviyoFlutterSdkPlugin :
                     // Replay a silent push that arrived before Flutter subscribed.
                     cachedSilentPush?.let { events?.success(it) }
                     cachedSilentPush = null
+                    // Replay a push open and push action that arrived before Flutter subscribed.
+                    cachedOpenedNotification?.let { events?.success(it) }
+                    cachedOpenedNotification = null
+                    cachedPushAction?.let { events?.success(it) }
+                    cachedPushAction = null
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -937,6 +948,13 @@ class KlaviyoFlutterSdkPlugin :
                 Klaviyo.handlePush(intent)
             }
 
+            // Reopening from Recents hands back the original launch intent, including
+            // after process death, so it is not emitted to Dart as a new open.
+            if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) {
+                Registry.log.verbose("Not emitting push open for intent relaunched from history")
+                return
+            }
+
             val extras = intent.extras
             if (extras != null && intent.isKlaviyoNotificationIntent) {
                 // Klaviyo namespaces all push extras with Constants.PACKAGE_PREFIX when building
@@ -959,13 +977,14 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
-                eventSink?.success(
+                emitOrCacheOpenedNotification(
                     mapOf(
                         "type" to "push_notification_opened",
                         "data" to notificationData,
                     ),
                 )
 
+                cachedPushAction = null
                 forwardActionButtonTap(notificationData)
             }
         } catch (e: Exception) {
@@ -1005,11 +1024,25 @@ class KlaviyoFlutterSdkPlugin :
         (notificationData["Button Label"] as? String)?.let { data["label"] = it }
         (notificationData["Button Link"] as? String)?.let { data["url"] = it }
 
-        eventSink?.success(
+        emitOrCachePushAction(
             mapOf(
                 "type" to "push_action_button_tapped",
                 "data" to data,
             ),
         )
+    }
+
+    private fun emitOrCacheOpenedNotification(payload: Map<String, Any?>) {
+        eventSink?.let { it.success(payload) } ?: run {
+            Registry.log.verbose("Flutter not ready. Caching notification open event.")
+            cachedOpenedNotification = payload
+        }
+    }
+
+    private fun emitOrCachePushAction(payload: Map<String, Any?>) {
+        eventSink?.let { it.success(payload) } ?: run {
+            Registry.log.verbose("Flutter not ready. Caching push action event.")
+            cachedPushAction = payload
+        }
     }
 }

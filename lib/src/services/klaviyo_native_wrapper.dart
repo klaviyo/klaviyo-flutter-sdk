@@ -26,16 +26,30 @@ class KlaviyoNativeWrapper {
 
   // Stream controllers for native events – buffer events that arrive
   // before any listener subscribes, then flush on first subscription.
+  // The pending push open and the pending push action are held in one slot
+  // each and replayed to every subscriber.
   final _pushNotificationController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (event) => event['type'] == 'push_notification_opened'
+        ? 'push_notification_opened'
+        : null,
+  );
   final _formEventController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _authTokenRequestController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _pushActionController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (_) => 'push_action',
+  );
 
   // Getters for streams
+
+  /// Push token, token error, silent push and push opened events.
+  ///
+  /// A `push_notification_opened` event that arrives before any listener
+  /// subscribes is held and replayed to every subscriber when it subscribes,
+  /// until a newer open arrives. Only the most recent open is held.
   Stream<Map<String, dynamic>> get onPushNotification =>
       _pushNotificationController.stream;
 
@@ -53,6 +67,10 @@ class KlaviyoNativeWrapper {
   /// `push_action_button_tapped`). Kept on a dedicated stream so they do not
   /// surface on [onPushNotification]; see [KlaviyoSDK.onPushAction] for the
   /// typed view.
+  ///
+  /// A push action that arrives before any listener subscribes is held and
+  /// replayed to every subscriber when it subscribes. Only the most recent
+  /// action is held, and each new push open clears it.
   Stream<Map<String, dynamic>> get onPushActionEvent =>
       _pushActionController.stream;
 
@@ -446,6 +464,9 @@ class KlaviyoNativeWrapper {
         case 'push_token_received':
         case 'push_token_error':
           _logger.info('Native push notification event: $eventData');
+          if (eventType == 'push_notification_opened') {
+            _pushActionController.clearHeld();
+          }
           _pushNotificationController.add(eventData);
           break;
         case 'form_event':
