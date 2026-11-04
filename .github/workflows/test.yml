@@ -59,5 +59,12 @@ jobs:
           flutter-version: 3.38.7
           cache: true
 
+      # Gradle's own NDK auto-install fails on these runners with
+      # "ZipException: Archive is not a ZIP archive"; install it up front instead.
+      - name: Install Android NDK
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install "ndk;28.2.13676358"
+
       - name: Run Kotlin unit tests
         run: make test-android
