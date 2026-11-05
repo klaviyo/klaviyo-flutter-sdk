@@ -62,9 +62,22 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEa
 
 val klaviyoSdkVersion = "4.6.0"
 
+// Matches Groovy's String.toBoolean(): "true", "y" or "1", trimmed and case-insensitive.
+fun booleanProperty(
+    name: String,
+    default: Boolean,
+): Boolean =
+    rootProject
+        .findProperty(name)
+        ?.toString()
+        ?.trim()
+        ?.lowercase()
+        ?.let { it == "true" || it == "y" || it == "1" }
+        ?: default
+
 // Whether to include the full forms module (in-app forms rendering).
 // Set klaviyoIncludeForms=false in your host app's gradle.properties to exclude forms.
-val includeForms = rootProject.findProperty("klaviyoIncludeForms")?.toString()?.toBoolean() ?: true
+val includeForms = booleanProperty("klaviyoIncludeForms", true)
 
 dependencies {
     "implementation"("com.github.klaviyo.klaviyo-android-sdk:core:$klaviyoSdkVersion")
@@ -72,7 +85,7 @@ dependencies {
     "api"("com.github.klaviyo.klaviyo-android-sdk:push-fcm:$klaviyoSdkVersion")
 
     // Location: full module (includes -core transitively), or just -core for lightweight
-    val includeLocation = rootProject.findProperty("klaviyoIncludeLocation")?.toString()?.toBoolean() ?: false
+    val includeLocation = booleanProperty("klaviyoIncludeLocation", false)
 
     if (includeLocation) {
         "api"("com.github.klaviyo.klaviyo-android-sdk:location:$klaviyoSdkVersion")
