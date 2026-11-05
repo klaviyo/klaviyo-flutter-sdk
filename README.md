@@ -256,7 +256,7 @@ Declare `KlaviyoFlutterPushService` in your app's `android/app/src/main/AndroidM
 </service>
 ```
 
-If you subclass `KlaviyoFlutterPushService`, put your subclass's class name in `android:name`.
+If you subclass `KlaviyoFlutterPushService`, put your subclass's class name in `android:name`. If your subclass overrides `onMessageReceived`, call `super.onMessageReceived(message)` first, or Klaviyo pushes won't display and silent pushes won't reach Dart.
 
 With this declaration, Klaviyo's service receives every FCM message. It displays Klaviyo pushes and forwards Klaviyo silent pushes to Dart. Non-Klaviyo messages get the same treatment as in the native `KlaviyoPushService`: Firebase's base service still displays `notification` messages while your app is in the background, and the Klaviyo code logs and ignores them otherwise. Nothing is passed on to the other library's service. For the other library, that means:
 
