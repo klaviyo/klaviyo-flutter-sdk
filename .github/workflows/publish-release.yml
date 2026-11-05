@@ -69,7 +69,7 @@ jobs:
       PRERELEASE: ${{ contains(inputs.version, '-') }}
       INPUT_REF: ${{ inputs.ref }}
       SKIP_CI: ${{ inputs.skip_ci_check == true }}
-      FLUTTER_VERSION: 3.38.7
+      FLUTTER_VERSION: 3.44.9
     steps:
       - name: Validate version and tag
         id: validate
