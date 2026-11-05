@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   lint:
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -35,19 +35,16 @@ jobs:
           dart --version
 
       - name: Install native linters
-        run: |
-          brew install ktlint swiftlint
+        run: scripts/setup-linux.sh ktlint swiftlint
 
       - name: Dart format check
-        run: dart format --set-exit-if-changed .
+        run: make format-check
 
       - name: Flutter analyze
-        run: flutter analyze --no-fatal-infos
+        run: make analyze
 
       - name: Kotlin lint check
-        run: ktlint --reporter=plain "**/*.kt"
-        working-directory: android
+        run: make ktlint
 
       - name: Swift lint check
-        run: swiftlint lint --strict
-        working-directory: ios
+        run: make swiftlint
