@@ -17,6 +17,51 @@ env:
   SLACK_ICON_EMOJI: ':merlin-orb-flutter:'
 
 jobs:
+  # Posts the live Slack message when this run was started without one
+  # (tag push from the GitHub UI). publish-release.yml passes slack_ts, which
+  # skips this job and keeps that message as the one that gets edited.
+  announce:
+    if: startsWith(github.ref, 'refs/tags/') && inputs.slack_ts == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      contents: read
+    outputs:
+      slack_ts: ${{ steps.slack.outputs.ts }}
+    steps:
+      - name: Checkout Slack action
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Short commit
+        id: sha
+        env:
+          SHA: ${{ github.sha }}
+        run: echo "short=${SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack release awaiting approval
+        id: slack
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          status: pending
+          title: Flutter SDK `${{ github.ref_name }}` awaiting `pub.dev` approval
+          body: Approve the `pub.dev` environment on this run. This message updates with the result.
+          fields: |
+            Version: `${{ github.ref_name }}`
+            Commit: `${{ steps.sha.outputs.short }}`
+            Requested by: ${{ github.actor }}
+          links: |
+            Approve here|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+
   validate:
     runs-on: macos-15
     outputs:
@@ -145,8 +190,8 @@ jobs:
   # dispatched); a release published in the UI fires release: published
   # itself, so nothing here runs.
   finalize:
-    needs: verify
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [announce, verify]
+    if: "!cancelled() && needs.verify.result == 'success' && startsWith(github.ref, 'refs/tags/')"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -197,7 +242,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-          SLACK_TS: ${{ inputs.slack_ts }}
+          SLACK_TS: ${{ inputs.slack_ts || needs.announce.outputs.slack_ts }}
         run: |
           # True when the workflow file at $TAG declares slack_thread_ts.
           takes_thread_ts() {
@@ -211,7 +256,7 @@ jobs:
           fi
 
   notify:
-    needs: [validate, publish, verify, finalize]
+    needs: [announce, validate, publish, verify, finalize]
     if: always() && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -281,10 +326,10 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          ts: ${{ inputs.slack_ts }}
+          ts: ${{ inputs.slack_ts || needs.announce.outputs.slack_ts }}
           status: ${{ steps.result.outputs.result }}
           title: Flutter SDK `${{ github.ref_name }}` ${{ steps.result.outputs.result == 'success' && 'published to `pub.dev`' || steps.result.outputs.result == 'stopped' && 'release stopped' || 'release failed' }}
-          body: ${{ steps.result.outputs.result == 'success' && inputs.slack_ts != '' && 'The example app deploy replies in this thread.' || '' }}
+          body: ${{ steps.result.outputs.result == 'success' && (inputs.slack_ts != '' || needs.announce.outputs.slack_ts != '') && 'The example app deploy replies in this thread.' || '' }}
           fields: |
             Version: `${{ github.ref_name }}`
             Commit: `${{ steps.result.outputs.commit_short }}`
