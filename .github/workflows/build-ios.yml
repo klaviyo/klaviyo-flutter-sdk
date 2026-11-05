@@ -11,8 +11,14 @@ on:
 jobs:
   build-ios:
     runs-on: macos-15
+    defaults:
+      run:
+        working-directory: klaviyo_flutter_sdk
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: klaviyo_flutter_sdk
+          persist-credentials: false
 
       - uses: subosito/flutter-action@v2
         with:
