@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
+import '../widgets/test_id.dart';
+
 class EventsTab extends StatefulWidget {
   const EventsTab({super.key});
 
@@ -103,49 +105,64 @@ class _EventsTabState extends State<EventsTab> {
                 color: Colors.blue.shade100,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                _status,
-                style: TextStyle(color: Colors.blue.shade900),
+              child: TestId(
+                'events_status_text',
+                child: Text(
+                  _status,
+                  style: TextStyle(color: Colors.blue.shade900),
+                ),
               ),
             ),
             const SizedBox(height: 20),
 
             // Event Name
-            TextField(
-              controller: _eventNameController,
-              decoration: const InputDecoration(
-                labelText: 'Event Name',
-                border: OutlineInputBorder(),
-                hintText: 'e.g., Product Viewed',
+            TestId(
+              'events_name_field',
+              child: TextField(
+                controller: _eventNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Event Name',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g., Product Viewed',
+                ),
               ),
             ),
             const SizedBox(height: 16),
 
             // Property Key
-            TextField(
-              controller: _propertyKeyController,
-              decoration: const InputDecoration(
-                labelText: 'Property Key (optional)',
-                border: OutlineInputBorder(),
-                hintText: 'e.g., product_id',
+            TestId(
+              'events_property_key_field',
+              child: TextField(
+                controller: _propertyKeyController,
+                decoration: const InputDecoration(
+                  labelText: 'Property Key (optional)',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g., product_id',
+                ),
               ),
             ),
             const SizedBox(height: 10),
 
             // Property Value
-            TextField(
-              controller: _propertyValueController,
-              decoration: const InputDecoration(
-                labelText: 'Property Value (optional)',
-                border: OutlineInputBorder(),
-                hintText: 'e.g., 12345',
+            TestId(
+              'events_property_value_field',
+              child: TextField(
+                controller: _propertyValueController,
+                decoration: const InputDecoration(
+                  labelText: 'Property Value (optional)',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g., 12345',
+                ),
               ),
             ),
             const SizedBox(height: 20),
 
-            ElevatedButton(
-              onPressed: () => _trackEvent(clearFields: true),
-              child: const Text('Track Event'),
+            TestId(
+              'events_track_button',
+              child: ElevatedButton(
+                onPressed: () => _trackEvent(clearFields: true),
+                child: const Text('Track Event'),
+              ),
             ),
             const SizedBox(height: 20),
 
@@ -156,49 +173,61 @@ class _EventsTabState extends State<EventsTab> {
             ),
             const SizedBox(height: 10),
 
-            ElevatedButton.icon(
-              onPressed: () => _trackEvent(eventName: EventMetric.openedApp),
-              icon: const Icon(Icons.rocket_launch),
-              label: const Text('Opened App'),
+            TestId(
+              'events_opened_app_button',
+              child: ElevatedButton.icon(
+                onPressed: () => _trackEvent(eventName: EventMetric.openedApp),
+                icon: const Icon(Icons.rocket_launch),
+                label: const Text('Opened App'),
+              ),
             ),
             const SizedBox(height: 8),
 
-            ElevatedButton.icon(
-              onPressed: () => _trackEvent(
-                eventName: EventMetric.viewedProduct,
-                properties: {
-                  'product_id': '12345',
-                  'product_name': 'Cool Widget',
-                  'price': 29.99,
-                },
+            TestId(
+              'events_viewed_product_button',
+              child: ElevatedButton.icon(
+                onPressed: () => _trackEvent(
+                  eventName: EventMetric.viewedProduct,
+                  properties: {
+                    'product_id': '12345',
+                    'product_name': 'Cool Widget',
+                    'price': 29.99,
+                  },
+                ),
+                icon: const Icon(Icons.remove_red_eye),
+                label: const Text('Viewed Product'),
               ),
-              icon: const Icon(Icons.remove_red_eye),
-              label: const Text('Viewed Product'),
             ),
             const SizedBox(height: 8),
 
-            ElevatedButton.icon(
-              onPressed: () => _trackEvent(
-                eventName: EventMetric.addedToCart,
-                properties: {
-                  'product_id': '12345',
-                  'quantity': 2,
-                },
-                value: 59.98,
+            TestId(
+              'events_added_to_cart_button',
+              child: ElevatedButton.icon(
+                onPressed: () => _trackEvent(
+                  eventName: EventMetric.addedToCart,
+                  properties: {
+                    'product_id': '12345',
+                    'quantity': 2,
+                  },
+                  value: 59.98,
+                ),
+                icon: const Icon(Icons.add_shopping_cart),
+                label: const Text('Added to Cart'),
               ),
-              icon: const Icon(Icons.add_shopping_cart),
-              label: const Text('Added to Cart'),
             ),
             const SizedBox(height: 8),
 
-            ElevatedButton.icon(
-              onPressed: () => _trackEvent(
-                eventName: EventMetric.startedCheckout,
-                properties: {'cart_items': 3},
-                value: 99.99,
+            TestId(
+              'events_started_checkout_button',
+              child: ElevatedButton.icon(
+                onPressed: () => _trackEvent(
+                  eventName: EventMetric.startedCheckout,
+                  properties: {'cart_items': 3},
+                  value: 99.99,
+                ),
+                icon: const Icon(Icons.shopping_cart_checkout),
+                label: const Text('Started Checkout'),
               ),
-              icon: const Icon(Icons.shopping_cart_checkout),
-              label: const Text('Started Checkout'),
             ),
             const SizedBox(height: 8),
 
@@ -210,12 +239,15 @@ class _EventsTabState extends State<EventsTab> {
             ),
             const SizedBox(height: 10),
 
-            ElevatedButton.icon(
-              onPressed: () => _trackEvent(
-                eventName: const EventMetric.custom('Test Event'),
+            TestId(
+              'events_test_event_button',
+              child: ElevatedButton.icon(
+                onPressed: () => _trackEvent(
+                  eventName: const EventMetric.custom('Test Event'),
+                ),
+                icon: const Icon(Icons.science),
+                label: const Text('Test Event'),
               ),
-              icon: const Icon(Icons.science),
-              label: const Text('Test Event'),
             ),
           ],
         ),

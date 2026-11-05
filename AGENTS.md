@@ -16,6 +16,15 @@ in-app messaging (forms), and geofencing.
 Builds go through the example app — there is no standalone build for the plugin itself.
 Use `--no-codesign` for iOS: `cd example && flutter build ios --no-codesign`
 
+The `Makefile` mirrors the CI gates; `make help` lists targets.
+
+- `make setup` installs Flutter, JDK 17, the Android SDK, ktlint and SwiftLint into `~/.cache/klaviyo-flutter-sdk-tools` (Linux x86_64, no root). The Makefile puts them on `PATH`.
+- `make check` runs every Linux CI gate except the example APK build (`make build-android`): Dart format, `flutter analyze`, ktlint, SwiftLint, Dart unit tests and Kotlin unit tests.
+- `make test-android` runs the plugin's Kotlin JVM unit tests (`android/src/test/kotlin`) through the example app's Gradle project.
+- `make build-android` builds the example debug APK; it needs `example/android/app/google-services.json` (CI writes a dummy one).
+
+iOS builds and device tests can't run on Linux. Push the branch and read the `build-ios` workflow result with `gh run list --branch <branch>` and `gh run view <run-id> --log-failed`.
+
 ### Branching
 
 Branch format: `<initials>/<ticket-id>/<short-description>` (e.g. `ab/MAGE-123/fix-push-token`).
@@ -73,6 +82,12 @@ To test against a local native SDK build:
 ## Example app deployment
 
 `.github/workflows/publish-example.yml` ships the example app to the Play internal track and TestFlight on pushes to `master`/`rel/**`, published releases, `workflow_dispatch`, and same-repo PRs labeled `deploy-example-app[:android|:ios]`. Unit tests and lint gate every deploy. Deploys skip until the store secrets exist. Uploads go through fastlane lanes in `example/ios/fastlane` and `example/android/fastlane`. Setup and secrets: `.github/scripts/README.md`.
+
+### UI test IDs
+
+- Every new interactive or asserted-on control in the example app gets a snake_case test ID via `TestId` (`example/lib/widgets/test_id.dart`), which sets `Semantics(identifier:)` and a `ValueKey`.
+- Check the existing names before adding an ID. If the control also exists in the other Klaviyo SDK example apps, reuse its shared name (e.g. `push_request_permission_button`, `build_info_button`).
+- When you rename or remove a control, update its ID and every test or automation that references it (e.g. `example/test/test_ids_test.dart`).
 
 ## Code Review
 

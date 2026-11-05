@@ -45,6 +45,15 @@ android {
     defaultConfig {
         minSdkVersion 23
     }
+
+    testOptions {
+        unitTests.all {
+            testLogging {
+                events "passed", "skipped", "failed"
+                exceptionFormat "full"
+            }
+        }
+    }
 }
 
 def klaviyoSdkVersion = "feat~in-app-forms-previews-SNAPSHOT"
@@ -82,4 +91,7 @@ dependencies {
     }
 
     implementation "com.google.firebase:firebase-messaging:24.1.0"
+
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "io.mockk:mockk:1.13.17"
 }

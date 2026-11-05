@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../main.dart' show setupSilentPushListener, setupPushActionListener;
 import '../widgets/build_info_button.dart';
+import '../widgets/test_id.dart';
 import 'forms_tab.dart';
 import 'geofencing_tab.dart';
 
@@ -320,56 +321,64 @@ class _ProfileTabState extends State<ProfileTab> {
 
   /// Checkbox that toggles [value] in [consentSet].
   Widget _buildConsentCheckbox<T>(
+    String testId,
     String label,
     T value,
     Set<T> consentSet,
   ) {
-    return CheckboxListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      controlAffinity: ListTileControlAffinity.leading,
-      title: Text(label),
-      value: consentSet.contains(value),
-      // Channel selection is meaningless once the broad grant is requested.
-      onChanged: _allAvailableMarketing
-          ? null
-          : (checked) {
-              setState(() {
-                if (checked ?? false) {
-                  consentSet.add(value);
-                } else {
-                  consentSet.remove(value);
-                }
-              });
-            },
+    return TestId(
+      testId,
+      child: CheckboxListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        controlAffinity: ListTileControlAffinity.leading,
+        title: Text(label),
+        value: consentSet.contains(value),
+        // Channel selection is meaningless once the broad grant is requested.
+        onChanged: _allAvailableMarketing
+            ? null
+            : (checked) {
+                setState(() {
+                  if (checked ?? false) {
+                    consentSet.add(value);
+                  } else {
+                    consentSet.remove(value);
+                  }
+                });
+              },
+      ),
     );
   }
 
-  Widget _buildProfileValueRow(String label, String? value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
+  Widget _buildProfileValueRow(String testId, String label, String? value) {
+    return TestId(
+      testId,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 120,
+              child: Text(
+                '$label:',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Text(
-              value ?? '(not set)',
-              style: TextStyle(
-                color: value != null ? Colors.black : Colors.grey.shade600,
-                fontStyle: value != null ? FontStyle.normal : FontStyle.italic,
+            Expanded(
+              child: Text(
+                value ?? '(not set)',
+                style: TextStyle(
+                  color: value != null ? Colors.black : Colors.grey.shade600,
+                  fontStyle:
+                      value != null ? FontStyle.normal : FontStyle.italic,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -395,12 +404,15 @@ class _ProfileTabState extends State<ProfileTab> {
                     : Colors.orange.shade100,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                _status,
-                style: TextStyle(
-                  color: _isInitialized
-                      ? Colors.green.shade900
-                      : Colors.orange.shade900,
+              child: TestId(
+                'profile_status_text',
+                child: Text(
+                  _status,
+                  style: TextStyle(
+                    color: _isInitialized
+                        ? Colors.green.shade900
+                        : Colors.orange.shade900,
+                  ),
                 ),
               ),
             ),
@@ -429,17 +441,32 @@ class _ProfileTabState extends State<ProfileTab> {
                             color: Colors.blue.shade900,
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.refresh, size: 20),
-                          onPressed: _syncCurrentProfile,
-                          tooltip: 'Refresh',
+                        TestId(
+                          'profile_refresh_button',
+                          child: IconButton(
+                            icon: const Icon(Icons.refresh, size: 20),
+                            onPressed: _syncCurrentProfile,
+                            tooltip: 'Refresh profile values',
+                          ),
                         ),
                       ],
                     ),
                     const Divider(),
-                    _buildProfileValueRow('Email', _currentEmail),
-                    _buildProfileValueRow('Phone Number', _currentPhoneNumber),
-                    _buildProfileValueRow('External ID', _currentExternalId),
+                    _buildProfileValueRow(
+                      'profile_current_email_text',
+                      'Email',
+                      _currentEmail,
+                    ),
+                    _buildProfileValueRow(
+                      'profile_current_phone_text',
+                      'Phone Number',
+                      _currentPhoneNumber,
+                    ),
+                    _buildProfileValueRow(
+                      'profile_current_external_id_text',
+                      'External ID',
+                      _currentExternalId,
+                    ),
                   ],
                 ),
               ),
@@ -448,91 +475,127 @@ class _ProfileTabState extends State<ProfileTab> {
 
             // API Key Section
             if (!_isInitialized) ...[
-              TextField(
-                controller: _apiKeyController,
-                decoration: const InputDecoration(
-                  labelText: 'API Key',
-                  border: OutlineInputBorder(),
+              TestId(
+                'profile_api_key_field',
+                child: TextField(
+                  controller: _apiKeyController,
+                  decoration: const InputDecoration(
+                    labelText: 'API Key',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _initializeSDK,
-                child: const Text('Initialize SDK'),
+              TestId(
+                'profile_initialize_button',
+                child: ElevatedButton(
+                  onPressed: _initializeSDK,
+                  child: const Text('Initialize SDK'),
+                ),
               ),
             ],
 
             // Profile Fields (only show when initialized)
             if (_isInitialized) ...[
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _setEmail,
-                child: const Text('Set Email'),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _setPhoneNumber,
-                child: const Text('Set Phone Number'),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _externalIdController,
-                decoration: const InputDecoration(
-                  labelText: 'External ID',
-                  border: OutlineInputBorder(),
+              TestId(
+                'profile_email_field',
+                child: TextField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
                 ),
               ),
               const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _setExternalId,
-                child: const Text('Set External ID'),
+              TestId(
+                'profile_set_email_button',
+                child: ElevatedButton(
+                  onPressed: _setEmail,
+                  child: const Text('Set Email'),
+                ),
               ),
               const SizedBox(height: 20),
-              TextField(
-                controller: _firstNameController,
-                decoration: const InputDecoration(
-                  labelText: 'First Name',
-                  border: OutlineInputBorder(),
+              TestId(
+                'profile_phone_field',
+                child: TextField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.phone,
                 ),
               ),
               const SizedBox(height: 10),
-              TextField(
-                controller: _lastNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Last Name',
-                  border: OutlineInputBorder(),
+              TestId(
+                'profile_set_phone_button',
+                child: ElevatedButton(
+                  onPressed: _setPhoneNumber,
+                  child: const Text('Set Phone Number'),
                 ),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _setFullProfile,
-                child: const Text('Set Full Profile'),
+              TestId(
+                'profile_external_id_field',
+                child: TextField(
+                  controller: _externalIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'External ID',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TestId(
+                'profile_set_external_id_button',
+                child: ElevatedButton(
+                  onPressed: _setExternalId,
+                  child: const Text('Set External ID'),
+                ),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _resetProfile,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+              TestId(
+                'profile_first_name_field',
+                child: TextField(
+                  controller: _firstNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'First Name',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-                child: const Text('Reset Profile'),
+              ),
+              const SizedBox(height: 10),
+              TestId(
+                'profile_last_name_field',
+                child: TextField(
+                  controller: _lastNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Last Name',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              TestId(
+                'profile_set_full_profile_button',
+                child: ElevatedButton(
+                  onPressed: _setFullProfile,
+                  child: const Text('Set Full Profile'),
+                ),
+              ),
+              const SizedBox(height: 20),
+              TestId(
+                'profile_reset_profile_button',
+                child: ElevatedButton(
+                  onPressed: _resetProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Reset Profile'),
+                ),
               ),
               const SizedBox(height: 20),
               const Divider(),
@@ -541,95 +604,124 @@ class _ProfileTabState extends State<ProfileTab> {
               // Subscription Section
               // Lives beside the profile identifiers because consent is validated
               // natively against the email/phone already set on the profile.
-              ExpansionTile(
-                title: const Text(
-                  'Subscription',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              TestId(
+                'profile_subscription_section',
+                merge: false,
+                child: ExpansionTile(
+                  title: TestId(
+                    'profile_subscription_toggle',
+                    child: const Text(
+                      'Subscription',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  tilePadding: const EdgeInsets.all(2),
+                  shape: const Border(),
+                  childrenPadding: const EdgeInsets.symmetric(vertical: 8),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TestId(
+                      'profile_subscription_list_id_field',
+                      child: TextField(
+                        controller: _listIdController,
+                        decoration: const InputDecoration(
+                          labelText: 'List ID',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TestId(
+                      'profile_subscription_custom_source_field',
+                      child: TextField(
+                        controller: _customSourceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Custom Source (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    TestId(
+                      'profile_subscription_all_marketing_switch',
+                      child: SwitchListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('All available marketing'),
+                        subtitle: const Text(
+                          'Marketing consent on every identified channel',
+                        ),
+                        value: _allAvailableMarketing,
+                        onChanged: (value) {
+                          setState(() {
+                            _allAvailableMarketing = value;
+                          });
+                        },
+                      ),
+                    ),
+                    const Text('Email'),
+                    _buildConsentCheckbox(
+                      'profile_subscription_email_marketing_checkbox',
+                      'Marketing',
+                      EmailConsent.marketing,
+                      _emailConsent,
+                    ),
+                    _buildConsentCheckbox(
+                      'profile_subscription_email_open_tracking_checkbox',
+                      'Open tracking',
+                      EmailConsent.openTracking,
+                      _emailConsent,
+                    ),
+                    const Text('SMS'),
+                    _buildConsentCheckbox(
+                      'profile_subscription_sms_marketing_checkbox',
+                      'Marketing',
+                      MessagingConsent.marketing,
+                      _smsConsent,
+                    ),
+                    _buildConsentCheckbox(
+                      'profile_subscription_sms_transactional_checkbox',
+                      'Transactional',
+                      MessagingConsent.transactional,
+                      _smsConsent,
+                    ),
+                    const Text('WhatsApp'),
+                    _buildConsentCheckbox(
+                      'profile_subscription_whatsapp_marketing_checkbox',
+                      'Marketing',
+                      MessagingConsent.marketing,
+                      _whatsappConsent,
+                    ),
+                    _buildConsentCheckbox(
+                      'profile_subscription_whatsapp_transactional_checkbox',
+                      'Transactional',
+                      MessagingConsent.transactional,
+                      _whatsappConsent,
+                    ),
+                    const SizedBox(height: 10),
+                    TestId(
+                      'profile_subscription_create_button',
+                      child: ElevatedButton(
+                        onPressed: _createSubscription,
+                        child: const Text('Create Subscription'),
+                      ),
+                    ),
+                  ],
                 ),
-                tilePadding: const EdgeInsets.all(2),
-                shape: const Border(),
-                childrenPadding: const EdgeInsets.symmetric(vertical: 8),
-                expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _listIdController,
-                    decoration: const InputDecoration(
-                      labelText: 'List ID',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _customSourceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Custom Source (optional)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  SwitchListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('All available marketing'),
-                    subtitle: const Text(
-                      'Marketing consent on every identified channel',
-                    ),
-                    value: _allAvailableMarketing,
-                    onChanged: (value) {
-                      setState(() {
-                        _allAvailableMarketing = value;
-                      });
-                    },
-                  ),
-                  const Text('Email'),
-                  _buildConsentCheckbox(
-                    'Marketing',
-                    EmailConsent.marketing,
-                    _emailConsent,
-                  ),
-                  _buildConsentCheckbox(
-                    'Open tracking',
-                    EmailConsent.openTracking,
-                    _emailConsent,
-                  ),
-                  const Text('SMS'),
-                  _buildConsentCheckbox(
-                    'Marketing',
-                    MessagingConsent.marketing,
-                    _smsConsent,
-                  ),
-                  _buildConsentCheckbox(
-                    'Transactional',
-                    MessagingConsent.transactional,
-                    _smsConsent,
-                  ),
-                  const Text('WhatsApp'),
-                  _buildConsentCheckbox(
-                    'Marketing',
-                    MessagingConsent.marketing,
-                    _whatsappConsent,
-                  ),
-                  _buildConsentCheckbox(
-                    'Transactional',
-                    MessagingConsent.transactional,
-                    _whatsappConsent,
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _createSubscription,
-                    child: const Text('Create Subscription'),
-                  ),
-                ],
               ),
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _resetSDK,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey.shade700,
-                  foregroundColor: Colors.white,
+              TestId(
+                'profile_reset_sdk_button',
+                child: ElevatedButton(
+                  onPressed: _resetSDK,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey.shade700,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Reset SDK & Change API Key'),
                 ),
-                child: const Text('Reset SDK & Change API Key'),
               ),
             ],
           ],

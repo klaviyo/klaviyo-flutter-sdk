@@ -8,6 +8,7 @@ import '../auth/auth_models.dart';
 import '../auth/jwt_inspector.dart';
 import '../auth/refresh_estimate.dart';
 import '../auth/scripted_provider.dart';
+import '../widgets/test_id.dart';
 
 /// Screen 1 (MAGE-794): drives the SDK's auth-token provider — toggle
 /// registration, script the ordered responses, observe the current token, and
@@ -66,21 +67,24 @@ class _AuthTabState extends State<AuthTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Auth token provider'),
-          value: enabled,
-          // Disable the control while a register/unregister is in flight so the
-          // switch can't snap back and accept a re-entrant toggle mid-transition.
-          onChanged: authController.isTransitioning
-              ? null
-              : (on) {
-                  if (on) {
-                    authController.enable();
-                  } else {
-                    authController.disable();
-                  }
-                },
+        TestId(
+          'auth_provider_switch',
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Auth token provider'),
+            value: enabled,
+            // Disable the control while a register/unregister is in flight so the
+            // switch can't snap back and accept a re-entrant toggle mid-transition.
+            onChanged: authController.isTransitioning
+                ? null
+                : (on) {
+                    if (on) {
+                      authController.enable();
+                    } else {
+                      authController.disable();
+                    }
+                  },
+          ),
         ),
         Text(
           enabled
@@ -103,10 +107,13 @@ class _AuthTabState extends State<AuthTab> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _sectionTitle('Provider responses'),
-            TextButton.icon(
-              onPressed: authController.addResponse,
-              icon: const Icon(Icons.add),
-              label: const Text('Add'),
+            TestId(
+              'auth_add_response_button',
+              child: TextButton.icon(
+                onPressed: authController.addResponse,
+                icon: const Icon(Icons.add),
+                label: const Text('Add', semanticsLabel: 'Add response'),
+              ),
             ),
           ],
         ),
@@ -137,66 +144,86 @@ class _AuthTabState extends State<AuthTab> {
     return Opacity(
       key: ValueKey(response.id),
       opacity: locked ? 0.5 : 1.0,
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Call number (secondary), preceded by a dot marking the most
-            // recently served response; its label is blue when current.
-            Row(
-              children: [
-                if (isCurrent) ...[
-                  const Icon(Icons.circle, size: 8, color: Colors.blue),
-                  const SizedBox(width: 6),
+      child: TestId(
+        'auth_response_row_${index + 1}',
+        merge: false,
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Call number (secondary), preceded by a dot marking the most
+              // recently served response; its label is blue when current.
+              Row(
+                children: [
+                  if (isCurrent) ...[
+                    const Icon(Icons.circle, size: 8, color: Colors.blue),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(
+                    callLabel,
+                    style: secondaryStyle?.copyWith(
+                      color: isCurrent ? Colors.blue : secondary,
+                    ),
+                  ),
                 ],
-                Text(
-                  callLabel,
-                  style: secondaryStyle?.copyWith(
-                    color: isCurrent ? Colors.blue : secondary,
+              ),
+              // Response type (primary).
+              Text(
+                response.outcome.label,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              if (details != null) details,
+            ],
+          ),
+          onTap: locked
+              ? null
+              : () => context.push('/configure-auth-response/${response.id}'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TestId(
+                'auth_response_menu_button_${index + 1}',
+                child: PopupMenuButton<String>(
+                  onSelected: (action) {
+                    if (action == 'duplicate') {
+                      authController.duplicateResponse(response.id);
+                    } else if (action == 'delete') {
+                      authController.deleteResponse(response.id);
+                    }
+                  },
+                  tooltip: 'Response ${index + 1} options',
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'duplicate',
+                      child: TestId(
+                        'auth_response_duplicate_menu_item',
+                        child: const Text('Duplicate'),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      enabled: authController.canDelete(index),
+                      child: TestId(
+                        'auth_response_delete_menu_item',
+                        child: const Text('Delete'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TestId(
+                'auth_response_drag_handle_${index + 1}',
+                child: ReorderableDragStartListener(
+                  index: index,
+                  child: Icon(
+                    Icons.drag_handle,
+                    semanticLabel: 'Reorder response ${index + 1}',
                   ),
                 ),
-              ],
-            ),
-            // Response type (primary).
-            Text(
-              response.outcome.label,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            if (details != null) details,
-          ],
-        ),
-        onTap: locked
-            ? null
-            : () => context.push('/configure-auth-response/${response.id}'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PopupMenuButton<String>(
-              onSelected: (action) {
-                if (action == 'duplicate') {
-                  authController.duplicateResponse(response.id);
-                } else if (action == 'delete') {
-                  authController.deleteResponse(response.id);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'duplicate',
-                  child: Text('Duplicate'),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  enabled: authController.canDelete(index),
-                  child: const Text('Delete'),
-                ),
-              ],
-            ),
-            ReorderableDragStartListener(
-              index: index,
-              child: const Icon(Icons.drag_handle),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -353,9 +380,12 @@ class _AuthTabState extends State<AuthTab> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _sectionTitle('Auth logs'),
-            TextButton(
-              onPressed: authController.clearLogs,
-              child: const Text('Clear'),
+            TestId(
+              'auth_clear_logs_button',
+              child: TextButton(
+                onPressed: authController.clearLogs,
+                child: const Text('Clear', semanticsLabel: 'Clear auth logs'),
+              ),
             ),
           ],
         ),

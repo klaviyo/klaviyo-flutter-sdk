@@ -18,7 +18,6 @@ platform's credentials without building or uploading.
 - `gradle-retry.sh`: retries the Android build with `--refresh-dependencies` on a JitPack failure.
 - `source-label.sh`: release tag, PR head branch, or branch name, shown in notes and Slack.
 - `check-secrets.sh`: preflight; prints only the names of missing secrets.
-- `slack-payload.sh`: builds the Slack message as JSON.
 - `scripts/sdk-ref.sh` (repo root): writes `example/build-info.json` (SDK refs, commit, branch, source) that the
   builds embed and the app shows in its Build info sheet.
 
@@ -40,7 +39,8 @@ Repository secrets (not environment secrets; the preflight cannot see those):
   `SERVICE_ACCOUNT_JSON`
 - `APP_STORE_CONNECT_API_KEY_ID`, `APP_STORE_CONNECT_API_KEY_ISSUER_ID`, `APP_STORE_CONNECT_API_KEY_BASE64`
 - `MATCH_PASSWORD`, `MATCH_DEPLOY_KEY`, `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`
-- Optional: `SLACK_WEBHOOK_URL`, `APPLE_TEAM_ID` (defaults to `G3793W2RJ2`)
+- `SLACK_BOT_TOKEN` (Slack posts skip without it)
+- Optional: `APPLE_TEAM_ID` (defaults to `G3793W2RJ2`)
 
 Deploy jobs run in the `android-internal-track` and `testflight` environments, with no required reviewers.
 

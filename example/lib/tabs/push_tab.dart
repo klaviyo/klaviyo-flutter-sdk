@@ -6,6 +6,8 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../widgets/test_id.dart';
+
 final _logger = Logger('KlaviyoExample');
 
 class PushTab extends StatefulWidget {
@@ -203,9 +205,12 @@ class _PushTabState extends State<PushTab> {
                 color: Colors.purple.shade100,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                _status,
-                style: TextStyle(color: Colors.purple.shade900),
+              child: TestId(
+                'push_status_text',
+                child: Text(
+                  _status,
+                  style: TextStyle(color: Colors.purple.shade900),
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -217,7 +222,12 @@ class _PushTabState extends State<PushTab> {
             ),
             const SizedBox(height: 10),
 
-            Text('Status: ${_notificationsEnabled ? "Enabled" : "Disabled"}'),
+            TestId(
+              'push_permission_status_text',
+              child: Text(
+                'Status: ${_notificationsEnabled ? "Enabled" : "Disabled"}',
+              ),
+            ),
             const SizedBox(height: 10),
 
             if (_pushToken != null) ...[
@@ -225,31 +235,38 @@ class _PushTabState extends State<PushTab> {
                 'Push Token (tap to copy):',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              InkWell(
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: _pushToken!));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Push token copied to clipboard'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                child: Text(
-                  _pushToken!,
-                  style: const TextStyle(fontSize: 10),
+              TestId(
+                'push_token_copy_button',
+                child: InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: _pushToken!));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Push token copied to clipboard'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    _pushToken!,
+                    style: const TextStyle(fontSize: 10),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
             ],
 
-            ElevatedButton(
-              onPressed:
-                  _notificationsEnabled ? null : _requestNotificationPermission,
-              child: Text(
-                _notificationsEnabled
-                    ? 'Notifications Enabled'
-                    : 'Enable Push Notifications',
+            TestId(
+              'push_request_permission_button',
+              child: ElevatedButton(
+                onPressed: _notificationsEnabled
+                    ? null
+                    : _requestNotificationPermission,
+                child: Text(
+                  _notificationsEnabled
+                      ? 'Notifications Enabled'
+                      : 'Enable Push Notifications',
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -264,28 +281,41 @@ class _PushTabState extends State<PushTab> {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _badgeCountController,
-                      decoration: const InputDecoration(
-                        labelText: 'Badge Count',
-                        border: OutlineInputBorder(),
+                    child: TestId(
+                      'push_badge_count_field',
+                      child: TextField(
+                        controller: _badgeCountController,
+                        decoration: const InputDecoration(
+                          labelText: 'Badge Count',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
                       ),
-                      keyboardType: TextInputType.number,
                     ),
                   ),
                   const SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: _setBadgeCount,
-                    child: const Text('Set'),
+                  TestId(
+                    'push_set_badge_button',
+                    child: ElevatedButton(
+                      onPressed: _setBadgeCount,
+                      child:
+                          const Text('Set', semanticsLabel: 'Set badge count'),
+                    ),
                   ),
                   const SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: _clearBadge,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
+                  TestId(
+                    'push_clear_badge_button',
+                    child: ElevatedButton(
+                      onPressed: _clearBadge,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text(
+                        'Clear',
+                        semanticsLabel: 'Clear badge count',
+                      ),
                     ),
-                    child: const Text('Clear'),
                   ),
                 ],
               ),
