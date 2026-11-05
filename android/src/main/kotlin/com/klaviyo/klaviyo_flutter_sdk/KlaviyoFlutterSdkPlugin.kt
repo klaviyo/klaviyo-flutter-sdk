@@ -107,11 +107,16 @@ class KlaviyoFlutterSdkPlugin :
         // push cached by one engine's plugin isn't stranded when another claims delivery.
         @Volatile
         private var cachedSilentPush: Map<String, Any?>? = null
+
+        // Plugin instances whose engine is currently attached, in attach order.
+        // Mutated only from engine attach/detach on the main thread.
+        private val activePlugins = LinkedHashSet<KlaviyoFlutterSdkPlugin>()
     }
 
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
+        activePlugins.add(this)
         // Never take delivery away from an engine that already has a live Dart
         // listener. A host using firebase_messaging's onBackgroundMessage gets a
         // second FlutterEngine for the background isolate, which auto-registers
@@ -805,14 +810,18 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
+        activePlugins.remove(this)
         if (instance === this) {
-            instance = null
+            // Hand delivery to a remaining engine, preferring one with a live Dart listener.
+            instance = activePlugins.firstOrNull { it.eventSink != null } ?: activePlugins.firstOrNull()
         }
         eventSink = null
         // Unregister the auth token provider so the Klaviyo singleton stops
         // retaining (and invoking) this now-detached plugin instance's bridge
         // lambda after the engine is gone, and drain pending callbacks.
         tearDownAuthTokenProvider("Flutter engine detached")
+        // The form lifecycle handler is process-wide; only remove it once no engine remains.
+        if (activePlugins.isNotEmpty()) return
         try {
             Klaviyo.unregisterFormLifecycleHandler()
         } catch (_: MissingKlaviyoModule) {
