@@ -107,19 +107,25 @@ class KlaviyoFlutterSdkPlugin :
         // push cached by one engine's plugin isn't stranded when another claims delivery.
         @Volatile
         private var cachedSilentPush: Map<String, Any?>? = null
+
+        // Plugin instances whose engine is currently attached, in attach order.
+        // Mutated only from engine attach/detach on the main thread.
+        private val activePlugins = LinkedHashSet<KlaviyoFlutterSdkPlugin>()
+
+        // Primary engine: the first listening engine attached to an Activity, else the
+        // first listening engine, else the first attached engine.
+        private fun selectInstance() {
+            instance = activePlugins.firstOrNull { it.eventSink != null && it.activity != null }
+                ?: activePlugins.firstOrNull { it.eventSink != null }
+                ?: activePlugins.firstOrNull()
+        }
     }
 
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
-        // Never take delivery away from an engine that already has a live Dart
-        // listener. A host using firebase_messaging's onBackgroundMessage gets a
-        // second FlutterEngine for the background isolate, which auto-registers
-        // this plugin; that instance never subscribes to the EventChannel, so
-        // letting it claim `instance` would strand every event.
-        if (instance?.eventSink == null) {
-            instance = this
-        }
+        activePlugins.add(this)
+        selectInstance()
         applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
@@ -132,8 +138,7 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
-                    // Whichever engine has a live Dart listener owns event delivery.
-                    instance = this@KlaviyoFlutterSdkPlugin
+                    selectInstance()
                     // Replay a silent push that arrived before Flutter subscribed.
                     cachedSilentPush?.let { events?.success(it) }
                     cachedSilentPush = null
@@ -141,6 +146,7 @@ class KlaviyoFlutterSdkPlugin :
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
+                    selectInstance()
                     // The Dart side keeps a permanent auth-event listener, so this
                     // fires at engine teardown. Tear the auth bridge down here too
                     // (parity with iOS onCancel) so in-flight requests fail promptly
@@ -485,7 +491,8 @@ class KlaviyoFlutterSdkPlugin :
                         }
 
                         Handler(Looper.getMainLooper()).post {
-                            eventSink?.success(
+                            // Falls back to the current delivery owner once this engine has detached.
+                            (eventSink ?: instance?.eventSink)?.success(
                                 mapOf(
                                     "type" to "form_lifecycle_event",
                                     "data" to data,
@@ -805,14 +812,15 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
-        if (instance === this) {
-            instance = null
-        }
+        activePlugins.remove(this)
         eventSink = null
+        selectInstance()
         // Unregister the auth token provider so the Klaviyo singleton stops
         // retaining (and invoking) this now-detached plugin instance's bridge
         // lambda after the engine is gone, and drain pending callbacks.
         tearDownAuthTokenProvider("Flutter engine detached")
+        // The form lifecycle handler is process-wide; only remove it once no engine remains.
+        if (activePlugins.isNotEmpty()) return
         try {
             Klaviyo.unregisterFormLifecycleHandler()
         } catch (_: MissingKlaviyoModule) {
@@ -851,6 +859,7 @@ class KlaviyoFlutterSdkPlugin :
     @OptIn(AdvancedAPI::class)
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        selectInstance()
 
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
@@ -884,6 +893,7 @@ class KlaviyoFlutterSdkPlugin :
 
     override fun onDetachedFromActivity() {
         activity = null
+        selectInstance()
     }
 
     // Fallback when logging is enabled but no prior level was captured (e.g. it

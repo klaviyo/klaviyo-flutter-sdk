@@ -45,6 +45,12 @@ android {
     defaultConfig {
         minSdkVersion 23
     }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
 }
 
 def klaviyoSdkVersion = "4.6.0"
@@ -82,4 +88,8 @@ dependencies {
     }
 
     implementation "com.google.firebase:firebase-messaging:24.1.0"
+
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.robolectric:robolectric:4.14.1"
+    testImplementation "io.mockk:mockk:1.13.13"
 }
