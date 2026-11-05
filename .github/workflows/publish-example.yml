@@ -592,6 +592,9 @@ jobs:
       group: publish-example-ios
       cancel-in-progress: false
       queue: max
+    defaults:
+      run:
+        working-directory: klaviyo_flutter_sdk
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     outputs:
@@ -610,6 +613,7 @@ jobs:
       ios_sdk_ref: ${{ steps.result.outputs.ios_sdk_ref }}
     steps:
       - name: Record job start
+        working-directory: .
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -617,6 +621,7 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: klaviyo_flutter_sdk
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
@@ -655,7 +660,7 @@ jobs:
       # to xcodebuild on every attempt.
       - name: Generate Flutter config and install pods
         id: flutterconfig
-        working-directory: example
+        working-directory: klaviyo_flutter_sdk/example
         run: |
           flutter pub get
           flutter build ios --release --config-only --no-codesign \
@@ -666,11 +671,11 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
-          working-directory: example/ios
+          working-directory: klaviyo_flutter_sdk/example/ios
 
       - name: Check App Store Connect key only
         if: inputs.check_credentials == true
-        working-directory: example/ios
+        working-directory: klaviyo_flutter_sdk/example/ios
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
@@ -679,7 +684,7 @@ jobs:
 
       - name: Check match repo is readable
         if: inputs.check_credentials == true
-        working-directory: example/ios
+        working-directory: klaviyo_flutter_sdk/example/ios
         env:
           MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
         run: |
@@ -693,7 +698,7 @@ jobs:
       - name: Install signing identity, build and upload
         if: inputs.check_credentials != true
         id: build
-        working-directory: example/ios
+        working-directory: klaviyo_flutter_sdk/example/ios
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
