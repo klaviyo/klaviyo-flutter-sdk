@@ -501,7 +501,8 @@ class KlaviyoFlutterSdkPlugin :
                         }
 
                         Handler(Looper.getMainLooper()).post {
-                            eventSink?.success(
+                            // Falls back to the current delivery owner once this engine has detached.
+                            (eventSink ?: instance?.eventSink)?.success(
                                 mapOf(
                                     "type" to "form_lifecycle_event",
                                     "data" to data,
