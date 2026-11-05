@@ -1,5 +1,6 @@
 package com.klaviyo.klaviyo_flutter_sdk
 
+import android.app.Activity
 import android.os.Looper
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.forms.FormLifecycleEvent
@@ -8,6 +9,7 @@ import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.registerFormLifecycleHandler
 import com.klaviyo.forms.unregisterFormLifecycleHandler
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -84,6 +86,17 @@ class KlaviyoFlutterSdkPluginEngineTest {
 
         fun listen() = messenger.streamCall("listen")
 
+        fun cancel() = messenger.streamCall("cancel")
+
+        fun attachActivity() =
+            plugin.onAttachedToActivity(
+                mockk<ActivityPluginBinding>(relaxed = true) {
+                    every { activity } returns mockk<Activity>(relaxed = true)
+                },
+            )
+
+        fun detachActivity() = plugin.onDetachedFromActivity()
+
         fun registerForms() =
             plugin.onMethodCall(
                 MethodCall("registerForInAppForms", mapOf("configuration" to mapOf("sessionTimeoutDuration" to 60))),
@@ -149,20 +162,48 @@ class KlaviyoFlutterSdkPluginEngineTest {
     }
 
     @Test
-    fun `detaching a listening secondary engine hands delivery back to the primary`() {
+    fun `a later listening engine does not take delivery from the primary`() {
         val primary = attach()
         primary.listen()
         primary.registerForms()
 
         val secondary = attach()
         secondary.listen()
-        assertSame(secondary.plugin, KlaviyoFlutterSdkPlugin.instance)
+        assertSame(primary.plugin, KlaviyoFlutterSdkPlugin.instance)
 
         detach(secondary)
 
         assertSame(primary.plugin, KlaviyoFlutterSdkPlugin.instance)
         emitFormShown()
         assertEquals(1, primary.formEvents().size)
+    }
+
+    @Test
+    fun `a listening engine attached to an activity is primary over a headless engine`() {
+        val headless = attach()
+        headless.listen()
+        val ui = attach()
+        ui.listen()
+        assertSame(headless.plugin, KlaviyoFlutterSdkPlugin.instance)
+
+        ui.attachActivity()
+        assertSame(ui.plugin, KlaviyoFlutterSdkPlugin.instance)
+
+        ui.detachActivity()
+        assertSame(headless.plugin, KlaviyoFlutterSdkPlugin.instance)
+    }
+
+    @Test
+    fun `cancelling the primary hands delivery to the next listening engine`() {
+        val primary = attach()
+        primary.attachActivity()
+        primary.listen()
+        val headless = attach()
+        headless.listen()
+
+        primary.cancel()
+
+        assertSame(headless.plugin, KlaviyoFlutterSdkPlugin.instance)
     }
 
     @Test

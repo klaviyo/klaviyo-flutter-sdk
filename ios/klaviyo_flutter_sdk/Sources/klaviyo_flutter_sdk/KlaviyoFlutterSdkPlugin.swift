@@ -28,11 +28,16 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     public static let shared = KlaviyoFlutterSdkPlugin()
 
     /// Event sinks of engines whose Dart side is listening, in listen order.
-    /// The first entry is the primary engine and receives every event.
-    private var engineSinks: [(owner: ObjectIdentifier, sink: FlutterEventSink)] = []
+    private var engineSinks: [EngineSink] = []
+
+    /// The primary engine receives every event: the first listening engine that
+    /// has a view controller, or the first listening engine if none has one.
+    private var primarySink: EngineSink? {
+        engineSinks.first { $0.hasViewController() } ?? engineSinks.first
+    }
 
     private var eventSink: FlutterEventSink? {
-        engineSinks.first?.sink
+        primarySink?.sink
     }
 
     private static var didAddApplicationDelegate = false
@@ -59,7 +64,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         // Each engine gets its own stream handler; the shared instance routes events
         // to the primary engine. Publishing it delivers the engine's detach callback.
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
-        let engineStream = EngineEventStream()
+        let engineStream = EngineEventStream(registrar: registrar)
         eventChannel.setStreamHandler(engineStream)
         registrar.publish(engineStream)
 
@@ -410,7 +415,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         withArguments arguments: Any?,
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
-        addListener(ObjectIdentifier(self), sink: events)
+        addListener(EngineSink(owner: ObjectIdentifier(self), sink: events) { false })
         return nil
     }
 
@@ -419,22 +424,21 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         return nil
     }
 
-    /// Adds an engine's sink. The first engine to listen is primary until it
-    /// cancels or detaches; later engines queue behind it.
-    fileprivate func addListener(_ owner: ObjectIdentifier, sink events: @escaping FlutterEventSink) {
-        engineSinks.removeAll { $0.owner == owner }
-        engineSinks.append((owner: owner, sink: events))
-        if engineSinks.count == 1 {
-            replayCachedEvents(to: events)
+    /// Adds an engine's sink and replays cached events if it becomes the primary.
+    fileprivate func addListener(_ engineSink: EngineSink) {
+        engineSinks.removeAll { $0.owner == engineSink.owner }
+        engineSinks.append(engineSink)
+        if primarySink?.owner == engineSink.owner {
+            replayCachedEvents(to: engineSink.sink)
         }
     }
 
-    /// Removes an engine's sink. If it was the primary, the next listening
-    /// engine (if any) becomes primary and the auth bridge is torn down.
+    /// Removes an engine's sink. If it was the primary, the next engine chosen by
+    /// `primarySink` takes over and the auth bridge is torn down.
     fileprivate func removeListener(_ owner: ObjectIdentifier) {
-        guard let index = engineSinks.firstIndex(where: { $0.owner == owner }) else { return }
-        engineSinks.remove(at: index)
-        guard index == 0 else { return }
+        let wasPrimary = primarySink?.owner == owner
+        engineSinks.removeAll { $0.owner == owner }
+        guard wasPrimary else { return }
         // The Dart side keeps a permanent auth-event listener, so this fires at
         // engine teardown. Give parity with Android's onDetachedFromEngine:
         // unregister the auth-token provider and fail any in-flight requests
@@ -468,14 +472,31 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
     }
 }
 
+/// A listening engine's event sink.
+private struct EngineSink {
+    let owner: ObjectIdentifier
+    let sink: FlutterEventSink
+    let hasViewController: () -> Bool
+}
+
 /// Per-engine `klaviyo_events` stream handler that registers the engine's sink
 /// with the shared plugin.
 private final class EngineEventStream: NSObject, FlutterStreamHandler {
+    private weak var registrar: FlutterPluginRegistrar?
+
+    init(registrar: FlutterPluginRegistrar) {
+        self.registrar = registrar
+    }
+
     func onListen(
         withArguments arguments: Any?,
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
-        KlaviyoFlutterSdkPlugin.shared.addListener(ObjectIdentifier(self), sink: events)
+        KlaviyoFlutterSdkPlugin.shared.addListener(
+            EngineSink(owner: ObjectIdentifier(self), sink: events) { [weak self] in
+                self?.registrar?.viewController != nil
+            }
+        )
         return nil
     }
 
