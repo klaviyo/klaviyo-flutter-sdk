@@ -177,6 +177,20 @@ class KlaviyoFlutterSdkPluginEngineTest {
     }
 
     @Test
+    fun `form events reach the remaining engine after the registering engine detaches`() {
+        val primary = attach()
+        primary.listen()
+        primary.registerForms()
+        val secondary = attach()
+        secondary.listen()
+
+        detach(primary)
+
+        emitFormShown()
+        assertEquals(1, secondary.formEvents().size)
+    }
+
+    @Test
     fun `detaching the last engine tears down the form lifecycle handler`() {
         val primary = attach()
         primary.listen()
