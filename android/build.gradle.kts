@@ -54,6 +54,15 @@ extensions.configure<com.android.build.api.dsl.LibraryExtension> {
     defaultConfig {
         minSdk = 23
     }
+
+    testOptions {
+        unitTests.all {
+            it.testLogging {
+                events("passed", "skipped", "failed")
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+            }
+        }
+    }
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
@@ -101,4 +110,7 @@ dependencies {
     }
 
     "implementation"("com.google.firebase:firebase-messaging:24.1.0")
+
+    "testImplementation"("junit:junit:4.13.2")
+    "testImplementation"("io.mockk:mockk:1.13.17")
 }
