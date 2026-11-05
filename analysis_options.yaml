@@ -12,6 +12,11 @@ include: package:flutter_lints/flutter.yaml
 formatter:
   page_width: 80
 
+analyzer:
+  exclude:
+    - build/**
+    - example/build/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
