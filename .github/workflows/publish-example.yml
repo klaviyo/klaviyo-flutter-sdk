@@ -271,7 +271,7 @@ jobs:
         || needs.preflight-android.result == 'failure'
         || needs.preflight-ios.result == 'failure')
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 2
     permissions:
       contents: read
     outputs:
@@ -902,7 +902,7 @@ jobs:
     name: Update the deploy message
     needs:
       [announce, gate-test, gate-lint, preflight-android, preflight-ios, deploy-android, deploy-ios]
-    if: always() && needs.announce.outputs.slack_ts != ''
+    if: always() && needs.announce.result != 'skipped'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -1013,6 +1013,7 @@ jobs:
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
           status: ${{ steps.result.outputs.status }}
           title: ${{ steps.result.outputs.title }}
           body: ${{ steps.result.outputs.body }}
