@@ -902,7 +902,7 @@ jobs:
   report:
     name: Update the deploy message
     needs:
-      [announce, gate-test, gate-lint, preflight-android, preflight-ios, deploy-android, deploy-ios]
+      [announce, progress, gate-test, gate-lint, preflight-android, preflight-ios, deploy-android, deploy-ios]
     if: always() && needs.announce.result != 'skipped'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -990,7 +990,7 @@ jobs:
           elif [ "$CHECK_CREDENTIALS" = "true" ]; then
             status=success; title="Flutter Example App credential check passed"
           else
-            status=success; title="Flutter Example App deployed \`${VERSION}\`"
+            status=success; title="Flutter Example App deployed${VERSION:+ \`${VERSION}\`}"
             body="Details for each platform are in the thread."
           fi
           {
@@ -1000,6 +1000,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Checkout Slack action
+        if: always()
         continue-on-error: true
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
