@@ -287,7 +287,10 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.sha }}
-          sparse-checkout: .github
+          sparse-checkout: |
+            .github
+            pubspec.yaml
+          sparse-checkout-cone-mode: false
           persist-credentials: false
           path: _slack
 
