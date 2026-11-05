@@ -27,7 +27,15 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     /// Singleton instance to allow the Host App's AppDelegate to forward events manually.
     public static let shared = KlaviyoFlutterSdkPlugin()
 
-    private var eventSink: FlutterEventSink?
+    /// Event sinks of engines whose Dart side is listening, in listen order.
+    /// The first entry is the primary engine and receives every event.
+    private var engineSinks: [(owner: ObjectIdentifier, sink: FlutterEventSink)] = []
+
+    private var eventSink: FlutterEventSink? {
+        engineSinks.first?.sink
+    }
+
+    private static var didAddApplicationDelegate = false
 
     // Cache values to handle the race condition where the value arrives
     // before Flutter has finished initializing the EventChannel.
@@ -48,13 +56,20 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: channel)
 
         // 2. Setup Event Channel (For Data Streams: tokens, opened notifications)
+        // Each engine gets its own stream handler; the shared instance routes events
+        // to the primary engine. Publishing it delivers the engine's detach callback.
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
-        eventChannel.setStreamHandler(instance)
+        let engineStream = EngineEventStream()
+        eventChannel.setStreamHandler(engineStream)
+        registrar.publish(engineStream)
 
-        // 3. Register as Application Delegate
+        // 3. Register as Application Delegate, once per process
         // This allows us to automatically intercept 'didRegisterForRemoteNotifications'
         // without requiring code in the Host App's AppDelegate.
-        registrar.addApplicationDelegate(instance)
+        if !didAddApplicationDelegate {
+            didAddApplicationDelegate = true
+            registrar.addApplicationDelegate(instance)
+        }
     }
 }
 
@@ -395,8 +410,39 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         withArguments arguments: Any?,
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
-        eventSink = events
+        addListener(ObjectIdentifier(self), sink: events)
+        return nil
+    }
 
+    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        removeListener(ObjectIdentifier(self))
+        return nil
+    }
+
+    /// Adds an engine's sink. The first engine to listen is primary until it
+    /// cancels or detaches; later engines queue behind it.
+    fileprivate func addListener(_ owner: ObjectIdentifier, sink events: @escaping FlutterEventSink) {
+        engineSinks.removeAll { $0.owner == owner }
+        engineSinks.append((owner: owner, sink: events))
+        if engineSinks.count == 1 {
+            replayCachedEvents(to: events)
+        }
+    }
+
+    /// Removes an engine's sink. If it was the primary, the next listening
+    /// engine (if any) becomes primary and the auth bridge is torn down.
+    fileprivate func removeListener(_ owner: ObjectIdentifier) {
+        guard let index = engineSinks.firstIndex(where: { $0.owner == owner }) else { return }
+        engineSinks.remove(at: index)
+        guard index == 0 else { return }
+        // The Dart side keeps a permanent auth-event listener, so this fires at
+        // engine teardown. Give parity with Android's onDetachedFromEngine:
+        // unregister the auth-token provider and fail any in-flight requests
+        // immediately rather than leaving them suspended until the SDK timeout.
+        unregisterAuthTokenProvider(reason: "Flutter engine detached")
+    }
+
+    private func replayCachedEvents(to events: FlutterEventSink) {
         // If we have cached values from early app launch, send them now.
         // This solves the race condition where values arrive before Flutter is ready.
         if let cachedToken = cachedToken {
@@ -419,17 +465,29 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedPushAction.merging(["replayed": true]) { $1 })
             self.cachedPushAction = nil
         }
+    }
+}
+
+/// Per-engine `klaviyo_events` stream handler that registers the engine's sink
+/// with the shared plugin.
+private final class EngineEventStream: NSObject, FlutterStreamHandler {
+    func onListen(
+        withArguments arguments: Any?,
+        eventSink events: @escaping FlutterEventSink
+    ) -> FlutterError? {
+        KlaviyoFlutterSdkPlugin.shared.addListener(ObjectIdentifier(self), sink: events)
         return nil
     }
 
-    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        eventSink = nil
-        // The Dart side keeps a permanent auth-event listener, so this fires at
-        // engine teardown. Give parity with Android's onDetachedFromEngine:
-        // unregister the auth-token provider and fail any in-flight requests
-        // immediately rather than leaving them suspended until the SDK timeout.
-        unregisterAuthTokenProvider(reason: "Flutter engine detached")
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
         return nil
+    }
+
+    /// Called by the Flutter engine on deallocation for published values.
+    @objc(detachFromEngineForRegistrar:)
+    func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+        KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
     }
 }
 
