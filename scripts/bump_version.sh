@@ -6,6 +6,12 @@
 
 set -e  # Exit on error
 
+# In-place sed that works with both BSD (macOS) and GNU (Linux) sed.
+sed_inplace() {
+    local file="${@: -1}"
+    sed -i.bak "$@" && rm -f "$file.bak"
+}
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -47,29 +53,15 @@ echo -e "${BLUE}Updating files...${NC}"
 
 # 1. Update pubspec.yaml
 echo -e "${GREEN}✓${NC} Updating pubspec.yaml"
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    sed -i '' "s/^version: .*/version: $NEW_VERSION/" pubspec.yaml
-else
-    # Linux
-    sed -i "s/^version: .*/version: $NEW_VERSION/" pubspec.yaml
-fi
+sed_inplace "s/^version: .*/version: $NEW_VERSION/" pubspec.yaml
 
 # 2. Update README.md
 echo -e "${GREEN}✓${NC} Updating README.md"
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s/klaviyo_flutter_sdk: \^.*/klaviyo_flutter_sdk: ^$NEW_VERSION/" README.md
-else
-    sed -i "s/klaviyo_flutter_sdk: \^.*/klaviyo_flutter_sdk: ^$NEW_VERSION/" README.md
-fi
+sed_inplace "s/klaviyo_flutter_sdk: \^.*/klaviyo_flutter_sdk: ^$NEW_VERSION/" README.md
 
 # 3. Update Android strings.xml
 echo -e "${GREEN}✓${NC} Updating android/src/main/res/values/strings.xml"
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s/<string name=\"klaviyo_sdk_version_override\">.*<\/string>/<string name=\"klaviyo_sdk_version_override\">$NEW_VERSION<\/string>/" android/src/main/res/values/strings.xml
-else
-    sed -i "s/<string name=\"klaviyo_sdk_version_override\">.*<\/string>/<string name=\"klaviyo_sdk_version_override\">$NEW_VERSION<\/string>/" android/src/main/res/values/strings.xml
-fi
+sed_inplace "s/<string name=\"klaviyo_sdk_version_override\">.*<\/string>/<string name=\"klaviyo_sdk_version_override\">$NEW_VERSION<\/string>/" android/src/main/res/values/strings.xml
 
 # 4. Update iOS plist via sync_version.sh
 echo -e "${GREEN}✓${NC} Updating ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist"
@@ -82,11 +74,7 @@ if ! grep -q "## $NEW_VERSION" CHANGELOG.md; then
     CURRENT_DATE=$(date +"%Y-%m-%d")
 
     # Create temp file with new version section
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s/# Changelog/# Changelog\n\n## $NEW_VERSION - $CURRENT_DATE\n\n### Changes\n- TODO: Add changelog entries\n/" CHANGELOG.md
-    else
-        sed -i "s/# Changelog/# Changelog\n\n## $NEW_VERSION - $CURRENT_DATE\n\n### Changes\n- TODO: Add changelog entries\n/" CHANGELOG.md
-    fi
+    sed_inplace "s/# Changelog/# Changelog\n\n## $NEW_VERSION - $CURRENT_DATE\n\n### Changes\n- TODO: Add changelog entries\n/" CHANGELOG.md
     echo -e "${YELLOW}  ⚠ Added new CHANGELOG section - please update with actual changes${NC}"
 else
     echo -e "${YELLOW}  ⚠ Version already exists in CHANGELOG - please update manually${NC}"
@@ -101,7 +89,8 @@ ERRORS=0
 check_file_version() {
     local file=$1
     local pattern=$2
-    local version=$(grep -A1 "$pattern" "$file")
+    local version
+    version=$(grep -A1 "$pattern" "$file")
 
     if [[ $version == *"$NEW_VERSION"* ]]; then
         echo -e "${GREEN}✓${NC} $file"

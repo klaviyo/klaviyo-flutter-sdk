@@ -255,6 +255,16 @@ jobs:
             gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f platform=both
           fi
 
+      - name: Dispatch next release branch
+        if: ${{ !contains(github.ref_name, '-') }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          gh workflow run rel-branch.yml --repo "$GITHUB_REPOSITORY" --ref master -f "base=$VERSION"
+          echo "Dispatched rel-branch.yml from $VERSION"
+
   notify:
     needs: [announce, validate, publish, verify, finalize]
     if: always() && startsWith(github.ref, 'refs/tags/')
