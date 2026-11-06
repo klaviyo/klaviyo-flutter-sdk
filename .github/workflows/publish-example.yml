@@ -37,9 +37,11 @@ on:
       - '.github/scripts/**'
       - '.github/actions/**'
       - 'scripts/**'
+      - 'Makefile'
       - 'AGENTS.md'
       - 'test/**'
       - 'example/test/**'
+      - 'android/src/test/**'
   release:
     types: [published]
   workflow_dispatch:
@@ -253,9 +255,134 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
         run: .github/scripts/check-secrets.sh ios
 
+  # One live Slack message per run: this job posts it, `progress` and `report`
+  # edit it, and the deploy jobs reply under it. When release.yml passes
+  # slack_thread_ts the message is a reply in that release thread instead of a
+  # new top-level post. Skipped when no platform will deploy (secrets missing
+  # on a push or release, unrelated PR label, tree already released).
+  announce:
+    name: Announce the deploy
+    needs: [release-merge-check, preflight-android, preflight-ios]
+    if: |
+      !cancelled()
+      && needs.release-merge-check.outputs.skip != 'true'
+      && (needs.preflight-android.outputs.ready == 'true'
+        || needs.preflight-ios.outputs.ready == 'true'
+        || needs.preflight-android.result == 'failure'
+        || needs.preflight-ios.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      slack_ts: ${{ steps.slack.outputs.ts }}
+      thread_ts: ${{ inputs.slack_thread_ts || steps.slack.outputs.ts }}
+      version: ${{ steps.info.outputs.version }}
+      source_label: ${{ steps.info.outputs.source_label }}
+      commit_short: ${{ steps.info.outputs.commit_short }}
+      commit_sha: ${{ steps.info.outputs.commit_sha }}
+    steps:
+      - name: Checkout Slack action
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: |
+            .github
+            pubspec.yaml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+          path: _slack
+
+      - name: Describe the run
+        id: info
+        continue-on-error: true
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          version=$(grep '^version:' _slack/pubspec.yaml | awk '{print $2}' | cut -d+ -f1 || true)
+          source_label=$(_slack/.github/scripts/source-label.sh || true)
+          {
+            echo "version=${version:-unknown}"
+            echo "source_label=${source_label:-unknown}"
+            echo "commit_short=${COMMIT_SHA::7}"
+            echo "commit_sha=${COMMIT_SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack deploy started
+        id: slack
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
+          status: pending
+          title: ${{ inputs.check_credentials == true && 'Flutter Example App credential check running' || format('Flutter Example App deploying `{0}`', steps.info.outputs.version) }}
+          body: Each platform replies in this thread.
+          fields: |
+            Source: `${{ steps.info.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ steps.info.outputs.commit_short }}`
+            Requested by: ${{ github.actor }}
+          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.info.outputs.commit_sha }}
+
+  # Edits the live message once tests and lint pass and the deploys start.
+  progress:
+    name: Update the deploy message (gates passed)
+    needs: [announce, gate-test, gate-lint, preflight-android, preflight-ios]
+    if: |
+      !cancelled()
+      && needs.announce.outputs.slack_ts != ''
+      && inputs.check_credentials != true
+      && needs.gate-test.result == 'success'
+      && needs.gate-lint.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Name the platforms
+        id: platforms
+        env:
+          READY_ANDROID: ${{ needs.preflight-android.outputs.ready }}
+          READY_IOS: ${{ needs.preflight-ios.outputs.ready }}
+        run: |
+          list=""
+          [ "$READY_ANDROID" = "true" ] && list="Android"
+          [ "$READY_IOS" = "true" ] && list="${list:+$list + }iOS"
+          echo "list=${list:-no platform}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Slack action
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Update the Slack deploy message
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ needs.announce.outputs.slack_ts }}
+          status: pending
+          title: Flutter Example App deploying `${{ needs.announce.outputs.version }}`
+          body: Tests and lint passed, deploying ${{ steps.platforms.outputs.list }}. Each platform replies in this thread.
+          fields: |
+            Source: `${{ needs.announce.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ needs.announce.outputs.commit_short }}`
+            Requested by: ${{ github.actor }}
+          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.announce.outputs.commit_sha }}
+
   deploy-android:
     name: Publish to Play internal track
-    needs: [gate-test, gate-lint, preflight-android]
+    needs: [announce, gate-test, gate-lint, preflight-android]
     # A skipped gate skips its dependents, so the status check is explicit:
     # tests and lint must have passed, unless check_credentials skipped them.
     if: |
@@ -411,15 +538,15 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ inputs.slack_thread_ts }}
+          thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
           status: success
           title: Flutter Example (Android) deployed to Play internal
           body: Installs for anyone who has done the internal-track opt-in, once Play has finished processing the release.
           fields: |
-            Build: ${{ env.APP_VERSION }} (${{ env.VERSION_CODE }})
-            SDKs: ${{ steps.buildinfo.outputs.sdk_info }}
-            Source: ${{ steps.buildinfo.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ steps.buildinfo.outputs.commit_short }}
+            Build: `${{ env.APP_VERSION }}` (`${{ env.VERSION_CODE }}`)
+            SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
+            Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ steps.buildinfo.outputs.commit_short }}`
           links: |
             Install|https://play.google.com/apps/test/com.klaviyo.flutterexample/${{ env.VERSION_CODE }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.buildinfo.outputs.commit_sha }}
@@ -430,20 +557,20 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ inputs.slack_thread_ts }}
+          thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
           status: ${{ job.status == 'cancelled' && 'stopped' || 'failure' }}
           title: Flutter Example (Android) deploy to Play internal ${{ job.status == 'cancelled' && 'timed out' || 'failed' }}
           fields: |
-            Build: ${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.VERSION_CODE || '?' }})
-            SDKs: ${{ steps.buildinfo.outputs.sdk_info }}
-            Source: ${{ steps.buildinfo.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ steps.buildinfo.outputs.commit_short }}
-            Failed at: ${{ job.status == 'cancelled' && 'timeout' || steps.buildinfo.outcome == 'failure' && 'generate build info' || steps.signing.outcome == 'failure' && 'write signing material' || steps.build.outcome == 'failure' && 'build and upload' || 'an unknown step' }}
+            Build: `${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }}` (`${{ env.VERSION_CODE || '?' }}`)
+            SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
+            Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ steps.buildinfo.outputs.commit_short }}`
+            Failed at: ${{ job.status == 'cancelled' && '`timeout`' || steps.buildinfo.outcome == 'failure' && '`generate build info`' || steps.signing.outcome == 'failure' && '`write signing material`' || steps.build.outcome == 'failure' && '`build and upload`' || 'an unknown step' }}
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.buildinfo.outputs.commit_sha || github.sha }}
 
   deploy-ios:
     name: Publish to TestFlight
-    needs: [gate-test, gate-lint, preflight-ios]
+    needs: [announce, gate-test, gate-lint, preflight-ios]
     # A skipped gate skips its dependents, so the status check is explicit:
     # tests and lint must have passed, unless check_credentials skipped them.
     if: |
@@ -656,15 +783,15 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ inputs.slack_thread_ts }}
+          thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
           status: success
           title: Flutter Example (iOS) deployed to TestFlight
           body: Install from the TestFlight app once Apple finishes processing it, usually in 5 to 30 minutes.
           fields: |
-            Build: ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
-            SDKs: ${{ steps.buildinfo.outputs.sdk_info }}
-            Source: ${{ steps.buildinfo.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ steps.buildinfo.outputs.commit_short }}
+            Build: `${{ env.APP_VERSION }}` (`${{ env.BUILD_NUMBER }}`)
+            SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
+            Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ steps.buildinfo.outputs.commit_short }}`
           # The App Store Connect link needs a login; testers install via the TestFlight app.
           links: |
             TestFlight in App Store Connect|https://appstoreconnect.apple.com/apps/${{ env.ASC_APP_ID }}/testflight/ios
@@ -676,25 +803,26 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ inputs.slack_thread_ts }}
+          thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
           status: ${{ job.status == 'cancelled' && 'stopped' || 'failure' }}
           title: Flutter Example (iOS) deploy to TestFlight ${{ job.status == 'cancelled' && 'timed out' || 'failed' }}
           fields: |
-            Build: ${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }} (${{ env.BUILD_NUMBER || '?' }}, attempted)
-            SDKs: ${{ steps.buildinfo.outputs.sdk_info }}
-            Source: ${{ steps.buildinfo.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ steps.buildinfo.outputs.commit_short }}
-            Failed at: ${{ job.status == 'cancelled' && 'timeout' || steps.buildinfo.outcome == 'failure' && 'generate build info' || steps.flutterconfig.outcome == 'failure' && 'generate Flutter config' || steps.build.outcome == 'failure' && 'sign, build and upload' || 'an unknown step' }}
+            Build: `${{ env.APP_VERSION || steps.buildinfo.outputs.sdk_version || '?' }}` (`${{ env.BUILD_NUMBER || '?' }}`, attempted)
+            SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
+            Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ steps.buildinfo.outputs.commit_short }}`
+            Failed at: ${{ job.status == 'cancelled' && '`timeout`' || steps.buildinfo.outcome == 'failure' && '`generate build info`' || steps.flutterconfig.outcome == 'failure' && '`generate Flutter config`' || steps.build.outcome == 'failure' && '`sign, build and upload`' || 'an unknown step' }}
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.buildinfo.outputs.commit_sha || github.sha }}
 
   what-to-test:
     name: Set TestFlight "What to Test"
-    needs: deploy-ios
+    needs: [announce, deploy-ios]
     # Skipped deploy-ios (missing secrets) must not fail this job out.
     # A check_credentials run completes deploy-ios without building, and the next build number it records
     # belongs to no build, so there is nothing to attach What to Test to.
     if: |
-      needs.deploy-ios.result == 'success'
+      !cancelled()
+      && needs.deploy-ios.result == 'success'
       && inputs.check_credentials != true
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
@@ -763,15 +891,145 @@ jobs:
         uses: ./.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ inputs.slack_thread_ts }}
+          thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
           status: warning
           title: Flutter Example (iOS) uploaded to TestFlight, but saving What to Test failed
           fields: |
-            Build: ${{ needs.deploy-ios.outputs.app_version }} (${{ needs.deploy-ios.outputs.build_number }})
-            SDKs: ${{ needs.deploy-ios.outputs.sdk_info }}
-            Source: ${{ needs.deploy-ios.outputs.source_label }} (${{ github.event_name }})
-            Commit: ${{ needs.deploy-ios.outputs.commit_short }}
+            Build: `${{ needs.deploy-ios.outputs.app_version }}` (`${{ needs.deploy-ios.outputs.build_number }}`)
+            SDKs: `${{ needs.deploy-ios.outputs.sdk_info }}`
+            Source: `${{ needs.deploy-ios.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ needs.deploy-ios.outputs.commit_short }}`
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.deploy-ios.outputs.commit_sha }}
+
+  # Final edit of the live message `announce` posted. Also covers what the old
+  # `blocked` post reported: a failed gate or preflight skips both deploys, so
+  # no deploy job reports it.
+  report:
+    name: Update the deploy message
+    needs:
+      [announce, progress, gate-test, gate-lint, preflight-android, preflight-ios, deploy-android, deploy-ios]
+    if: always() && needs.announce.result != 'skipped'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Classify the deploy
+        id: result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECK_CREDENTIALS: ${{ inputs.check_credentials }}
+          VERSION: ${{ needs.announce.outputs.version }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          result_of() { jq -r --arg k "$1" '.[$k].result' <<<"$NEEDS_JSON"; }
+          GATE_TEST=$(result_of gate-test)
+          GATE_LINT=$(result_of gate-lint)
+          ANDROID=$(result_of deploy-android)
+          IOS=$(result_of deploy-ios)
+          gate_failed=$(jq -r '
+            {
+              "gate-test": "tests",
+              "gate-lint": "lint",
+              "preflight-android": "the Android preflight",
+              "preflight-ios": "the iOS preflight"
+            } as $names
+            | [to_entries[] | select(.key | in($names)) | select(.value.result == "failure") | $names[.key]]
+            | join(", ")
+          ' <<<"$NEEDS_JSON")
+          credential_failed=$(jq -r '
+            {"preflight-android": "Android", "preflight-ios": "iOS"} as $names
+            | [to_entries[] | select(.key | in($names)) | select(.value.result == "failure") | $names[.key]]
+            | join(" and ")
+          ' <<<"$NEEDS_JSON")
+          deploy_failed=$(jq -r '
+            {"deploy-android": "Android", "deploy-ios": "iOS"} as $names
+            | [to_entries[] | select(.key | in($names)) | select(.value.result == "failure") | $names[.key]]
+            | join(" and ")
+          ' <<<"$NEEDS_JSON")
+
+          describe() {
+            case "$1" in
+              success) if [ "$CHECK_CREDENTIALS" = "true" ]; then echo "credentials OK"; else echo "deployed"; fi ;;
+              failure) echo "failed" ;;
+              cancelled) echo "stopped" ;;
+              *) echo "not deployed" ;;
+            esac
+          }
+          {
+            echo "android=$(describe "$ANDROID")"
+            echo "ios=$(describe "$IOS")"
+          } >> "$GITHUB_OUTPUT"
+
+          body=""
+          if [ -n "$gate_failed" ] && [ "$CHECK_CREDENTIALS" = "true" ]; then
+            status=failure; title="Flutter Example App credential check failed (${credential_failed} preflight)"
+            body="Fix the credential issue, then re-run the credential check."
+          elif [ -n "$gate_failed" ]; then
+            status=failure; title="Flutter Example App deploy blocked, ${gate_failed} failed"
+            body="Fix the failing job, then re-run to deploy."
+          elif [ -n "$deploy_failed" ]; then
+            status=failure
+            if [ "$CHECK_CREDENTIALS" = "true" ]; then
+              title="Flutter Example App credential check failed (${deploy_failed})"
+            else
+              title="Flutter Example App deploy failed (${deploy_failed})"
+            fi
+            body="Details are in the thread."
+          elif [ "$ANDROID" = cancelled ] || [ "$IOS" = cancelled ] || [ "$GATE_TEST" = cancelled ] || [ "$GATE_LINT" = cancelled ]; then
+            timed_out=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" --jq '
+              [.jobs[]
+                | select(.name == "Publish to Play internal track" or .name == "Publish to TestFlight")
+                | select(.conclusion == "cancelled" and .started_at != null and .completed_at != null)
+                | select((.completed_at | fromdate) - (.started_at | fromdate) >= 45 * 60 - 60)]
+              | length' || echo 0)
+            status=stopped
+            if [ "$timed_out" != 0 ]; then
+              title="Flutter Example App deploy timed out"
+            else
+              title="Flutter Example App deploy stopped, run cancelled"
+            fi
+          elif [ "$ANDROID" != success ] && [ "$IOS" != success ]; then
+            status=info; title="Flutter Example App deploy skipped, nothing deployed"
+          elif [ "$CHECK_CREDENTIALS" = "true" ]; then
+            status=success; title="Flutter Example App credential check passed"
+          else
+            status=success; title="Flutter Example App deployed${VERSION:+ \`${VERSION}\`}"
+            body="Details for each platform are in the thread."
+          fi
+          {
+            echo "status=$status"
+            echo "title=$title"
+            echo "body=$body"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Slack action
+        if: always()
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Update the Slack deploy message
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
+          status: ${{ steps.result.outputs.status }}
+          title: ${{ steps.result.outputs.title }}
+          body: ${{ steps.result.outputs.body }}
+          fields: |
+            Android: ${{ steps.result.outputs.android }}
+            iOS: ${{ steps.result.outputs.ios }}
+            Source: `${{ needs.announce.outputs.source_label }}` (`${{ github.event_name }}`)
+            Commit: `${{ needs.announce.outputs.commit_short }}`
+          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.announce.outputs.commit_sha }}
 
   # Remove the deploy-example-app[:platform] label after the run so
   # re-applying re-triggers. Runs even when the deploys were skipped.
