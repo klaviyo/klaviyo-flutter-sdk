@@ -203,8 +203,11 @@ Future<void> _handler(RemoteMessage message) async {
 // Before
 if (Klaviyo.instance.isKlaviyoPush(message.data)) { ... }
 
-// After — use the extension
-if (message.data.isKlaviyoNotification) { ... }
+// After — remove the check
+// Klaviyo push events arrive on KlaviyoSDK's own streams, such as
+// onPushNotification and onPushAction, so there is no raw payload to inspect.
+// The isKlaviyoNotification extension still exists but is deprecated and
+// will be removed in 1.0.
 ```
 
 ### Profile management — `updateProfile`
@@ -399,7 +402,7 @@ After migrating, you gain access to features that were not available in the
 community SDK:
 
 - **In-App Forms:** `registerForInAppForms()`, `unregisterFromInAppForms()`,
-  and the `onFormEvent` stream.
+  and the `onFormLifecycleEvent` stream.
 - **Geofencing:** `registerGeofencing()`, `unregisterGeofencing()` (opt-in via
   build configuration).
 - **Deep Linking:** `handleUniversalTrackingLink()` with `go_router`
@@ -408,7 +411,8 @@ community SDK:
   without needing `firebase_messaging` as a dependency.
 - **Push event stream:** `onPushNotification` for token events, open events,
   and errors.
-- **Log level control:** `setLogLevel(KlaviyoLogLevel)` with granular levels.
+- **Logging toggle:** `setLoggingEnabled(bool)` turns native and Dart-side
+  logging on or off.
 
 See the [README](https://pub.dev/packages/klaviyo_flutter_sdk) for full
 documentation on these features.
@@ -425,7 +429,7 @@ documentation on these features.
 | `.logEvent(name, meta)` | `.createEvent(KlaviyoEvent.custom(metric: name, properties: meta))` |
 | `.sendTokenToKlaviyo(token)` | `.setPushToken(token)` |
 | `.handlePush(data)` | Remove — handled automatically by native layer |
-| `.isKlaviyoPush(data)` | `data.isKlaviyoNotification` |
+| `.isKlaviyoPush(data)` | Remove — Klaviyo push events arrive on `KlaviyoSDK`'s streams |
 | `.updateProfile(profile)` | `.setProfile(profile)` |
 | `.setFirstName(name)` | `.setProfileAttribute('first_name', name)` |
 | `.setLastName(name)` | `.setProfileAttribute('last_name', name)` |

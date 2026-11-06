@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Deprecated
+
+These APIs still work and will be removed in 1.0.
+
+- **`KlaviyoSDK.onFormEvent`**: use `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s.
+- **`KlaviyoSDK.handlePushNotificationReceived` and `KlaviyoSDK.handlePushNotificationOpened`**: these only logged a message. Remove the calls; push tracking is automatic.
+- **`KlaviyoNativeWrapper`**: use `KlaviyoSDK`. The class becomes internal in 1.0.
+- **`KlaviyoSDK.dispose()` and `KlaviyoNativeWrapper.dispose()`**: no longer needed. If you called `dispose()` to turn off personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()` instead. Otherwise, remove the calls.
+- **`KlaviyoSDK.setLogLevel` and the `KlaviyoLogLevel` enum**: use `setLoggingEnabled(bool)`.
+- **The `isKlaviyoNotification` extension on `Map<String, dynamic>`**: no longer needed. Klaviyo push events arrive on `KlaviyoSDK`'s streams, such as `onPushNotification` and `onPushAction`.
+
+### Changed
+
+- **`dispose()` no longer closes the SDK's event streams.** Calling it used to leave the SDK broken until the app restarted: push, form, and auth-token streams were closed for good and `initialize()` didn't reopen them. It now only unregisters the auth token provider, if one is registered.
+- **`setLoggingEnabled(bool)` is now the single documented switch for Dart and native logging.** It already turned Dart-side logs on and off; with `setLogLevel` and `KlaviyoLogLevel` deprecated, it is the only logging control. The iOS plugin's own log messages now follow it as well.
+- **The plugin logs less.** Push token values, full push and form event payloads, and per-call profile identifiers (email, phone number, external ID) are no longer logged. The iOS and Android token-received messages remain without the token. A few duplicate bridge messages were dropped.
+
 ## 0.5.0
 
 ### Changes

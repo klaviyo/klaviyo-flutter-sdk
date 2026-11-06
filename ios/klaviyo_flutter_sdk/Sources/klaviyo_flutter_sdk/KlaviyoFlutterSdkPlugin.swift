@@ -15,10 +15,15 @@ import UserNotifications
 
 @available(iOS 14.0, *)
 extension Logger {
-    static let klaviyoFlutterSDK = Logger(
+    private static let enabledKlaviyoFlutterSDK = Logger(
         subsystem: "com.klaviyo.flutter",
         category: "KlaviyoFlutterSDK"
     )
+
+    /// The plugin's logger, or a disabled logger while `KlaviyoSDK().isLoggingEnabled` is false.
+    static var klaviyoFlutterSDK: Logger {
+        KlaviyoSDK().isLoggingEnabled ? enabledKlaviyoFlutterSDK : Logger(OSLog.disabled)
+    }
 }
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
@@ -222,13 +227,7 @@ extension KlaviyoFlutterSdkPlugin {
             result(nil)
 
         case "getPushToken":
-            let token = KlaviyoSDK().pushToken
-            if let token {
-                if #available(iOS 14.0, *) {
-                    Logger.klaviyoFlutterSDK.info("Retrieved push token from SDK: \(token, privacy: .public)")
-                }
-            }
-            result(token)
+            result(KlaviyoSDK().pushToken)
 
         case "registerForInAppForms":
             #if canImport(KlaviyoForms)
@@ -445,7 +444,7 @@ extension KlaviyoFlutterSdkPlugin {
     ) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
         if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString, privacy: .public)")
+            Logger.klaviyoFlutterSDK.info("APNs token received")
         }
 
         // Respect `klaviyo_automatic_push_token_forwarding` in Info.plist when explicitly set:
