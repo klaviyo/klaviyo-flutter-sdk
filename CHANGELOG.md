@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 - 2026-11-06
+
+### Changes
+- TODO: Add changelog entries
+
+
 ## 0.5.0
 
 ### Changes
