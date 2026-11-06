@@ -104,7 +104,6 @@ jobs:
           {
             echo "version=$version"
             echo "branch=rel/$version"
-            echo "base_sha=$(git rev-parse HEAD)"
             echo "short_sha=$(git rev-parse --short HEAD)"
           } >> "$GITHUB_OUTPUT"
 
@@ -149,7 +148,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.resolve.outputs.version }}
           BRANCH: ${{ steps.resolve.outputs.branch }}
-          BASE_SHA: ${{ steps.resolve.outputs.base_sha }}
           ACTOR: ${{ github.actor }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -175,11 +173,9 @@ jobs:
             exit 0
           fi
 
-          git fetch --quiet --no-tags origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
-          if [ "$(git rev-list --count "$BASE_SHA..refs/remotes/origin/$BRANCH")" -eq 0 ]; then
-            echo "$BRANCH has no commits over its base, so there is nothing to open a PR for"
-            echo "url=" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY/compare/master...$BRANCH" --jq .ahead_by)" = 0 ]; then
+            echo "::error::$BRANCH has no commits ahead of master, so GitHub can't open its release PR. Add the version bump to $BRANCH."
+            exit 1
           fi
 
           assignee=()
