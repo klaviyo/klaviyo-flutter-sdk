@@ -11,12 +11,18 @@ on:
 jobs:
   build-ios:
     runs-on: macos-15
+    defaults:
+      run:
+        working-directory: klaviyo_flutter_sdk
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: klaviyo_flutter_sdk
+          persist-credentials: false
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.38.7
+          flutter-version: 3.44.9
           cache: true
 
       - name: Install dependencies

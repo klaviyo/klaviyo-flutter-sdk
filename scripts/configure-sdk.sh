@@ -8,7 +8,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 PODSPEC="$ROOT_DIR/ios/klaviyo_flutter_sdk.podspec"
 PACKAGE_SWIFT="$ROOT_DIR/ios/klaviyo_flutter_sdk/Package.swift"
-BUILD_GRADLE="$ROOT_DIR/android/build.gradle"
+BUILD_GRADLE="$ROOT_DIR/android/build.gradle.kts"
 PODFILE="$ROOT_DIR/example/ios/Podfile"
 SETTINGS_GRADLE="$ROOT_DIR/example/android/settings.gradle"
 
@@ -324,7 +324,7 @@ remove_android_override() {
 
 update_android_version() {
     local version="$1"
-    sedi -E "s|def klaviyoSdkVersion = \".*\"|def klaviyoSdkVersion = \"$version\"|" "$BUILD_GRADLE"
+    sedi -E "s|val klaviyoSdkVersion = \".*\"|val klaviyoSdkVersion = \"$version\"|" "$BUILD_GRADLE"
 }
 
 # Inject an includeBuild block into settings.gradle for local development.
@@ -402,7 +402,7 @@ show_status() {
 
     # Android
     local android_version
-    android_version=$(grep -oE 'def klaviyoSdkVersion = "[^"]*"' "$BUILD_GRADLE")
+    android_version=$(grep -oE 'val klaviyoSdkVersion = "[^"]*"' "$BUILD_GRADLE")
     printf '%b\n' "  ${CYAN}Android${NC}: $android_version"
     if grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$SETTINGS_GRADLE" 2>/dev/null; then
         printf '%b\n' "          ${YELLOW}(settings.gradle override active — local includeBuild)${NC}"

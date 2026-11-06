@@ -52,7 +52,7 @@ Push/form events flow back via `EventChannel` streams.
 
 Native SDK versions are pinned in two places — keep them in sync when bumping:
 - **iOS**: `ios/klaviyo_flutter_sdk.podspec` — `KlaviyoSwift ~> X.Y.Z`
-- **Android**: `android/build.gradle` — `klaviyoSdkVersion = "X.Y.Z"`
+- **Android**: `android/build.gradle.kts` — `klaviyoSdkVersion = "X.Y.Z"`
 
 Optional features controlled by host app build properties:
 - **Forms** (`klaviyoIncludeForms`): defaults to **true**
@@ -71,7 +71,7 @@ Key lint rules (`analysis_options.yaml`):
 
 To test against a local native SDK build:
 - **iOS**: In `ios/klaviyo_flutter_sdk.podspec`, replace the `KlaviyoSwift ~> X.Y.Z` dependency with a local path: `s.dependency 'KlaviyoSwift', :path => '../path/to/KlaviyoSwift'`
-- **Android**: In `android/build.gradle`, replace the version string with a local Maven path or use `includeBuild()` in `example/android/settings.gradle`
+- **Android**: In `android/build.gradle.kts`, replace the version string with a local Maven path or use `includeBuild()` in `example/android/settings.gradle`
 
 ### Gotchas
 
