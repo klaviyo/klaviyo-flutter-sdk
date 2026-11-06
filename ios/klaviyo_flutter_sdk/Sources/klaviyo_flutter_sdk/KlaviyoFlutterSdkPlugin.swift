@@ -408,7 +408,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             self.cachedError = nil
         }
         if let cachedOpenedNotification = cachedOpenedNotification {
-            events(cachedOpenedNotification)
+            events(cachedOpenedNotification.merging(["replayed": true]) { $1 })
             self.cachedOpenedNotification = nil
         }
         if let cachedSilentPush = cachedSilentPush {
@@ -416,7 +416,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             self.cachedSilentPush = nil
         }
         if let cachedPushAction {
-            events(cachedPushAction)
+            events(cachedPushAction.merging(["replayed": true]) { $1 })
             self.cachedPushAction = nil
         }
         return nil
