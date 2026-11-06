@@ -11,8 +11,14 @@ on:
         type: string
         required: false
         default: ''
+      triggered_by:
+        description: Login of the person who started this run. Set by publish-release.yml; leave empty to use the actor
+        type: string
+        required: false
+        default: ''
 
 env:
+  TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || inputs.triggered_by || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   SLACK_USERNAME: Flutter SDK
   SLACK_ICON_EMOJI: ':merlin-orb-flutter:'
 
@@ -57,7 +63,7 @@ jobs:
           fields: |
             Version: `${{ github.ref_name }}`
             Commit: `${{ steps.sha.outputs.short }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Approve here|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
@@ -246,16 +252,19 @@ jobs:
           TAG: ${{ github.ref_name }}
           SLACK_TS: ${{ inputs.slack_ts || needs.announce.outputs.slack_ts }}
         run: |
-          # True when the workflow file at $TAG declares slack_thread_ts.
-          takes_thread_ts() {
+          # True when the workflow file at $TAG declares the input named by $1.
+          takes_input() {
             gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/publish-example.yml?ref=$TAG" \
-              -H "Accept: application/vnd.github.raw" | grep -q '^[[:space:]]*slack_thread_ts:'
+              -H "Accept: application/vnd.github.raw" | grep -q "^[[:space:]]*$1:"
           }
-          if [ -n "$SLACK_TS" ] && takes_thread_ts; then
-            gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f platform=both -f "slack_thread_ts=$SLACK_TS"
-          else
-            gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f platform=both
+          args=()
+          if [ -n "$SLACK_TS" ] && takes_input slack_thread_ts; then
+            args+=(-f "slack_thread_ts=$SLACK_TS")
           fi
+          if takes_input triggered_by; then
+            args+=(-f "triggered_by=$TRIGGERED_BY")
+          fi
+          gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f platform=both "${args[@]}"
 
       - name: Dispatch next release branch
         if: ${{ !contains(env.VERSION, '-') }}
@@ -263,7 +272,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run rel-branch.yml --repo "$GITHUB_REPOSITORY" --ref master -f "base=$VERSION"
+          gh workflow run rel-branch.yml --repo "$GITHUB_REPOSITORY" --ref master -f "base=$VERSION" -f "triggered_by=$TRIGGERED_BY"
           echo "Dispatched rel-branch.yml from $VERSION"
 
   notify:
@@ -345,6 +354,7 @@ jobs:
             Version: `${{ github.ref_name }}`
             Commit: `${{ steps.result.outputs.commit_short }}`
             Event: `${{ github.event_name }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Release|${{ steps.result.outputs.release_url }}
             pub.dev|${{ steps.result.outputs.result == 'success' && format('https://pub.dev/packages/klaviyo_flutter_sdk/versions/{0}', github.ref_name) || '' }}
@@ -360,3 +370,5 @@ jobs:
           status: ${{ steps.result.outputs.result }}
           title: ${{ steps.result.outputs.result == 'stopped' && 'Stopped:' || 'Failed at' }} `${{ steps.result.outputs.failed_step }}`
           body: Tag `${{ github.ref_name }}` kept. Run `release.yml` at the tag to retry.
+          fields: |
+            Triggered by: `${{ env.TRIGGERED_BY }}`
