@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- **`setProfileAttribute` and `setProfileProperties` now map standard keys the same way on iOS and Android** — On Android, camelCase keys such as `firstName` were saved as custom properties instead of the standard first name field. Keys for standard attributes are now normalized in Dart, matching case-insensitively in camelCase or snake_case, and Android maps them to the native standard profile keys. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
+
 ## 0.5.0
 
 ### Changes
