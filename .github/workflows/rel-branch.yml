@@ -363,10 +363,13 @@ jobs:
 
       - name: Commit pin
         id: commit
+        env:
+          PIN_PATHS: android/build.gradle ios/klaviyo_flutter_sdk.podspec ios/klaviyo_flutter_sdk/Package.swift example/ios/Podfile example/ios/Podfile.lock
         run: |
           set -euo pipefail
 
-          git add -A
+          read -ra paths <<< "$PIN_PATHS"
+          git add -- "${paths[@]}"
           if git diff --cached --quiet; then
             echo "Native pins already match $BRANCH, nothing to commit"
             echo "changed=false" >> "$GITHUB_OUTPUT"
