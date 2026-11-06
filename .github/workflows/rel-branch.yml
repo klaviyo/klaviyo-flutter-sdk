@@ -118,15 +118,20 @@ jobs:
         run: |
           set -euo pipefail
 
+          git show "$GITHUB_SHA:scripts/bump_version.sh" > "$RUNNER_TEMP/bump_version.sh" # POC-TEMP
+          chmod +x "$RUNNER_TEMP/bump_version.sh" # POC-TEMP
+          "$RUNNER_TEMP/bump_version.sh" "$VERSION" # POC-TEMP
+          git diff --stat # POC-TEMP
+          git diff --quiet && echo "::error::bump_version.sh changed nothing" # POC-TEMP
+          git checkout -- . # POC-TEMP
+
           if git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" > /dev/null; then
             echo "$BRANCH already exists on origin, nothing to do"
             echo "created=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          git show "$GITHUB_SHA:scripts/bump_version.sh" > "$RUNNER_TEMP/bump_version.sh" # POC-TEMP
-          chmod +x "$RUNNER_TEMP/bump_version.sh" # POC-TEMP
-          "$RUNNER_TEMP/bump_version.sh" "$VERSION" # POC-TEMP
+          ./scripts/bump_version.sh "$VERSION"
 
           if git diff --quiet; then
             echo "::error::bump_version.sh changed nothing"
