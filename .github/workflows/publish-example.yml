@@ -65,6 +65,11 @@ on:
         required: false
         default: ''
         type: string
+      triggered_by:
+        description: Login of the person who started this run. Set by publish-release.yml; leave empty to use the actor
+        required: false
+        default: ''
+        type: string
   pull_request:
     types: [labeled]
 
@@ -72,6 +77,7 @@ permissions:
   contents: read
 
 env:
+  TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || inputs.triggered_by || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   SLACK_USERNAME: Flutter Example App
   SLACK_ICON_EMOJI: ':merlin-orb-flutter:'
   FLUTTER_VERSION: 3.38.7
@@ -322,13 +328,16 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts }}
           status: pending
-          title: ${{ inputs.check_credentials == true && 'Flutter Example App credential check running' || format('Flutter Example App deploying `{0}`', steps.info.outputs.version) }}
+          title: "${{ github.event_name == 'pull_request' && format('Flutter Example App deploying PR #{0}', github.event.pull_request.number) || inputs.check_credentials == true && 'Flutter Example App credential check running' || format('Flutter Example App deploying `{0}`', steps.info.outputs.version) }}"
           body: Each platform replies in this thread.
           fields: |
             Source: `${{ steps.info.outputs.source_label }}` (`${{ github.event_name }}`)
             Commit: `${{ steps.info.outputs.commit_short }}`
-            Requested by: ${{ github.actor }}
-          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.info.outputs.commit_sha }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
+          links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.info.outputs.commit_sha }}
 
   # Edits the live message once tests and lint pass and the deploys start.
   progress:
@@ -372,13 +381,16 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
           status: pending
-          title: Flutter Example App deploying `${{ needs.announce.outputs.version }}`
+          title: "${{ github.event_name == 'pull_request' && format('Flutter Example App deploying PR #{0}', github.event.pull_request.number) || format('Flutter Example App deploying `{0}`', needs.announce.outputs.version) }}"
           body: Tests and lint passed, deploying ${{ steps.platforms.outputs.list }}. Each platform replies in this thread.
           fields: |
             Source: `${{ needs.announce.outputs.source_label }}` (`${{ github.event_name }}`)
             Commit: `${{ needs.announce.outputs.commit_short }}`
-            Requested by: ${{ github.actor }}
-          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.announce.outputs.commit_sha }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
+          links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.announce.outputs.commit_sha }}
 
   deploy-android:
     name: Publish to Play internal track
@@ -547,6 +559,8 @@ jobs:
             SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
             Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
             Commit: `${{ steps.buildinfo.outputs.commit_short }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
             Install|https://play.google.com/apps/test/com.klaviyo.flutterexample/${{ env.VERSION_CODE }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.buildinfo.outputs.commit_sha }}
@@ -566,6 +580,8 @@ jobs:
             Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
             Commit: `${{ steps.buildinfo.outputs.commit_short }}`
             Failed at: ${{ job.status == 'cancelled' && '`timeout`' || steps.buildinfo.outcome == 'failure' && '`generate build info`' || steps.signing.outcome == 'failure' && '`write signing material`' || steps.build.outcome == 'failure' && '`build and upload`' || 'an unknown step' }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.buildinfo.outputs.commit_sha || github.sha }}
 
   deploy-ios:
@@ -787,6 +803,8 @@ jobs:
             SDKs: `${{ steps.buildinfo.outputs.sdk_info }}`
             Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
             Commit: `${{ steps.buildinfo.outputs.commit_short }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           # The App Store Connect link needs a login; testers install via the TestFlight app.
           links: |
             TestFlight in App Store Connect|https://appstoreconnect.apple.com/apps/${{ env.ASC_APP_ID }}/testflight/ios
@@ -807,6 +825,8 @@ jobs:
             Source: `${{ steps.buildinfo.outputs.source_label }}` (`${{ github.event_name }}`)
             Commit: `${{ steps.buildinfo.outputs.commit_short }}`
             Failed at: ${{ job.status == 'cancelled' && '`timeout`' || steps.buildinfo.outcome == 'failure' && '`generate build info`' || steps.flutterconfig.outcome == 'failure' && '`generate Flutter config`' || steps.build.outcome == 'failure' && '`sign, build and upload`' || 'an unknown step' }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.buildinfo.outputs.commit_sha || github.sha }}
 
   what-to-test:
@@ -894,6 +914,8 @@ jobs:
             SDKs: `${{ needs.deploy-ios.outputs.sdk_info }}`
             Source: `${{ needs.deploy-ios.outputs.source_label }}` (`${{ github.event_name }}`)
             Commit: `${{ needs.deploy-ios.outputs.commit_short }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.deploy-ios.outputs.commit_sha }}
 
   # Final edit of the live message `announce` posted. Also covers what the old
@@ -983,7 +1005,7 @@ jobs:
             if [ "$timed_out" != 0 ]; then
               title="Flutter Example App deploy timed out"
             else
-              title="Flutter Example App deploy stopped, run cancelled"
+              title="Flutter Example App deploy cancelled"
             fi
           elif [ "$ANDROID" != success ] && [ "$IOS" != success ]; then
             status=info; title="Flutter Example App deploy skipped, nothing deployed"
@@ -1024,7 +1046,11 @@ jobs:
             iOS: ${{ steps.result.outputs.ios }}
             Source: `${{ needs.announce.outputs.source_label }}` (`${{ github.event_name }}`)
             Commit: `${{ needs.announce.outputs.commit_short }}`
-          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.announce.outputs.commit_sha }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
+          links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.announce.outputs.commit_sha }}
 
   # Remove the deploy-example-app[:platform] label after the run so
   # re-applying re-triggers. Runs even when the deploys were skipped.
