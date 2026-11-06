@@ -359,7 +359,7 @@ jobs:
 
           flutter pub get
           (cd example && flutter pub get)
-          (cd example/ios && pod install)
+          (cd example/ios && pod update KlaviyoCore KlaviyoSwift KlaviyoForms KlaviyoLocation KlaviyoSwiftExtension)
 
       - name: Commit pin
         id: commit
