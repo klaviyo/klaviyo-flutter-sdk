@@ -627,6 +627,12 @@ extension KlaviyoFlutterSdkPlugin {
     /// This should be called from the Host App's AppDelegate
     /// in `didReceiveRemoteNotification:fetchCompletionHandler:`.
     /// Note: The host app is responsible for calling the completion handler after this method returns.
+    ///
+    /// - Important: Experimental. This method and the `silent_push_received` event it emits
+    ///   may change before or after 1.0. The host `AppDelegate` must forward silent pushes here
+    ///   (flutter/flutter#155479). If the completion handler is called right after this method
+    ///   returns, background Dart work isn't guaranteed to finish. iOS doesn't deliver silent
+    ///   pushes after the user swipes the app away.
     public func handleSilentPush(userInfo: [AnyHashable: Any]) {
         if #available(iOS 14.0, *) {
             Logger.klaviyoFlutterSDK.info("Silent push received")
