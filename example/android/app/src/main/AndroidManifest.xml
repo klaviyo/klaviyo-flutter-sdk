@@ -69,12 +69,10 @@
             android:name="com.klaviyo.core.log_level"
             android:value="1" />
 
-        <!-- Declared here with priority 1 so it receives MESSAGING_EVENT ahead of
-             firebase_messaging's service. See the README's firebase_messaging section. -->
         <service
             android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService"
             android:exported="false">
-            <intent-filter android:priority="1">
+            <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>

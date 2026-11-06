@@ -244,17 +244,19 @@ Android delivers `MESSAGING_EVENT` to exactly one service, so the plugin also re
 
 FCM delivers each `MESSAGING_EVENT` to exactly one service: the one with the highest `android:priority`, then the first in merged-manifest order. `firebase_messaging` registers its own service, and Flutter merges its manifest before this plugin's, so it wins every message. If your app uses `firebase_messaging` and skips the step below, Klaviyo pushes never display and silent pushes never reach Dart.
 
-Declare `KlaviyoFlutterPushService` in your app's `android/app/src/main/AndroidManifest.xml`, inside `<application>`, with `android:priority="1"` on its intent filter. `firebase_messaging` declares its service with the default priority (0), so `1` is enough; if another library declares its own priority, use a higher value than that one:
+Declare `KlaviyoFlutterPushService` in your app's own `android/app/src/main/AndroidManifest.xml`, inside `<application>`. Your app's manifest merges ahead of every library manifest, so this declaration comes first and wins over `firebase_messaging`'s service, which uses the default priority (0):
 
 ```xml
 <service
     android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService"
     android:exported="false">
-    <intent-filter android:priority="1">
+    <intent-filter>
         <action android:name="com.google.firebase.MESSAGING_EVENT" />
     </intent-filter>
 </service>
 ```
+
+Optionally, add `android:priority="1"` to the `<intent-filter>` as an extra safeguard. It keeps Klaviyo's service ahead of any other FCM library that declares its service with a priority of its own, as long as yours is higher.
 
 If you subclass `KlaviyoFlutterPushService`, put your subclass's class name in `android:name`. If your subclass overrides `onMessageReceived`, call `super.onMessageReceived(message)` first, or Klaviyo pushes won't display and silent pushes won't reach Dart.
 
