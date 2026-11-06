@@ -6,6 +6,10 @@ This guide outlines how developers can migrate from older versions of the
 > Migrating from the community [`klaviyo_flutter`](https://pub.dev/packages/klaviyo_flutter)
 > package to the official SDK? See [MIGRATION.md](./MIGRATION.md) instead.
 
+## Migrating to v0.6.0
+
+- `KlaviyoProfile.toJson` now nests custom properties under `properties` instead of merging them into the top level, so code that reads custom keys from its output must read them from `json['properties']`; `KlaviyoProfile.fromJson` still accepts the old flat shape, but ignores unknown top-level keys when a nested `properties` map is present.
+
 ## Migrating to v0.3.0
 
 ### Android's `automatic_push_token_forwarding` flag is now three-valued
