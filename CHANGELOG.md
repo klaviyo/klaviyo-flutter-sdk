@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **`handleUniversalTrackingLink()` threw if called before `initialize()`** — It now works before `initialize()` on iOS and Android and never throws, so universal links that open the app from a cold start are tracked and resolved even if `initialize()` hasn't run yet. On Android, the plugin registers the native SDK's lifecycle callbacks first when the SDK isn't initialized yet.
+
 ## 0.5.0
 
 ### Changes

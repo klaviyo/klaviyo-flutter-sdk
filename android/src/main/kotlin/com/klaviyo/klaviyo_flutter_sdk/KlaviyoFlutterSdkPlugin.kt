@@ -20,6 +20,7 @@ import com.klaviyo.analytics.model.Subscription
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
+import com.klaviyo.core.config.Config
 import com.klaviyo.core.config.Log
 import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
@@ -720,6 +721,12 @@ class KlaviyoFlutterSdkPlugin :
                     if (url == null) {
                         result.error("INVALID_URL", "URL cannot be null", null)
                         return
+                    }
+
+                    if (!Registry.isRegistered<Config>()) {
+                        // Before initialize(), registers the application context and API
+                        // client that the native SDK needs to resolve the link.
+                        Klaviyo.registerForLifecycleCallbacks(applicationContext)
                     }
 
                     val isKlaviyoLink = Klaviyo.handleUniversalTrackingLink(url)
