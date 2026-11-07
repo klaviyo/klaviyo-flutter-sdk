@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- **Forms and geofencing failures now throw** — `registerForInAppForms()`, `unregisterFromInAppForms()`, `registerGeofencing()`, `unregisterGeofencing()` and `getCurrentGeofences()` used to log native errors and return normally. They now throw a `KlaviyoException` whose `code` is the native error code, such as `FORMS_NOT_AVAILABLE` or `GEOFENCING_NOT_AVAILABLE`. `getCurrentGeofences()` throws instead of returning an empty list. Wrap these calls in `try`/`catch` if your app calls them without the forms or location module linked. Success paths are unchanged.
+
 ## 0.5.0
 
 ### Changes

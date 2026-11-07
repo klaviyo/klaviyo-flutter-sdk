@@ -189,4 +189,96 @@ void main() {
       );
     });
   });
+
+  group('KlaviyoSDK forms and geofencing errors', () {
+    void failNativeWith(String code) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        if (call.method == 'initialize') return null;
+        throw PlatformException(code: code, message: 'module missing');
+      });
+    }
+
+    Matcher throwsKlaviyoCode(String code) => throwsA(
+          isA<KlaviyoException>().having((e) => e.code, 'code', code).having(
+                (e) => e.originalError,
+                'originalError',
+                isA<PlatformException>(),
+              ),
+        );
+
+    final cases = <String, (String, Future<Object?> Function(KlaviyoSDK))>{
+      'registerForInAppForms': (
+        'FORMS_NOT_AVAILABLE',
+        (sdk) => sdk.registerForInAppForms(),
+      ),
+      'unregisterFromInAppForms': (
+        'FORMS_NOT_AVAILABLE',
+        (sdk) => sdk.unregisterFromInAppForms(),
+      ),
+      'registerGeofencing': (
+        'GEOFENCING_NOT_AVAILABLE',
+        (sdk) => sdk.registerGeofencing(),
+      ),
+      'unregisterGeofencing': (
+        'GEOFENCING_NOT_AVAILABLE',
+        (sdk) => sdk.unregisterGeofencing(),
+      ),
+      'getCurrentGeofences': (
+        'GEOFENCING_NOT_AVAILABLE',
+        (sdk) => sdk.getCurrentGeofences(),
+      ),
+    };
+
+    for (final MapEntry(key: method, value: (code, invoke)) in cases.entries) {
+      test('$method throws KlaviyoException with native code $code', () async {
+        final sdk = KlaviyoSDK();
+        await sdk.initialize(apiKey: 'KEY_1');
+        failNativeWith(code);
+
+        await expectLater(invoke(sdk), throwsKlaviyoCode(code));
+      });
+
+      test('$method completes when native succeeds', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(methodChannel, (call) async {
+          log.add(call);
+          if (call.method == 'getCurrentGeofences') {
+            return {'geofences': <Map<String, Object>>[]};
+          }
+          return null;
+        });
+        final sdk = KlaviyoSDK();
+        await sdk.initialize(apiKey: 'KEY_1');
+
+        await expectLater(invoke(sdk), completes);
+        expect(log.where((c) => c.method == method), hasLength(1));
+      });
+    }
+
+    test('getCurrentGeofences returns native geofences', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        if (call.method == 'getCurrentGeofences') {
+          return {
+            'geofences': [
+              {
+                'identifier': 'store',
+                'latitude': 42.0,
+                'longitude': -71.0,
+                'radius': 100,
+              },
+            ],
+          };
+        }
+        return null;
+      });
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      final geofences = await sdk.getCurrentGeofences();
+      expect(geofences.single.identifier, 'store');
+      expect(geofences.single.radius, 100.0);
+    });
+  });
 }
