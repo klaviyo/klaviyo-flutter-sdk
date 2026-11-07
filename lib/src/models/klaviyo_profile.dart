@@ -125,7 +125,7 @@ class KlaviyoProfile {
     if (image != null) data['image'] = image;
     if (location != null) data['location'] = location!.toJson();
 
-    if (properties != null) {
+    if (properties != null && properties!.isNotEmpty) {
       data['properties'] = Map<String, dynamic>.from(properties!);
     }
 
@@ -164,7 +164,9 @@ class KlaviyoProfile {
     final Map<String, dynamic>? properties;
     final nestedProperties = json['properties'];
     if (nestedProperties is Map) {
-      properties = Map<String, dynamic>.from(nestedProperties);
+      properties = nestedProperties.isNotEmpty
+          ? Map<String, dynamic>.from(nestedProperties)
+          : null;
     } else {
       // Pre-0.6.0 toJson wrote custom properties at the top level.
       final legacy = Map<String, dynamic>.from(json)

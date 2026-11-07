@@ -77,6 +77,24 @@ void main() {
       expect(json.containsKey('properties'), isFalse);
     });
 
+    test('toJson omits properties when empty', () {
+      final json = KlaviyoProfile(
+        email: 'test@example.com',
+        properties: {},
+      ).toJson();
+
+      expect(json.containsKey('properties'), isFalse);
+    });
+
+    test('fromJson reads an empty nested properties map as null', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'properties': <String, dynamic>{},
+      });
+
+      expect(profile.properties, isNull);
+    });
+
     test('fromJson reads nested properties', () {
       final profile = KlaviyoProfile.fromJson({
         'email': 'test@example.com',
