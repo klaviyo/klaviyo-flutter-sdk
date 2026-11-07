@@ -26,16 +26,30 @@ class KlaviyoNativeWrapper {
 
   // Stream controllers for native events – buffer events that arrive
   // before any listener subscribes, then flush on first subscription.
+  // The pending push open and the pending push action are held in one slot
+  // each and replayed to every subscriber.
   final _pushNotificationController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (event) => event['type'] == 'push_notification_opened'
+        ? 'push_notification_opened'
+        : null,
+  );
   final _formEventController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _authTokenRequestController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _pushActionController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (_) => 'push_action',
+  );
 
   // Getters for streams
+
+  /// Push token, token error, silent push and push opened events.
+  ///
+  /// A `push_notification_opened` event that arrives before any listener
+  /// subscribes is held and replayed to every subscriber when it subscribes,
+  /// until a newer open arrives. Only the most recent open is held.
   Stream<Map<String, dynamic>> get onPushNotification =>
       _pushNotificationController.stream;
 
@@ -53,6 +67,10 @@ class KlaviyoNativeWrapper {
   /// `push_action_button_tapped`). Kept on a dedicated stream so they do not
   /// surface on [onPushNotification]; see [KlaviyoSDK.onPushAction] for the
   /// typed view.
+  ///
+  /// A push action that arrives before any listener subscribes is held and
+  /// replayed to every subscriber when it subscribes. Only the most recent
+  /// action is held, and each new push open clears it.
   Stream<Map<String, dynamic>> get onPushActionEvent =>
       _pushActionController.stream;
 
@@ -377,6 +395,8 @@ class KlaviyoNativeWrapper {
 
     try {
       await _channel.invokeMethod('resetProfile');
+      _pushNotificationController.clearHeld();
+      _pushActionController.clearHeld();
     } catch (e) {
       throw KlaviyoException('Failed to reset profile: $e');
     }
@@ -438,6 +458,9 @@ class KlaviyoNativeWrapper {
     try {
       final Map<String, dynamic> eventData = _deepConvertMap(event);
       final String eventType = eventData['type'] as String? ?? '';
+      // Native sets `replayed` on events it cached before the channel listener
+      // attached.
+      final bool replayed = eventData.remove('replayed') == true;
 
       switch (eventType) {
         case 'push_notification_received':
@@ -446,7 +469,10 @@ class KlaviyoNativeWrapper {
         case 'push_token_received':
         case 'push_token_error':
           _logger.info('Native push notification event: $eventData');
-          _pushNotificationController.add(eventData);
+          if (eventType == 'push_notification_opened') {
+            _pushActionController.clearHeld();
+          }
+          _pushNotificationController.add(eventData, hold: replayed);
           break;
         case 'form_event':
         case 'form_lifecycle_event':
@@ -464,7 +490,7 @@ class KlaviyoNativeWrapper {
           // Log the type only; the payload carries CTA URLs (possible PII), so
           // keep the full payload out of INFO logs.
           _logger.info('Native push action event: $eventType');
-          _pushActionController.add(eventData);
+          _pushActionController.add(eventData, hold: replayed);
           break;
         default:
           // Handle unknown event types

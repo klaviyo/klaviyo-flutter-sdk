@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- **Android: push opens and action-button taps that launch the app now reach Dart.** On a cold start the tap was handled before your Dart listener subscribed, so the `push_notification_opened` event and `onPushAction`'s `ActionButtonTapped` were dropped. The plugin now holds the most recent open and the most recent action until Dart subscribes. Reopening the app from Recents doesn't re-deliver the original tap.
+
+### Changes
+
+- **A held push open or push action now reaches every subscriber.** Previously, events that arrived before anyone subscribed went only to the first listener, so a token listener could take the cold-start open from a router that subscribed later. The SDK now keeps one pending open and one pending action and delivers them to every listener that subscribes, until a newer open arrives. Other events are unchanged: they still go to the first listener.
+
 ## 0.5.0
 
 ### Changes
