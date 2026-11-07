@@ -260,6 +260,22 @@ Optionally, add `android:priority="1"` to the `<intent-filter>` as an extra safe
 
 If you subclass `KlaviyoFlutterPushService`, put your subclass's class name in `android:name`. If your subclass overrides `onMessageReceived`, call `super.onMessageReceived(message)` first, or Klaviyo pushes won't display and silent pushes won't reach Dart.
 
+The plugin's manifest still contributes the base `KlaviyoFlutterPushService`. Remove it from the merged manifest so your subclass is the only Klaviyo service that handles `MESSAGING_EVENT` (this needs `xmlns:tools="http://schemas.android.com/tools"` on your `<manifest>` element):
+
+```xml
+<service
+    android:name="com.example.app.MyPushService"
+    android:exported="false">
+    <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+    </intent-filter>
+</service>
+
+<service
+    android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService"
+    tools:node="remove" />
+```
+
 With this declaration, Klaviyo's service receives every FCM message. It displays Klaviyo pushes and forwards Klaviyo silent pushes to Dart. Non-Klaviyo messages get the same treatment as in the native `KlaviyoPushService`: Firebase's base service still displays `notification` messages while your app is in the background, and the Klaviyo code logs and ignores them otherwise. Nothing is passed on to the other library's service. For the other library, that means:
 
 - `firebase_messaging`: `onMessage` and `onBackgroundMessage` keep firing for all messages, including Klaviyo's, because `firebase_messaging` receives them through its own broadcast receiver, not its service. `onTokenRefresh` no longer fires, because FCM hands new tokens to the same single service. `getToken()` still works, and `KlaviyoFlutterPushService` still forwards rotated tokens to Klaviyo unless `com.klaviyo.push.automatic_push_token_forwarding` is set to `false`.
