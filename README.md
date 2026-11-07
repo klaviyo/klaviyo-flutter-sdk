@@ -256,25 +256,11 @@ Declare `KlaviyoFlutterPushService` in your app's own `android/app/src/main/Andr
 </service>
 ```
 
-Optionally, add `android:priority="1"` to the `<intent-filter>` as an extra safeguard. It keeps Klaviyo's service ahead of any other FCM library that declares its service with a priority of its own, as long as yours is higher.
+Optionally, add `android:priority="1"` to the intent-filter as a safeguard: FCM then picks Klaviyo by priority instead of manifest order, in case your declaration doesn't end up first in the merged manifest.
 
-If you subclass `KlaviyoFlutterPushService`, put your subclass's class name in `android:name`. If your subclass overrides `onMessageReceived`, call `super.onMessageReceived(message)` first, or Klaviyo pushes won't display and silent pushes won't reach Dart.
+If you subclass `KlaviyoFlutterPushService`, put your subclass's fully qualified class name in `android:name` instead. Declare only one service for `MESSAGING_EVENT` in your app manifest. The plugin's own `KlaviyoFlutterPushService` declaration is still merged in from its library manifest, but it lands after yours, so your subclass still receives every message and you don't need to remove it. If your subclass overrides `onMessageReceived`, call `super.onMessageReceived(message)` first, or Klaviyo pushes won't display and silent pushes won't reach Dart.
 
-The plugin's manifest still contributes the base `KlaviyoFlutterPushService`. Remove it from the merged manifest so your subclass is the only Klaviyo service that handles `MESSAGING_EVENT` (this needs `xmlns:tools="http://schemas.android.com/tools"` on your `<manifest>` element):
-
-```xml
-<service
-    android:name="com.example.app.MyPushService"
-    android:exported="false">
-    <intent-filter>
-        <action android:name="com.google.firebase.MESSAGING_EVENT" />
-    </intent-filter>
-</service>
-
-<service
-    android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService"
-    tools:node="remove" />
-```
+Optionally, to make the choice explicit instead of relying on manifest order, remove the plugin's base service with `<service android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService" tools:node="remove" />` (this needs `xmlns:tools="http://schemas.android.com/tools"` on your `<manifest>` element), or add `android:priority="1"` to your subclass's intent-filter.
 
 With this declaration, Klaviyo's service receives every FCM message. It displays Klaviyo pushes and forwards Klaviyo silent pushes to Dart. Non-Klaviyo messages get the same treatment as in the native `KlaviyoPushService`: Firebase's base service still displays `notification` messages while your app is in the background, and the Klaviyo code logs and ignores them otherwise. Nothing is passed on to the other library's service. For the other library, that means:
 
