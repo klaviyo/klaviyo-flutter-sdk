@@ -55,14 +55,12 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
     private var eventSink: EventChannel.EventSink? = null
-
-    // Most recent push open and push action emitted before Flutter subscribed;
-    // replayed on the next onListen. One slot each, matching iOS.
-    private var cachedOpenedNotification: Map<String, Any?>? = null
-    private var cachedPushAction: Map<String, Any?>? = null
-
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
+
+    // True from onAttachedToActivity until onDetachedFromActivity, including across
+    // configuration changes.
+    private var attachedToActivity = false
 
     /**
      * Pending auth token requests keyed by correlation ID. The native SDK
@@ -108,11 +106,17 @@ class KlaviyoFlutterSdkPlugin :
         @Volatile
         internal var instance: KlaviyoFlutterSdkPlugin? = null
 
-        // Most recent silent push that arrived before Flutter subscribed; replayed on
-        // the next onListen. One entry, matching iOS. Process-wide like `instance`, so a
-        // push cached by one engine's plugin isn't stranded when another claims delivery.
+        // Most recent silent push, push open and push action that arrived while no
+        // engine was listening; replayed to the primary engine once it listens. One
+        // slot each, matching iOS.
         @Volatile
         private var cachedSilentPush: Map<String, Any?>? = null
+
+        @Volatile
+        private var cachedOpenedNotification: Map<String, Any?>? = null
+
+        @Volatile
+        private var cachedPushAction: Map<String, Any?>? = null
 
         // Plugin instances whose engine is currently attached, in attach order.
         // Mutated only from engine attach/detach on the main thread.
@@ -120,10 +124,28 @@ class KlaviyoFlutterSdkPlugin :
 
         // Primary engine: the first listening engine attached to an Activity, else the
         // first listening engine, else the first attached engine.
+        // Replays held events to the primary engine when it is listening.
         private fun selectInstance() {
-            instance = activePlugins.firstOrNull { it.eventSink != null && it.activity != null }
+            instance = activePlugins.firstOrNull { it.eventSink != null && it.attachedToActivity }
                 ?: activePlugins.firstOrNull { it.eventSink != null }
                 ?: activePlugins.firstOrNull()
+            instance?.eventSink?.let { replayCachedEvents(it) }
+        }
+
+        private fun replayCachedEvents(sink: EventChannel.EventSink) {
+            cachedSilentPush?.let { sink.success(it) }
+            cachedSilentPush = null
+            cachedOpenedNotification?.let { sink.success(it + ("replayed" to true)) }
+            cachedOpenedNotification = null
+            cachedPushAction?.let { sink.success(it + ("replayed" to true)) }
+            cachedPushAction = null
+        }
+
+        // Sends to the primary engine, or returns false if no engine is listening.
+        private fun emitToPrimary(payload: Map<String, Any?>): Boolean {
+            val sink = instance?.eventSink ?: return false
+            sink.success(payload)
+            return true
         }
     }
 
@@ -145,14 +167,6 @@ class KlaviyoFlutterSdkPlugin :
                 ) {
                     eventSink = events
                     selectInstance()
-                    // Replay a silent push that arrived before Flutter subscribed.
-                    cachedSilentPush?.let { events?.success(it) }
-                    cachedSilentPush = null
-                    // Replay a push open and push action that arrived before Flutter subscribed.
-                    cachedOpenedNotification?.let { events?.success(it + ("replayed" to true)) }
-                    cachedOpenedNotification = null
-                    cachedPushAction?.let { events?.success(it + ("replayed" to true)) }
-                    cachedPushAction = null
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -859,7 +873,7 @@ class KlaviyoFlutterSdkPlugin :
             )
 
         Handler(Looper.getMainLooper()).post {
-            eventSink?.let { it.success(payload) } ?: run {
+            if (!emitToPrimary(payload)) {
                 Registry.log.verbose("Flutter not ready. Caching silent push event.")
                 cachedSilentPush = payload
             }
@@ -870,6 +884,7 @@ class KlaviyoFlutterSdkPlugin :
     @OptIn(AdvancedAPI::class)
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        attachedToActivity = true
         selectInstance()
 
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
@@ -888,11 +903,14 @@ class KlaviyoFlutterSdkPlugin :
 
     override fun onDetachedFromActivityForConfigChanges() {
         activity = null
+        selectInstance()
     }
 
     @OptIn(AdvancedAPI::class)
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
+        attachedToActivity = true
+        selectInstance()
 
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
@@ -904,6 +922,7 @@ class KlaviyoFlutterSdkPlugin :
 
     override fun onDetachedFromActivity() {
         activity = null
+        attachedToActivity = false
         selectInstance()
     }
 
@@ -1043,14 +1062,14 @@ class KlaviyoFlutterSdkPlugin :
     }
 
     private fun emitOrCacheOpenedNotification(payload: Map<String, Any?>) {
-        eventSink?.let { it.success(payload) } ?: run {
+        if (!emitToPrimary(payload)) {
             Registry.log.verbose("Flutter not ready. Caching notification open event.")
             cachedOpenedNotification = payload
         }
     }
 
     private fun emitOrCachePushAction(payload: Map<String, Any?>) {
-        eventSink?.let { it.success(payload) } ?: run {
+        if (!emitToPrimary(payload)) {
             Registry.log.verbose("Flutter not ready. Caching push action event.")
             cachedPushAction = payload
         }
