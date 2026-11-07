@@ -28,11 +28,6 @@ linter:
     depend_on_referenced_packages: false
     require_trailing_commas: true
     avoid_print: true
-analyzer:
-  exclude:
-    - build/**
-    - android/**
-    - ios/**
   # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
 
 # Additional information about this file can be found at
