@@ -348,7 +348,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          flutter-version: 3.38.7
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Pin native SDKs
@@ -375,11 +375,15 @@ jobs:
       - name: Commit pin
         id: commit
         env:
-          PIN_PATHS: android/build.gradle ios/klaviyo_flutter_sdk.podspec ios/klaviyo_flutter_sdk/Package.swift example/ios/Podfile example/ios/Podfile.lock
+          PIN_PATHS: android/build.gradle android/build.gradle.kts ios/klaviyo_flutter_sdk.podspec ios/klaviyo_flutter_sdk/Package.swift example/ios/Podfile example/ios/Podfile.lock
         run: |
           set -euo pipefail
 
-          read -ra paths <<< "$PIN_PATHS"
+          read -ra candidates <<< "$PIN_PATHS"
+          paths=()
+          for path in "${candidates[@]}"; do
+            [ -e "$path" ] && paths+=("$path")
+          done
           git add -- "${paths[@]}"
           if git diff --cached --quiet; then
             echo "Native pins already match $BRANCH, nothing to commit"
