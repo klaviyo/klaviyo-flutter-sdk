@@ -9,6 +9,9 @@
 ### Added
 
 - **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
+### Fixed
+
+- **`handleUniversalTrackingLink()` threw if called before `initialize()`** — It now works before `initialize()` on iOS and Android and never throws, so universal links that open the app from a cold start are tracked and resolved even if `initialize()` hasn't run yet. On Android, the plugin registers the native SDK's lifecycle callbacks first when the SDK isn't initialized yet.
 
 ## 0.5.0
 

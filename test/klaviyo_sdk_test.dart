@@ -85,6 +85,64 @@ void main() {
     });
   });
 
+  group('KlaviyoSDK.handleUniversalTrackingLink before initialize', () {
+    const trackingUrl = 'https://trk.example.com/u/abc123';
+
+    test('does not throw and forwards the link to native', () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+
+      expect(KlaviyoSDK().handleUniversalTrackingLink(trackingUrl), isTrue);
+      await pumpEventQueue();
+
+      final calls =
+          log.where((c) => c.method == 'handleUniversalTrackingLink').toList();
+      expect(calls.length, 1);
+      expect(calls.single.arguments['url'], trackingUrl);
+    });
+
+    test('returns false for a non-tracking link without calling native',
+        () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+
+      expect(
+        KlaviyoSDK().handleUniversalTrackingLink('https://example.com/a'),
+        isFalse,
+      );
+      await pumpEventQueue();
+
+      expect(
+        log.where((c) => c.method == 'handleUniversalTrackingLink'),
+        isEmpty,
+      );
+    });
+
+    test('does not throw when the native call fails', () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        throw PlatformException(code: 'ERROR', message: 'native failure');
+      });
+
+      expect(KlaviyoSDK().handleUniversalTrackingLink(trackingUrl), isTrue);
+      await pumpEventQueue();
+    });
+
+    test('native wrapper forwards the link without initialize', () async {
+      expect(KlaviyoNativeWrapper().isInitialized, isFalse);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        log.add(call);
+        return call.method == 'handleUniversalTrackingLink';
+      });
+
+      await expectLater(
+        KlaviyoNativeWrapper().handleUniversalTrackingLink(trackingUrl),
+        completion(isTrue),
+      );
+      expect(log.single.method, 'handleUniversalTrackingLink');
+    });
+  });
+
   group('KlaviyoSDK.initialize', () {
     test('initializes and sets apiKey', () async {
       final sdk = KlaviyoSDK();
