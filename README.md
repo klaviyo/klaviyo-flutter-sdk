@@ -552,10 +552,10 @@ The simplest approach — the SDK automatically fetches the push token without r
 await KlaviyoSDK().registerForPushNotifications();
 ```
 
-To see the token, listen to `onPushToken`. It emits a `KlaviyoPushToken` whose `type` is `KlaviyoPushTokenType.apns` on iOS or `KlaviyoPushTokenType.fcm` on Android. A registration failure arrives as a stream error (a `KlaviyoException` with code `PUSH_TOKEN_ERROR`), so handle it with `onError`:
+To receive the token, listen to `onPushToken`. It emits a `KlaviyoPushToken` whose `type` is `KlaviyoPushTokenType.apns` on iOS or `KlaviyoPushTokenType.fcm` on Android. A registration failure arrives as a stream error (a `KlaviyoException` with code `PUSH_TOKEN_ERROR`), so handle it with `onError`:
 ```dart
 KlaviyoSDK().onPushToken.listen(
-  (event) => _logger.info('${event.type.name} token received: ${event.token}'),
+  (event) => _logger.info('${event.type.name} token received'),
   onError: (Object error) => _logger.warning('Token error: $error'),
 );
 ```
@@ -578,11 +578,11 @@ Push events arrive on one typed stream per concern, the same split `firebase_mes
 KlaviyoSDK().onPushToken.listen((event) {
   switch (event.type) {
     case KlaviyoPushTokenType.apns:
-      _logger.info('APNs token: ${event.token}');
+      _logger.info('APNs token received');
     case KlaviyoPushTokenType.fcm:
-      _logger.info('FCM token: ${event.token}');
+      _logger.info('FCM token received');
     default:
-      _logger.info('${event.type.name} token: ${event.token}');
+      _logger.info('${event.type.name} token received');
   }
 });
 ```

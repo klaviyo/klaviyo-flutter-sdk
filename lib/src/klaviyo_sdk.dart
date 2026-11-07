@@ -268,7 +268,7 @@ class KlaviyoSDK {
   /// After calling this method, you can listen for the token via [onPushToken]:
   /// ```dart
   /// klaviyo.onPushToken.listen(
-  ///   (token) => log('${token.type.name} token received: ${token.token}'),
+  ///   (token) => log('${token.type.name} token received'),
   ///   onError: (Object error) => log('Token error: $error'),
   /// );
   /// ```
