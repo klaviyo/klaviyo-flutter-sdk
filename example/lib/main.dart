@@ -92,7 +92,7 @@ Future<void> _setupFCM() async {
 
 /// Subscription for silent push notifications.
 /// Tracked to prevent duplicate subscriptions on SDK re-initialization.
-StreamSubscription<Map<String, dynamic>>? _silentPushSubscription;
+StreamSubscription<KlaviyoPushData>? _silentPushSubscription;
 
 /// Subscription for push open events, including action-button and web URL
 /// taps. Tracked to prevent duplicate subscriptions on SDK re-initialization.
@@ -141,18 +141,9 @@ void setupSilentPushListener() {
   // Cancel any existing subscription to prevent duplicates
   _silentPushSubscription?.cancel();
 
-  // ignore: deprecated_member_use
-  _silentPushSubscription = klaviyo.onPushNotification.listen((eventData) {
-    final eventType = eventData['type'] as String? ?? '';
-
-    if (eventType == 'silent_push_received') {
-      final data = eventData['data'];
-      final userInfo =
-          data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-
-      _logger.info('Silent push received: $userInfo');
-      _showSilentPushAlert(userInfo);
-    }
+  _silentPushSubscription = klaviyo.onPushData.listen((data) {
+    _logger.info('Silent push received: ${data.payload}');
+    _showSilentPushAlert(data.payload);
   });
 }
 

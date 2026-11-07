@@ -617,8 +617,8 @@ class KlaviyoSDK {
 
   /// Get push notification events stream
   @Deprecated(
-    'Use onPushToken, onPushOpened or onPushData instead. '
-    'Will be removed in 1.0.',
+    'Use onPushToken for tokens and token errors, onPushOpened for opens, '
+    'and onPushData for silent pushes. Will be removed in 1.0.',
   )
   Stream<Map<String, dynamic>> get onPushNotification =>
       _nativeWrapper.onPushNotification;

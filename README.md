@@ -487,7 +487,9 @@ Push events arrive on one typed stream per concern, the same split `firebase_mes
 
 `KlaviyoPushOpened` and `KlaviyoPushData` both expose the full push `payload` and the push's Klaviyo key/value pairs as `keyValuePairs` (null when there are none).
 
-`onPushNotification` and `onPushAction` still work, but they are deprecated and will be removed in 1.0. `onPushNotification`'s `push_token_received` and `push_token_error` events move to `onPushToken`, `push_notification_opened` moves to `onPushOpened`, and `silent_push_received` moves to `onPushData`. Every `onPushAction` event is now an `onPushOpened` event with `tap` set to `KlaviyoPushTap.actionButton` or `KlaviyoPushTap.webUrl`.
+> **Deprecated:** `onPushNotification`, `onPushAction` and the `KlaviyoPushAction` types (`OpenWebUrl`, `ActionButtonTapped`) still work, but they are deprecated in favor of the typed streams and will be removed in 1.0.
+
+Migrating: `onPushNotification`'s `push_token_received` and `push_token_error` events move to `onPushToken`, `push_notification_opened` moves to `onPushOpened`, and `silent_push_received` moves to `onPushData`. Every `onPushAction` event is now an `onPushOpened` event with `tap` set to `KlaviyoPushTap.actionButton` or `KlaviyoPushTap.webUrl`.
 
 ### Handling Push Notification Opens
 

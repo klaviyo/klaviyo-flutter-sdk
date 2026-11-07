@@ -8,8 +8,10 @@
 
 ### Deprecated
 
-- `KlaviyoSDK.onPushNotification`: use `onPushToken`, `onPushOpened` or `onPushData`. Will be removed in 1.0.
-- `KlaviyoSDK.onPushAction`: use `onPushOpened`, which carries the tapped button or web URL. Will be removed in 1.0.
+- The old push streams are deprecated in favor of the typed streams and will be removed in 1.0. They keep working unchanged until then.
+  - `KlaviyoSDK.onPushNotification`: use `onPushToken` for tokens and token errors, `onPushOpened` for opens, and `onPushData` for silent pushes.
+  - `KlaviyoSDK.onPushAction`: use `onPushOpened`, which carries the tapped button or web URL.
+  - `KlaviyoPushAction`, `OpenWebUrl` and `ActionButtonTapped`: use `KlaviyoPushOpened`, with `tap` set to `KlaviyoPushTap.webUrl` (read `webUrl`) or `KlaviyoPushTap.actionButton` (read `button`).
 
 ### Behavior Changes
 

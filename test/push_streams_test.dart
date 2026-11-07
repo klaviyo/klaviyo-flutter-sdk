@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import 'dart:async';
 
 import 'package:flutter/services.dart';
@@ -141,9 +143,7 @@ void main() {
         ..clear()
         ..addAll([
           sdk.onPushOpened.listen(events.add),
-          // ignore: deprecated_member_use_from_same_package
           sdk.onPushAction.listen(actions.add),
-          // ignore: deprecated_member_use_from_same_package
           sdk.onPushNotification.listen(raw.add),
         ]);
     });
