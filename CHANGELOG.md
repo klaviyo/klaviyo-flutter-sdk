@@ -6,6 +6,9 @@
 
 - **`setProfile` dropped custom properties on iOS and Android** — `KlaviyoProfile.toJson` merged `properties` into the top level of the profile map, but both native plugins read them from a nested `properties` key, so custom properties passed to `setProfile` never reached Klaviyo. They are now sent under `properties`. `KlaviyoProfile.fromJson` reads them from the same nested key and still accepts JSON saved in the old top-level shape. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
 - **`setProfileAttribute` and `setProfileProperties` now map standard keys the same way on iOS and Android** — On Android, camelCase keys such as `firstName` were saved as custom properties instead of the standard first name field. Keys for standard attributes are now normalized in Dart, matching case-insensitively in camelCase or snake_case, and Android maps them to the native standard profile keys. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
+### Added
+
+- **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
 
 ## 0.5.0
 

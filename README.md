@@ -330,6 +330,18 @@ final purchaseEvent = KlaviyoEvent.custom(
 await KlaviyoSDK().createEvent(purchaseEvent);
 ```
 
+Set `valueCurrency` to an ISO 4217 code (e.g. `EUR`) to say which currency `value` is in. Klaviyo rejects an event whose code is not valid ISO 4217.
+
+```dart
+// Track a purchase event with value and currency
+final euroPurchaseEvent = KlaviyoEvent.custom(
+  metric: 'Purchase Completed',
+  value: 10.0,
+  valueCurrency: 'EUR',
+);
+await KlaviyoSDK().createEvent(euroPurchaseEvent);
+```
+
 ## Subscriptions
 
 Subscribe the current profile to a Klaviyo list and record its consent. Set the profile's email
@@ -1107,6 +1119,7 @@ KlaviyoEvent({
   required EventMetric name,
   Map<String, dynamic>? properties,
   double? value,
+  String? valueCurrency,
   String? uniqueId,
 })
 
@@ -1115,6 +1128,7 @@ KlaviyoEvent.custom({
   required String metric,
   Map<String, dynamic>? properties,
   double? value,
+  String? valueCurrency,
   String? uniqueId,
 })
 ```
