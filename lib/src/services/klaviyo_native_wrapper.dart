@@ -42,6 +42,14 @@ class KlaviyoNativeWrapper {
       BufferedBroadcastStreamController<Map<String, dynamic>>(
     holdKey: (_) => 'push_action',
   );
+  final _pushTokenController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>();
+  final _pushOpenedController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (_) => 'push_notification_opened',
+  );
+  final _pushDataController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>();
 
   // Getters for streams
 
@@ -73,6 +81,29 @@ class KlaviyoNativeWrapper {
   /// action is held, and each new push open clears it.
   Stream<Map<String, dynamic>> get onPushActionEvent =>
       _pushActionController.stream;
+
+  /// Raw `push_token_received` and `push_token_error` events backing
+  /// [KlaviyoSDK.onPushToken]. Events that arrive before any listener
+  /// subscribes go to the first subscriber.
+  @internal
+  Stream<Map<String, dynamic>> get onPushTokenEvent =>
+      _pushTokenController.stream;
+
+  /// Raw `push_notification_opened` events backing [KlaviyoSDK.onPushOpened].
+  ///
+  /// An open that arrives before any listener subscribes is held and replayed
+  /// to every subscriber when it subscribes, until a newer open arrives. Only
+  /// the most recent open is held.
+  @internal
+  Stream<Map<String, dynamic>> get onPushOpenedEvent =>
+      _pushOpenedController.stream;
+
+  /// Raw `silent_push_received` events backing [KlaviyoSDK.onPushData].
+  /// Events that arrive before any listener subscribes go to the first
+  /// subscriber.
+  @internal
+  Stream<Map<String, dynamic>> get onPushDataEvent =>
+      _pushDataController.stream;
 
   /// Initialize the native SDK wrapper
   Future<void> initialize({
@@ -397,6 +428,7 @@ class KlaviyoNativeWrapper {
       await _channel.invokeMethod('resetProfile');
       _pushNotificationController.clearHeld();
       _pushActionController.clearHeld();
+      _pushOpenedController.clearHeld();
     } catch (e) {
       throw KlaviyoException('Failed to reset profile: $e');
     }
@@ -468,11 +500,24 @@ class KlaviyoNativeWrapper {
         case 'silent_push_received':
         case 'push_token_received':
         case 'push_token_error':
+          final action = eventData.remove('action');
           _logger.info('Native push notification event: $eventData');
-          if (eventType == 'push_notification_opened') {
-            _pushActionController.clearHeld();
-          }
           _pushNotificationController.add(eventData, hold: replayed);
+          switch (eventType) {
+            case 'push_notification_opened':
+              _pushActionController.clearHeld();
+              _pushOpenedController.add(
+                action is Map<String, dynamic>
+                    ? {...eventData, 'action': action}
+                    : eventData,
+                hold: replayed,
+              );
+            case 'push_token_received':
+            case 'push_token_error':
+              _pushTokenController.add(eventData);
+            case 'silent_push_received':
+              _pushDataController.add(eventData);
+          }
           break;
         case 'form_event':
         case 'form_lifecycle_event':
@@ -545,5 +590,8 @@ class KlaviyoNativeWrapper {
     _formEventController.close();
     _authTokenRequestController.close();
     _pushActionController.close();
+    _pushTokenController.close();
+    _pushOpenedController.close();
+    _pushDataController.close();
   }
 }

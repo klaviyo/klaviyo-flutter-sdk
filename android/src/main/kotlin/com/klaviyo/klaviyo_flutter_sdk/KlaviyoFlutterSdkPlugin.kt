@@ -1054,15 +1054,18 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
+                cachedPushAction = null
+                val pushAction = actionButtonTapPayload(notificationData)
+
                 emitOrCacheOpenedNotification(
-                    mapOf(
-                        "type" to "push_notification_opened",
-                        "data" to notificationData,
-                    ),
+                    buildMap {
+                        put("type", "push_notification_opened")
+                        put("data", notificationData)
+                        pushAction?.let { put("action", it) }
+                    },
                 )
 
-                cachedPushAction = null
-                forwardActionButtonTap(notificationData)
+                pushAction?.let { emitOrCachePushAction(it) }
             }
         } catch (e: Exception) {
             Registry.log.error("Error handling push: ${e.message}", e)
@@ -1070,8 +1073,10 @@ class KlaviyoFlutterSdkPlugin :
     }
 
     /**
-     * Surfaces an action-button tap as a typed `push_action_button_tapped`
-     * event, in parallel with the `push_notification_opened` event.
+     * Builds the `push_action_button_tapped` event for an action-button tap, or
+     * null if the open was not a button tap. It is sent on its own for
+     * `onPushAction` and embedded as `action` in the `push_notification_opened`
+     * event for `onPushOpened`.
      *
      * The native SDK only launches the host app (carrying these `Button *`
      * extras) for `deep_link` / `open_app` buttons; `open_url` buttons are
@@ -1079,8 +1084,8 @@ class KlaviyoFlutterSdkPlugin :
      * they are not bridged here. The button's URL (when present) is forwarded
      * verbatim regardless of scheme — scheme handling stays in the native SDK.
      */
-    private fun forwardActionButtonTap(notificationData: Map<String, Any?>) {
-        val buttonId = notificationData["Button ID"] as? String ?: return
+    private fun actionButtonTapPayload(notificationData: Map<String, Any?>): Map<String, Any?>? {
+        val buttonId = notificationData["Button ID"] as? String ?: return null
 
         // The native SDK serializes the action as a display name; map it back to
         // the raw token shared with iOS and the Dart layer. "Open URL" is
@@ -1090,7 +1095,7 @@ class KlaviyoFlutterSdkPlugin :
             when (notificationData["Button Action"] as? String) {
                 "Open App" -> "open_app"
                 "Deep Link" -> "deep_link"
-                else -> return
+                else -> return null
             }
 
         val data =
@@ -1101,11 +1106,9 @@ class KlaviyoFlutterSdkPlugin :
         (notificationData["Button Label"] as? String)?.let { data["label"] = it }
         (notificationData["Button Link"] as? String)?.let { data["url"] = it }
 
-        emitOrCachePushAction(
-            mapOf(
-                "type" to "push_action_button_tapped",
-                "data" to data,
-            ),
+        return mapOf(
+            "type" to "push_action_button_tapped",
+            "data" to data,
         )
     }
 
