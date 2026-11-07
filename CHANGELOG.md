@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### New Features
+
+- **Typed push streams.** `onPushToken` (`Stream<String>`) emits push tokens; a registration failure arrives as a stream error carrying a `KlaviyoException` with code `PUSH_TOKEN_ERROR`. `onPushOpened` (`Stream<KlaviyoPushOpened>`) emits exactly one event for every tap on a Klaviyo push, whether on the body, an action button or a web URL push, with the tapped `button` or `webUrl` on the event. `onPushData` (`Stream<KlaviyoPushData>`, `@experimental`) emits push data received in the foreground. `KlaviyoPushOpened` and `KlaviyoPushData` expose the push's key/value pairs as `keyValuePairs`. A held cold-start open is replayed to every `onPushOpened` subscriber. See [Typed Push Streams](README.md#typed-push-streams).
+
+### Deprecated
+
+- `KlaviyoSDK.onPushNotification`: use `onPushToken`, `onPushOpened` or `onPushData`. Will be removed in 1.0.
+- `KlaviyoSDK.onPushAction`: use `onPushOpened`, which carries the tapped button or web URL. Will be removed in 1.0.
+
+### Behavior Changes
+
+- **Push data now includes visible pushes with key/value pairs.** `onPushData` and `silent_push_received` on `onPushNotification` fire for every silent push and for every visible push that carries key/value pairs, so such a push fires twice by design: push data on arrival, then an open on tap. On iOS the "visible content" check moved from the host `AppDelegate` into `handleSilentPush(userInfo:)`, so forward every push to it. **Apps still using the old README snippet keep dropping visible pushes with key/value pairs until they update it.**
+
 ### Bug Fixes
 
 - **Android: push opens and action-button taps that launch the app now reach Dart.** On a cold start the tap was handled before your Dart listener subscribed, so the `push_notification_opened` event and `onPushAction`'s `ActionButtonTapped` were dropped. The plugin now holds the most recent open and the most recent action until Dart subscribes. Reopening the app from Recents doesn't re-deliver the original tap.
