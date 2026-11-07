@@ -245,8 +245,7 @@ class KlaviyoSDK {
   /// ```dart
   /// klaviyo.onPushNotification.listen((event) {
   ///   if (event['type'] == 'push_token_received') {
-  ///     final token = event['data']['token'];
-  ///     log('Token received: $token');
+  ///     log('Push token received');
   ///   }
   /// });
   /// ```

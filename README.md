@@ -479,8 +479,7 @@ For visibility into push token events, subscribe to the `onPushNotification` str
 KlaviyoSDK().onPushNotification.listen((event) {
   switch (event['type']) {
     case 'push_token_received':
-      final token = event['data']['token'];
-      _logger.info('Token received: $token');
+      _logger.info('Push token received');
       break;
     case 'push_token_error':
       final error = event['data']['error'];

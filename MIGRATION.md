@@ -176,7 +176,7 @@ await KlaviyoSDK().registerForPushNotifications();
 // Listen for token events
 KlaviyoSDK().onPushNotification.listen((event) {
   if (event['type'] == 'push_token_received') {
-    print('Token: ${event['data']['token']}');
+    print('Push token received');
   }
 });
 ```
