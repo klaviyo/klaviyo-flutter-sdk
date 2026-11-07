@@ -189,4 +189,40 @@ void main() {
       );
     });
   });
+
+  group('KlaviyoSDK.setProfile', () {
+    test('sends custom properties nested under properties', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'test@example.com',
+          externalId: 'ext-123',
+          properties: {'plan': 'premium', 'age': 25},
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'email': 'test@example.com',
+          'external_id': 'ext-123',
+          'properties': {'plan': 'premium', 'age': 25},
+        },
+      });
+    });
+
+    test('omits properties when none are set', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(KlaviyoProfile(email: 'test@example.com'));
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {'email': 'test@example.com'},
+      });
+    });
+  });
 }

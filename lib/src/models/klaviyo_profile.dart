@@ -125,13 +125,24 @@ class KlaviyoProfile {
     if (image != null) data['image'] = image;
     if (location != null) data['location'] = location!.toJson();
 
-    // Merge custom properties
-    if (properties != null) {
-      data.addAll(properties!);
+    if (properties != null && properties!.isNotEmpty) {
+      data['properties'] = Map<String, dynamic>.from(properties!);
     }
 
     return data;
   }
+
+  static const _knownJsonKeys = {
+    'email',
+    'phone_number',
+    'external_id',
+    'first_name',
+    'last_name',
+    'organization',
+    'title',
+    'image',
+    'location',
+  };
 
   /// Create from JSON
   factory KlaviyoProfile.fromJson(Map<String, dynamic> json) {
@@ -150,21 +161,18 @@ class KlaviyoProfile {
       location = KlaviyoLocation.fromJson(json['location']);
     }
 
-    // Extract custom properties (exclude known fields)
-    final Map<String, dynamic> properties = Map.from(json);
-    properties.removeWhere(
-      (key, value) => [
-        'email',
-        'phone_number',
-        'external_id',
-        'first_name',
-        'last_name',
-        'organization',
-        'title',
-        'image',
-        'location',
-      ].contains(key),
-    );
+    final Map<String, dynamic>? properties;
+    final nestedProperties = json['properties'];
+    if (nestedProperties is Map) {
+      properties = nestedProperties.isNotEmpty
+          ? Map<String, dynamic>.from(nestedProperties)
+          : null;
+    } else {
+      // Pre-0.6.0 toJson wrote custom properties at the top level.
+      final legacy = Map<String, dynamic>.from(json)
+        ..removeWhere((key, value) => _knownJsonKeys.contains(key));
+      properties = legacy.isNotEmpty ? legacy : null;
+    }
 
     return KlaviyoProfile(
       email: email,
@@ -176,7 +184,7 @@ class KlaviyoProfile {
       title: title,
       image: image,
       location: location,
-      properties: properties.isNotEmpty ? properties : null,
+      properties: properties,
     );
   }
 
