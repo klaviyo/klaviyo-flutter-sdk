@@ -678,7 +678,7 @@ class KlaviyoSDK {
   /// Unregisters the auth token provider, if one is registered.
   ///
   /// Event streams stay open, so the SDK keeps working after this call.
-  @Deprecated('No longer needed; will be removed in 1.0.')
+  @Deprecated('No longer needed. Will be removed in 1.0.')
   void dispose() {
     if (_authTokenProvider != null) {
       _authTokenProvider = null;
