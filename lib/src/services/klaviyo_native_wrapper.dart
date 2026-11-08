@@ -267,6 +267,8 @@ class KlaviyoNativeWrapper {
       await _channel.invokeMethod('registerForInAppForms', {
         'configuration': configuration,
       });
+    } on PlatformException catch (e) {
+      throw _platformException('Failed to register for in-app forms', e);
     } catch (e) {
       throw KlaviyoException('Failed to register for in-app forms: $e');
     }
@@ -277,6 +279,8 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
     try {
       await _channel.invokeMethod('unregisterFromInAppForms');
+    } on PlatformException catch (e) {
+      throw _platformException('Failed to unregister from in-app forms', e);
     } catch (e) {
       throw KlaviyoException('Failed to unregister from in-app forms: $e');
     }
@@ -340,6 +344,8 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
     try {
       await _channel.invokeMethod('registerGeofencing');
+    } on PlatformException catch (e) {
+      throw _platformException('Failed to register for geofencing', e);
     } catch (e) {
       throw KlaviyoException('Failed to register for geofencing: $e');
     }
@@ -350,6 +356,8 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
     try {
       await _channel.invokeMethod('unregisterGeofencing');
+    } on PlatformException catch (e) {
+      throw _platformException('Failed to unregister from geofencing', e);
     } catch (e) {
       throw KlaviyoException('Failed to unregister from geofencing: $e');
     }
@@ -369,6 +377,8 @@ class KlaviyoNativeWrapper {
       return geofencesJson
           .map((json) => Geofence.fromJson(Map<String, dynamic>.from(json)))
           .toList();
+    } on PlatformException catch (e) {
+      throw _platformException('Failed to get current geofences', e);
     } catch (e) {
       throw KlaviyoException('Failed to get current geofences: $e');
     }
@@ -496,6 +506,14 @@ class KlaviyoNativeWrapper {
       return value.map(_deepConvertValue).toList();
     }
     return value;
+  }
+
+  KlaviyoException _platformException(String context, PlatformException e) {
+    return KlaviyoException(
+      '$context: ${e.message ?? e.code}',
+      code: e.code,
+      originalError: e,
+    );
   }
 
   /// Ensure SDK is initialized

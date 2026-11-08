@@ -33,6 +33,10 @@ These APIs still work and will be removed in 1.0.
 
 - **Using the SDK alongside `firebase_messaging` on Android** — FCM delivers each message to one service, and `firebase_messaging`'s service wins by default, so Klaviyo pushes never displayed in apps that also use it. The README now has a "Using with firebase_messaging (or another FCM library)" section: declare `KlaviyoFlutterPushService` in your app's own manifest. Adding `android:priority="1"` to its `MESSAGING_EVENT` intent filter is an optional extra safeguard. The example app's manifest now includes the declaration.
 
+### Breaking Changes
+
+- **Forms and geofencing failures now throw** — `registerForInAppForms()`, `unregisterFromInAppForms()`, `registerGeofencing()`, `unregisterGeofencing()` and `getCurrentGeofences()` used to log native errors and return normally. They now throw a `KlaviyoException` whose `code` is the native error code, such as `FORMS_NOT_AVAILABLE` or `GEOFENCING_NOT_AVAILABLE`. `getCurrentGeofences()` throws instead of returning an empty list. Wrap these calls in `try`/`catch` if your app calls them without the forms or location module linked. Success paths are unchanged.
+
 ## 0.5.0
 
 ### Changes
