@@ -23,6 +23,16 @@ These APIs still work and will be removed in 1.0.
 
 - **Silent push is experimental.** The `silent_push_received` event on `onPushNotification` and the iOS `handleSilentPush` method may change before or after 1.0. The README now lists the platform limits: iOS needs `AppDelegate` forwarding and doesn't deliver after the user swipes the app away, and Android doesn't deliver while the app is killed. No behavior change.
 
+### Changes
+
+- **`KlaviyoFlutterPushService` can be subclassed (Android)** — The class is now `open`, so apps can extend it for custom FCM handling, as the README describes. A subclass that overrides `onMessageReceived` must call `super.onMessageReceived` to keep Klaviyo display and silent push forwarding, and must be declared in your app's manifest in place of `KlaviyoFlutterPushService`.
+
+### Documentation
+
+- **iOS silent push after a force quit** — The Delivery Guarantees note no longer says iOS is unaffected. iOS doesn't launch a force-quit app for silent pushes until the user opens it again or restarts the device.
+
+- **Using the SDK alongside `firebase_messaging` on Android** — FCM delivers each message to one service, and `firebase_messaging`'s service wins by default, so Klaviyo pushes never displayed in apps that also use it. The README now has a "Using with firebase_messaging (or another FCM library)" section: declare `KlaviyoFlutterPushService` in your app's own manifest. Adding `android:priority="1"` to its `MESSAGING_EVENT` intent filter is an optional extra safeguard. The example app's manifest now includes the declaration.
+
 ## 0.5.0
 
 ### Changes
