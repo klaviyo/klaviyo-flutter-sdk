@@ -823,6 +823,10 @@ class KlaviyoFlutterSdkPlugin :
      * matching how the rest of the plugin emits events. If Flutter hasn't subscribed
      * yet, the event is held in memory and replayed on the next `onListen`; only the
      * most recent is kept, so a burst before subscription surfaces just the last one.
+     *
+     * Experimental: this method and the `silent_push_received` event it emits may change
+     * before or after 1.0. Not delivered while the app is killed, because no Flutter
+     * engine is running.
      */
     fun handleSilentPush(data: Map<String, Any?>) {
         val payload =
