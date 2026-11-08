@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### New Features
+
+- **Typed push streams.** `onPushToken` (`Stream<String>`) emits push tokens; a registration failure arrives as a stream error carrying a `KlaviyoException` with code `PUSH_TOKEN_ERROR`. `onPushOpened` (`Stream<KlaviyoPushOpened>`) emits exactly one event for every tap on a Klaviyo push, whether on the body, an action button or a web URL push, with the tapped `button` or `webUrl` on the event. On Android, web-link taps (a web URL push or an `open_url` button) reach `onPushOpened` while the app process is running, the same as `onPushAction`. `onPushData` (`Stream<KlaviyoPushData>`, `@experimental`) emits push data received in the foreground. `KlaviyoPushOpened` and `KlaviyoPushData` expose the push's key/value pairs as `keyValuePairs`. A held cold-start open is replayed to every `onPushOpened` subscriber. See [Typed Push Streams](README.md#typed-push-streams).
+
+### Deprecated
+
+- The old push streams are deprecated in favor of the typed streams and will be removed in 1.0. They keep working unchanged until then.
+  - `KlaviyoSDK.onPushNotification`: use `onPushToken` for tokens and token errors, `onPushOpened` for opens, and `onPushData` for silent pushes.
+  - `KlaviyoSDK.onPushAction`: use `onPushOpened`, which carries the tapped button or web URL.
+  - `KlaviyoPushAction`, `OpenWebUrl` and `ActionButtonTapped`: use `KlaviyoPushOpened`, with `tap` set to `KlaviyoPushTap.webUrl` (read `webUrl`) or `KlaviyoPushTap.actionButton` (read `button`).
+
+### Behavior Changes
+
+- **Push data now includes visible pushes with key/value pairs.** `onPushData` and `silent_push_received` on `onPushNotification` fire for every silent push and for every visible push that carries key/value pairs, so such a push fires twice by design: push data on arrival, then an open on tap. On iOS the "visible content" check moved from the host `AppDelegate` into `handleSilentPush(userInfo:)`, so forward every push to it. **Apps still using the old README snippet keep dropping visible pushes with key/value pairs until they update it.**
+
+### Bug Fixes
+
+- **Android: push opens and action-button taps that launch the app now reach Dart.** On a cold start the tap was handled before your Dart listener subscribed, so the `push_notification_opened` event and `onPushAction`'s `ActionButtonTapped` were dropped. The plugin now holds the most recent open and the most recent action until Dart subscribes. Reopening the app from Recents doesn't re-deliver the original tap.
+- **Android: web-link push taps now reach Dart through `onPushAction`.** A tap on a push whose body opens a web URL (`web_url`) now emits `OpenWebUrl`, and a tap on an `open_url` action button emits `ActionButtonTapped` with `action: 'open_url'`, matching iOS. Previously the native SDK opened the browser without launching your app, so neither event fired. This covers warm taps only, made while the app process is running. A web-link tap on a fully killed app still doesn't reach Dart, because the app never starts and the plugin isn't loaded to receive it.
+
+### Changes
+
+- **A held push open or push action now reaches every subscriber.** Previously, events that arrived before anyone subscribed went only to the first listener, so a token listener could take the cold-start open from a router that subscribed later. The SDK now keeps one pending open and one pending action and delivers them to every listener that subscribes, until a newer open arrives. Other events are unchanged: they still go to the first listener.
+
 ## 0.5.0
 
 ### Changes

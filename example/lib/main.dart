@@ -92,35 +92,37 @@ Future<void> _setupFCM() async {
 
 /// Subscription for silent push notifications.
 /// Tracked to prevent duplicate subscriptions on SDK re-initialization.
-StreamSubscription<Map<String, dynamic>>? _silentPushSubscription;
+StreamSubscription<KlaviyoPushData>? _silentPushSubscription;
 
-/// Subscription for push action (open_url / action button) events.
-/// Tracked to prevent duplicate subscriptions on SDK re-initialization.
-StreamSubscription<KlaviyoPushAction>? _pushActionSubscription;
+/// Subscription for push open events, including action-button and web URL
+/// taps. Tracked to prevent duplicate subscriptions on SDK re-initialization.
+StreamSubscription<KlaviyoPushOpened>? _pushOpenedSubscription;
 
-/// Set up listener for push action events (open_url taps and action buttons).
+/// Set up listener for push opens (body taps, action buttons, web URLs).
 /// Called from ProfileTab after SDK initialization.
 void setupPushActionListener() {
   final klaviyo = KlaviyoSDK();
   if (!klaviyo.isInitialized) {
     _logger.warning(
-      'Cannot set up push action listener: SDK not initialized',
+      'Cannot set up push open listener: SDK not initialized',
     );
     return;
   }
 
   // Cancel any existing subscription to prevent duplicates
-  _pushActionSubscription?.cancel();
+  _pushOpenedSubscription?.cancel();
 
-  _pushActionSubscription = klaviyo.onPushAction.listen((action) {
-    switch (action) {
-      case OpenWebUrl():
+  _pushOpenedSubscription = klaviyo.onPushOpened.listen((opened) {
+    switch (opened.tap) {
+      case KlaviyoPushTap.webUrl:
         _logger.info('Push open_url tapped');
-      case ActionButtonTapped():
+      case KlaviyoPushTap.actionButton:
         _logger.info(
-          'Push action button tapped — id: ${action.buttonId}, '
-          'action: ${action.action}',
+          'Push action button tapped — id: ${opened.button?.id}, '
+          'action: ${opened.button?.action.name}',
         );
+      default:
+        _logger.info('Push notification opened');
     }
   });
 }
@@ -139,17 +141,9 @@ void setupSilentPushListener() {
   // Cancel any existing subscription to prevent duplicates
   _silentPushSubscription?.cancel();
 
-  _silentPushSubscription = klaviyo.onPushNotification.listen((eventData) {
-    final eventType = eventData['type'] as String? ?? '';
-
-    if (eventType == 'silent_push_received') {
-      final data = eventData['data'];
-      final userInfo =
-          data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-
-      _logger.info('Silent push received: $userInfo');
-      _showSilentPushAlert(userInfo);
-    }
+  _silentPushSubscription = klaviyo.onPushData.listen((data) {
+    _logger.info('Silent push received: ${data.payload}');
+    _showSilentPushAlert(data.payload);
   });
 }
 

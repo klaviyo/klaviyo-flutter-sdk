@@ -4,9 +4,11 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
+import androidx.annotation.VisibleForTesting
 import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.AuthTokenProvider
 import com.klaviyo.analytics.Klaviyo
@@ -17,12 +19,15 @@ import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.analytics.model.Subscription
+import com.klaviyo.analytics.state.ProfileEventObserver
+import com.klaviyo.analytics.state.State
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.config.Log
 import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
+import com.klaviyo.core.utils.hasAllowedOpenUrlScheme
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
@@ -57,6 +62,10 @@ class KlaviyoFlutterSdkPlugin :
     private var eventSink: EventChannel.EventSink? = null
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
+
+    // True from onAttachedToActivity until onDetachedFromActivity, including across
+    // configuration changes.
+    private var attachedToActivity = false
 
     /**
      * Pending auth token requests keyed by correlation ID. The native SDK
@@ -102,24 +111,169 @@ class KlaviyoFlutterSdkPlugin :
         @Volatile
         internal var instance: KlaviyoFlutterSdkPlugin? = null
 
-        // Most recent silent push that arrived before Flutter subscribed; replayed on
-        // the next onListen. One entry, matching iOS. Process-wide like `instance`, so a
-        // push cached by one engine's plugin isn't stranded when another claims delivery.
+        // Most recent silent push, push open and push action that arrived while no
+        // engine was listening; replayed to the primary engine once it listens. One
+        // slot each, matching iOS.
         @Volatile
         private var cachedSilentPush: Map<String, Any?>? = null
+
+        @Volatile
+        private var cachedOpenedNotification: Map<String, Any?>? = null
+
+        @Volatile
+        private var cachedPushAction: Map<String, Any?>? = null
+
+        // Plugin instances whose engine is currently attached, in attach order.
+        // Mutated only from engine attach/detach on the main thread.
+        private val activePlugins = LinkedHashSet<KlaviyoFlutterSdkPlugin>()
+
+        // Primary engine: the first listening engine attached to an Activity, else the
+        // first listening engine, else the first attached engine.
+        // Replays held events to the primary engine when it is listening.
+        private fun selectInstance() {
+            instance = activePlugins.firstOrNull { it.eventSink != null && it.attachedToActivity }
+                ?: activePlugins.firstOrNull { it.eventSink != null }
+                ?: activePlugins.firstOrNull()
+            instance?.eventSink?.let { replayCachedEvents(it) }
+        }
+
+        private fun replayCachedEvents(sink: EventChannel.EventSink) {
+            cachedSilentPush?.let { sink.success(it) }
+            cachedSilentPush = null
+            cachedOpenedNotification?.let { sink.success(it + ("replayed" to true)) }
+            cachedOpenedNotification = null
+            cachedPushAction?.let { sink.success(it + ("replayed" to true)) }
+            cachedPushAction = null
+        }
+
+        // Sends to the primary engine, or returns false if no engine is listening.
+        private fun emitToPrimary(payload: Map<String, Any?>): Boolean {
+            val sink = instance?.eventSink ?: return false
+            sink.success(payload)
+            return true
+        }
+
+        private const val OPENED_PUSH_METRIC = "\$opened_push"
+
+        private val OPENED_PUSH_METADATA_KEYS =
+            setOf(
+                "\$event_id",
+                "push_token",
+                "_time",
+                "Device ID",
+                "Device Manufacturer",
+                "Device Model",
+                "OS Name",
+                "OS Version",
+                "SDK Name",
+                "SDK Version",
+                "App Name",
+                "App ID",
+                "App Version",
+                "App Build",
+                "Push Token",
+            )
+
+        private var lastEmittedOpenKey: String? = null
+
+        private val webLinkTapObserver: ProfileEventObserver = { event ->
+            webLinkOpenedPayload(event)?.let { payload ->
+                Handler(Looper.getMainLooper()).post { emitWebLinkOpen(payload) }
+            }
+        }
+
+        /**
+         * Returns false if an open for the same push delivery (its `_k` tracking payload) was
+         * already emitted, so a tap seen by both the activity and the "Opened Push" observer
+         * reaches Dart once. Opens without `_k` are never deduplicated. Main thread only.
+         */
+        internal fun markOpenEmitted(notificationData: Map<String, Any?>): Boolean {
+            val key = notificationData[Constants.TRACKING_PARAMETER]?.toString() ?: return true
+            if (key == lastEmittedOpenKey) return false
+            lastEmittedOpenKey = key
+            return true
+        }
+
+        @VisibleForTesting
+        internal fun resetEmittedOpens() {
+            lastEmittedOpenKey = null
+        }
+
+        /**
+         * Builds the `push_notification_opened` event for a web-link tap from its "Opened Push"
+         * event, with the push-action payload from [webLinkTapPayload] under `action` and the
+         * device metadata the native SDK adds removed from `data`. Returns null for every other
+         * event.
+         */
+        internal fun webLinkOpenedPayload(event: Event): Map<String, Any?>? {
+            val action = webLinkTapPayload(event) ?: return null
+            return mapOf(
+                "type" to "push_notification_opened",
+                "data" to event.toMap().filterKeys { it !in OPENED_PUSH_METADATA_KEYS },
+                "action" to action,
+            )
+        }
+
+        /**
+         * Emits a web-link tap built by [webLinkOpenedPayload] to the primary engine: the open
+         * for `onPushOpened`, then its action for `onPushAction`. Each is cached until an
+         * engine listens. Main thread only.
+         */
+        @Suppress("UNCHECKED_CAST")
+        internal fun emitWebLinkOpen(payload: Map<String, Any?>) {
+            val data = payload["data"] as? Map<String, Any?> ?: return
+            if (!markOpenEmitted(data)) return
+            cachedPushAction = null
+            if (!emitToPrimary(payload)) {
+                Registry.log.verbose("Flutter not ready. Caching notification open event.")
+                cachedOpenedNotification = payload
+            }
+            val action = payload["action"] as? Map<String, Any?> ?: return
+            if (!emitToPrimary(action)) {
+                Registry.log.verbose("Flutter not ready. Caching push action event.")
+                cachedPushAction = action
+            }
+        }
+
+        /** Registers [webLinkTapObserver] once, if the native SDK is initialized. */
+        internal fun observeWebLinkTaps() {
+            Registry.getOrNull<State>()?.run {
+                offProfileEvent(webLinkTapObserver)
+                onProfileEvent(webLinkTapObserver)
+            }
+        }
+
+        /**
+         * Maps an "Opened Push" event for a web-link tap (an `open_url` button, or a body
+         * tap with an allowed `web_url` and no deep-link `url`) to the iOS push-action
+         * payload. Returns null for every other event.
+         */
+        internal fun webLinkTapPayload(event: Event): Map<String, Any?>? {
+            if (event.metric.name != OPENED_PUSH_METRIC) return null
+            val props = event.toMap()
+
+            val buttonId = props["Button ID"] as? String
+            if (buttonId != null) {
+                if (props["Button Action"] != "Open URL") return null
+                val url = props[Constants.BUTTON_LINK_PARAMETER] as? String ?: return null
+                val data = mutableMapOf<String, Any?>("id" to buttonId, "action" to "open_url", "url" to url)
+                (props["Button Label"] as? String)?.let { data["label"] = it }
+                return mapOf("type" to "push_action_button_tapped", "data" to data)
+            }
+
+            if (props.containsKey(Constants.URL_PARAMETER)) return null
+            val webUrl = (props["web_url"] as? String)?.takeIf { it.isNotBlank() } ?: return null
+            if (!Uri.parse(webUrl).hasAllowedOpenUrlScheme()) return null
+            return mapOf("type" to "push_open_web_url", "data" to mapOf("url" to webUrl))
+        }
     }
 
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
-        // Never take delivery away from an engine that already has a live Dart
-        // listener. A host using firebase_messaging's onBackgroundMessage gets a
-        // second FlutterEngine for the background isolate, which auto-registers
-        // this plugin; that instance never subscribes to the EventChannel, so
-        // letting it claim `instance` would strand every event.
-        if (instance?.eventSink == null) {
-            instance = this
-        }
+        activePlugins.add(this)
+        selectInstance()
+        observeWebLinkTaps()
         applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
@@ -132,15 +286,12 @@ class KlaviyoFlutterSdkPlugin :
                     events: EventChannel.EventSink?,
                 ) {
                     eventSink = events
-                    // Whichever engine has a live Dart listener owns event delivery.
-                    instance = this@KlaviyoFlutterSdkPlugin
-                    // Replay a silent push that arrived before Flutter subscribed.
-                    cachedSilentPush?.let { events?.success(it) }
-                    cachedSilentPush = null
+                    selectInstance()
                 }
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
+                    selectInstance()
                     // The Dart side keeps a permanent auth-event listener, so this
                     // fires at engine teardown. Tear the auth bridge down here too
                     // (parity with iOS onCancel) so in-flight requests fail promptly
@@ -162,6 +313,7 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     // Initialize Klaviyo SDK
                     Klaviyo.initialize(apiKey!!, applicationContext)
+                    observeWebLinkTaps()
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("INIT_ERROR", "Failed to initialize Klaviyo", e.message)
@@ -485,7 +637,8 @@ class KlaviyoFlutterSdkPlugin :
                         }
 
                         Handler(Looper.getMainLooper()).post {
-                            eventSink?.success(
+                            // Falls back to the current delivery owner once this engine has detached.
+                            (eventSink ?: instance?.eventSink)?.success(
                                 mapOf(
                                     "type" to "form_lifecycle_event",
                                     "data" to data,
@@ -805,14 +958,15 @@ class KlaviyoFlutterSdkPlugin :
         @NonNull binding: FlutterPlugin.FlutterPluginBinding,
     ) {
         channel.setMethodCallHandler(null)
-        if (instance === this) {
-            instance = null
-        }
+        activePlugins.remove(this)
         eventSink = null
+        selectInstance()
         // Unregister the auth token provider so the Klaviyo singleton stops
         // retaining (and invoking) this now-detached plugin instance's bridge
         // lambda after the engine is gone, and drain pending callbacks.
         tearDownAuthTokenProvider("Flutter engine detached")
+        // The form lifecycle handler is process-wide; only remove it once no engine remains.
+        if (activePlugins.isNotEmpty()) return
         try {
             Klaviyo.unregisterFormLifecycleHandler()
         } catch (_: MissingKlaviyoModule) {
@@ -840,7 +994,7 @@ class KlaviyoFlutterSdkPlugin :
             )
 
         Handler(Looper.getMainLooper()).post {
-            eventSink?.let { it.success(payload) } ?: run {
+            if (!emitToPrimary(payload)) {
                 Registry.log.verbose("Flutter not ready. Caching silent push event.")
                 cachedSilentPush = payload
             }
@@ -851,6 +1005,8 @@ class KlaviyoFlutterSdkPlugin :
     @OptIn(AdvancedAPI::class)
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        attachedToActivity = true
+        selectInstance()
 
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
@@ -868,11 +1024,14 @@ class KlaviyoFlutterSdkPlugin :
 
     override fun onDetachedFromActivityForConfigChanges() {
         activity = null
+        selectInstance()
     }
 
     @OptIn(AdvancedAPI::class)
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
+        attachedToActivity = true
+        selectInstance()
 
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
@@ -884,6 +1043,8 @@ class KlaviyoFlutterSdkPlugin :
 
     override fun onDetachedFromActivity() {
         activity = null
+        attachedToActivity = false
+        selectInstance()
     }
 
     // Fallback when logging is enabled but no prior level was captured (e.g. it
@@ -937,6 +1098,13 @@ class KlaviyoFlutterSdkPlugin :
                 Klaviyo.handlePush(intent)
             }
 
+            // Reopening from Recents hands back the original launch intent, including
+            // after process death, so it is not emitted to Dart as a new open.
+            if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) {
+                Registry.log.verbose("Not emitting push open for intent relaunched from history")
+                return
+            }
+
             val extras = intent.extras
             if (extras != null && intent.isKlaviyoNotificationIntent) {
                 // Klaviyo namespaces all push extras with Constants.PACKAGE_PREFIX when building
@@ -959,14 +1127,23 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
-                eventSink?.success(
-                    mapOf(
-                        "type" to "push_notification_opened",
-                        "data" to notificationData,
-                    ),
+                if (!markOpenEmitted(notificationData)) {
+                    Registry.log.verbose("Push open already emitted for this delivery")
+                    return
+                }
+
+                cachedPushAction = null
+                val pushAction = actionButtonTapPayload(notificationData)
+
+                emitOrCacheOpenedNotification(
+                    buildMap {
+                        put("type", "push_notification_opened")
+                        put("data", notificationData)
+                        pushAction?.let { put("action", it) }
+                    },
                 )
 
-                forwardActionButtonTap(notificationData)
+                pushAction?.let { emitOrCachePushAction(it) }
             }
         } catch (e: Exception) {
             Registry.log.error("Error handling push: ${e.message}", e)
@@ -974,8 +1151,10 @@ class KlaviyoFlutterSdkPlugin :
     }
 
     /**
-     * Surfaces an action-button tap as a typed `push_action_button_tapped`
-     * event, in parallel with the `push_notification_opened` event.
+     * Builds the `push_action_button_tapped` event for an action-button tap, or
+     * null if the open was not a button tap. It is sent on its own for
+     * `onPushAction` and embedded as `action` in the `push_notification_opened`
+     * event for `onPushOpened`.
      *
      * The native SDK only launches the host app (carrying these `Button *`
      * extras) for `deep_link` / `open_app` buttons; `open_url` buttons are
@@ -983,8 +1162,8 @@ class KlaviyoFlutterSdkPlugin :
      * they are not bridged here. The button's URL (when present) is forwarded
      * verbatim regardless of scheme — scheme handling stays in the native SDK.
      */
-    private fun forwardActionButtonTap(notificationData: Map<String, Any?>) {
-        val buttonId = notificationData["Button ID"] as? String ?: return
+    private fun actionButtonTapPayload(notificationData: Map<String, Any?>): Map<String, Any?>? {
+        val buttonId = notificationData["Button ID"] as? String ?: return null
 
         // The native SDK serializes the action as a display name; map it back to
         // the raw token shared with iOS and the Dart layer. "Open URL" is
@@ -994,7 +1173,7 @@ class KlaviyoFlutterSdkPlugin :
             when (notificationData["Button Action"] as? String) {
                 "Open App" -> "open_app"
                 "Deep Link" -> "deep_link"
-                else -> return
+                else -> return null
             }
 
         val data =
@@ -1005,11 +1184,23 @@ class KlaviyoFlutterSdkPlugin :
         (notificationData["Button Label"] as? String)?.let { data["label"] = it }
         (notificationData["Button Link"] as? String)?.let { data["url"] = it }
 
-        eventSink?.success(
-            mapOf(
-                "type" to "push_action_button_tapped",
-                "data" to data,
-            ),
+        return mapOf(
+            "type" to "push_action_button_tapped",
+            "data" to data,
         )
+    }
+
+    private fun emitOrCacheOpenedNotification(payload: Map<String, Any?>) {
+        if (!emitToPrimary(payload)) {
+            Registry.log.verbose("Flutter not ready. Caching notification open event.")
+            cachedOpenedNotification = payload
+        }
+    }
+
+    internal fun emitOrCachePushAction(payload: Map<String, Any?>) {
+        if (!emitToPrimary(payload)) {
+            Registry.log.verbose("Flutter not ready. Caching push action event.")
+            cachedPushAction = payload
+        }
     }
 }
