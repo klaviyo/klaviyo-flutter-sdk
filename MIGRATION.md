@@ -204,8 +204,8 @@ Future<void> _handler(RemoteMessage message) async {
 if (Klaviyo.instance.isKlaviyoPush(message.data)) { ... }
 
 // After — remove the check
-// Klaviyo push events arrive on KlaviyoSDK's own streams, such as
-// onPushNotification and onPushAction, so there is no raw payload to inspect.
+// Listen to KlaviyoSDK().onPushOpened for taps or
+// KlaviyoSDK().onPushData for push data received in the foreground.
 // The isKlaviyoNotification extension still exists but is deprecated and
 // will be removed in 1.0.
 ```
