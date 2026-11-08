@@ -260,6 +260,15 @@ Optionally, add `android:priority="1"` to the intent-filter as a safeguard: FCM 
 
 If you subclass `KlaviyoFlutterPushService`, put your subclass's fully qualified class name in `android:name` instead. Declare only one service for `MESSAGING_EVENT` in your app manifest. The plugin's own `KlaviyoFlutterPushService` declaration is still merged in from its library manifest, but it lands after yours, so your subclass still receives every message and you don't need to remove it. If your subclass overrides `onMessageReceived`, call `super.onMessageReceived(message)` first, or Klaviyo pushes won't display and silent pushes won't reach Dart.
 
+The plugin declares `firebase-messaging` as an `implementation` dependency, so `RemoteMessage` isn't on your app's compile classpath. Add it to `android/app/build.gradle` before your subclass will compile. Use the Firebase BoM, or match the version your Firebase plugins already resolve:
+
+```groovy
+dependencies {
+    implementation platform("com.google.firebase:firebase-bom:<version>")
+    implementation "com.google.firebase:firebase-messaging"
+}
+```
+
 Optionally, to make the choice explicit instead of relying on manifest order, remove the plugin's base service with `<service android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService" tools:node="remove" />` (this needs `xmlns:tools="http://schemas.android.com/tools"` on your `<manifest>` element), or add `android:priority="1"` to your subclass's intent-filter.
 
 With this declaration, Klaviyo's service receives every FCM message. It displays Klaviyo pushes and forwards Klaviyo silent pushes to Dart. Non-Klaviyo messages get the same treatment as in the native `KlaviyoPushService`: Firebase's base service still displays `notification` messages while your app is in the background, and the Klaviyo code logs and ignores them otherwise. Nothing is passed on to the other library's service. For the other library, that means:
