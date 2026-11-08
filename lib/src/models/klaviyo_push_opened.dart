@@ -17,8 +17,8 @@ final class KlaviyoPushTap {
   static const actionButton = KlaviyoPushTap._('actionButton');
 
   /// The notification body of a push whose action opens an external web URL.
-  /// See [KlaviyoPushOpened.webUrl]. iOS only: on Android the native SDK opens
-  /// the URL without launching the app.
+  /// See [KlaviyoPushOpened.webUrl]. On Android this reaches Dart only while
+  /// the app process is running.
   static const webUrl = KlaviyoPushTap._('webUrl');
 
   /// A stable identifier, suitable for logging.
@@ -52,8 +52,8 @@ final class KlaviyoPushButtonAction {
   /// Opens a deep link in the app. See [KlaviyoPushButton.url].
   static const deepLink = KlaviyoPushButtonAction._('deep_link');
 
-  /// Opens an external web URL. See [KlaviyoPushButton.url]. iOS only: on
-  /// Android the native SDK opens the URL without launching the app.
+  /// Opens an external web URL. See [KlaviyoPushButton.url]. On Android this
+  /// reaches Dart only while the app process is running.
   static const openUrl = KlaviyoPushButtonAction._('open_url');
 
   /// The raw value the native SDKs send.
@@ -143,15 +143,19 @@ class KlaviyoPushOpened {
         if (id is! String || buttonAction is! String) break;
         final label = actionData['label'];
         final url = actionData['url'];
+        final button = KlaviyoPushButton(
+          id: id,
+          label: label is String ? label : '',
+          action: KlaviyoPushButtonAction.fromName(buttonAction),
+          url: url is String && url.isNotEmpty ? url : null,
+        );
         return KlaviyoPushOpened(
           payload: payload,
           tap: KlaviyoPushTap.actionButton,
-          button: KlaviyoPushButton(
-            id: id,
-            label: label is String ? label : '',
-            action: KlaviyoPushButtonAction.fromName(buttonAction),
-            url: url is String && url.isNotEmpty ? url : null,
-          ),
+          button: button,
+          webUrl: button.action == KlaviyoPushButtonAction.openUrl
+              ? button.url
+              : null,
         );
       case 'push_open_web_url':
         final url = actionData['url'];
@@ -175,7 +179,9 @@ class KlaviyoPushOpened {
   /// The tapped action button, when [tap] is [KlaviyoPushTap.actionButton].
   final KlaviyoPushButton? button;
 
-  /// The web URL the push opens, when [tap] is [KlaviyoPushTap.webUrl].
+  /// The external web URL the tap opens: the push's web URL when [tap] is
+  /// [KlaviyoPushTap.webUrl], or the button's URL for a
+  /// [KlaviyoPushButtonAction.openUrl] button. Null for every other tap.
   final String? webUrl;
 
   /// The key/value pairs set on the push in Klaviyo, or null if it has none.

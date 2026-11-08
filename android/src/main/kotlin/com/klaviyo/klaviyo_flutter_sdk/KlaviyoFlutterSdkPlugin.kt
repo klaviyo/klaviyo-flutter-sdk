@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
+import androidx.annotation.VisibleForTesting
 import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.AuthTokenProvider
 import com.klaviyo.analytics.Klaviyo
@@ -154,11 +155,83 @@ class KlaviyoFlutterSdkPlugin :
 
         private const val OPENED_PUSH_METRIC = "\$opened_push"
 
+        private val OPENED_PUSH_METADATA_KEYS =
+            setOf(
+                "\$event_id",
+                "push_token",
+                "_time",
+                "Device ID",
+                "Device Manufacturer",
+                "Device Model",
+                "OS Name",
+                "OS Version",
+                "SDK Name",
+                "SDK Version",
+                "App Name",
+                "App ID",
+                "App Version",
+                "App Build",
+                "Push Token",
+            )
+
+        private var lastEmittedOpenKey: String? = null
+
         private val webLinkTapObserver: ProfileEventObserver = { event ->
-            webLinkTapPayload(event)?.let { payload ->
-                Handler(Looper.getMainLooper()).post {
-                    instance?.emitOrCachePushAction(payload) ?: run { cachedPushAction = payload }
-                }
+            webLinkOpenedPayload(event)?.let { payload ->
+                Handler(Looper.getMainLooper()).post { emitWebLinkOpen(payload) }
+            }
+        }
+
+        /**
+         * Returns false if an open for the same push delivery (its `_k` tracking payload) was
+         * already emitted, so a tap seen by both the activity and the "Opened Push" observer
+         * reaches Dart once. Opens without `_k` are never deduplicated. Main thread only.
+         */
+        internal fun markOpenEmitted(notificationData: Map<String, Any?>): Boolean {
+            val key = notificationData[Constants.TRACKING_PARAMETER]?.toString() ?: return true
+            if (key == lastEmittedOpenKey) return false
+            lastEmittedOpenKey = key
+            return true
+        }
+
+        @VisibleForTesting
+        internal fun resetEmittedOpens() {
+            lastEmittedOpenKey = null
+        }
+
+        /**
+         * Builds the `push_notification_opened` event for a web-link tap from its "Opened Push"
+         * event, with the push-action payload from [webLinkTapPayload] under `action` and the
+         * device metadata the native SDK adds removed from `data`. Returns null for every other
+         * event.
+         */
+        internal fun webLinkOpenedPayload(event: Event): Map<String, Any?>? {
+            val action = webLinkTapPayload(event) ?: return null
+            return mapOf(
+                "type" to "push_notification_opened",
+                "data" to event.toMap().filterKeys { it !in OPENED_PUSH_METADATA_KEYS },
+                "action" to action,
+            )
+        }
+
+        /**
+         * Emits a web-link tap built by [webLinkOpenedPayload] to the primary engine: the open
+         * for `onPushOpened`, then its action for `onPushAction`. Each is cached until an
+         * engine listens. Main thread only.
+         */
+        @Suppress("UNCHECKED_CAST")
+        internal fun emitWebLinkOpen(payload: Map<String, Any?>) {
+            val data = payload["data"] as? Map<String, Any?> ?: return
+            if (!markOpenEmitted(data)) return
+            cachedPushAction = null
+            if (!emitToPrimary(payload)) {
+                Registry.log.verbose("Flutter not ready. Caching notification open event.")
+                cachedOpenedNotification = payload
+            }
+            val action = payload["action"] as? Map<String, Any?> ?: return
+            if (!emitToPrimary(action)) {
+                Registry.log.verbose("Flutter not ready. Caching push action event.")
+                cachedPushAction = action
             }
         }
 
@@ -1053,6 +1126,11 @@ class KlaviyoFlutterSdkPlugin :
                 }
 
                 Registry.log.verbose("Push notification opened: $notificationData")
+
+                if (!markOpenEmitted(notificationData)) {
+                    Registry.log.verbose("Push open already emitted for this delivery")
+                    return
+                }
 
                 cachedPushAction = null
                 val pushAction = actionButtonTapPayload(notificationData)

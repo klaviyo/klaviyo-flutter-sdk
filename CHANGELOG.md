@@ -4,7 +4,7 @@
 
 ### New Features
 
-- **Typed push streams.** `onPushToken` (`Stream<String>`) emits push tokens; a registration failure arrives as a stream error carrying a `KlaviyoException` with code `PUSH_TOKEN_ERROR`. `onPushOpened` (`Stream<KlaviyoPushOpened>`) emits exactly one event for every tap on a Klaviyo push, whether on the body, an action button or a web URL push, with the tapped `button` or `webUrl` on the event. `onPushData` (`Stream<KlaviyoPushData>`, `@experimental`) emits push data received in the foreground. `KlaviyoPushOpened` and `KlaviyoPushData` expose the push's key/value pairs as `keyValuePairs`. A held cold-start open is replayed to every `onPushOpened` subscriber. See [Typed Push Streams](README.md#typed-push-streams).
+- **Typed push streams.** `onPushToken` (`Stream<String>`) emits push tokens; a registration failure arrives as a stream error carrying a `KlaviyoException` with code `PUSH_TOKEN_ERROR`. `onPushOpened` (`Stream<KlaviyoPushOpened>`) emits exactly one event for every tap on a Klaviyo push, whether on the body, an action button or a web URL push, with the tapped `button` or `webUrl` on the event. On Android, web-link taps (a web URL push or an `open_url` button) reach `onPushOpened` while the app process is running, the same as `onPushAction`. `onPushData` (`Stream<KlaviyoPushData>`, `@experimental`) emits push data received in the foreground. `KlaviyoPushOpened` and `KlaviyoPushData` expose the push's key/value pairs as `keyValuePairs`. A held cold-start open is replayed to every `onPushOpened` subscriber. See [Typed Push Streams](README.md#typed-push-streams).
 
 ### Deprecated
 

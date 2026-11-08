@@ -183,6 +183,7 @@ void main() {
           url: 'app://shop',
         ),
       );
+      expect(events.single.webUrl, isNull);
       expect(actions.single, isA<ActionButtonTapped>());
       expect(raw.single['type'], 'push_notification_opened');
       expect(raw.single.containsKey('action'), isFalse);
@@ -202,6 +203,45 @@ void main() {
       expect(events.single.tap, KlaviyoPushTap.webUrl);
       expect(events.single.webUrl, 'https://example.com');
       expect(actions.single, const OpenWebUrl(url: 'https://example.com'));
+    });
+
+    test('Android open_url button tap emits one webUrl open', () async {
+      final action = {
+        'type': 'push_action_button_tapped',
+        'data': {
+          'id': 'b1',
+          'label': 'Open Site',
+          'action': 'open_url',
+          'url': 'https://example.com/shop',
+        },
+      };
+      sink!
+        ..success({
+          'type': 'push_notification_opened',
+          'data': {
+            'Button ID': 'b1',
+            'Button Action': 'Open URL',
+            'Button Link': 'https://example.com/shop',
+          },
+          'action': action,
+        })
+        ..success(action);
+      await pumpEventQueue();
+
+      expect(events, hasLength(1));
+      expect(events.single.tap, KlaviyoPushTap.actionButton);
+      expect(events.single.button?.action, KlaviyoPushButtonAction.openUrl);
+      expect(events.single.button?.url, 'https://example.com/shop');
+      expect(events.single.webUrl, 'https://example.com/shop');
+      expect(
+        actions.single,
+        const ActionButtonTapped(
+          buttonId: 'b1',
+          label: 'Open Site',
+          action: 'open_url',
+          url: 'https://example.com/shop',
+        ),
+      );
     });
 
     test('ignores token and push data events', () async {

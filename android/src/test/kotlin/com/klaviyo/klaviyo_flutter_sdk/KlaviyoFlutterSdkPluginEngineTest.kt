@@ -160,6 +160,7 @@ class KlaviyoFlutterSdkPluginEngineTest {
     @After
     fun tearDown() {
         attached.toList().forEach { detach(it) }
+        KlaviyoFlutterSdkPlugin.resetEmittedOpens()
         Registry.unregister<State>()
         unmockkAll()
     }
@@ -408,5 +409,34 @@ class KlaviyoFlutterSdkPluginEngineTest {
         assertEquals(1, primary.webUrlOpens().size)
         assertEquals(mapOf("url" to "https://example.com"), primary.webUrlOpens().single()["data"])
         assertEquals(0, secondary.webUrlOpens().size)
+        assertEquals(1, primary.pushOpens().size)
+        assertEquals(primary.webUrlOpens().single(), primary.pushOpens().single()["action"])
+        assertEquals(0, secondary.pushOpens().size)
+    }
+
+    @Test
+    fun `web-link tap before any engine listens is replayed once to the primary`() {
+        val observers = registerState()
+        val engine = attach()
+        engine.attachActivity()
+
+        val openedPush =
+            Event(EventMetric.CUSTOM("\$opened_push")).apply {
+                this[EventKey.CUSTOM("Button ID")] = "b1"
+                this[EventKey.CUSTOM("Button Action")] = "Open URL"
+                this[EventKey.CUSTOM("Button Link")] = "https://example.com/shop"
+                this[EventKey.CUSTOM("_k")] = "{\"tm\":\"replay-1\"}"
+            }
+        observers.forEach { it(openedPush) }
+        observers.forEach { it(openedPush) }
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, engine.pushOpens().size)
+
+        engine.listen()
+
+        assertEquals(1, engine.pushOpens().size)
+        assertEquals(true, engine.pushOpens().single()["replayed"])
+        assertEquals(1, engine.pushActions().size)
+        assertEquals("open_url", (engine.pushActions().single()["data"] as Map<*, *>)["action"])
     }
 }
