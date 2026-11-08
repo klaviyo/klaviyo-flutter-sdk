@@ -590,11 +590,20 @@ extension KlaviyoFlutterSdkPlugin {
             Logger.klaviyoFlutterSDK.info("Push notification opened")
         }
 
-        // 1. Prepare Payload
-        let eventPayload: [String: Any] = [
+        // Each notification interaction supersedes any push action still cached
+        // for a not-yet-ready Flutter listener, including when this interaction
+        // produces no push-action payload (e.g. a deep-link body tap).
+        cachedPushAction = nil
+        let pushAction = pushActionPayload(for: response, userInfo: userInfo)
+
+        // 1. Prepare Payload, with the tapped button or web URL under `action`
+        var eventPayload: [String: Any] = [
             "type": "push_notification_opened",
             "data": userInfo
         ]
+        if let pushAction {
+            eventPayload["action"] = pushAction
+        }
 
         // 2. Send to Flutter (or Cache if Flutter is asleep)
         if let eventSink = eventSink {
@@ -608,7 +617,9 @@ extension KlaviyoFlutterSdkPlugin {
 
         // 3. Surface the open_url action / action-button tap as a typed push action
         // event, in parallel with the raw opened-notification event above.
-        forwardPushAction(for: response, userInfo: userInfo)
+        if let pushAction {
+            forwardPushAction(pushAction)
+        }
 
         // 4. Pass to Native Klaviyo SDK
         // We pass a dummy completion handler because the Host App owns the real one.
@@ -616,26 +627,19 @@ extension KlaviyoFlutterSdkPlugin {
         _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
     }
 
-    /// Mirrors an `open_url` body tap or an action-button tap to Flutter as a
-    /// typed push-action event. The native SDK still performs the actual
-    /// dispatch (opening the URL / launching the app); this only forwards the
-    /// event so Flutter apps can react.
+    /// Builds the push-action event for an `open_url` body tap or an
+    /// action-button tap, or nil for any other interaction. The native SDK still
+    /// performs the actual dispatch (opening the URL / launching the app); this
+    /// only describes the tap so Flutter apps can react.
     ///
     /// Scheme handling is deliberately left to the native SDK: whatever URL the
     /// payload carries is forwarded verbatim, including special schemes such as
     /// `mailto:`/`tel:`/`sms:`. The plugin does not re-implement the SDK's
     /// scheme allowlist.
-    private func forwardPushAction(
+    private func pushActionPayload(
         for response: UNNotificationResponse,
         userInfo: [AnyHashable: Any]
-    ) {
-        // Each notification interaction supersedes any push action still cached
-        // for a not-yet-ready Flutter listener. Clear it up front so that an
-        // earlier, superseded event can't be delivered on `onListen` when this
-        // interaction produces no push-action payload (e.g. a deep-link body tap
-        // or a notification dismiss, both of which return without caching below).
-        cachedPushAction = nil
-
+    ) -> [String: Any]? {
         let actionIdentifier = response.actionIdentifier
 
         var eventPayload: [String: Any]?
@@ -665,7 +669,7 @@ extension KlaviyoFlutterSdkPlugin {
                         "No action button matches identifier '\(actionIdentifier)'; dropping tap."
                     )
                 }
-                return
+                return nil
             }
             // Dart's KlaviyoPushAction.fromMap requires `action`, so drop
             // incomplete taps here with a log rather than silently downstream.
@@ -675,7 +679,7 @@ extension KlaviyoFlutterSdkPlugin {
                         "Action button '\(actionIdentifier)' has no action type; dropping tap."
                     )
                 }
-                return
+                return nil
             }
             var data: [String: Any] = ["id": actionIdentifier, "action": action]
             if let label = button["label"] as? String {
@@ -690,8 +694,11 @@ extension KlaviyoFlutterSdkPlugin {
             ]
         }
 
-        guard let eventPayload else { return }
+        return eventPayload
+    }
 
+    /// Sends a push-action event to Flutter, or caches it until Flutter listens.
+    private func forwardPushAction(_ eventPayload: [String: Any]) {
         if let eventSink {
             eventSink(eventPayload)
         } else {
@@ -702,11 +709,16 @@ extension KlaviyoFlutterSdkPlugin {
         }
     }
 
-    /// Manual Forwarding Helper - Silent Push
+    /// Manual Forwarding Helper - Push Data
     /// This should be called from the Host App's AppDelegate
-    /// in `didReceiveRemoteNotification:fetchCompletionHandler:`.
+    /// in `didReceiveRemoteNotification:fetchCompletionHandler:` for every push.
+    /// Only a silent push (no `aps.alert`) or a push with `key_value_pairs` reaches Dart;
+    /// any other push is ignored.
     /// Note: The host app is responsible for calling the completion handler after this method returns.
     public func handleSilentPush(userInfo: [AnyHashable: Any]) {
+        let isSilent = (userInfo["aps"] as? [String: Any])?["alert"] == nil
+        guard isSilent || userInfo["key_value_pairs"] != nil else { return }
+
         if #available(iOS 14.0, *) {
             Logger.klaviyoFlutterSDK.info("Silent push received")
         }

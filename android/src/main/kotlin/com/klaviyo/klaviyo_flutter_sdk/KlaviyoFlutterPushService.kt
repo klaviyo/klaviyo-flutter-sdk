@@ -11,8 +11,8 @@ import org.json.JSONException
 import org.json.JSONObject
 
 /**
- * FCM service that forwards Klaviyo silent pushes (data-only messages, with or
- * without `key_value_pairs`) to the Flutter `EventChannel` as
+ * FCM service that forwards Klaviyo push data (every silent push, and every
+ * visible push that carries `key_value_pairs`) to the Flutter `EventChannel` as
  * `{type: 'silent_push_received', data: <RemoteMessage.data>}`, mirroring the iOS
  * `handleSilentPush` path.
  *
@@ -23,12 +23,26 @@ class KlaviyoFlutterPushService : KlaviyoPushService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
-        // A Klaviyo push is "silent" when it carries the tracking parameter (_k)
-        // but has no title/body — i.e. isKlaviyoMessage && !isKlaviyoNotification.
-        // This covers silent pushes both with and without `key_value_pairs`.
-        if (message.isKlaviyoMessage && !message.isKlaviyoNotification) {
+        if (isPushData(
+                isKlaviyoMessage = message.isKlaviyoMessage,
+                isKlaviyoNotification = message.isKlaviyoNotification,
+                hasKeyValuePairs = message.keyValuePairs != null,
+            )
+        ) {
             forwardSilentPush(message)
         }
+    }
+
+    internal companion object {
+        /**
+         * True for a Klaviyo push that is silent (no title/body), or visible with
+         * key/value pairs.
+         */
+        internal fun isPushData(
+            isKlaviyoMessage: Boolean,
+            isKlaviyoNotification: Boolean,
+            hasKeyValuePairs: Boolean,
+        ): Boolean = isKlaviyoMessage && (!isKlaviyoNotification || hasKeyValuePairs)
     }
 
     private fun forwardSilentPush(message: RemoteMessage) {
