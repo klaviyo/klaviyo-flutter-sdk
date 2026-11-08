@@ -56,6 +56,23 @@ void main() {
       expect(calls[1].arguments['enabled'], isTrue);
     });
 
+    test('setLoggingEnabled toggles Dart-side logging', () async {
+      final sdk = KlaviyoSDK();
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+
+      await sdk.setLoggingEnabled(false);
+      expect(Logger('KlaviyoSDK').level, Level.OFF);
+      Logger('KlaviyoSDK').info('while disabled');
+
+      await sdk.setLoggingEnabled(true);
+      expect(Logger('KlaviyoSDK').level, isNot(Level.OFF));
+      Logger('KlaviyoSDK').info('while enabled');
+
+      await sub.cancel();
+      expect(records.map((r) => r.message), ['while enabled']);
+    });
+
     test('isLoggingEnabled returns native value', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(methodChannel, (call) async {
