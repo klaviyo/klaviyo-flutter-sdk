@@ -506,9 +506,9 @@ KlaviyoSDK().onPushOpened.listen((opened) {
 });
 ```
 
-One tap emits one event. Before 0.6.0, an iOS action-button or web URL tap emitted both `push_notification_opened` and an `onPushAction` event. `webUrl` is set for a web URL push and for an `open_url` action button.
+One tap emits one event. Before 0.6.0, an iOS action-button or web URL tap emitted both `push_notification_opened` and an `onPushAction` event. `webUrl` is set for a web URL push and for an `open_url` action button. `KlaviyoPushTap` and `KlaviyoPushButtonAction` are not enums, because later releases may add new kinds, so keep a `default` case when you switch on them.
 
-> **Android web-link taps:** a tap on a web URL push or an `open_url` button opens the browser without launching your app's activity, so the plugin reads it from the native SDK's "Opened Push" event instead. It reaches `onPushOpened` only while your app's process is running (foreground or background). A web-link tap on a fully killed app doesn't reach Dart. The same limit applies to `onPushAction`. `KlaviyoPushTap` and `KlaviyoPushButtonAction` are not enums, because later releases may add new kinds, so keep a `default` case when you switch on them.
+> **Android web-link taps:** a tap on a web URL push or an `open_url` button opens the browser without launching your app's activity, so the plugin reads it from the native SDK's "Opened Push" event instead. It reaches `onPushOpened` only while your app's process is running (foreground or background). A web-link tap on a fully killed app doesn't reach Dart. The same limit applies to `onPushAction`.
 
 > **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
 

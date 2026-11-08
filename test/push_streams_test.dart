@@ -379,6 +379,31 @@ void main() {
     });
   });
 
+  group('KlaviyoPushData.keyValuePairs', () {
+    test('reads a map or decodes a JSON string', () {
+      expect(
+        KlaviyoPushData({
+          'key_value_pairs': {'a': 'b', 'n': 1},
+        }).keyValuePairs,
+        {'a': 'b', 'n': '1'},
+      );
+      expect(
+        KlaviyoPushData({'key_value_pairs': '{"a":"b","n":1}'}).keyValuePairs,
+        {'a': 'b', 'n': '1'},
+      );
+    });
+
+    test('is null when missing, empty or not a JSON object', () {
+      expect(KlaviyoPushData({}).keyValuePairs, isNull);
+      expect(KlaviyoPushData({'key_value_pairs': ''}).keyValuePairs, isNull);
+      expect(
+        KlaviyoPushData({'key_value_pairs': 'not json'}).keyValuePairs,
+        isNull,
+      );
+      expect(KlaviyoPushData({'key_value_pairs': '[1]'}).keyValuePairs, isNull);
+    });
+  });
+
   group('KlaviyoPushOpened.fromMap', () {
     test('hoists key/value pairs from a map or an Android JSON string', () {
       final ios = KlaviyoPushOpened.fromMap({
