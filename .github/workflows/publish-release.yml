@@ -49,6 +49,7 @@ permissions:
   contents: read
 
 env:
+  TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   SLACK_USERNAME: Flutter SDK
   SLACK_ICON_EMOJI: ':merlin-orb-flutter:'
 
@@ -304,7 +305,7 @@ jobs:
             Version: `${{ inputs.version }}`
             Commit: `${{ steps.failed.outputs.commit_short }}`
             Stage: Prepare
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.ref.outputs.sha || github.sha }}
 
       - name: Reply with failure details
@@ -363,7 +364,7 @@ jobs:
           fields: |
             Version: `${{ inputs.version }}`
             Commit: `${{ needs.prepare.outputs.sha_short }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Draft release|${{ needs.prepare.outputs.release_url }}
             Approve here|${{ github.server_url }}/${{ github.repository }}/actions/workflows/release.yml
@@ -374,16 +375,19 @@ jobs:
         env:
           SLACK_TS: ${{ steps.slack_pending.outputs.ts }}
         run: |
-          # True when the workflow file at $VERSION declares slack_ts.
-          takes_slack_ts() {
+          # True when the workflow file at $VERSION declares the input named by $1.
+          takes_input() {
             gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$VERSION" \
-              -H "Accept: application/vnd.github.raw" | grep -q '^[[:space:]]*slack_ts:'
+              -H "Accept: application/vnd.github.raw" | grep -q "^[[:space:]]*$1:"
           }
-          if [ -n "$SLACK_TS" ] && takes_slack_ts; then
-            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f "slack_ts=$SLACK_TS"
-          else
-            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
+          args=()
+          if [ -n "$SLACK_TS" ] && takes_input slack_ts; then
+            args+=(-f "slack_ts=$SLACK_TS")
           fi
+          if takes_input triggered_by; then
+            args+=(-f "triggered_by=$TRIGGERED_BY")
+          fi
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" "${args[@]}"
           {
             echo "### klaviyo_flutter_sdk ${VERSION} tagged"
             echo
@@ -434,6 +438,7 @@ jobs:
             Version: `${{ inputs.version }}`
             Commit: `${{ needs.prepare.outputs.sha_short }}`
             Stage: Publish
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Release|${{ needs.prepare.outputs.release_url }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
@@ -462,7 +467,7 @@ jobs:
             Version: `${{ inputs.version }}`
             Commit: `${{ needs.prepare.outputs.sha_short }}`
             Stage: Publish
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Release|${{ needs.prepare.outputs.release_url }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
