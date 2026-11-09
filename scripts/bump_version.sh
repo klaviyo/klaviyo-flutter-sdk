@@ -19,15 +19,35 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+NEW_VERSION=""
+ANDROID_VERSION=""
+IOS_VERSION=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --android-version)
+            ANDROID_VERSION="${2:-}"
+            shift 2 || shift
+            ;;
+        --ios-version)
+            IOS_VERSION="${2:-}"
+            shift 2 || shift
+            ;;
+        *)
+            if [ -z "$NEW_VERSION" ]; then
+                NEW_VERSION=$1
+            fi
+            shift
+            ;;
+    esac
+done
+
 # Check if version argument is provided
-if [ -z "$1" ]; then
+if [ -z "$NEW_VERSION" ]; then
     echo -e "${RED}Error: Version number required${NC}"
-    echo "Usage: ./scripts/bump_version.sh <new-version>"
+    echo "Usage: ./scripts/bump_version.sh <new-version> [--android-version X] [--ios-version Y]"
     echo "Example: ./scripts/bump_version.sh 0.2.0-alpha.1"
     exit 1
 fi
-
-NEW_VERSION=$1
 
 # Validate version format (semantic versioning with optional prerelease)
 if ! [[ $NEW_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
@@ -66,6 +86,19 @@ sed_inplace "s/<string name=\"klaviyo_sdk_version_override\">.*<\/string>/<strin
 # 4. Update iOS plist via sync_version.sh
 echo -e "${GREEN}✓${NC} Updating ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist"
 ./scripts/sync_version.sh
+
+# 5. Pin native SDK versions
+native_args=()
+if [ -n "$ANDROID_VERSION" ]; then
+    native_args+=(--android-version "$ANDROID_VERSION")
+fi
+if [ -n "$IOS_VERSION" ]; then
+    native_args+=(--ios-version "$IOS_VERSION")
+fi
+if [ "${#native_args[@]}" -gt 0 ]; then
+    echo -e "${GREEN}✓${NC} Pinning native SDK versions"
+    ./scripts/configure-sdk.sh "${native_args[@]}"
+fi
 
 echo ""
 echo -e "${BLUE}Verifying changes...${NC}"
