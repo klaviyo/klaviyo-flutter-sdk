@@ -641,7 +641,13 @@ For the equivalent native integration guides, see [Android Personalized Forms Au
 
 ### Previewing Draft Forms on a Device
 
-The Klaviyo form editor's **Preview on device** button gives you a short-lived preview token, a QR code, and a preview link for the draft form. Start a preview from a pasted token with `startFormsPreview`, and call `endFormsPreview` to return to published forms. Starting or ending a preview restarts in-app forms, like unregistering and registering again. If you haven't called `registerForInAppForms` yet, the preview starts when you do.
+> Available in Flutter SDK 0.6.0 and higher, by push or by preview link.
+
+There are two ways to preview a draft form in your app. Push is the preferred one.
+
+Push: in the form editor, choose **Preview on device** > **Send push** and send it to a saved test device. Tap the notification and the draft form opens in your app. A push preview needs only the standard Klaviyo push setup (see [Push Notifications](#push-notifications)). The native SDK handles the tap, so your app needs no preview code.
+
+Preview link or token: the **Preview on device** dialog also gives you a short-lived preview token, a QR code, and a preview link for the draft form. Start a preview from a pasted token with `startFormsPreview`, and call `endFormsPreview` to return to published forms. Starting or ending a preview restarts in-app forms, like unregistering and registering again. If you haven't called `registerForInAppForms` yet, the preview starts when you do.
 
 ```dart
 await KlaviyoSDK().startFormsPreview(token); // start a draft preview
