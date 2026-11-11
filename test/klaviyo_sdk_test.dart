@@ -224,5 +224,16 @@ void main() {
       final call = log.singleWhere((c) => c.method == 'setProfileProperties');
       expect(call.arguments['properties'], {'first_name': 'Ada'});
     });
+
+    test('setProfileAttribute with ProfileProperty sends the wire key',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileAttribute(ProfileProperty.firstName, 'Ada');
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {'first_name': 'Ada'});
+    });
   });
 }

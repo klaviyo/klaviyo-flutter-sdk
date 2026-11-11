@@ -265,29 +265,42 @@ await KlaviyoSDK().setExternalId('user123');
 await KlaviyoSDK().setProfileProperties({
   'preferences': {'notifications': true},
 });
-await KlaviyoSDK().setProfileAttribute('first_name', 'John');
+await KlaviyoSDK().setProfileAttribute(ProfileProperty.firstName, 'John');
 ```
 
 ### Standard Profile Attributes
 
-`setProfileProperties` and `setProfileAttribute` send these keys to Klaviyo's standard profile fields. Matching ignores case and accepts camelCase or snake_case, so `firstName`, `first_name` and `FIRST_NAME` all set the first name. Any other key is stored as a custom property under the key you passed.
+Use the `ProfileProperty` constants as keys for `setProfileAttribute` and `setProfileProperties`:
 
-| Standard field | Accepted keys |
-|----------------|---------------|
-| First name | `first_name`, `firstName` |
-| Last name | `last_name`, `lastName` |
-| Organization | `organization` |
-| Title | `title` |
-| Image URL | `image` |
-| Address line 1 | `address1`, `address_1` |
-| Address line 2 | `address2`, `address_2` |
-| City | `city` |
-| Country | `country` |
-| Region | `region` |
-| Zip | `zip` |
-| Latitude | `latitude` |
-| Longitude | `longitude` |
-| Timezone | `timezone`, `timeZone`, `time_zone` (Android only, see below) |
+```dart
+await KlaviyoSDK().setProfileAttribute(ProfileProperty.firstName, 'Jane');
+await KlaviyoSDK().setProfileProperties({
+  ProfileProperty.city: 'Boston',
+  ProfileProperty.zip: '02110',
+  'favorite_color': 'blue', // custom property
+});
+```
+
+Raw strings still work. Matching ignores case and accepts camelCase or snake_case, so `ProfileProperty.firstName`, `'first_name'`, `'firstName'` and `'FIRST_NAME'` all set the first name. Any other key is stored as a custom property under the key you passed.
+
+| Standard field | Constant | Accepted string keys |
+|----------------|----------|----------------------|
+| First name | `ProfileProperty.firstName` | `first_name`, `firstName` |
+| Last name | `ProfileProperty.lastName` | `last_name`, `lastName` |
+| Organization | `ProfileProperty.organization` | `organization` |
+| Title | `ProfileProperty.title` | `title` |
+| Image URL | `ProfileProperty.image` | `image` |
+| Address line 1 | `ProfileProperty.address1` | `address1`, `address_1` |
+| Address line 2 | `ProfileProperty.address2` | `address2`, `address_2` |
+| City | `ProfileProperty.city` | `city` |
+| Country | `ProfileProperty.country` | `country` |
+| Region | `ProfileProperty.region` | `region` |
+| Zip | `ProfileProperty.zip` | `zip` |
+| Latitude | `ProfileProperty.latitude` | `latitude` |
+| Longitude | `ProfileProperty.longitude` | `longitude` |
+| Timezone | `ProfileProperty.timezone` | `timezone`, `timeZone`, `time_zone` (Android only, see below) |
+
+Email, phone number and external ID aren't attributes; set them with `setEmail`, `setPhoneNumber` and `setExternalId`.
 
 **Timezone on iOS:** the native iOS SDK can't set the timezone as a single attribute, so on iOS `timezone` is stored as a custom property. Both native SDKs already send the device timezone with the profile automatically. To set a timezone explicitly on both platforms, pass it in `KlaviyoProfile.location` through `setProfile`.
 
@@ -1160,6 +1173,10 @@ KlaviyoLocation({
   String? timezone,
 })
 ```
+
+#### ProfileProperty
+
+String constants for the standard profile attribute keys: `firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone`. See [Standard Profile Attributes](#standard-profile-attributes).
 
 #### InAppFormConfig
 

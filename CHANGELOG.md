@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+### What's New
+
+- **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
+
 ### Bug Fixes
 
-- **`setProfileAttribute` and `setProfileProperties` now map standard keys the same way on iOS and Android** — On Android, camelCase keys such as `firstName` were saved as custom properties instead of the standard first name field. Keys for standard attributes are now normalized in Dart, matching case-insensitively in camelCase or snake_case, and Android maps them to the native standard profile keys. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
+- **Android: camelCase profile keys now land in standard fields** — `setProfileAttribute` and `setProfileProperties` now normalize keys for standard attributes in Dart, case-insensitively and in camelCase or snake_case, before calling the native SDKs. On Android, keys such as `firstName` or `address_1` used to be saved as custom properties; they now set the standard field, matching iOS. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
 
 ## 0.5.0
 

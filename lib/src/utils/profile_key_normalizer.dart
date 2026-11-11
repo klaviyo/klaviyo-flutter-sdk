@@ -1,25 +1,27 @@
+import '../models/profile_property.dart';
+
 /// Maps lowercased camelCase and snake_case spellings of standard Klaviyo
 /// profile attributes to the canonical key sent over the platform channel.
 const Map<String, String> _standardProfileKeys = {
-  'firstname': 'first_name',
-  'first_name': 'first_name',
-  'lastname': 'last_name',
-  'last_name': 'last_name',
-  'organization': 'organization',
-  'title': 'title',
-  'image': 'image',
-  'address1': 'address1',
-  'address_1': 'address1',
-  'address2': 'address2',
-  'address_2': 'address2',
-  'city': 'city',
-  'country': 'country',
-  'region': 'region',
-  'zip': 'zip',
-  'latitude': 'latitude',
-  'longitude': 'longitude',
-  'timezone': 'timezone',
-  'time_zone': 'timezone',
+  'firstname': ProfileProperty.firstName,
+  'first_name': ProfileProperty.firstName,
+  'lastname': ProfileProperty.lastName,
+  'last_name': ProfileProperty.lastName,
+  'organization': ProfileProperty.organization,
+  'title': ProfileProperty.title,
+  'image': ProfileProperty.image,
+  'address1': ProfileProperty.address1,
+  'address_1': ProfileProperty.address1,
+  'address2': ProfileProperty.address2,
+  'address_2': ProfileProperty.address2,
+  'city': ProfileProperty.city,
+  'country': ProfileProperty.country,
+  'region': ProfileProperty.region,
+  'zip': ProfileProperty.zip,
+  'latitude': ProfileProperty.latitude,
+  'longitude': ProfileProperty.longitude,
+  'timezone': ProfileProperty.timezone,
+  'time_zone': ProfileProperty.timezone,
 };
 
 /// Returns the canonical snake_case key for a standard profile attribute
