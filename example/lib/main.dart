@@ -9,6 +9,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 
+import 'chunke_probes.dart';
+export 'chunke_probes.dart' show chunkeSecondaryMain;
 import 'firebase_background_handler.dart';
 import 'tabs/profile_tab.dart';
 import 'tabs/events_tab.dart';
@@ -109,6 +111,7 @@ void setupPushActionListener() {
     return;
   }
 
+  installChunkEProbes();
   // Cancel any existing subscription to prevent duplicates
   _pushOpenedSubscription?.cancel();
 

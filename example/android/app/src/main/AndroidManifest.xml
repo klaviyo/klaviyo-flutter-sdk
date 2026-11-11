@@ -65,6 +65,11 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- LOCAL TEST HARNESS ONLY (chunk E2): opt into the native trampoline. -->
+        <meta-data
+            android:name="com.klaviyo.push.automatic_push_open_tracking"
+            android:value="true" />
+
         <meta-data
             android:name="com.klaviyo.core.log_level"
             android:value="1" />
