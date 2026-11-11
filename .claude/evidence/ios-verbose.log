@@ -1,0 +1,49 @@
+getpwuid_r did not find a match for uid 502
+Filtering the log data using "composedMessage CONTAINS "CHUNKB" OR subsystem BEGINSWITH "com.klaviyo.klaviyo-swift-sdk""
+Timestamp               Ty Process[PID:TID]
+2026-11-07 21:01:45.614 Df Runner[62539:36ac63af] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:Notifications] Automatic push tracking is off.
+2026-11-07 21:01:45.615 Df Runner[62539:36ac63af] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:Notifications] Automatic token forwarding is off.
+2026-11-07 21:01:54.602 Df Runner[62539:36ac63af] (Flutter) flutter: CHUNKB_CASE H TC005 camel names
+2026-11-07 21:01:55.324 Df Runner[62539:36ac63af] (Foundation) CHUNKB_MAP setProfileProperties key=first_name -> firstName value=Ada
+2026-11-07 21:01:55.325 Df Runner[62539:36ac63af] (Foundation) CHUNKB_MAP setProfileProperties key=last_name -> lastName value=Lovelace
+2026-11-07 21:01:55.728 Df Runner[62539:36ac63af] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 21:01:55.735 I  Runner[62539:36ac6450] [com.klaviyo.klaviyo-swift-sdk.klaviyoCore:Event Buffering] 📤 Buffering event: chunkb_flush
+2026-11-07 21:01:55.735 I  Runner[62539:36ac6450] [com.klaviyo.klaviyo-swift-sdk.klaviyoCore:Event Buffering] 💾 Buffer now has 1 event(s)
+2026-11-07 21:01:58.013 Df Runner[62539:36ac63af] (Flutter) flutter: CHUNKB_CASE H TC015 EUR
+2026-11-07 21:01:58.721 Df Runner[62539:36ac63af] (Foundation) CHUNKB_MAP trackEvent name=Added to Cart value=Optional(10.0) currency=Optional("EUR") props=[:]
+2026-11-07 21:01:58.724 I  Runner[62539:36ac6450] [com.klaviyo.klaviyo-swift-sdk.klaviyoCore:Event Buffering] 📤 Buffering event: Added to Cart
+2026-11-07 21:01:58.724 I  Runner[62539:36ac6450] [com.klaviyo.klaviyo-swift-sdk.klaviyoCore:Event Buffering] 💾 Buffer now has 2 event(s)
+2026-11-07 21:02:32.580 Df Runner[62539:36ac63af] (Flutter) flutter: CHUNKB_CASE H TC020 non-tracking url
+2026-11-07 21:02:33.997 Df Runner[62539:36ac63af] (Flutter) flutter: CHUNKB_CASE H TC018 link preinit-safe
+2026-11-07 21:02:34.014 I  Runner[62539:36ac63af] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:State] Attempting to resolve tracking link destination from tracking URL 'https://email.example-track.com/u/abc123'
+2026-11-07 21:02:34.079 E  Runner[62539:36acd9db] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:State] Unable to resolve tracking link destination; error:
+'KlaviyoCore.KlaviyoAPIError.networkError(Error Domain=NSURLErrorDomain Code=-1003 "A server with the specified hostname could not be found." UserInfo={_kCFStreamErrorCodeKey=8, NSUnderlyingError=0x11e19b420 {Error Domain=kCFErrorDomainCFNetwork Code=-1003 "(null)" UserInfo={_kCFStreamErrorDomainKey=12, _kCFStreamErrorCodeKey=8, _NSURLErrorNWResolutionReportKey=Resolved 0 endpoints in 51ms using unknown from cache, _NSURLErrorNWPathKey=satisfied (Path is satisfied), interface: en9}}, _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <D4C81AA9-AF08-404C-B262-814EC3A4B614>.<6>, _NSURLErrorRelatedURLSessionTaskErrorKey=(
+    "LocalDataTask <D4C81AA9-AF08-404C-B262-814EC3A4B614>.<6>"
+), NSLocalizedDescription=A server with the specified hostname could not be found., NSErrorFailingURLStringKey=https://email.example-track.com/u/abc123, NSErrorFailingURLKey=https://email.example-track.com/u/abc123, _kCFStreamErrorDomainKey=12})'
+2026-11-07 21:03:01.095 Df Runner[98348:36ad54a8] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:Notifications] Automatic push tracking is off.
+2026-11-07 21:03:01.095 Df Runner[98348:36ad54a8] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:Notifications] Automatic token forwarding is off.
+2026-11-07 21:03:27.683 Df Runner[5974:36ad8286] (Flutter) flutter: CHUNKB_CASE H TC018 link preinit-safe
+2026-11-07 21:03:27.705 I  Runner[5974:36ad8286] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:State] Attempting to resolve tracking link destination from tracking URL 'https://email.example-track.com/u/abc123'
+2026-11-07 21:03:27.736 E  Runner[5974:36ad82ff] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:State] Unable to resolve tracking link destination; error:
+'KlaviyoCore.KlaviyoAPIError.networkError(Error Domain=NSURLErrorDomain Code=-1003 "A server with the specified hostname could not be found." UserInfo={_kCFStreamErrorCodeKey=8, NSUnderlyingError=0x11aab7e70 {Error Domain=kCFErrorDomainCFNetwork Code=-1003 "(null)" UserInfo={_kCFStreamErrorDomainKey=12, _kCFStreamErrorCodeKey=8, _NSURLErrorNWResolutionReportKey=Resolved 0 endpoints in 1ms using unknown from cache, _NSURLErrorNWPathKey=satisfied (Path is satisfied), interface: en9}}, _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <31CD4E04-F6E0-40EB-94A0-2822CD9E7970>.<1>, _NSURLErrorRelatedURLSessionTaskErrorKey=(
+    "LocalDataTask <31CD4E04-F6E0-40EB-94A0-2822CD9E7970>.<1>"
+), NSLocalizedDescription=A server with the specified hostname could not be found., NSErrorFailingURLStringKey=https://email.example-track.com/u/abc123, NSErrorFailingURLKey=https://email.example-track.com/u/abc123, _kCFStreamErrorDomainKey=12})'
+2026-11-07 21:03:28.415 Df Runner[5974:36ad8286] (Flutter) flutter: CHUNKB_CASE H TC020 non-tracking url
+2026-11-07 21:03:38.529 Db log[13483:36adb5bf] [com.apple.defaults:User Defaults] setting new value process == "Runner" AND (eventMessage CONTAINS "CHUNKB" OR eventMessage CONTAINS "racking" OR eventMessage CONTAINS "Unable to resolve" OR eventMessage CONTAINS "xception" OR eventMessage CONTAINS "initialize") for key -predicate in CFPrefsSource<0x10386c100> (Domain: Volatile, User: , ByHost: No, Container: , Contents Need Refresh: No)
+2026-11-07 21:04:00.184 Df Runner[5974:36ad8286] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:Notifications] Automatic push tracking is off.
+2026-11-07 21:04:00.184 Df Runner[5974:36ad8286] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:Notifications] Automatic token forwarding is off.
+2026-11-07 21:04:05.300 Df Runner[5974:36ad8286] (Flutter) flutter: CHUNKB_CASE H TC017 USD+sku
+2026-11-07 21:04:06.014 Df Runner[5974:36ad8286] (Foundation) CHUNKB_MAP trackEvent name=Added to Cart value=Optional(20.0) currency=Optional("USD") props=["sku": SKU-1]
+2026-11-07 21:04:06.016 I  Runner[5974:36add9f7] [com.klaviyo.klaviyo-swift-sdk.klaviyoCore:Event Buffering] 📤 Buffering event: Added to Cart
+2026-11-07 21:04:06.016 I  Runner[5974:36add9f7] [com.klaviyo.klaviyo-swift-sdk.klaviyoCore:Event Buffering] 💾 Buffer now has 1 event(s)
+2026-11-07 21:04:32.681 Df Runner[5974:36ad8286] (Flutter) flutter: CHUNKB_CASE H TC018 link preinit-safe
+2026-11-07 21:04:32.694 I  Runner[5974:36ad8286] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:State] Attempting to resolve tracking link destination from tracking URL 'https://email.example-track.com/u/abc123'
+2026-11-07 21:04:32.703 E  Runner[5974:36ae47f6] [com.klaviyo.klaviyo-swift-sdk.klaviyoSwift:State] Unable to resolve tracking link destination; error:
+'KlaviyoCore.KlaviyoAPIError.networkError(Error Domain=NSURLErrorDomain Code=-1003 "A server with the specified hostname could not be found." UserInfo={_kCFStreamErrorCodeKey=8, NSUnderlyingError=0x12b3851a0 {Error Domain=kCFErrorDomainCFNetwork Code=-1003 "(null)" UserInfo={_kCFStreamErrorDomainKey=12, _kCFStreamErrorCodeKey=8, _NSURLErrorNWResolutionReportKey=Resolved 0 endpoints in 1ms using unknown from cache, _NSURLErrorNWPathKey=satisfied (Path is satisfied), interface: en9}}, _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <8E9AE245-899C-4ACB-BF16-85F2A367B50F>.<5>, _NSURLErrorRelatedURLSessionTaskErrorKey=(
+    "LocalDataTask <8E9AE245-899C-4ACB-BF16-85F2A367B50F>.<5>"
+), NSLocalizedDescription=A server with the specified hostname could not be found., NSErrorFailingURLStringKey=https://email.example-track.com/u/abc123, NSErrorFailingURLKey=https://email.example-track.com/u/abc123, _kCFStreamErrorDomainKey=12})'
+2026-11-07 21:04:37.753 Db log[36689:36ae559d] [com.apple.defaults:User Defaults] setting new value process == "Runner" AND (eventMessage CONTAINS "CHUNKB_CASE" OR eventMessage CONTAINS "resolve" OR eventMessage CONTAINS "pre-init") for key -predicate in CFPrefsSource<0x10386c100> (Domain: Volatile, User: , ByHost: No, Container: , Contents Need Refresh: No)
+2026-11-07 21:05:04.016 Df Runner[5974:36ad8286] (Foundation) CHUNKB_MAP trackEvent name=Started Checkout value=Optional(99.99) currency=nil props=["cart_items": 3]
+2026-11-07 21:05:04.018 I  Runner[5974:36ae97b8] [com.klaviyo.klaviyo-swift-sdk.klaviyoCore:Event Buffering] 📤 Buffering event: Started Checkout
+2026-11-07 21:05:04.018 I  Runner[5974:36ae97b8] [com.klaviyo.klaviyo-swift-sdk.klaviyoCore:Event Buffering] 💾 Buffer now has 1 event(s)
+Child process terminated with signal 15: Terminated

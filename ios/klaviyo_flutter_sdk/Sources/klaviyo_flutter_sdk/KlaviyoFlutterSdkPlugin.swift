@@ -75,6 +75,7 @@ extension KlaviyoFlutterSdkPlugin {
                 result(error)
                 return
             }
+            KlaviyoSDK().setLoggingEnabled(true) // CHUNKB local-only
             KlaviyoSDK().initialize(with: apiKey)
             result(nil)
 
@@ -98,6 +99,7 @@ extension KlaviyoFlutterSdkPlugin {
                 location: location,
                 properties: profileData["properties"] as? [String: Any]
             )
+            NSLog("CHUNKB_MAP setProfile properties=%@ keys=%@", String(describing: profileData["properties"]), profileData.keys.sorted().joined(separator: ","))
             KlaviyoSDK().set(profile: profile)
             result(nil)
 
@@ -154,6 +156,7 @@ extension KlaviyoFlutterSdkPlugin {
             // swiftlint:disable:next identifier_name
             for (key, value) in properties {
                 let profileKey = Profile.ProfileKey.from(key)
+                NSLog("CHUNKB_MAP setProfileProperties key=%@ -> %@ value=%@", key, String(describing: profileKey), String(describing: value))
                 KlaviyoSDK().set(profileAttribute: profileKey, value: value)
             }
             result(nil)
@@ -170,6 +173,7 @@ extension KlaviyoFlutterSdkPlugin {
             let value = eventData["value"] as? Double
             let valueCurrency = eventData["value_currency"] as? String
             let uniqueId = eventData["unique_id"] as? String
+            NSLog("CHUNKB_MAP trackEvent name=%@ value=%@ currency=%@ props=%@", name, String(describing: value), String(describing: valueCurrency), String(describing: properties))
             let event = Event(
                 name: .customEvent(name),
                 properties: properties,

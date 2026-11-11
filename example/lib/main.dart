@@ -280,7 +280,7 @@ final GoRouter _router = GoRouter(
 
     // Handle Klaviyo universal tracking links
     final klaviyo = KlaviyoSDK();
-    if (klaviyo.isInitialized) {
+    if (true) { // CHUNK-B LOCAL: isInitialized guard bypassed
       _logger.fine('Checking if tracking link...');
       final isTrackingLink = klaviyo.handleUniversalTrackingLink(url);
       _logger.info('Is tracking link: $isTrackingLink');

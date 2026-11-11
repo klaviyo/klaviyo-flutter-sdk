@@ -172,6 +172,7 @@ class KlaviyoFlutterSdkPlugin :
             "setProfile" -> {
                 val profileJson = call.argument<Map<String, Any>>("profile")
                 try {
+                    android.util.Log.i("CHUNKB_MAP", "setProfile keys=${profileJson?.keys?.sorted()} properties=${profileJson?.get("properties")}")
                     // Build properties map for custom fields
                     val properties = mutableMapOf<ProfileKey, java.io.Serializable>()
                     (profileJson?.get("first_name") as? String)?.let { properties[ProfileKey.FIRST_NAME] = it }
@@ -277,6 +278,7 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     // Set each property individually using setProfileAttribute
                     properties?.forEach { (key, value) ->
+                        android.util.Log.i("CHUNKB_MAP", "setProfileProperties key=$key -> ${profileKeyFor(key)::class.simpleName} value=$value serializable=${value is java.io.Serializable}")
                         if (value is java.io.Serializable) {
                             Klaviyo.setProfileAttribute(profileKeyFor(key), value)
                         }
@@ -315,6 +317,7 @@ class KlaviyoFlutterSdkPlugin :
                         event = event.setUniqueId(uniqueId)
                     }
 
+                    android.util.Log.i("CHUNKB_MAP", "trackEvent name=$eventName value=${eventJson["value"]} currency=${eventJson["value_currency"]} props=${eventJson["properties"]} eventValueCurrency=${event.valueCurrency} eventProps=${event.toMap()}")
                     Klaviyo.createEvent(event)
                     result.success(null)
                 } catch (e: Exception) {
@@ -734,7 +737,9 @@ class KlaviyoFlutterSdkPlugin :
                         Klaviyo.registerForLifecycleCallbacks(applicationContext)
                     }
 
+                    android.util.Log.i("CHUNKB_MAP", "handleUniversalTrackingLink url=$url configRegistered=${Registry.isRegistered<Config>()}")
                     val isKlaviyoLink = Klaviyo.handleUniversalTrackingLink(url)
+                    android.util.Log.i("CHUNKB_MAP", "handleUniversalTrackingLink returned=$isKlaviyoLink")
                     result.success(isKlaviyoLink)
                 } catch (e: Exception) {
                     result.error("DEEP_LINK_ERROR", "Failed to handle universal tracking link", e.message)

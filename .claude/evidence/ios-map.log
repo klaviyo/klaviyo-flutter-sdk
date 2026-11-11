@@ -1,0 +1,69 @@
+getpwuid_r did not find a match for uid 502
+Filtering the log data using "composedMessage CONTAINS "CHUNKB""
+Timestamp               Ty Process[PID:TID]
+2026-11-07 20:54:59.531 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H RUN ALL
+2026-11-07 20:55:00.236 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC001 full profile
+2026-11-07 20:55:00.945 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfile properties=Optional({
+    "example_app_source" = "flutter_profile_tab";
+}) keys=email,first_name,last_name,properties
+2026-11-07 20:55:04.950 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC002 props
+2026-11-07 20:55:05.655 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfile properties=Optional({
+    plan = pro;
+    seats = 5;
+    trial = 1;
+}) keys=email,properties
+2026-11-07 20:55:09.658 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC003 firstName custom
+2026-11-07 20:55:10.364 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfile properties=Optional({
+    firstName = Grace;
+}) keys=email,first_name,properties
+2026-11-07 20:55:14.369 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC004 no props
+2026-11-07 20:55:15.075 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfile properties=nil keys=email,first_name,last_name
+2026-11-07 20:55:19.078 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC005 camel names
+2026-11-07 20:55:19.794 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=first_name -> firstName value=Ada
+2026-11-07 20:55:19.795 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=last_name -> lastName value=Lovelace
+2026-11-07 20:55:20.199 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 20:55:24.205 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC006 snake/upper
+2026-11-07 20:55:24.910 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=first_name -> firstName value=Ada
+2026-11-07 20:55:24.910 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=last_name -> lastName value=Lovelace
+2026-11-07 20:55:25.313 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 20:55:29.318 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC007 org/title/image
+2026-11-07 20:55:30.027 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=organization -> organization value=Acme
+2026-11-07 20:55:30.027 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=title -> title value=Engineer
+2026-11-07 20:55:30.027 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=image -> image value=https://example.com/ada.png
+2026-11-07 20:55:30.430 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 20:55:34.434 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC008 location
+2026-11-07 20:55:35.138 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=address1 -> address1 value=1 Main St
+2026-11-07 20:55:35.138 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=address2 -> address2 value=Suite 4
+2026-11-07 20:55:35.138 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=city -> city value=Boston
+2026-11-07 20:55:35.138 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=country -> country value=US
+2026-11-07 20:55:35.138 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=region -> region value=MA
+2026-11-07 20:55:35.138 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=zip -> zip value=02110
+2026-11-07 20:55:35.141 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=latitude -> latitude value=42.35
+2026-11-07 20:55:35.141 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=longitude -> longitude value=-71.05
+2026-11-07 20:55:35.545 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 20:55:39.549 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC009 timezone
+2026-11-07 20:55:40.262 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=timezone -> custom(customKey: "timezone") value=America/New_York
+2026-11-07 20:55:40.262 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=timezone -> custom(customKey: "timezone") value=America/Chicago
+2026-11-07 20:55:40.665 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 20:55:44.668 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC010 identifiers
+2026-11-07 20:55:45.373 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=externalId -> custom(customKey: "externalId") value=ext-123
+2026-11-07 20:55:45.373 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=phoneNumber -> custom(customKey: "phoneNumber") value=+15555550100
+2026-11-07 20:55:45.777 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 20:55:49.781 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC011 unknown
+2026-11-07 20:55:50.486 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=favorite_color -> custom(customKey: "favorite_color") value=green
+2026-11-07 20:55:50.889 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 20:55:54.893 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC012 null alias
+2026-11-07 20:55:55.599 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=first_name -> firstName value=Ada
+2026-11-07 20:55:56.002 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 20:56:00.011 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC013 lone null
+2026-11-07 20:56:00.720 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP setProfileProperties key=nickname -> custom(customKey: "nickname") value=<null>
+2026-11-07 20:56:01.124 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=chunkb_flush value=nil currency=nil props=[:]
+2026-11-07 20:56:05.127 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC014 USD
+2026-11-07 20:56:05.833 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=Added to Cart value=Optional(59.98) currency=Optional("USD") props=[:]
+2026-11-07 20:56:09.835 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC015 EUR
+2026-11-07 20:56:10.541 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=Added to Cart value=Optional(10.0) currency=Optional("EUR") props=[:]
+2026-11-07 20:56:14.545 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC015 JPY
+2026-11-07 20:56:15.251 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=Added to Cart value=Optional(1000.0) currency=Optional("JPY") props=[:]
+2026-11-07 20:56:19.253 Df Runner[84571:36a76bee] (Flutter) flutter: CHUNKB_CASE H TC017 USD+sku
+2026-11-07 20:56:19.961 Df Runner[84571:36a76bee] (Foundation) CHUNKB_MAP trackEvent name=Added to Cart value=Optional(20.0) currency=Optional("USD") props=["sku": SKU-1]
+Child process terminated with signal 15: Terminated
