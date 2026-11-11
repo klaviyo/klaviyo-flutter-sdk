@@ -25,6 +25,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Logger.root.onRecord.listen((record) {
+    debugPrint('CHUNKD ${record.loggerName}: ${record.message}');
     developer.log(
       record.message,
       time: record.time,

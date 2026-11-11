@@ -11,6 +11,21 @@ class AppDelegate: FlutterAppDelegate {
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
 
+        // LOCAL TEST HARNESS ONLY (chunk D): simctl push does not run the NSE, so register
+        // a category with the action ids used by the test payload and a dismiss action.
+        let testActions = [
+            UNNotificationAction(identifier: "com.klaviyo.chunkd.open_app", title: "Open App", options: [.foreground]),
+            UNNotificationAction(identifier: "com.klaviyo.chunkd.link", title: "Events", options: [.foreground])
+        ]
+        UNUserNotificationCenter.current().setNotificationCategories([
+            UNNotificationCategory(
+                identifier: "chunkd.actions",
+                actions: testActions,
+                intentIdentifiers: [],
+                options: .customDismissAction
+            )
+        ])
+
         GeneratedPluginRegistrant.register(with: self)
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }

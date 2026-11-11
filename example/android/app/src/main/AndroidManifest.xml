@@ -65,6 +65,17 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- LOCAL TEST HARNESS ONLY (chunk D): firebase_messaging's service wins MESSAGING_EVENT over
+             KlaviyoFlutterPushService, so Klaviyo never builds the notification. -->
+        <service
+            android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService"
+            tools:node="remove" />
+
+        <!-- LOCAL TEST HARNESS ONLY (chunk D, TC-010): opt into the native trampoline. -->
+        <meta-data
+            android:name="com.klaviyo.push.automatic_push_open_tracking"
+            android:value="true" />
+
         <meta-data
             android:name="com.klaviyo.core.log_level"
             android:value="1" />
