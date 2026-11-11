@@ -277,7 +277,7 @@ class KlaviyoFlutterSdkPlugin :
                     // Set each property individually using setProfileAttribute
                     properties?.forEach { (key, value) ->
                         if (value is java.io.Serializable) {
-                            Klaviyo.setProfileAttribute(profileKeyFor(key), value)
+                            Klaviyo.setProfileAttribute(ProfileKey.CUSTOM(key), value)
                         }
                     }
                     result.success(null)
@@ -972,29 +972,6 @@ class KlaviyoFlutterSdkPlugin :
             Registry.log.error("Error handling push: ${e.message}", e)
         }
     }
-
-    /**
-     * Maps a canonical snake_case profile attribute key (normalized on the Dart side)
-     * to its standard [ProfileKey], or [ProfileKey.CUSTOM] for any other key.
-     */
-    private fun profileKeyFor(key: String): ProfileKey =
-        when (key) {
-            "first_name" -> ProfileKey.FIRST_NAME
-            "last_name" -> ProfileKey.LAST_NAME
-            "organization" -> ProfileKey.ORGANIZATION
-            "title" -> ProfileKey.TITLE
-            "image" -> ProfileKey.IMAGE
-            "address1" -> ProfileKey.ADDRESS1
-            "address2" -> ProfileKey.ADDRESS2
-            "city" -> ProfileKey.CITY
-            "country" -> ProfileKey.COUNTRY
-            "region" -> ProfileKey.REGION
-            "zip" -> ProfileKey.ZIP
-            "latitude" -> ProfileKey.LATITUDE
-            "longitude" -> ProfileKey.LONGITUDE
-            "timezone" -> ProfileKey.TIMEZONE
-            else -> ProfileKey.CUSTOM(key)
-        }
 
     /**
      * Surfaces an action-button tap as a typed `push_action_button_tapped`
