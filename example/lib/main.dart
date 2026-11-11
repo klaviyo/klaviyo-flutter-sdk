@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -25,6 +25,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Logger.root.onRecord.listen((record) {
+    debugPrint('CHUNKC ${record.loggerName}: ${record.message}');
     developer.log(
       record.message,
       time: record.time,
@@ -54,6 +55,22 @@ Future<void> _setupFCM() async {
     // Silent pushes delivered while the app is terminated never reach the plugin's
     // event stream — this handles them. See firebase_background_handler.dart.
     FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+
+    // LOCAL TEST HARNESS ONLY (chunk C): hand the live FCM token to the test
+    // driver through the app's private dir. Never logged.
+    try {
+      final marker =
+          File('/data/data/com.klaviyo.flutterexample/files/chunkc_rotate');
+      if (await marker.exists()) {
+        await marker.delete();
+        await FirebaseMessaging.instance.deleteToken();
+      }
+      final liveToken = await FirebaseMessaging.instance.getToken();
+      if (liveToken != null) {
+        await File('/data/data/com.klaviyo.flutterexample/files/chunkc_tok.txt')
+            .writeAsString(liveToken);
+      }
+    } catch (_) {}
 
     // Note: Permission is requested from the Push tab via permission_handler when
     // the user taps "Enable Push Notifications" — not at launch. firebase_messaging's

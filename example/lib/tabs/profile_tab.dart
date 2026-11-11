@@ -99,6 +99,10 @@ class _ProfileTabState extends State<ProfileTab> {
 
     try {
       await _klaviyo.initialize(apiKey: apiKey);
+      // LOCAL TEST HARNESS ONLY (chunk C)
+      await _klaviyo.setLoggingEnabled(
+        const bool.fromEnvironment('CHUNKC_LOG', defaultValue: true),
+      );
 
       // Save API key
       final prefs = await SharedPreferences.getInstance();

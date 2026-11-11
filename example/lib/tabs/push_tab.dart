@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
@@ -198,6 +199,31 @@ class _PushTabState extends State<PushTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // LOCAL TEST HARNESS ONLY (chunk C, TC-004)
+            ElevatedButton(
+              key: const ValueKey('chunkc_dispose_button'),
+              onPressed: () {
+                // ignore: deprecated_member_use
+                _klaviyo.dispose();
+                setState(() => _status = 'CHUNKC disposed');
+              },
+              child: const Text('CHUNKC dispose()'),
+            ),
+            // LOCAL TEST HARNESS ONLY (chunk C, TC-016)
+            ElevatedButton(
+              key: const ValueKey('chunkc_rotate_button'),
+              onPressed: () async {
+                await FirebaseMessaging.instance.deleteToken();
+                final t = await FirebaseMessaging.instance.getToken();
+                if (t != null) {
+                  await File(
+                    '/data/data/com.klaviyo.flutterexample/files/chunkc_tok.txt',
+                  ).writeAsString(t);
+                }
+                setState(() => _status = 'CHUNKC rotated');
+              },
+              child: const Text('CHUNKC rotate FCM token'),
+            ),
             // Status
             Container(
               padding: const EdgeInsets.all(12),

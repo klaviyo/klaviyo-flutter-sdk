@@ -176,6 +176,12 @@ class _FormsTabState extends State<FormsTab> {
             ),
             const SizedBox(height: 20),
 
+            // LOCAL TEST HARNESS ONLY (chunk C, TC-020)
+            ElevatedButton(
+              key: const ValueKey('chunkc_forms_unregister'),
+              onPressed: _unregisterFromForms,
+              child: const Text('CHUNKC unregister forms'),
+            ),
             if (!_isRegistered) ...[
               TestId(
                 'forms_session_timeout_field',

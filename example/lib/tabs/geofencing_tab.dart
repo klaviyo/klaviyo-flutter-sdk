@@ -278,6 +278,29 @@ class _GeofencingTabState extends State<GeofencingTab>
             ),
             const SizedBox(height: 10),
 
+            // LOCAL TEST HARNESS ONLY (chunk C, TC-021/TC-022)
+            ElevatedButton(
+              key: const ValueKey('chunkc_geo_register'),
+              onPressed: () async {
+                try {
+                  await _klaviyo.registerGeofencing();
+                  setState(() => _status = 'CHUNKC registered without error');
+                } catch (e) {
+                  setState(() => _status = 'Failed to register geofencing: $e');
+                }
+              },
+              child: const Text('CHUNKC register geofencing (no gate)'),
+            ),
+            ElevatedButton(
+              key: const ValueKey('chunkc_geo_unregister'),
+              onPressed: _unregisterGeofencing,
+              child: const Text('CHUNKC unregister geofencing'),
+            ),
+            ElevatedButton(
+              key: const ValueKey('chunkc_geo_list'),
+              onPressed: _loadGeofences,
+              child: const Text('CHUNKC list geofences'),
+            ),
             if (!_isRegistered) ...[
               TestId(
                 'geofencing_register_button',

@@ -60,7 +60,7 @@ PODS:
   - GoogleUtilities/UserDefaults (8.1.4):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
-  - klaviyo_flutter_sdk (0.5.0):
+  - klaviyo_flutter_sdk (0.6.0):
     - Flutter
     - KlaviyoForms (~> 5.6.0)
     - KlaviyoLocation (~> 5.6.0)
@@ -145,7 +145,7 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleUtilities: db34c1c11c6f2eccb6fab2340cb8ceb1451299dc
-  klaviyo_flutter_sdk: 85a8f4a014bac46082dcc6ffdd670fa45beee16d
+  klaviyo_flutter_sdk: f76e41793b2f30e7477a996797357646ee359143
   KlaviyoCore: 164331e6fdd6deec7f88f915475f173db49c6b34
   KlaviyoForms: 6769bc3310335554b12ad3c2b33ddf4a1fd27fac
   KlaviyoLocation: 0ec7510cf6af4e4b08729065234a9059991fd54a
