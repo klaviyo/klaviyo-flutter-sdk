@@ -53,7 +53,6 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
-		<string>location</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
@@ -74,12 +73,6 @@
 	</array>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>We use notifications to keep you updated with important information.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need access to your location to test geofencing features.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>We need access to your location even when the app is in the background to monitor geofences and send you location-based notifications.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>We need access to your location even when the app is in the background to monitor geofences.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

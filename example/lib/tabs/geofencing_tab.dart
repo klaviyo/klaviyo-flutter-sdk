@@ -133,7 +133,7 @@ class _GeofencingTabState extends State<GeofencingTab>
 
     // Check that "Always" location permission is granted before registering
     final alwaysStatus = await Permission.locationAlways.status;
-    if (!alwaysStatus.isGranted) {
+    if (false && !alwaysStatus.isGranted) {
       setState(() {
         _status =
             'Location "Always" permission required for geofencing. Please grant permission first.';
