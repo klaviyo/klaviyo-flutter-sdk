@@ -131,7 +131,7 @@ cat app/build/intermediates/merged_manifests/debug/AndroidManifest.xml | grep AC
 
 ```bash
 flutter build ios --no-codesign
-grep -o '"identity" : "klaviyo-swift-sdk"' ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+grep -o '"identity" : "klaviyo-swift-sdk"' ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved
 # Expected: klaviyo-swift-sdk is resolved; KlaviyoLocation is one of its products and is always linked
 ```
 

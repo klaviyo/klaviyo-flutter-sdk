@@ -17,7 +17,7 @@ set -u
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 PUBSPEC="${PUBSPEC:-$REPO_ROOT/pubspec.yaml}"
 EXAMPLE_PUBSPEC="${EXAMPLE_PUBSPEC:-$REPO_ROOT/example/pubspec.yaml}"
-PACKAGE_RESOLVED="${PACKAGE_RESOLVED:-$REPO_ROOT/example/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved}"
+PACKAGE_RESOLVED="${PACKAGE_RESOLVED:-$REPO_ROOT/example/ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved}"
 EXAMPLE_PBXPROJ="${EXAMPLE_PBXPROJ:-$REPO_ROOT/example/ios/Runner.xcodeproj/project.pbxproj}"
 PODSPEC="${PODSPEC:-$REPO_ROOT/ios/klaviyo_flutter_sdk.podspec}"
 ANDROID_BUILD_GRADLE="${ANDROID_BUILD_GRADLE:-$REPO_ROOT/android/build.gradle.kts}"

@@ -655,10 +655,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "IOS_MARKETING_VERSION=$MARKETING_VERSION" >> "$GITHUB_ENV"
 
-      # Runs before setup-ruby so pod install uses the runner's own CocoaPods.
       # The build number here is a placeholder; build_ipa passes the real one
       # to xcodebuild on every attempt.
-      - name: Generate Flutter config and install pods
+      - name: Generate Flutter config
         id: flutterconfig
         working-directory: klaviyo_flutter_sdk/example
         run: |

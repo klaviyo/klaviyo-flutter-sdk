@@ -72,11 +72,6 @@ jobs:
           </plist>
           EOF
 
-      - name: Install CocoaPods dependencies
-        run: |
-          cd example/ios
-          pod install
-
       - name: Build iOS (no codesigning)
         run: |
           cd example
