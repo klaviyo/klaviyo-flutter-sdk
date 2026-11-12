@@ -10,7 +10,7 @@ PODSPEC="$ROOT_DIR/ios/klaviyo_flutter_sdk.podspec"
 PACKAGE_SWIFT="$ROOT_DIR/ios/klaviyo_flutter_sdk/Package.swift"
 BUILD_GRADLE="$ROOT_DIR/android/build.gradle.kts"
 EXAMPLE_PBXPROJ="$ROOT_DIR/example/ios/Runner.xcodeproj/project.pbxproj"
-EXAMPLE_PACKAGE_RESOLVED="$ROOT_DIR/example/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+EXAMPLE_PACKAGE_RESOLVED="$ROOT_DIR/example/ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved"
 SETTINGS_GRADLE="$ROOT_DIR/example/android/settings.gradle"
 
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
@@ -221,7 +221,7 @@ set_package_swift_dependency() {
         return 1
     fi
     PACKAGE_SWIFT_DEP_RE="$PACKAGE_SWIFT_DEP_RE" PACKAGE_SWIFT_DEP_ARGS="$1" \
-        perl -0pi -e 's/$ENV{PACKAGE_SWIFT_DEP_RE}/.package(\n            $ENV{PACKAGE_SWIFT_DEP_ARGS}\n        )/' "$PACKAGE_SWIFT"
+        perl -0pi -e 's/$ENV{PACKAGE_SWIFT_DEP_RE}/.package(\n            $ENV{PACKAGE_SWIFT_DEP_ARGS}\n        )/' "$PACKAGE_SWIFT" || return 1
 }
 
 SWIFT_PACKAGE_URL="https://github.com/klaviyo/klaviyo-swift-sdk"
@@ -278,7 +278,7 @@ if ($s =~ m{/\* Begin $newisa section \*/\n(.*?)/\* End $newisa section \*/\n}s)
     if ($next) { $s =~ s{(/\* Begin $next section \*/\n)}{$block$1} } else { $s =~ s{(\t\};\n\trootObject = )}{$block$1} }
 }
 $s =~ s{/\* Begin (XC(?:Remote|Local)SwiftPackageReference) section \*/\n/\* End \1 section \*/\n\n}{}g;
-open my $out, ">", $file or die "cannot write $file\n"; print $out $s; close $out;
+open my $out, ">", $file or die "cannot write $file\n"; print $out $s or die "cannot write $file\n"; close $out or die "cannot write $file\n";
 '
 
 has_example_package_reference() {
@@ -316,9 +316,12 @@ set_ios_sources() {
     local package_swift_args="$1"
     shift
     preflight_ios_manifests || return 1
-    set_package_swift_dependency "$package_swift_args"
-    perl -e "$PBXPROJ_TOOL" set "$EXAMPLE_PBXPROJ" "$@"
-    drop_resolved_pin
+    set_package_swift_dependency "$package_swift_args" || return 1
+    if ! perl -e "$PBXPROJ_TOOL" set "$EXAMPLE_PBXPROJ" "$@"; then
+        error "Failed to update $EXAMPLE_PBXPROJ; $PACKAGE_SWIFT was already changed"
+        return 1
+    fi
+    drop_resolved_pin || return 1
 }
 
 configure_ios_version() {
