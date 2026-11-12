@@ -37,11 +37,12 @@ if (!builtInKotlin) {
 }
 
 // Reads the `flutter` extension reflectively: its type is not on this script's classpath in add-to-app hosts.
-val flutterExtension = extensions.findByName("flutter")
-val flutterCompileSdk =
-    flutterExtension
-        ?.let { runCatching { it.javaClass.getMethod("getCompileSdkVersion").invoke(it) as? Int }.getOrNull() }
-        ?: 36
+// Older Flutter declares compileSdkVersion as a public field; newer versions expose a getter.
+val flutterCompileSdk: Int =
+    extensions.findByName("flutter")?.let { flutter ->
+        runCatching { flutter.javaClass.getMethod("getCompileSdkVersion").invoke(flutter) as? Int }.getOrNull()
+            ?: runCatching { flutter.javaClass.getField("compileSdkVersion").get(flutter) as? Int }.getOrNull()
+    } ?: 36
 
 extensions.configure<com.android.build.api.dsl.LibraryExtension> {
     compileSdk = flutterCompileSdk
