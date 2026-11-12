@@ -61,9 +61,7 @@ class KlaviyoSDK {
   ///
   /// Can be called multiple times to re-initialize with a different API key,
   /// matching native Android and iOS SDK behavior.
-  Future<KlaviyoSDK> initialize({
-    required String apiKey,
-  }) async {
+  Future<KlaviyoSDK> initialize({required String apiKey}) async {
     try {
       await _nativeWrapper.initialize(apiKey: apiKey);
 
@@ -335,8 +333,9 @@ class KlaviyoSDK {
     _ensureInitialized();
 
     // Attach the single permanent listener once (see [_authTokenSubscription]).
-    _authTokenSubscription ??=
-        _nativeWrapper.onAuthTokenRequested.listen(_handleAuthTokenRequest);
+    _authTokenSubscription ??= _nativeWrapper.onAuthTokenRequested.listen(
+      _handleAuthTokenRequest,
+    );
 
     // Re-register: tear down the native provider first so it drains any pending
     // requests before the replacement takes over. The Dart listener stays put;
@@ -616,8 +615,33 @@ class KlaviyoSDK {
   }
 
   /// Get push notification events stream
+  ///
+  /// A `push_notification_opened` event that arrives before anyone subscribes
+  /// (for example, the tap that launched the app) is buffered; only the most
+  /// recent one is kept. The first subscriber receives it once, then the
+  /// buffer is cleared, so later subscribers don't receive it. Use
+  /// [getInitialPushNotification] to read the launch tap whenever you need it.
   Stream<Map<String, dynamic>> get onPushNotification =>
       _nativeWrapper.onPushNotification;
+
+  /// The push notification tap that launched the app from a killed state, or
+  /// `null` if the app wasn't launched by a push tap.
+  ///
+  /// The map has the same shape as the `push_notification_opened` event on
+  /// [onPushNotification]. Every call returns the same value for the life of
+  /// the process, including after the first [onPushNotification] subscriber
+  /// has received that event, so it can be read whenever it's needed (for
+  /// example, by a router at startup). Taps while the app is running never set
+  /// it, and [resetProfile] clears it.
+  ///
+  /// Safe to call before [initialize].
+  Future<Map<String, dynamic>?> getInitialPushNotification() async {
+    try {
+      return await _nativeWrapper.getInitialPushNotification();
+    } catch (e) {
+      throw KlaviyoException('Failed to get initial push notification: $e');
+    }
+  }
 
   /// Get form events stream
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
@@ -646,6 +670,12 @@ class KlaviyoSDK {
   /// ([ActionButtonTapped]). Filters for the `push_open_web_url` and
   /// `push_action_button_tapped` event types and parses the native map.
   /// Malformed events are logged and dropped rather than crashing the stream.
+  ///
+  /// A push action that arrives before anyone subscribes is buffered; only the
+  /// most recent one is kept, and each new push open clears it. The first
+  /// subscriber receives it once, then the buffer is cleared, so later
+  /// subscribers don't receive it. Use [getInitialPushNotification] to read
+  /// the launch tap whenever you need it.
   Stream<KlaviyoPushAction> get onPushAction => _nativeWrapper.onPushActionEvent
           .where(
         (event) =>
@@ -684,8 +714,9 @@ class KlaviyoSDK {
       _authTokenProvider = null;
       // dispose() is synchronous; fire-and-forget the native unregister.
       _nativeWrapper.unregisterAuthTokenProvider().catchError((Object e) {
-        _logger
-            .warning('Failed to unregister auth token provider on dispose: $e');
+        _logger.warning(
+          'Failed to unregister auth token provider on dispose: $e',
+        );
       });
     }
     _nativeWrapper.dispose();

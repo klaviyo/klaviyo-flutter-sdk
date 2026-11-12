@@ -503,7 +503,21 @@ KlaviyoSDK().onPushNotification.listen((event) {
 
 > **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
 
-> **Cold starts and late listeners:** if the app is launched by tapping a notification, the open can arrive before your Dart code subscribes. The SDK holds the most recent `push_notification_opened` event that arrived with no listener and delivers it to **every** listener that subscribes later, so a token listener and a navigation listener both see it. A held open stays held until a newer open arrives; only one is kept. `onPushAction` holds the most recent push action the same way, and each new open clears it. Other `onPushNotification` events (tokens, token errors, silent pushes) that arrive with no listener go to the first listener only. On Android, reopening the app from the Recents screen doesn't re-deliver the tap that originally launched it.
+> **Cold starts and late listeners:** if the app is launched by tapping a notification, the open can arrive before your Dart code subscribes. The SDK buffers the most recent `push_notification_opened` event that arrived with no listener and delivers it **once, to the first listener** that subscribes. Later listeners don't receive it. `onPushAction` buffers the most recent push action the same way, and each new open clears it. Other `onPushNotification` events (tokens, token errors, silent pushes) that arrive with no listener also go to the first listener only. On Android, reopening the app from the Recents screen doesn't re-deliver the tap that originally launched it.
+
+#### Reading the Launch Tap
+
+To read the tap that launched the app at any time, for example from a router that subscribes after another listener has already taken the stream event, call `getInitialPushNotification()`. It returns the same map as the `push_notification_opened` event, or `null` if the app wasn't launched by a push tap:
+
+```dart
+Future<String> initialRoute() async {
+  final launchTap = await KlaviyoSDK().getInitialPushNotification();
+  final url = launchTap?['data']?['url'] as String?;
+  return url != null ? Uri.parse(url).path : '/';
+}
+```
+
+It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`.
 
 #### Identifying Klaviyo Notifications
 
@@ -725,7 +739,7 @@ subscription.cancel();
 
 > **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. On **iOS**, both body `open_url` taps and action-button taps surface. On **Android**, `open_url` is dispatched to an external handler by the native SDK and does **not** reach the app, so only `deep_link` / `open_app` action-button taps surface on Android.
 
-> **Cold starts:** a push action that arrives before you subscribe is held and delivered to every listener that subscribes later — see the note under [Handling Push Notification Opens](#handling-push-notification-opens).
+> **Cold starts:** a push action that arrives before you subscribe is buffered and delivered once, to the first listener that subscribes. See the note under [Handling Push Notification Opens](#handling-push-notification-opens).
 
 ## Deep Linking
 
