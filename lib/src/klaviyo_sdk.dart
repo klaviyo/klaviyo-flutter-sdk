@@ -11,6 +11,7 @@ import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
 import 'models/klaviyo_push_action.dart';
+import 'models/profile_property.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
@@ -182,8 +183,13 @@ class KlaviyoSDK {
   ///
   /// Example:
   /// ```dart
-  /// await klaviyo.setProfileAttribute('first_name', 'John');
+  /// await klaviyo.setProfileAttribute(ProfileProperty.firstName, 'John');
   /// ```
+  ///
+  /// [propertyKey] can be a [ProfileProperty] constant or any string.
+  /// camelCase and snake_case spellings of standard keys (for example
+  /// `firstName` or `first_name`) set the standard field on both platforms.
+  /// Any other key is stored as a custom property.
   Future<void> setProfileAttribute(String propertyKey, dynamic value) async {
     await setProfileProperties({propertyKey: value});
   }
