@@ -17,8 +17,8 @@ set -u
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 PUBSPEC="${PUBSPEC:-$REPO_ROOT/pubspec.yaml}"
 EXAMPLE_PUBSPEC="${EXAMPLE_PUBSPEC:-$REPO_ROOT/example/pubspec.yaml}"
-PODFILE_LOCK="${PODFILE_LOCK:-$REPO_ROOT/example/ios/Podfile.lock}"
-PODFILE="${PODFILE:-$REPO_ROOT/example/ios/Podfile}"
+PACKAGE_RESOLVED="${PACKAGE_RESOLVED:-$REPO_ROOT/example/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved}"
+EXAMPLE_PBXPROJ="${EXAMPLE_PBXPROJ:-$REPO_ROOT/example/ios/Runner.xcodeproj/project.pbxproj}"
 PODSPEC="${PODSPEC:-$REPO_ROOT/ios/klaviyo_flutter_sdk.podspec}"
 ANDROID_BUILD_GRADLE="${ANDROID_BUILD_GRADLE:-$REPO_ROOT/android/build.gradle.kts}"
 ANDROID_SETTINGS_GRADLE="${ANDROID_SETTINGS_GRADLE:-$REPO_ROOT/example/android/settings.gradle}"
@@ -75,107 +75,85 @@ resolve_flutter_ref() {
 
 # ─── iOS (KlaviyoSwift) ───────────────────────────────────────────────
 
-# resolve_ios_pod_lock prints the ref if Podfile.lock pins KlaviyoSwift.
-resolve_ios_pod_lock() {
-  [ -f "$PODFILE_LOCK" ] || return 1
-
-  local ext
-  ext="$(awk '
-    /^EXTERNAL SOURCES:/ { in_ext = 1; next }
-    /^[A-Z][A-Z ]*:/ { in_ext = 0 }
-    in_ext && /^  KlaviyoSwift:/ { in_pod = 1; next }
-    in_ext && in_pod && /^  [^ ]/ { in_pod = 0 }
-    in_ext && in_pod { print }
-  ' "$PODFILE_LOCK")"
-  if [ -n "$ext" ]; then
-    path="$(printf '%s\n' "$ext" | sed -n 's/.*:path: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -1)"
-    if [ -n "$path" ]; then
-      local_ref "$path"
-      return 0
-    fi
-    local branch commit
-    branch="$(printf '%s\n' "$ext" | sed -n 's/.*:branch: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -1)"
-    commit="$(awk '
-      /^CHECKOUT OPTIONS:/ { in_co = 1; next }
-      /^[A-Z][A-Z ]*:/ { in_co = 0 }
-      in_co && /^  KlaviyoSwift:/ { in_pod = 1; next }
-      in_co && in_pod && /^  [^ ]/ { in_pod = 0 }
-      in_co && in_pod { print }
-    ' "$PODFILE_LOCK" | sed -n 's/.*:commit: *\([0-9a-f]*\).*/\1/p' | head -1)"
-    if [ -n "$branch" ]; then
-      if [ -n "$commit" ]; then
-        printf '%s@%s' "$branch" "$(printf '%s' "$commit" | cut -c1-$SHORT)"
-      else
-        printf '%s' "$branch"
-      fi
-      return 0
-    fi
-    if [ -n "$commit" ]; then
-      # Commit pin: report the branch only if the commit is still its head.
-      local heads
-      heads="$(git ls-remote --heads "$SWIFT_REPO" 2>/dev/null \
-        | awk -v c="$commit" 'index($1, c) == 1 {sub("refs/heads/", "", $2); print $2}' \
-        | sort || true)"
-      local best
-      best="$(printf '%s\n' "$heads" | { grep -x master || true; } | head -1)"
-      [ -n "$best" ] || best="$(printf '%s\n' "$heads" | grep '^rel/' | head -1)"
-      [ -n "$best" ] || best="$(printf '%s\n' "$heads" | head -1)"
-      if [ -n "$best" ]; then
-        printf '%s@%s' "$best" "$(printf '%s' "$commit" | cut -c1-$SHORT)"
-      else
-        printf '%s' "$(printf '%s' "$commit" | cut -c1-$SHORT)"
-      fi
-      return 0
-    fi
-  fi
-
-  # Release pin: "  - KlaviyoSwift (5.4.1):" in the PODS section.
-  local ver
-  ver="$(sed -n 's/^  - KlaviyoSwift (\([^)]*\)):*.*$/\1/p' "$PODFILE_LOCK" | head -1)"
-  if [ -n "$ver" ]; then
-    printf '%s' "$ver"
-    return 0
-  fi
-  return 1
+# branch_for_commit <sha>: master, else a rel/* branch, else any branch whose head is <sha>.
+branch_for_commit() {
+  local commit="$1" heads best
+  heads="$(git ls-remote --heads "$SWIFT_REPO" 2>/dev/null \
+    | awk -v c="$commit" 'index($1, c) == 1 {sub("refs/heads/", "", $2); print $2}' \
+    | sort || true)"
+  best="$(printf '%s\n' "$heads" | { grep -x master || true; } | head -1)"
+  [ -n "$best" ] || best="$(printf '%s\n' "$heads" | grep '^rel/' | head -1)"
+  [ -n "$best" ] || best="$(printf '%s\n' "$heads" | head -1)"
+  printf '%s' "$best"
 }
 
-# resolve_ios_podfile_override reads the configure-sdk.sh marker block.
-resolve_ios_podfile_override() {
-  [ -f "$PODFILE" ] || return 1
-  local block
-  block="$(sed -n '/\[KLAVIYO-SDK-OVERRIDE-START\]/,/\[KLAVIYO-SDK-OVERRIDE-END\]/p' "$PODFILE" 2>/dev/null)"
-  [ -n "$block" ] || return 1
-  local line
-  line="$(printf '%s\n' "$block" | grep "pod 'KlaviyoSwift'" | head -1)"
-  [ -n "$line" ] || return 1
-  if printf '%s' "$line" | grep -q ':path'; then
+# resolve_ios_package_reference reads the example's klaviyo-swift-sdk package
+# reference in project.pbxproj and the matching Package.resolved pin.
+resolve_ios_package_reference() {
+  [ -f "$EXAMPLE_PBXPROJ" ] || return 1
+  local req
+  # shellcheck disable=SC2016
+  req="$(perl -0ne '
+    my %ids = map { $_ => 1 } /^\t\t[0-9A-F]{24} \/\* Klaviyo\w+ \*\/ = \{\n\t\t\tisa = XCSwiftPackageProductDependency;\n\t\t\tpackage = ([0-9A-F]{24}) /mg;
+    my @ids = keys %ids;
+    exit 0 unless @ids == 1;
+    if (/^\t\t$ids[0] \/\* (XC(?:Remote|Local)SwiftPackageReference) "[^"]*" \*\/ = \{\n(.*?)\n\t\t\};\n/ms) {
+      my ($isa, $body) = ($1, $2);
+      if ($isa eq "XCLocalSwiftPackageReference") { my ($p) = $body =~ /relativePath = "?([^";\n]+)"?;/; print "local $p\n"; exit 0 }
+      my %f = $body =~ /^\t\t\t\t(\w+) = "?([^";\n]+)"?;$/mg;
+      print "$f{kind} ", ($f{branch} // $f{revision} // $f{minimumVersion} // $f{version} // "-"), "\n";
+    }' "$EXAMPLE_PBXPROJ" 2>/dev/null)"
+  [ -n "$req" ] || return 1
+  local kind value pinned_version pinned_revision
+  read -r kind value <<<"$req"
+  if [ "$kind" = "local" ]; then
     local path
-    path="$(printf '%s' "$line" | sed -n "s/.*:path => '\([^']*\)'.*/\1/p")"
-    [ -n "$path" ] && { local_ref "$path"; return 0; }
-    printf 'local'
+    case "$value" in
+      /*) path="$value" ;;
+      *) path="$(cd "$(dirname "$(dirname "$EXAMPLE_PBXPROJ")")/$value" 2>/dev/null && pwd)" ;;
+    esac
+    if [ -n "$path" ] && [ -d "$path" ]; then local_ref "$path"; else printf 'local'; fi
     return 0
   fi
-  local branch commit
-  branch="$(printf '%s' "$line" | sed -n "s/.*:branch => '\([^']*\)'.*/\1/p")"
-  commit="$(printf '%s' "$line" | sed -n "s/.*:commit => '\([^']*\)'.*/\1/p")"
-  if [ -n "$branch" ]; then
-    printf '%s' "$branch"
-    return 0
+  if [ -f "$PACKAGE_RESOLVED" ]; then
+    # shellcheck disable=SC2016
+    read -r pinned_version pinned_revision <<<"$(perl -MJSON::PP -0777 -ne '
+      my $d = eval { decode_json($_) } or exit 0;
+      for my $p (@{ $d->{pins} || [] }) {
+        next unless $p->{identity} eq "klaviyo-swift-sdk";
+        print(($p->{state}{version} // "-"), " ", ($p->{state}{revision} // "-"), "\n");
+      }' "$PACKAGE_RESOLVED" 2>/dev/null)"
   fi
-  if [ -n "$commit" ]; then
-    printf '%s' "$(printf '%s' "$commit" | cut -c1-$SHORT)"
-    return 0
-  fi
-  return 1
+  case "$kind" in
+    branch)
+      if [ -n "${pinned_revision:-}" ] && [ "$pinned_revision" != "-" ]; then
+        printf '%s@%s' "$value" "$(printf '%s' "$pinned_revision" | cut -c1-$SHORT)"
+      else
+        printf '%s' "$value"
+      fi
+      ;;
+    revision)
+      local best
+      best="$(branch_for_commit "$value")"
+      if [ -n "$best" ]; then
+        printf '%s@%s' "$best" "$(printf '%s' "$value" | cut -c1-$SHORT)"
+      else
+        printf '%s' "$(printf '%s' "$value" | cut -c1-$SHORT)"
+      fi
+      ;;
+    *)
+      if [ -n "${pinned_version:-}" ] && [ "$pinned_version" != "-" ]; then
+        printf '%s' "$pinned_version"
+      else
+        printf '%s' "$value"
+      fi
+      ;;
+  esac
 }
 
 resolve_ios_ref() {
   local ref
-  if ref="$(resolve_ios_pod_lock)"; then
-    printf '%s' "$ref"
-    return
-  fi
-  if ref="$(resolve_ios_podfile_override)"; then
+  if ref="$(resolve_ios_package_reference)"; then
     printf '%s' "$ref"
     return
   fi

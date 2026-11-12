@@ -70,13 +70,13 @@ Key lint rules (`analysis_options.yaml`):
 ### Native SDK Development
 
 To test against a local native SDK build:
-- **iOS**: In `ios/klaviyo_flutter_sdk.podspec`, replace the `KlaviyoSwift ~> X.Y.Z` dependency with a local path: `s.dependency 'KlaviyoSwift', :path => '../path/to/KlaviyoSwift'`
+- **iOS**: Run `scripts/configure-sdk.sh --ios-local ../klaviyo-swift-sdk` (or `--ios-branch` / `--ios-commit`). It points `ios/klaviyo_flutter_sdk/Package.swift` and the example's Xcode project at that source; `--ios-version X.Y.Z` puts the release pin back.
 - **Android**: In `android/build.gradle.kts`, replace the version string with a local Maven path or use `includeBuild()` in `example/android/settings.gradle`
 
 ### Gotchas
 
 - **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist, the example app's `pubspec.yaml`, and `MARKETING_VERSION` in the example app's Xcode project. Use `scripts/bump_version.sh` to update all version references at once.
-- **Example Podfile.lock is committed**: it pins the native iOS SDK the published example app ships with. Native SDK bumps and `scripts/configure-sdk.sh` overrides change it — regenerate with `pod install` in `example/ios` and commit the result. Never commit a lock pointing at a feature branch or local checkout.
+- **Example iOS app uses Swift Package Manager, not CocoaPods**: `klaviyo-swift-sdk` is a package dependency of `example/ios/Runner.xcodeproj` (the `XCRemoteSwiftPackageReference "klaviyo-swift-sdk"` in `project.pbxproj`, whose requirement must match `ios/klaviyo_flutter_sdk/Package.swift`; `.github/scripts/check-native-pins.sh` checks this). Its lockfile, `example/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`, is committed and pins the iOS SDK the published example app ships with. `scripts/configure-sdk.sh` rewrites both manifests and drops the `klaviyo-swift-sdk` pin from `Package.resolved`; the next `flutter build ios` re-resolves it. Commit the regenerated lockfile for a released version only, never one pointing at a branch, commit or local checkout.
 - `BufferedBroadcastStreamController` (`lib/src/utils/buffered_broadcast_stream_controller.dart`) exists because native events (push tokens, notifications) can fire before Dart listeners are attached. Don't replace it with a plain `StreamController.broadcast`.
 
 ## Example app deployment

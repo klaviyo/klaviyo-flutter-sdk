@@ -77,10 +77,7 @@ Geofencing methods will return "UNAVAILABLE" errors.
 
 #### iOS
 
-1. If the app builds with CocoaPods, add to `ios/Podfile` (before `flutter_install_all_ios_pods`). Swift Package Manager builds always link `KlaviyoLocation`, so skip this step for them:
-   ```ruby
-   ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
-   ```
+1. The example builds with Swift Package Manager, which always links `KlaviyoLocation`, so there's no flag to set. (In your own app, CocoaPods builds need `ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'` in `ios/Podfile`; see the main README.)
 
 2. Add location permission descriptions and the `location` background mode to `ios/Runner/Info.plist`. Without `location` under `UIBackgroundModes`, iOS won't allow background location updates, so geofencing won't start:
    ```xml
@@ -98,7 +95,7 @@ Geofencing methods will return "UNAVAILABLE" errors.
 
 3. Rebuild:
    ```bash
-   cd ios && rm -rf Pods Podfile.lock && pod install && cd .. && flutter clean && flutter run
+   flutter clean && flutter run
    ```
 
 ### Expected Behavior
@@ -130,19 +127,12 @@ cat app/build/intermediates/merged_manifests/debug/AndroidManifest.xml | grep AC
 # Expected: Shows the permission line
 ```
 
-#### iOS Pod Verification
+#### iOS Package Verification
 
 ```bash
-# Default (should NOT include location pod)
-cd ios && pod install
-pod list | grep KlaviyoLocation
-# Expected: No output (pod not installed)
-
-# With ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'
-# (Add ENV line to Podfile first)
-cd ios && rm -rf Pods Podfile.lock && pod install
-pod list | grep KlaviyoLocation
-# Expected: Shows KlaviyoLocation with version number
+flutter build ios --no-codesign
+grep -o '"identity" : "klaviyo-swift-sdk"' ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+# Expected: klaviyo-swift-sdk is resolved; KlaviyoLocation is one of its products and is always linked
 ```
 
 ## Push Notification Testing

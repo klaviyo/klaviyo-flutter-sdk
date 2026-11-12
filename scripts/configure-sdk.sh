@@ -9,7 +9,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PODSPEC="$ROOT_DIR/ios/klaviyo_flutter_sdk.podspec"
 PACKAGE_SWIFT="$ROOT_DIR/ios/klaviyo_flutter_sdk/Package.swift"
 BUILD_GRADLE="$ROOT_DIR/android/build.gradle.kts"
-PODFILE="$ROOT_DIR/example/ios/Podfile"
+EXAMPLE_PBXPROJ="$ROOT_DIR/example/ios/Runner.xcodeproj/project.pbxproj"
+EXAMPLE_PACKAGE_RESOLVED="$ROOT_DIR/example/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
 SETTINGS_GRADLE="$ROOT_DIR/example/android/settings.gradle"
 
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
@@ -22,10 +23,6 @@ DEFAULT_IOS_LOCAL_PATH="$ROOT_DIR/../klaviyo-swift-sdk"
 DEFAULT_ANDROID_LOCAL_PATH="$ROOT_DIR/../klaviyo-android-sdk"
 
 # Marker comments for injected overrides
-IOS_MARKER_START='# \[KLAVIYO-SDK-OVERRIDE-START\]'
-IOS_MARKER_END='# \[KLAVIYO-SDK-OVERRIDE-END\]'
-IOS_MARKER_START_LITERAL='# [KLAVIYO-SDK-OVERRIDE-START]'
-IOS_MARKER_END_LITERAL='# [KLAVIYO-SDK-OVERRIDE-END]'
 ANDROID_MARKER_START='// \[KLAVIYO-SDK-OVERRIDE-START\]'
 ANDROID_MARKER_END='// \[KLAVIYO-SDK-OVERRIDE-END\]'
 ANDROID_MARKER_START_LITERAL='// [KLAVIYO-SDK-OVERRIDE-START]'
@@ -179,13 +176,6 @@ validate_remote_branch() {
 
 # ─── iOS helpers ──────────────────────────────────────────────────────
 
-# Remove any existing Podfile override block
-remove_ios_override() {
-    if grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$PODFILE" 2>/dev/null; then
-        sedi "/${IOS_MARKER_START}/,/${IOS_MARKER_END}/d" "$PODFILE"
-    fi
-}
-
 # Update podspec dependency versions.
 # $1 = version string (e.g. "~> 5.2.1") or empty to remove version constraint.
 update_podspec_versions() {
@@ -201,34 +191,6 @@ update_podspec_versions() {
     fi
 }
 
-# Update the KlaviyoSwiftExtension pod line in the Podfile.
-# $1 = full pod arguments, e.g. "'KlaviyoSwiftExtension', '~> 5.2.1'"
-update_podfile_extension() {
-    local pod_spec="$1"
-    sedi -E "s|pod 'KlaviyoSwiftExtension'.*|pod $pod_spec|" "$PODFILE"
-}
-
-# Inject an override block into the Podfile, right after the flutter_install_all_ios_pods line.
-# $1 = override content (multi-line string of pod declarations)
-inject_ios_override() {
-    local override_content="$1"
-    local temp_file
-    temp_file=$(mktemp)
-
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        printf '%s\n' "$line" >> "$temp_file"
-        if [[ "$line" == *"flutter_install_all_ios_pods"* ]]; then
-            echo "  $IOS_MARKER_START_LITERAL" >> "$temp_file"
-            while IFS= read -r override_line; do
-                echo "  $override_line" >> "$temp_file"
-            done <<< "$override_content"
-            echo "  $IOS_MARKER_END_LITERAL" >> "$temp_file"
-        fi
-    done < "$PODFILE"
-
-    mv "$temp_file" "$PODFILE"
-}
-
 # Resolve a path to absolute, or error if it doesn't exist.
 resolve_path() {
     local path="$1"
@@ -237,6 +199,11 @@ resolve_path() {
         return 1
     fi
     (cd "$path" && pwd)
+}
+
+# Print $1 relative to directory $2 (both absolute).
+relative_path() {
+    perl -MFile::Spec -e 'print File::Spec->abs2rel($ARGV[0], $ARGV[1])' "$1" "$2"
 }
 
 # Matches the klaviyo-swift-sdk entry in Package.swift in any form this script writes.
@@ -259,6 +226,101 @@ set_package_swift_dependency() {
 
 SWIFT_PACKAGE_URL="https://github.com/klaviyo/klaviyo-swift-sdk"
 
+# Reads or rewrites the klaviyo-swift-sdk package reference in the example's project.pbxproj.
+# The reference is the one the Klaviyo* XCSwiftPackageProductDependency entries point at,
+# as an XCRemoteSwiftPackageReference or an XCLocalSwiftPackageReference.
+# Usage: pbxproj_tool check|show FILE
+#        pbxproj_tool set FILE remote KIND VALUE   (KIND = branch | revision | upToNextMinorVersion)
+#        pbxproj_tool set FILE local RELATIVE_PATH
+# shellcheck disable=SC2016
+PBXPROJ_TOOL='
+use strict; use warnings;
+my ($mode, $file, $form, $a1, $a2) = @ARGV;
+open my $in, "<", $file or die "cannot read $file\n"; local $/; my $s = <$in>; close $in;
+my %ids = map { $_ => 1 } $s =~ /^\t\t[0-9A-F]{24} \/\* Klaviyo\w+ \*\/ = \{\n\t\t\tisa = XCSwiftPackageProductDependency;\n\t\t\tpackage = ([0-9A-F]{24}) \/\* XC(?:Remote|Local)SwiftPackageReference "[^"]*" \*\/;\n/mg;
+my @ids = keys %ids;
+my $id = @ids == 1 ? $ids[0] : undef;
+my $objre = $id ? qr/^\t\t$id \/\* (XC(?:Remote|Local)SwiftPackageReference) "[^"]*" \*\/ = \{\n(?:\t\t\t[^\n]*\n)*?\t\t\};\n/m : undef;
+my ($obj, $isa) = $id && $s =~ $objre ? ($&, $1) : ();
+my $ok = $obj && ($isa eq "XCLocalSwiftPackageReference" || $obj =~ /repositoryURL = "?https:\/\/github\.com\/klaviyo\/klaviyo-swift-sdk(?:\.git)?"?;/);
+if ($mode eq "check") { exit($ok ? 0 : 1) }
+die "no klaviyo-swift-sdk package reference\n" unless $ok;
+if ($mode eq "show") {
+    if ($isa eq "XCLocalSwiftPackageReference") { my ($p) = $obj =~ /relativePath = ([^;\n]+);/; print "local, relativePath = $p\n" }
+    else { my %f = $obj =~ /^\t\t\t\t(\w+) = ([^;\n]+);$/mg; print join(", ", map { "$_ = $f{$_}" } sort keys %f), "\n" }
+    exit 0;
+}
+sub pbx_value { my $v = shift; return $v =~ /^[A-Za-z0-9_\$.\/]+$/ && $v !~ m{//|___} ? $v : "\"" . ($v =~ s/(["\\])/\\$1/gr) . "\"" }
+my ($newisa, $name, $body);
+if ($form eq "local") {
+    ($newisa, $name) = ("XCLocalSwiftPackageReference", $a1);
+    $body = "\t\t\tisa = $newisa;\n\t\t\trelativePath = " . pbx_value($a1) . ";\n";
+} else {
+    ($newisa, $name) = ("XCRemoteSwiftPackageReference", "klaviyo-swift-sdk");
+    my $key = $a1 eq "upToNextMinorVersion" ? "minimumVersion" : $a1;
+    my %req = (kind => $a1, $key => pbx_value($a2));
+    $body = "\t\t\tisa = $newisa;\n\t\t\trepositoryURL = \"https://github.com/klaviyo/klaviyo-swift-sdk\";\n\t\t\trequirement = {\n"
+        . join("", map { "\t\t\t\t$_ = $req{$_};\n" } sort keys %req) . "\t\t\t};\n";
+}
+my $newobj = "\t\t$id /* $newisa \"$name\" */ = {\n$body\t\t};\n";
+$s =~ s/\Q$obj\E//;
+$s =~ s{\b$id /\* XC(?:Remote|Local)SwiftPackageReference "[^"]*" \*/}{$id /* $newisa "$name" */}g;
+if ($s =~ m{/\* Begin $newisa section \*/\n(.*?)/\* End $newisa section \*/\n}s) {
+    my $sec = $1;
+    my @objs = $sec =~ /(\t\t[0-9A-F]{24} \/\*.*?\n\t\t\};\n)/sg;
+    push @objs, $newobj;
+    my $joined = join "", sort { substr($a, 2, 24) cmp substr($b, 2, 24) } @objs;
+    $s =~ s{(/\* Begin $newisa section \*/\n).*?(/\* End $newisa section \*/\n)}{$1$joined$2}s;
+} else {
+    my @after = grep { $_ gt $newisa } $s =~ m{^/\* Begin (\w+) section \*/$}mg;
+    my $next = (sort @after)[0];
+    my $block = "/* Begin $newisa section */\n$newobj/* End $newisa section */\n\n";
+    if ($next) { $s =~ s{(/\* Begin $next section \*/\n)}{$block$1} } else { $s =~ s{(\t\};\n\trootObject = )}{$block$1} }
+}
+$s =~ s{/\* Begin (XC(?:Remote|Local)SwiftPackageReference) section \*/\n/\* End \1 section \*/\n\n}{}g;
+open my $out, ">", $file or die "cannot write $file\n"; print $out $s; close $out;
+'
+
+has_example_package_reference() {
+    [[ -f "$EXAMPLE_PBXPROJ" ]] && perl -e "$PBXPROJ_TOOL" check "$EXAMPLE_PBXPROJ"
+}
+
+# Fails unless both Package.swift and the example's project.pbxproj carry a
+# klaviyo-swift-sdk dependency this script can rewrite.
+preflight_ios_manifests() {
+    if ! has_package_swift_dependency; then
+        error "klaviyo-swift-sdk dependency not found in $PACKAGE_SWIFT"
+        return 1
+    fi
+    if ! has_example_package_reference; then
+        error "No klaviyo-swift-sdk Swift package reference (XCRemoteSwiftPackageReference or XCLocalSwiftPackageReference used by the Klaviyo* package products) found in $EXAMPLE_PBXPROJ"
+        return 1
+    fi
+}
+
+# Drop the klaviyo-swift-sdk pin from the example's Package.resolved so the next
+# Xcode or flutter build re-resolves it against the new requirement.
+drop_resolved_pin() {
+    [[ -f "$EXAMPLE_PACKAGE_RESOLVED" ]] || return 0
+    perl -MJSON::PP -0777 -i -ne '
+        my $json = JSON::PP->new->canonical->pretty->indent_length(2)->space_before(1)->space_after(1);
+        my $data = $json->decode($_);
+        $data->{pins} = [ grep { $_->{identity} ne "klaviyo-swift-sdk" } @{ $data->{pins} || [] } ];
+        print $json->encode($data);
+    ' "$EXAMPLE_PACKAGE_RESOLVED"
+}
+
+# Point Package.swift and the example's Xcode project at the same klaviyo-swift-sdk source.
+# $1 = Package.swift dependency arguments; remaining args are pbxproj_tool set arguments.
+set_ios_sources() {
+    local package_swift_args="$1"
+    shift
+    preflight_ios_manifests || return 1
+    set_package_swift_dependency "$package_swift_args"
+    perl -e "$PBXPROJ_TOOL" set "$EXAMPLE_PBXPROJ" "$@"
+    drop_resolved_pin
+}
+
 configure_ios_version() {
     local version="$1"
     info "Configuring iOS SDK: published version ${BOLD}$version${NC}"
@@ -275,15 +337,9 @@ configure_ios_version() {
             return 1
         fi
     done
-    if ! has_package_swift_dependency; then
-        error "klaviyo-swift-sdk dependency not found in $PACKAGE_SWIFT"
-        return 1
-    fi
-    remove_ios_override
+    set_ios_sources "url: \"$SWIFT_PACKAGE_URL\",
+            .upToNextMinor(from: \"$version\")" remote upToNextMinorVersion "$version" || return 1
     update_podspec_versions "~> $version"
-    set_package_swift_dependency "url: \"$SWIFT_PACKAGE_URL\",
-            .upToNextMinor(from: \"$version\")"
-    update_podfile_extension "'KlaviyoSwiftExtension', '~> $version'"
     success "iOS SDK → published version $version"
 }
 
@@ -291,30 +347,18 @@ configure_ios_branch() {
     local branch="$1"
     validate_remote_branch "$SWIFT_REPO" "$branch"
     info "Configuring iOS SDK: branch ${BOLD}$branch${NC}"
-    set_package_swift_dependency "url: \"$SWIFT_PACKAGE_URL\",
-            branch: \"$branch\"" || return 1
-    remove_ios_override
+    set_ios_sources "url: \"$SWIFT_PACKAGE_URL\",
+            branch: \"$branch\"" remote branch "$branch" || return 1
     update_podspec_versions ""
-    inject_ios_override "pod 'KlaviyoSwift', :git => '$SWIFT_REPO', :branch => '$branch'
-pod 'KlaviyoCore', :git => '$SWIFT_REPO', :branch => '$branch'
-pod 'KlaviyoForms', :git => '$SWIFT_REPO', :branch => '$branch'
-pod 'KlaviyoLocation', :git => '$SWIFT_REPO', :branch => '$branch'"
-    update_podfile_extension "'KlaviyoSwiftExtension', :git => '$SWIFT_REPO', :branch => '$branch'"
     success "iOS SDK → branch '$branch'"
 }
 
 configure_ios_commit() {
     local commit="$1"
     info "Configuring iOS SDK: commit ${BOLD}$commit${NC}"
-    set_package_swift_dependency "url: \"$SWIFT_PACKAGE_URL\",
-            revision: \"$commit\"" || return 1
-    remove_ios_override
+    set_ios_sources "url: \"$SWIFT_PACKAGE_URL\",
+            revision: \"$commit\"" remote revision "$commit" || return 1
     update_podspec_versions ""
-    inject_ios_override "pod 'KlaviyoSwift', :git => '$SWIFT_REPO', :commit => '$commit'
-pod 'KlaviyoCore', :git => '$SWIFT_REPO', :commit => '$commit'
-pod 'KlaviyoForms', :git => '$SWIFT_REPO', :commit => '$commit'
-pod 'KlaviyoLocation', :git => '$SWIFT_REPO', :commit => '$commit'"
-    update_podfile_extension "'KlaviyoSwiftExtension', :git => '$SWIFT_REPO', :commit => '$commit'"
     success "iOS SDK → commit '$commit'"
 }
 
@@ -322,14 +366,9 @@ configure_ios_local() {
     local path
     path="$(resolve_path "$1")"
     info "Configuring iOS SDK: local path ${BOLD}$path${NC}"
-    set_package_swift_dependency "name: \"klaviyo-swift-sdk\", path: \"$path\"" || return 1
-    remove_ios_override
+    set_ios_sources "name: \"klaviyo-swift-sdk\", path: \"$path\"" \
+        local "$(relative_path "$path" "$(dirname "$(dirname "$EXAMPLE_PBXPROJ")")")" || return 1
     update_podspec_versions ""
-    inject_ios_override "pod 'KlaviyoSwift', :path => '$path'
-pod 'KlaviyoCore', :path => '$path'
-pod 'KlaviyoForms', :path => '$path'
-pod 'KlaviyoLocation', :path => '$path'"
-    update_podfile_extension "'KlaviyoSwiftExtension', :path => '$path'"
     success "iOS SDK → local path '$path'"
 }
 
@@ -416,9 +455,10 @@ show_status() {
     ios_version=$(grep -oE "s\.dependency 'KlaviyoSwift'.*" "$PODSPEC" | head -1)
     printf '%b\n' "  ${CYAN}iOS${NC}:     $ios_version"
     PACKAGE_SWIFT_DEP_RE="$PACKAGE_SWIFT_DEP_RE" perl -0ne 'if (/($ENV{PACKAGE_SWIFT_DEP_RE})/) { (my $d = $1) =~ s/\s+/ /g; print "          (Package.swift: $d)\n" }' "$PACKAGE_SWIFT"
-    if grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$PODFILE" 2>/dev/null; then
-        printf '%b\n' "          ${YELLOW}(Podfile override active)${NC}"
-        sed -n '/KLAVIYO-SDK-OVERRIDE-START/,/KLAVIYO-SDK-OVERRIDE-END/p' "$PODFILE" | grep -v 'OVERRIDE' | sed 's/^/          /' || true
+    if has_example_package_reference; then
+        printf '%s\n' "          (example Xcode project: $(perl -e "$PBXPROJ_TOOL" show "$EXAMPLE_PBXPROJ"))"
+    else
+        printf '%s\n' "          (example Xcode project: no klaviyo-swift-sdk package reference)"
     fi
 
     # Android
@@ -489,7 +529,7 @@ interactive_mode() {
     echo ""
     success "Configuration complete."
     warn "Run ${CYAN}cd example && flutter pub get${NC} to apply changes."
-    warn "For iOS, also run ${CYAN}cd example/ios && pod install${NC} (CocoaPods builds); SwiftPM builds resolve Package.swift on the next ${CYAN}flutter build ios${NC}."
+    warn "For iOS, the next ${CYAN}flutter build ios${NC} or Xcode build re-resolves the klaviyo-swift-sdk package; commit the regenerated Package.resolved only for a released version."
 }
 
 # ─── CLI mode ─────────────────────────────────────────────────────────
@@ -506,6 +546,10 @@ iOS Options:
   --ios-branch BRANCH        Use iOS SDK from a git branch
   --ios-commit HASH          Use iOS SDK from a git commit
   --ios-local [PATH]         Use a local iOS SDK checkout (default: $DEFAULT_IOS_LOCAL_PATH)
+
+  iOS options rewrite the klaviyo-swift-sdk dependency in ios/klaviyo_flutter_sdk/Package.swift
+  and in example/ios/Runner.xcodeproj/project.pbxproj, clear its pin from the example's
+  Package.resolved, and set the podspec's Klaviyo* version constraints.
 
 Android Options:
   --android-version VERSION  Use a published Android SDK version (e.g., 4.3.0)
@@ -608,7 +652,7 @@ parse_args() {
     echo ""
     success "Configuration complete."
     warn "Run ${CYAN}cd example && flutter pub get${NC} to apply changes."
-    warn "For iOS, also run ${CYAN}cd example/ios && pod install${NC} (CocoaPods builds); SwiftPM builds resolve Package.swift on the next ${CYAN}flutter build ios${NC}."
+    warn "For iOS, the next ${CYAN}flutter build ios${NC} or Xcode build re-resolves the klaviyo-swift-sdk package; commit the regenerated Package.resolved only for a released version."
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────
