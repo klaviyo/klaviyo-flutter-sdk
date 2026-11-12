@@ -6,6 +6,7 @@ import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
+import '../utils/profile_key_normalizer.dart';
 import 'package:logging/logging.dart';
 
 class KlaviyoNativeWrapper {
@@ -169,7 +170,7 @@ class KlaviyoNativeWrapper {
 
     try {
       await _channel.invokeMethod('setProfileProperties', {
-        'properties': properties,
+        'properties': normalizeProfileProperties(properties),
       });
     } catch (e) {
       throw KlaviyoException('Failed to set profile properties: $e');

@@ -305,6 +305,11 @@ class KlaviyoFlutterSdkPlugin :
                         event = event.setValue(value.toDouble())
                     }
 
+                    // Add valueCurrency if provided
+                    (eventJson?.get("value_currency") as? String)?.let { valueCurrency ->
+                        event = event.setValueCurrency(valueCurrency)
+                    }
+
                     // Add uniqueId if provided
                     (eventJson?.get("unique_id") as? String)?.let { uniqueId ->
                         event = event.setUniqueId(uniqueId)

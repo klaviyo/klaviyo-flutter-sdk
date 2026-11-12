@@ -168,11 +168,13 @@ extension KlaviyoFlutterSdkPlugin {
             }
             let properties = eventData["properties"] as? [String: Any] ?? [:]
             let value = eventData["value"] as? Double
+            let valueCurrency = eventData["value_currency"] as? String
             let uniqueId = eventData["unique_id"] as? String
             let event = Event(
                 name: .customEvent(name),
                 properties: properties,
                 value: value,
+                valueCurrency: valueCurrency,
                 uniqueId: uniqueId
             )
             KlaviyoSDK().create(event: event)
