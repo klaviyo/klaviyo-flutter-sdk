@@ -5,6 +5,7 @@
 ### What's New
 
 - **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
+- **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
 
 ### Bug Fixes
 
