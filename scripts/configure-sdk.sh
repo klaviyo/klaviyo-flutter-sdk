@@ -239,11 +239,25 @@ resolve_path() {
     (cd "$path" && pwd)
 }
 
-# Update the klaviyo-swift-sdk pin in Package.swift to .upToNextMinor(from: "<version>").
-update_package_swift_version() {
-    local version="$1"
-    sedi -E "s|(\.upToNextMinor\(from: )\"[^\"]+\"|\1\"$version\"|" "$PACKAGE_SWIFT"
+# Matches the klaviyo-swift-sdk entry in Package.swift in any form this script writes.
+PACKAGE_SWIFT_DEP_RE='\.package\(\s*(?:url:\s*"https://github\.com/klaviyo/klaviyo-swift-sdk(?:\.git)?"|name:\s*"klaviyo-swift-sdk",\s*path:\s*"[^"]*")\s*(?:,\s*(?:\.\w+\([^()]*\)|\w+:\s*"[^"]*"))?\s*\)'
+
+has_package_swift_dependency() {
+    PACKAGE_SWIFT_DEP_RE="$PACKAGE_SWIFT_DEP_RE" perl -0ne 'exit(/$ENV{PACKAGE_SWIFT_DEP_RE}/ ? 0 : 1)' "$PACKAGE_SWIFT"
 }
+
+# Replace the klaviyo-swift-sdk entry in Package.swift.
+# $1 = dependency arguments, e.g. 'url: "https://github.com/klaviyo/klaviyo-swift-sdk", branch: "main"'
+set_package_swift_dependency() {
+    if ! has_package_swift_dependency; then
+        error "klaviyo-swift-sdk dependency not found in $PACKAGE_SWIFT"
+        return 1
+    fi
+    PACKAGE_SWIFT_DEP_RE="$PACKAGE_SWIFT_DEP_RE" PACKAGE_SWIFT_DEP_ARGS="$1" \
+        perl -0pi -e 's/$ENV{PACKAGE_SWIFT_DEP_RE}/.package(\n            $ENV{PACKAGE_SWIFT_DEP_ARGS}\n        )/' "$PACKAGE_SWIFT"
+}
+
+SWIFT_PACKAGE_URL="https://github.com/klaviyo/klaviyo-swift-sdk"
 
 configure_ios_version() {
     local version="$1"
@@ -261,13 +275,14 @@ configure_ios_version() {
             return 1
         fi
     done
-    if ! grep -qE '\.upToNextMinor\(from: "[^"]+"' "$PACKAGE_SWIFT"; then
-        error "Expected SPM version pin not found in $PACKAGE_SWIFT"
+    if ! has_package_swift_dependency; then
+        error "klaviyo-swift-sdk dependency not found in $PACKAGE_SWIFT"
         return 1
     fi
     remove_ios_override
     update_podspec_versions "~> $version"
-    update_package_swift_version "$version"
+    set_package_swift_dependency "url: \"$SWIFT_PACKAGE_URL\",
+            .upToNextMinor(from: \"$version\")"
     update_podfile_extension "'KlaviyoSwiftExtension', '~> $version'"
     success "iOS SDK → published version $version"
 }
@@ -278,6 +293,8 @@ configure_ios_branch() {
     info "Configuring iOS SDK: branch ${BOLD}$branch${NC}"
     remove_ios_override
     update_podspec_versions ""
+    set_package_swift_dependency "url: \"$SWIFT_PACKAGE_URL\",
+            branch: \"$branch\"" || return 1
     inject_ios_override "pod 'KlaviyoSwift', :git => '$SWIFT_REPO', :branch => '$branch'
 pod 'KlaviyoCore', :git => '$SWIFT_REPO', :branch => '$branch'
 pod 'KlaviyoForms', :git => '$SWIFT_REPO', :branch => '$branch'
@@ -291,6 +308,8 @@ configure_ios_commit() {
     info "Configuring iOS SDK: commit ${BOLD}$commit${NC}"
     remove_ios_override
     update_podspec_versions ""
+    set_package_swift_dependency "url: \"$SWIFT_PACKAGE_URL\",
+            revision: \"$commit\"" || return 1
     inject_ios_override "pod 'KlaviyoSwift', :git => '$SWIFT_REPO', :commit => '$commit'
 pod 'KlaviyoCore', :git => '$SWIFT_REPO', :commit => '$commit'
 pod 'KlaviyoForms', :git => '$SWIFT_REPO', :commit => '$commit'
@@ -305,6 +324,7 @@ configure_ios_local() {
     info "Configuring iOS SDK: local path ${BOLD}$path${NC}"
     remove_ios_override
     update_podspec_versions ""
+    set_package_swift_dependency "name: \"klaviyo-swift-sdk\", path: \"$path\"" || return 1
     inject_ios_override "pod 'KlaviyoSwift', :path => '$path'
 pod 'KlaviyoCore', :path => '$path'
 pod 'KlaviyoForms', :path => '$path'
@@ -395,6 +415,7 @@ show_status() {
     local ios_version
     ios_version=$(grep -oE "s\.dependency 'KlaviyoSwift'.*" "$PODSPEC" | head -1)
     printf '%b\n' "  ${CYAN}iOS${NC}:     $ios_version"
+    PACKAGE_SWIFT_DEP_RE="$PACKAGE_SWIFT_DEP_RE" perl -0ne 'if (/($ENV{PACKAGE_SWIFT_DEP_RE})/) { (my $d = $1) =~ s/\s+/ /g; print "          (Package.swift: $d)\n" }' "$PACKAGE_SWIFT"
     if grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$PODFILE" 2>/dev/null; then
         printf '%b\n' "          ${YELLOW}(Podfile override active)${NC}"
         sed -n '/KLAVIYO-SDK-OVERRIDE-START/,/KLAVIYO-SDK-OVERRIDE-END/p' "$PODFILE" | grep -v 'OVERRIDE' | sed 's/^/          /' || true
@@ -468,7 +489,7 @@ interactive_mode() {
     echo ""
     success "Configuration complete."
     warn "Run ${CYAN}cd example && flutter pub get${NC} to apply changes."
-    warn "For iOS, also run ${CYAN}cd example/ios && pod install${NC}."
+    warn "For iOS, also run ${CYAN}cd example/ios && pod install${NC} (CocoaPods builds); SwiftPM builds resolve Package.swift on the next ${CYAN}flutter build ios${NC}."
 }
 
 # ─── CLI mode ─────────────────────────────────────────────────────────
@@ -587,7 +608,7 @@ parse_args() {
     echo ""
     success "Configuration complete."
     warn "Run ${CYAN}cd example && flutter pub get${NC} to apply changes."
-    warn "For iOS, also run ${CYAN}cd example/ios && pod install${NC}."
+    warn "For iOS, also run ${CYAN}cd example/ios && pod install${NC} (CocoaPods builds); SwiftPM builds resolve Package.swift on the next ${CYAN}flutter build ios${NC}."
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────
