@@ -74,7 +74,7 @@ permissions:
 env:
   SLACK_USERNAME: Flutter Example App
   SLACK_ICON_EMOJI: ':merlin-orb-flutter:'
-  FLUTTER_VERSION: 3.44.9
+  FLUTTER_VERSION: 3.47.9
   GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
 
 jobs:
