@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'klaviyo_location.dart';
+import 'profile_property.dart';
 
 /// Represents a user profile in Klaviyo
 class KlaviyoProfile {
@@ -118,11 +119,11 @@ class KlaviyoProfile {
     if (email != null) data['email'] = email;
     if (phoneNumber != null) data['phone_number'] = phoneNumber;
     if (externalId != null) data['external_id'] = externalId;
-    if (firstName != null) data['first_name'] = firstName;
-    if (lastName != null) data['last_name'] = lastName;
-    if (organization != null) data['organization'] = organization;
-    if (title != null) data['title'] = title;
-    if (image != null) data['image'] = image;
+    if (firstName != null) data[ProfileProperty.firstName] = firstName;
+    if (lastName != null) data[ProfileProperty.lastName] = lastName;
+    if (organization != null) data[ProfileProperty.organization] = organization;
+    if (title != null) data[ProfileProperty.title] = title;
+    if (image != null) data[ProfileProperty.image] = image;
     if (location != null) data['location'] = location!.toJson();
 
     if (properties != null && properties!.isNotEmpty) {
@@ -136,11 +137,11 @@ class KlaviyoProfile {
     'email',
     'phone_number',
     'external_id',
-    'first_name',
-    'last_name',
-    'organization',
-    'title',
-    'image',
+    ProfileProperty.firstName,
+    ProfileProperty.lastName,
+    ProfileProperty.organization,
+    ProfileProperty.title,
+    ProfileProperty.image,
     'location',
   };
 
@@ -150,11 +151,11 @@ class KlaviyoProfile {
     final email = json['email'] as String?;
     final phoneNumber = json['phone_number'] as String?;
     final externalId = json['external_id'] as String?;
-    final firstName = json['first_name'] as String?;
-    final lastName = json['last_name'] as String?;
-    final organization = json['organization'] as String?;
-    final title = json['title'] as String?;
-    final image = json['image'] as String?;
+    final firstName = json[ProfileProperty.firstName] as String?;
+    final lastName = json[ProfileProperty.lastName] as String?;
+    final organization = json[ProfileProperty.organization] as String?;
+    final title = json[ProfileProperty.title] as String?;
+    final image = json[ProfileProperty.image] as String?;
 
     KlaviyoLocation? location;
     if (json['location'] != null) {
