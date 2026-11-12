@@ -8,6 +8,9 @@ on:
       - 'feat/**'
       - 'rel/**'
 
+permissions:
+  contents: read
+
 jobs:
   build-ios:
     runs-on: macos-15
