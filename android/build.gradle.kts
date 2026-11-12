@@ -36,8 +36,15 @@ if (!builtInKotlin) {
     apply(plugin = "kotlin-android")
 }
 
+// Reads the `flutter` extension reflectively: its type is not on this script's classpath in add-to-app hosts.
+val flutterExtension = extensions.findByName("flutter")
+val flutterCompileSdk =
+    flutterExtension
+        ?.let { runCatching { it.javaClass.getMethod("getCompileSdkVersion").invoke(it) as? Int }.getOrNull() }
+        ?: 36
+
 extensions.configure<com.android.build.api.dsl.LibraryExtension> {
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = flutterCompileSdk
     namespace = "com.klaviyo.klaviyo_flutter_sdk"
 
     compileOptions {
