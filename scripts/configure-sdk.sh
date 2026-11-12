@@ -291,10 +291,10 @@ configure_ios_branch() {
     local branch="$1"
     validate_remote_branch "$SWIFT_REPO" "$branch"
     info "Configuring iOS SDK: branch ${BOLD}$branch${NC}"
-    remove_ios_override
-    update_podspec_versions ""
     set_package_swift_dependency "url: \"$SWIFT_PACKAGE_URL\",
             branch: \"$branch\"" || return 1
+    remove_ios_override
+    update_podspec_versions ""
     inject_ios_override "pod 'KlaviyoSwift', :git => '$SWIFT_REPO', :branch => '$branch'
 pod 'KlaviyoCore', :git => '$SWIFT_REPO', :branch => '$branch'
 pod 'KlaviyoForms', :git => '$SWIFT_REPO', :branch => '$branch'
@@ -306,10 +306,10 @@ pod 'KlaviyoLocation', :git => '$SWIFT_REPO', :branch => '$branch'"
 configure_ios_commit() {
     local commit="$1"
     info "Configuring iOS SDK: commit ${BOLD}$commit${NC}"
-    remove_ios_override
-    update_podspec_versions ""
     set_package_swift_dependency "url: \"$SWIFT_PACKAGE_URL\",
             revision: \"$commit\"" || return 1
+    remove_ios_override
+    update_podspec_versions ""
     inject_ios_override "pod 'KlaviyoSwift', :git => '$SWIFT_REPO', :commit => '$commit'
 pod 'KlaviyoCore', :git => '$SWIFT_REPO', :commit => '$commit'
 pod 'KlaviyoForms', :git => '$SWIFT_REPO', :commit => '$commit'
@@ -322,9 +322,9 @@ configure_ios_local() {
     local path
     path="$(resolve_path "$1")"
     info "Configuring iOS SDK: local path ${BOLD}$path${NC}"
+    set_package_swift_dependency "name: \"klaviyo-swift-sdk\", path: \"$path\"" || return 1
     remove_ios_override
     update_podspec_versions ""
-    set_package_swift_dependency "name: \"klaviyo-swift-sdk\", path: \"$path\"" || return 1
     inject_ios_override "pod 'KlaviyoSwift', :path => '$path'
 pod 'KlaviyoCore', :path => '$path'
 pod 'KlaviyoForms', :path => '$path'
