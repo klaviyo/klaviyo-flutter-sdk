@@ -207,8 +207,9 @@ import klaviyo_flutter_sdk
 **1. Push Notification Opens (automatic)**
 
 No `MainActivity.kt` changes are required. The plugin tracks push notification opens on its own via
-Flutter's Activity lifecycle hooks (cold start and warm start alike) and both reports the "Opened
-Push" event to Klaviyo and emits the Dart `push_notification_opened` stream — see
+Flutter's Activity lifecycle hooks, on cold and warm starts. It reports the "Opened Push" event to
+Klaviyo and emits the Dart `push_notification_opened` stream. On a cold start the event is held until
+your Dart listener subscribes — see
 [Handling Push Notification Opens](#handling-push-notification-opens). If an earlier version of this
 SDK had you add a manual `Klaviyo.handlePush(intent)` call in `MainActivity.kt`, you can remove it —
 the plugin's automatic handling already covers it.
@@ -552,7 +553,21 @@ KlaviyoSDK().onPushNotification.listen((event) {
 
 > **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
 
-> **Known limitation (Android)**: on a cold start — app fully killed, then relaunched by tapping a notification — this event (and `ActionButtonTapped` under [Push Action Events](#push-action-events), which fires from the same code path) can be dropped if the tap is processed before your Dart listener subscribes. Native "Opened Push" backend tracking to Klaviyo is unaffected — this only affects the Dart-facing stream in your Flutter app. We plan to close this gap in a follow-up release. iOS is unaffected: its native caching mechanism replays the event once your listener attaches.
+> **Cold starts and late listeners:** if the app is launched by tapping a notification, the open can arrive before your Dart code subscribes. The SDK buffers the most recent `push_notification_opened` event that arrived with no listener and delivers it **once, to the first listener** that subscribes. Later listeners don't receive it. `onPushAction` buffers the most recent push action the same way, and each new open clears it. Other `onPushNotification` events (tokens, token errors, silent pushes) that arrive with no listener also go to the first listener only. On Android, reopening the app from the Recents screen doesn't re-deliver the tap that originally launched it.
+
+#### Reading the Launch Tap
+
+To read the tap that launched the app at any time, for example from a router that subscribes after another listener has already taken the stream event, call `getInitialPushNotification()`. It returns the same map as the `push_notification_opened` event, or `null` if the app wasn't launched by a push tap:
+
+```dart
+Future<String> initialRoute() async {
+  final launchTap = await KlaviyoSDK().getInitialPushNotification();
+  final url = launchTap?['data']?['url'] as String?;
+  return url != null ? Uri.parse(url).path : '/';
+}
+```
+
+It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`.
 
 #### Identifying Klaviyo Notifications
 
@@ -803,7 +818,7 @@ subscription.cancel();
 
 > **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. On **iOS**, both body `open_url` taps and action-button taps surface. On **Android**, `open_url` is dispatched to an external handler by the native SDK and does **not** reach the app, so only `deep_link` / `open_app` action-button taps surface on Android.
 
-> **Known limitation (Android)**: `ActionButtonTapped` has the same cold-start limitation as `push_notification_opened` — see the note under [Handling Push Notification Opens](#handling-push-notification-opens).
+> **Cold starts:** a push action that arrives before you subscribe is buffered and delivered once, to the first listener that subscribes. See the note under [Handling Push Notification Opens](#handling-push-notification-opens).
 
 ## Deep Linking
 
@@ -1314,7 +1329,6 @@ All SDK exceptions extend `KlaviyoException`:
 - If nothing fires at all (neither "Opened Push" in Klaviyo nor the Dart `push_notification_opened` stream), use `singleTop` or `singleTask` launch mode so `onNewIntent` fires for warm starts, and check intent delivery/SDK initialization.
 - If "Opened Push" isn't showing up in Klaviyo specifically, check that `com.klaviyo.push.automatic_push_open_tracking` isn't set to `false` in your manifest (see [Android Setup](#android-setup)) — this only affects native backend tracking, not the Dart stream, which fires regardless.
 - If "Opened Push" shows up in Klaviyo despite setting that flag to `false`, check for a leftover manual `Klaviyo.handlePush()` call in your own code from an older SDK version — it bypasses the flag entirely, since it's a separate call site outside the plugin's own gate.
-- If the Dart `push_notification_opened` event fires on a warm start (app backgrounded) but not on a cold start (app fully killed), this is a known limitation — see [Handling Push Notification Opens](#handling-push-notification-opens).
 
 **Push notifications not displaying** — Check Firebase setup (`google-services.json`, plugin applied in `build.gradle`). On Android 13+, runtime notification permission is required. Test with Firebase Console first to rule out Klaviyo-specific issues.
 
