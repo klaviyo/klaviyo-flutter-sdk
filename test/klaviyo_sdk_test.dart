@@ -206,4 +206,51 @@ void main() {
       );
     });
   });
+
+  group('KlaviyoSDK.setProfileProperties', () {
+    test('normalizes standard keys to snake_case', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileProperties({
+        'firstName': 'Ada',
+        'LastName': 'Lovelace',
+        'address_1': '1 Main St',
+        'address2': 'Apt 2',
+        'timeZone': 'America/New_York',
+        'favoriteColor': 'blue',
+      });
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'first_name': 'Ada',
+        'last_name': 'Lovelace',
+        'address1': '1 Main St',
+        'address2': 'Apt 2',
+        'timezone': 'America/New_York',
+        'favoriteColor': 'blue',
+      });
+    });
+
+    test('setProfileAttribute normalizes a camelCase key', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileAttribute('firstName', 'Ada');
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {'first_name': 'Ada'});
+    });
+
+    test('setProfileAttribute with ProfileProperty sends the wire key',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileAttribute(ProfileProperty.firstName, 'Ada');
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {'first_name': 'Ada'});
+    });
+  });
 }

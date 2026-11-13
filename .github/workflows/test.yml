@@ -11,10 +11,10 @@ permissions:
 
 jobs:
   test:
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
@@ -26,7 +26,7 @@ jobs:
         run: flutter pub get
 
       - name: Run tests
-        run: flutter test --coverage
+        run: make test
 
       - name: Check test coverage
         run: |
@@ -36,8 +36,35 @@ jobs:
           fi
 
       - name: Upload coverage to Codecov (optional)
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         if: always()
         with:
           file: ./coverage/lcov.info
           fail_ci_if_error: false
+
+  test-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: gradle
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.38.7
+          cache: true
+
+      - name: Install Android NDK
+        run: |
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          sdkmanager="$(command -v sdkmanager || ls -d "$sdk_root"/cmdline-tools/*/bin/sdkmanager | head -1)"
+          yes | "$sdkmanager" --sdk_root="$sdk_root" --licenses > /dev/null || true
+          "$sdkmanager" --sdk_root="$sdk_root" --install "ndk;28.2.13676358"
+
+      - name: Run Kotlin unit tests
+        run: make test-android

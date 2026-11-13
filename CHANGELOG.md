@@ -4,8 +4,6 @@
 
 ### Deprecated
 
-These APIs still work and will be removed in 1.0.
-
 - **`KlaviyoSDK.onFormEvent`**: use `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s.
 - **`KlaviyoSDK.handlePushNotificationReceived` and `KlaviyoSDK.handlePushNotificationOpened`**: these only logged a message. Remove the calls; push tracking is automatic.
 - **`KlaviyoNativeWrapper`**: use `KlaviyoSDK`. The class becomes internal in 1.0.
@@ -18,6 +16,15 @@ These APIs still work and will be removed in 1.0.
 - **`dispose()` no longer closes the SDK's event streams.** Calling it used to leave the SDK broken until the app restarted: push, form, and auth-token streams were closed for good and `initialize()` didn't reopen them. It now only unregisters the auth token provider, if one is registered.
 - **`setLoggingEnabled(bool)` is now the single documented switch for Dart and native logging.** It already turned Dart-side logs on and off; with `setLogLevel` and `KlaviyoLogLevel` deprecated, it is the only logging control. The iOS plugin's own log messages now follow it as well.
 - **The plugin logs less.** Push token values, full push and form event payloads, and per-call profile identifiers (email, phone number, external ID) are no longer logged. The iOS and Android token-received messages remain without the token. A few duplicate bridge messages were dropped.
+
+### What's New
+
+- **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
+- **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
+
+### Bug Fixes
+
+- **Android: camelCase profile keys now land in standard fields** — `setProfileAttribute` and `setProfileProperties` now normalize keys for standard attributes in Dart, case-insensitively and in camelCase or snake_case, before calling the native SDKs. On Android, keys such as `firstName` or `address_1` used to be saved as custom properties; they now set the standard field, matching iOS. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
 
 ## 0.5.0
 
