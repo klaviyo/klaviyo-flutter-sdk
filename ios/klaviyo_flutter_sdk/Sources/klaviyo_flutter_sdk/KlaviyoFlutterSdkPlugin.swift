@@ -37,6 +37,13 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedSilentPush: [String: Any]?
     private var cachedPushAction: [String: Any]?
 
+    // Background push data state, used by KlaviyoFlutterSdkPlugin+BackgroundPushData.swift.
+    var backgroundChannel: FlutterMethodChannel?
+    var isBackgroundHandlerRegistered = false
+    var pendingBackgroundPushData: BackgroundPushDataDelivery?
+
+    var hasStreamListener: Bool { eventSink != nil }
+
     // MARK: - Flutter Plugin Registration
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -51,7 +58,13 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
         eventChannel.setStreamHandler(instance)
 
-        // 3. Register as Application Delegate
+        // 3. Setup Background Channel (For running the Dart background push data handler)
+        instance.backgroundChannel = FlutterMethodChannel(
+            name: "klaviyo_sdk_background",
+            binaryMessenger: registrar.messenger()
+        )
+
+        // 4. Register as Application Delegate
         // This allows us to automatically intercept 'didRegisterForRemoteNotifications'
         // without requiring code in the Host App's AppDelegate.
         registrar.addApplicationDelegate(instance)
@@ -428,6 +441,10 @@ extension KlaviyoFlutterSdkPlugin {
             KlaviyoSDK().setBadgeCount(count)
             result(nil)
 
+        case "registerBackgroundPushDataHandler":
+            registerBackgroundPushDataHandler()
+            result(nil)
+
         case "handleUniversalTrackingLink":
             guard let args = call.arguments as? [String: Any],
                   let urlString = args["url"] as? String,
@@ -687,13 +704,17 @@ extension KlaviyoFlutterSdkPlugin {
         }
     }
 
-    /// Manual Forwarding Helper - Silent Push
-    /// This should be called from the Host App's AppDelegate
-    /// in `didReceiveRemoteNotification:fetchCompletionHandler:`.
-    /// Note: The host app is responsible for calling the completion handler after this method returns.
+    /// Routes push data by app state, like `handleSilentPush(userInfo:fetchCompletionHandler:)`,
+    /// but cannot delay the system completion handler, so iOS may suspend the app before the
+    /// Dart background handler finishes.
+    @available(*, deprecated, message: "Use handleSilentPush(userInfo:fetchCompletionHandler:)")
     public func handleSilentPush(userInfo: [AnyHashable: Any]) {
+        handleSilentPush(userInfo: userInfo, fetchCompletionHandler: { _ in })
+    }
+
+    func emitPushDataToStream(userInfo: [AnyHashable: Any]) {
         if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("Silent push received")
+            Logger.klaviyoFlutterSDK.info("Push data received")
         }
 
         // Prepare payload
@@ -707,7 +728,7 @@ extension KlaviyoFlutterSdkPlugin {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
-                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching silent push event.")
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push data event.")
             }
             cachedSilentPush = eventPayload
         }
