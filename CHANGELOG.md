@@ -7,6 +7,15 @@
 - **Silent push is now push data, routed by app state (experimental)**: Klaviyo push data reaches Dart in exactly one place: the new `onPushData` stream (`Stream<KlaviyoPushData>`) while the app is in the foreground, or the handler registered with the new `KlaviyoSDK.onBackgroundPushData` while it is in the background or not running. On Android a killed app now runs the handler in a headless engine instead of dropping the push. Without a handler, background push data is dropped; `silent_push_received` on `onPushNotification` still fires in the foreground. See [Push Data](README.md#push-data) and the [migration guide](MIGRATION_GUIDE.md#migrating-to-v060).
 - **Push data now includes visible pushes with key/value pairs**: on both platforms, push data fires for every silent push and for every visible push that carries key/value pairs, so such a push fires twice by design (push data on arrival, `push_notification_opened` on tap). On iOS the "visible content" check moved from the host `AppDelegate` into `handleSilentPush(userInfo:fetchCompletionHandler:)`, and hosts should forward every push. **Apps still using the old README snippet keep dropping visible pushes with key/value pairs until they update it.**
 
+### What's New
+
+- **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
+- **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
+
+### Bug Fixes
+
+- **Android: camelCase profile keys now land in standard fields** — `setProfileAttribute` and `setProfileProperties` now normalize keys for standard attributes in Dart, case-insensitively and in camelCase or snake_case, before calling the native SDKs. On Android, keys such as `firstName` or `address_1` used to be saved as custom properties; they now set the standard field, matching iOS. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
+
 ## 0.5.0
 
 ### Changes

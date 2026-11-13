@@ -49,6 +49,7 @@ permissions:
   contents: read
 
 env:
+  TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   SLACK_USERNAME: Flutter SDK
   SLACK_ICON_EMOJI: ':merlin-orb-flutter:'
 
@@ -62,6 +63,7 @@ jobs:
       pull-requests: read
     outputs:
       sha: ${{ steps.ref.outputs.sha }}
+      sha_short: ${{ steps.ref.outputs.sha_short }}
       release_url: ${{ steps.draft.outputs.url }}
       ci_skipped: ${{ inputs.skip_ci_check == true }}
     env:
@@ -102,10 +104,13 @@ jobs:
           fi
           sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${ref}" --jq .sha)
           echo "Releasing ${ref} at ${sha}"
-          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
-          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          {
+            echo "ref=${ref}"
+            echo "sha=${sha}"
+            echo "sha_short=${sha::7}"
+          } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
         with:
           ref: ${{ steps.ref.outputs.sha }}
@@ -249,7 +254,7 @@ jobs:
       - name: Checkout Slack action
         if: failure()
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -261,6 +266,7 @@ jobs:
         if: failure()
         env:
           STEPS_JSON: ${{ toJSON(steps) }}
+          COMMIT_SHA: ${{ steps.ref.outputs.sha || github.sha }}
         run: |
           step=$(jq -r '
             {
@@ -284,6 +290,7 @@ jobs:
             | if $key == null then "unknown step" else ($names[$key] // $key) end
           ' <<<"$STEPS_JSON")
           echo "step=$step" >> "$GITHUB_OUTPUT"
+          echo "commit_short=${COMMIT_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack on failure
         id: slack_failure
@@ -293,12 +300,13 @@ jobs:
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: failure
-          title: klaviyo_flutter_sdk ${{ inputs.version }} release failed${{ inputs.dry_run && ' (dry run)' || '' }}
+          title: Flutter SDK `${{ inputs.version }}` release failed${{ inputs.dry_run && ' (dry run)' || '' }}
           fields: |
-            Version: ${{ inputs.version }}
-            Commit: ${{ steps.ref.outputs.sha || github.sha }}
+            Version: `${{ inputs.version }}`
+            Commit: `${{ steps.failed.outputs.commit_short }}`
             Stage: Prepare
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.ref.outputs.sha || github.sha }}
 
       - name: Reply with failure details
         if: failure() && steps.slack_failure.outputs.ts != ''
@@ -308,7 +316,7 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ steps.slack_failure.outputs.ts }}
           status: failure
-          title: Failed at ${{ steps.failed.outputs.step }}
+          title: Failed at `${{ steps.failed.outputs.step }}`
 
   publish:
     needs: prepare
@@ -326,7 +334,7 @@ jobs:
     steps:
       - name: Checkout Slack action
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -351,31 +359,35 @@ jobs:
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: pending
-          title: klaviyo_flutter_sdk ${{ inputs.version }} awaiting pub.dev approval${{ needs.prepare.outputs.ci_skipped == 'true' && ' (CI check skipped)' || '' }}
-          body: Approve the `pub.dev` environment on the release.yml run. This message updates with the result.
+          title: Flutter SDK `${{ inputs.version }}` awaiting `pub.dev` approval${{ needs.prepare.outputs.ci_skipped == 'true' && ' (CI check skipped)' || '' }}
+          body: Approve the `pub.dev` environment on the `release.yml` run. This message updates with the result.
           fields: |
-            Version: ${{ inputs.version }}
-            Commit: ${{ needs.prepare.outputs.sha }}
-            Requested by: ${{ github.actor }}
+            Version: `${{ inputs.version }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Draft release|${{ needs.prepare.outputs.release_url }}
             Approve here|${{ github.server_url }}/${{ github.repository }}/actions/workflows/release.yml
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
 
       - name: Dispatch release.yml at the tag
         id: dispatch
         env:
           SLACK_TS: ${{ steps.slack_pending.outputs.ts }}
         run: |
-          # True when the workflow file at $VERSION declares slack_ts.
-          takes_slack_ts() {
+          # True when the workflow file at $VERSION declares the input named by $1.
+          takes_input() {
             gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/release.yml?ref=$VERSION" \
-              -H "Accept: application/vnd.github.raw" | grep -q '^[[:space:]]*slack_ts:'
+              -H "Accept: application/vnd.github.raw" | grep -q "^[[:space:]]*$1:"
           }
-          if [ -n "$SLACK_TS" ] && takes_slack_ts; then
-            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f "slack_ts=$SLACK_TS"
-          else
-            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
+          args=()
+          if [ -n "$SLACK_TS" ] && takes_input slack_ts; then
+            args+=(-f "slack_ts=$SLACK_TS")
           fi
+          if takes_input triggered_by; then
+            args+=(-f "triggered_by=$TRIGGERED_BY")
+          fi
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" "${args[@]}"
           {
             echo "### klaviyo_flutter_sdk ${VERSION} tagged"
             echo
@@ -421,12 +433,15 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ steps.slack_pending.outputs.ts }}
           status: failure
-          title: klaviyo_flutter_sdk ${{ inputs.version }} release failed
+          title: Flutter SDK `${{ inputs.version }}` release failed
           fields: |
-            Version: ${{ inputs.version }}
-            Commit: ${{ needs.prepare.outputs.sha }}
+            Version: `${{ inputs.version }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
             Stage: Publish
-          links: Release|${{ needs.prepare.outputs.release_url }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+          links: |
+            Release|${{ needs.prepare.outputs.release_url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
 
       - name: Reply with failure details
         if: failure() && steps.slack_failure.outputs.ts != ''
@@ -436,4 +451,23 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ steps.slack_failure.outputs.ts }}
           status: failure
-          title: Failed at ${{ steps.failed.outputs.step }}
+          title: Failed at `${{ steps.failed.outputs.step }}`
+
+      - name: Notify Slack that the release stopped
+        if: cancelled() && steps.slack_pending.outputs.ts != ''
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ steps.slack_pending.outputs.ts }}
+          status: stopped
+          title: Flutter SDK `${{ inputs.version }}` release stopped, run cancelled
+          body: The run was cancelled before it finished. If `release.yml` did not start, run it at the tag to retry.
+          fields: |
+            Version: `${{ inputs.version }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
+            Stage: Publish
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+          links: |
+            Release|${{ needs.prepare.outputs.release_url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
