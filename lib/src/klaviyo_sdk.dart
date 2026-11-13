@@ -301,14 +301,10 @@ class KlaviyoSDK {
   /// Register for in-app forms
   Future<void> registerForInAppForms({InAppFormConfig? configuration}) async {
     _ensureInitialized();
-    try {
-      await _nativeWrapper.registerForInAppForms(
-        configuration: configuration?.toJson(),
-      );
-      _logger.info('Registered for in-app forms');
-    } on KlaviyoException catch (e) {
-      _logger.warning('Failed to register for in-app forms: ${e.message}');
-    }
+    await _nativeWrapper.registerForInAppForms(
+      configuration: configuration?.toJson(),
+    );
+    _logger.info('Registered for in-app forms');
   }
 
   /// Start a draft in-app forms preview session with a preview token from the
@@ -370,12 +366,8 @@ class KlaviyoSDK {
   /// Unregister from in-app forms
   Future<void> unregisterFromInAppForms() async {
     _ensureInitialized();
-    try {
-      await _nativeWrapper.unregisterFromInAppForms();
-      _logger.info('Unregistered from in-app forms');
-    } on KlaviyoException catch (e) {
-      _logger.warning('Failed to unregister from in-app forms: ${e.message}');
-    }
+    await _nativeWrapper.unregisterFromInAppForms();
+    _logger.info('Unregistered from in-app forms');
   }
 
   // ============================================================================
@@ -505,23 +497,15 @@ class KlaviyoSDK {
   /// Requires location permissions to be granted by user
   Future<void> registerGeofencing() async {
     _ensureInitialized();
-    try {
-      await _nativeWrapper.registerGeofencing();
-      _logger.info('Registered for geofencing');
-    } on KlaviyoException catch (e) {
-      _logger.warning('Failed to register for geofencing: ${e.message}');
-    }
+    await _nativeWrapper.registerGeofencing();
+    _logger.info('Registered for geofencing');
   }
 
   /// Stop monitoring all geofences
   Future<void> unregisterGeofencing() async {
     _ensureInitialized();
-    try {
-      await _nativeWrapper.unregisterGeofencing();
-      _logger.info('Unregistered from geofencing');
-    } on KlaviyoException catch (e) {
-      _logger.warning('Failed to unregister from geofencing: ${e.message}');
-    }
+    await _nativeWrapper.unregisterGeofencing();
+    _logger.info('Unregistered from geofencing');
   }
 
   /// Get currently monitored geofences
@@ -533,12 +517,7 @@ class KlaviyoSDK {
   @internal
   Future<List<Geofence>> getCurrentGeofences() async {
     _ensureInitialized();
-    try {
-      return await _nativeWrapper.getCurrentGeofences();
-    } on KlaviyoException catch (e) {
-      _logger.warning('Failed to get current geofences: ${e.message}');
-      return [];
-    }
+    return _nativeWrapper.getCurrentGeofences();
   }
 
   // ============================================================================

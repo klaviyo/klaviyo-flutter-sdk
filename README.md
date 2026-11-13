@@ -954,7 +954,7 @@ await KlaviyoSDK().registerGeofencing();
 await KlaviyoSDK().unregisterGeofencing();
 ```
 
-If the app doesn't include the full location module, geofencing methods return error code `GEOFENCING_NOT_AVAILABLE` with instructions to enable it.
+If the app doesn't include the full location module, geofencing methods throw a `KlaviyoException` with `code` set to `GEOFENCING_NOT_AVAILABLE` and a message that explains how to enable it.
 
 ## Optional Module Configuration
 
@@ -1016,7 +1016,7 @@ klaviyoIncludeForms=false
 ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'
 ```
 
-Without the forms module, forms methods will log an error and no-op gracefully (error code: `FORMS_NOT_AVAILABLE`).
+Without the forms module, `registerForInAppForms()` and `unregisterFromInAppForms()` throw a `KlaviyoException` with `code` set to `FORMS_NOT_AVAILABLE`.
 
 ## Profile Reset (Logout)
 
