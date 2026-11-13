@@ -13,6 +13,17 @@ class KlaviyoProfile {
   final String? title;
   final String? image;
   final KlaviyoLocation? location;
+
+  /// Custom profile properties.
+  ///
+  /// Keys for identifiers (`email`, `phone_number`, `external_id`) and
+  /// standard attributes (see [ProfileProperty]) are used only when the
+  /// matching typed field is null, and are never sent as custom properties.
+  /// Entries with a null value are ignored and don't clear a property.
+  /// [DateTime] values, including nested ones, are sent as UTC ISO 8601
+  /// strings. Values the platform channel can't encode, such as [Duration],
+  /// [Uri] or custom classes, are dropped with a warning and the rest of the
+  /// profile is still sent.
   final Map<String, dynamic>? properties;
 
   /// Creates a new [KlaviyoProfile].
@@ -126,13 +137,24 @@ class KlaviyoProfile {
     if (image != null) data[ProfileProperty.image] = image;
     if (location != null) data['location'] = location!.toJson();
 
-    // Merge custom properties
-    if (properties != null) {
-      data.addAll(properties!);
+    if (properties != null && properties!.isNotEmpty) {
+      data['properties'] = Map<String, dynamic>.from(properties!);
     }
 
     return data;
   }
+
+  static const _knownJsonKeys = {
+    'email',
+    'phone_number',
+    'external_id',
+    ProfileProperty.firstName,
+    ProfileProperty.lastName,
+    ProfileProperty.organization,
+    ProfileProperty.title,
+    ProfileProperty.image,
+    'location',
+  };
 
   /// Create from JSON
   factory KlaviyoProfile.fromJson(Map<String, dynamic> json) {
@@ -151,21 +173,18 @@ class KlaviyoProfile {
       location = KlaviyoLocation.fromJson(json['location']);
     }
 
-    // Extract custom properties (exclude known fields)
-    final Map<String, dynamic> properties = Map.from(json);
-    properties.removeWhere(
-      (key, value) => [
-        'email',
-        'phone_number',
-        'external_id',
-        ProfileProperty.firstName,
-        ProfileProperty.lastName,
-        ProfileProperty.organization,
-        ProfileProperty.title,
-        ProfileProperty.image,
-        'location',
-      ].contains(key),
-    );
+    final Map<String, dynamic>? properties;
+    final nestedProperties = json['properties'];
+    if (nestedProperties is Map) {
+      properties = nestedProperties.isNotEmpty
+          ? Map<String, dynamic>.from(nestedProperties)
+          : null;
+    } else {
+      // Pre-0.6.0 toJson wrote custom properties at the top level.
+      final legacy = Map<String, dynamic>.from(json)
+        ..removeWhere((key, value) => _knownJsonKeys.contains(key));
+      properties = legacy.isNotEmpty ? legacy : null;
+    }
 
     return KlaviyoProfile(
       email: email,
@@ -177,7 +196,7 @@ class KlaviyoProfile {
       title: title,
       image: image,
       location: location,
-      properties: properties.isNotEmpty ? properties : null,
+      properties: properties,
     );
   }
 

@@ -6,6 +6,13 @@ This guide outlines how developers can migrate from older versions of the
 > Migrating from the community [`klaviyo_flutter`](https://pub.dev/packages/klaviyo_flutter)
 > package to the official SDK? See [MIGRATION.md](./MIGRATION.md) instead.
 
+## Migrating to v0.6.0
+
+- `KlaviyoProfile.toJson` now nests custom properties under `properties` instead of merging them into the top level, so code that reads custom keys from its output must read them from `json['properties']`; `KlaviyoProfile.fromJson` still accepts the old flat shape, but ignores unknown top-level keys when a nested `properties` map is present.
+- In 0.5.0, a snake_case standard key inside `properties`, such as `first_name` or `email`, set the standard field because `toJson` flattened `properties` into the top level. It still does, on both iOS and Android, and if the matching typed field is also set, the typed field wins. Standard attribute keys are now matched in camelCase too, so `firstName` inside `properties` sets the first name as well; in 0.5.0 it was dropped. Prefer the typed `KlaviyoProfile` fields or `setProfileAttribute` for standard fields, and keep `properties` for custom keys.
+- On iOS, `setProfileAttribute('email', …)` and `setProfileProperties({'email': …})` (also `phone_number` and `external_id`) used to create a custom property. They now set the identifier, as on Android, which can switch the tracked profile. Use a different key if you meant a custom property.
+- `setProfile`, `setProfileAttribute` and `setProfileProperties` now ignore null values on both platforms. Android already skipped them; iOS used to send them as JSON null. Null doesn't clear a property.
+
 ## Migrating to v0.3.0
 
 ### Android's `automatic_push_token_forwarding` flag is now three-valued

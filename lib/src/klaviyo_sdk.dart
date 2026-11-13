@@ -165,6 +165,17 @@ class KlaviyoSDK {
 
   /// Set profile properties
   /// Calls the native SDK directly - native SDK manages profile state
+  ///
+  /// Keys for standard attributes (see [ProfileProperty]) set the standard
+  /// field. The identifier keys `email`, `phone_number` and `external_id` set
+  /// the profile's identifiers, the same as [setEmail], [setPhoneNumber] and
+  /// [setExternalId]. Number and bool values for standard text fields are sent
+  /// as strings, and latitude and longitude accept numbers or numeric strings.
+  /// Null values are ignored and don't clear a property. [DateTime] values,
+  /// including nested ones, are sent as UTC ISO 8601 strings. Values the
+  /// platform channel can't encode, such as [Duration], [Uri] or custom
+  /// classes, are dropped with a warning and the other keys are still sent.
+  /// Any other key is stored as a custom property.
   Future<void> setProfileProperties(Map<String, dynamic> properties) async {
     _ensureInitialized();
 
@@ -189,7 +200,11 @@ class KlaviyoSDK {
   /// [propertyKey] can be a [ProfileProperty] constant or any string.
   /// camelCase and snake_case spellings of standard keys (for example
   /// `firstName` or `first_name`) set the standard field on both platforms.
-  /// Any other key is stored as a custom property.
+  /// `email`, `phone_number` and `external_id` set the identifier. Any other
+  /// key is stored as a custom property. A null [value] is ignored, a
+  /// [DateTime] is sent as a UTC ISO 8601 string, and a value the platform
+  /// channel can't encode is dropped with a warning. See
+  /// [setProfileProperties] for how values are converted.
   Future<void> setProfileAttribute(String propertyKey, dynamic value) async {
     await setProfileProperties({propertyKey: value});
   }
