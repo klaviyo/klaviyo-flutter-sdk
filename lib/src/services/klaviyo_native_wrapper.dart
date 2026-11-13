@@ -420,9 +420,9 @@ class KlaviyoNativeWrapper {
 
   /// Handle a Klaviyo universal tracking link URL
   /// Returns true if the URL is a valid Klaviyo tracking link, false otherwise
+  ///
+  /// Callable before initialize().
   Future<bool> handleUniversalTrackingLink(String url) async {
-    _ensureInitialized();
-
     try {
       final result = await _channel.invokeMethod<bool>(
         'handleUniversalTrackingLink',

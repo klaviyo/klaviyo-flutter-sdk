@@ -10,6 +10,7 @@
 ### Bug Fixes
 
 - **Android: camelCase profile keys now land in standard fields** — `setProfileAttribute` and `setProfileProperties` now normalize keys for standard attributes in Dart, case-insensitively and in camelCase or snake_case, before calling the native SDKs. On Android, keys such as `firstName` or `address_1` used to be saved as custom properties; they now set the standard field, matching iOS. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
+- **`handleUniversalTrackingLink()` threw if called before `initialize()`** — It now works before `initialize()` on iOS and Android and never throws, so universal links that open the app from a cold start are tracked and resolved even if `initialize()` hasn't run yet. On Android, the plugin registers the native SDK's lifecycle callbacks first when the SDK isn't initialized yet.
 
 ## 0.5.0
 

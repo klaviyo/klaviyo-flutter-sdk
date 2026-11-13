@@ -511,10 +511,10 @@ class KlaviyoSDK {
   /// This is a synchronous operation that validates the URL and returns immediately.
   /// The native SDK handles tracking and link resolution in the background (fire-and-forget).
   ///
+  /// Safe to call before [initialize]; this method never throws.
+  ///
   /// Returns `true` if the URL matches the Klaviyo tracking link pattern, `false` otherwise.
   bool handleUniversalTrackingLink(String url) {
-    _ensureInitialized();
-
     // Validate empty/null URL
     if (url.trim().isEmpty) {
       _logger.warning('[DeepLink SDK] Error: Empty tracking link provided');

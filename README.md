@@ -911,6 +911,8 @@ void main() async {
 
 **Note**: `handleUniversalTrackingLink()` is synchronous - it validates the URL and returns a bool immediately, while the native tracking happens asynchronously in the background.
 
+`handleUniversalTrackingLink()` never throws, including before `initialize()`, and resolves the link right away on both platforms. If that resolve fails before `initialize()`, Android queues the click and retries it, but iOS drops it unless the native SDK's pre-init disk capture is enabled, so the click isn't recorded. The click is tracked as soon as you call it, before any profile is identified, which can create an anonymous profile in Klaviyo. If your app must wait for consent before tracking, keep the URL and call `handleUniversalTrackingLink()` once consent is given.
+
 ## Geofencing
 
 The Klaviyo Flutter SDK supports geofencing for location-based event tracking. On Android, the full location module is **not included by default**. On iOS, it depends on how the app pulls in the plugin: Swift Package Manager builds include it automatically, and CocoaPods builds need to opt in. See [Enabling Geofencing](#enabling-geofencing) for setup.
