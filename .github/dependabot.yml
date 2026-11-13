@@ -20,3 +20,135 @@ updates:
       bundler:
         patterns:
           - "*"
+  # The plugin's Dart packages. `logging` and `meta` are resolved into
+  # customers' apps; the rest are dev tooling.
+  - package-ecosystem: pub
+    directories:
+      - /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 4
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      pub-shipped-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - logging
+          - meta
+        update-types:
+          - minor
+          - patch
+      pub-shipped-security:
+        applies-to: security-updates
+        patterns:
+          - logging
+          - meta
+      pub-tooling-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - logging
+          - meta
+        update-types:
+          - minor
+          - patch
+      pub-tooling-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - logging
+          - meta
+  - package-ecosystem: pub
+    directories:
+      - /example
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      pub-example-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      pub-example-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+  # The Android plugin module. Kotlin and Firebase Messaging are compiled into
+  # customers' apps; AGP and the test libraries are build tooling.
+  - package-ecosystem: gradle
+    directories:
+      - /android
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 4
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      gradle-shipped-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "org.jetbrains.kotlin:*"
+          - "com.google.firebase:*"
+        update-types:
+          - minor
+          - patch
+      gradle-shipped-security:
+        applies-to: security-updates
+        patterns:
+          - "org.jetbrains.kotlin:*"
+          - "com.google.firebase:*"
+      gradle-tooling-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "org.jetbrains.kotlin:*"
+          - "com.google.firebase:*"
+        update-types:
+          - minor
+          - patch
+      gradle-tooling-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "org.jetbrains.kotlin:*"
+          - "com.google.firebase:*"
+    ignore:
+      # Bumped by hand at release.
+      - dependency-name: "com.github.klaviyo.klaviyo-android-sdk:*"
+  - package-ecosystem: gradle
+    directories:
+      - /example/android
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      gradle-example-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      gradle-example-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    ignore:
+      # Bumped by hand at release.
+      - dependency-name: "com.github.klaviyo.klaviyo-android-sdk:*"
