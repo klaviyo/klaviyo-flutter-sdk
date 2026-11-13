@@ -567,4 +567,174 @@ void main() {
       expect(log.single.arguments['properties'], {'visits': 3});
     });
   });
+
+  group('DateTime and unsupported property values', () {
+    final date = DateTime.utc(2026, 11, 13, 9, 30);
+    final localDate = DateTime(2026, 11, 13, 9, 30);
+
+    List<LogRecord> captureWarnings() {
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+      addTearDown(sub.cancel);
+      return records;
+    }
+
+    test('setProfile sends DateTime as UTC ISO 8601, top level and nested',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'test@example.com',
+          properties: {
+            'signup': date,
+            'local': localDate,
+            'history': {
+              'visits': [date, 'x'],
+            },
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments['profile']['properties'], {
+        'signup': '2026-11-13T09:30:00.000Z',
+        'local': localDate.toUtc().toIso8601String(),
+        'history': {
+          'visits': ['2026-11-13T09:30:00.000Z', 'x'],
+        },
+      });
+    });
+
+    test('setProfile sends a DateTime under a standard key as an ISO string',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(KlaviyoProfile(properties: {'title': date}));
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {'title': '2026-11-13T09:30:00.000Z'},
+      });
+    });
+
+    test('setProfile drops unsupported values and keeps the rest', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = captureWarnings();
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'test@example.com',
+          properties: {
+            'plan': 'premium',
+            'wait': const Duration(seconds: 5),
+            'nested': {
+              'link': Uri.parse('https://example.com'),
+              'ok': 1,
+            },
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'email': 'test@example.com',
+          'properties': {
+            'plan': 'premium',
+            'nested': {'ok': 1},
+          },
+        },
+      });
+      final warnings = records
+          .where((r) => r.level == Level.WARNING)
+          .map((r) => r.message)
+          .toList();
+      expect(warnings.where((m) => m.contains("'wait'")), hasLength(1));
+      expect(warnings.where((m) => m.contains("'nested.link'")), hasLength(1));
+    });
+
+    test('setProfileProperties converts DateTime and drops unsupported values',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = captureWarnings();
+
+      await sdk.setProfileProperties({
+        'signup': date,
+        'dates': [date],
+        'wait': const Duration(seconds: 5),
+        'plan': 'premium',
+      });
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'signup': '2026-11-13T09:30:00.000Z',
+        'dates': ['2026-11-13T09:30:00.000Z'],
+        'plan': 'premium',
+      });
+      expect(
+        records.where(
+          (r) => r.level == Level.WARNING && r.message.contains("'wait'"),
+        ),
+        hasLength(1),
+      );
+    });
+
+    test('setProfileAttribute sends a DateTime as an ISO string', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileAttribute('signup', date);
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'signup': '2026-11-13T09:30:00.000Z',
+      });
+    });
+
+    test('createEvent converts DateTime and drops unsupported values',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = captureWarnings();
+
+      await sdk.createEvent(
+        KlaviyoEvent(
+          name: const EventMetric.custom('Purchase'),
+          value: 10,
+          properties: {
+            'at': date,
+            'items': [
+              {'shipped': date, 'sku': 'A1'},
+            ],
+            'link': Uri.parse('https://example.com'),
+            'bytes': Uint8List.fromList([1, 2]),
+            'map': {1: 'x', 'k': 'v'},
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'trackEvent');
+      expect(call.arguments['event']['name'], 'Purchase');
+      expect(call.arguments['event']['value'], 10.0);
+      expect(call.arguments['event']['properties'], {
+        'at': '2026-11-13T09:30:00.000Z',
+        'items': [
+          {'shipped': '2026-11-13T09:30:00.000Z', 'sku': 'A1'},
+        ],
+        'bytes': Uint8List.fromList([1, 2]),
+        'map': {'k': 'v'},
+      });
+      final warnings = records
+          .where((r) => r.level == Level.WARNING)
+          .map((r) => r.message)
+          .toList();
+      expect(warnings.where((m) => m.contains("'link'")), hasLength(1));
+      expect(warnings.where((m) => m.contains("'map[1]'")), hasLength(1));
+    });
+  });
 }

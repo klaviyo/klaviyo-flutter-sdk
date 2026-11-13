@@ -20,6 +20,10 @@ class KlaviyoProfile {
   /// standard attributes (see [ProfileProperty]) are used only when the
   /// matching typed field is null, and are never sent as custom properties.
   /// Entries with a null value are ignored and don't clear a property.
+  /// [DateTime] values, including nested ones, are sent as UTC ISO 8601
+  /// strings. Values the platform channel can't encode, such as [Duration],
+  /// [Uri] or custom classes, are dropped with a warning and the rest of the
+  /// profile is still sent.
   final Map<String, dynamic>? properties;
 
   /// Creates a new [KlaviyoProfile].

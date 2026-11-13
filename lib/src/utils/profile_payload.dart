@@ -1,6 +1,7 @@
 import 'package:logging/logging.dart';
 
 import '../models/profile_property.dart';
+import 'channel_value_sanitizer.dart';
 import 'profile_key_normalizer.dart';
 
 const String _propertiesKey = 'properties';
@@ -90,7 +91,8 @@ class ProfilePropertiesUpdate {
 
 /// Prepares a `setProfileProperties` map for the platform channel.
 ///
-/// Keys are normalized with [normalizeProfileProperties]. The identifier keys
+/// Values are first passed through [sanitizeChannelProperties]. Keys are
+/// then normalized with [normalizeProfileProperties]. The identifier keys
 /// `email`, `phone_number` and `external_id` (matched exactly) are moved to
 /// [ProfilePropertiesUpdate.identifiers]. Standard attribute values are
 /// converted with [coerceProfileValue], and entries whose value is null, or
@@ -100,7 +102,9 @@ ProfilePropertiesUpdate splitProfileProperties(
 ) {
   final identifiers = <String, String>{};
   final remaining = <String, dynamic>{};
-  normalizeProfileProperties(properties).forEach((key, value) {
+  normalizeProfileProperties(
+    sanitizeChannelProperties(properties, source: 'setProfileProperties'),
+  ).forEach((key, value) {
     final coerced = _coerceOrWarn('setProfileProperties', key, value);
     if (coerced == null) return;
     if (ProfileIdentifierKey.all.contains(key) && coerced is String) {
@@ -115,6 +119,7 @@ ProfilePropertiesUpdate splitProfileProperties(
 /// Returns the `setProfile` payload for [profileJson], the output of
 /// `KlaviyoProfile.toJson`.
 ///
+/// `properties` values are first passed through [sanitizeChannelProperties].
 /// Standard attribute keys inside `properties` are matched as
 /// [normalizeProfileKey] matches them. The identifier keys `email`,
 /// `phone_number` and `external_id` are matched exactly. Each one is converted
@@ -133,8 +138,12 @@ Map<String, dynamic> resolveProfilePayload(Map<String, dynamic> profileJson) {
       : <String, dynamic>{};
   final custom = <String, dynamic>{};
 
-  normalizeProfileProperties(Map<String, dynamic>.from(rawProperties))
-      .forEach((key, value) {
+  normalizeProfileProperties(
+    sanitizeChannelProperties(
+      Map<String, dynamic>.from(rawProperties),
+      source: 'setProfile',
+    ),
+  ).forEach((key, value) {
     if (_topLevelStringKeys.contains(key)) {
       _fillIfUnset(payload, key, _coerceOrWarn('setProfile', key, value));
     } else if (_locationStringKeys.contains(key) ||

@@ -6,6 +6,7 @@ import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
+import '../utils/channel_value_sanitizer.dart';
 import '../utils/profile_payload.dart';
 import 'package:logging/logging.dart';
 
@@ -203,7 +204,13 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('trackEvent', {'event': event.toJson()});
+      final eventJson = event.toJson();
+      final properties = eventJson['properties'];
+      if (properties is Map<String, dynamic>) {
+        eventJson['properties'] =
+            sanitizeChannelProperties(properties, source: 'createEvent');
+      }
+      await _channel.invokeMethod('trackEvent', {'event': eventJson});
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
     }
