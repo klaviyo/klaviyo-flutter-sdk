@@ -10,14 +10,14 @@
 set -euo pipefail
 
 root="${1:-.}"
-gradle="android/build.gradle"
+gradle="android/build.gradle.kts"
 podspec="ios/klaviyo_flutter_sdk.podspec"
 podfile="example/ios/Podfile"
 package="ios/klaviyo_flutter_sdk/Package.swift"
 
 errors=()
 
-android=$(sed -nE 's/^[[:space:]]*def[[:space:]]+klaviyoSdkVersion[[:space:]]*=[[:space:]]*["'\'']([^"'\'']*)["'\''].*/\1/p' "$root/$gradle")
+android=$(sed -nE 's/^[[:space:]]*val[[:space:]]+klaviyoSdkVersion[[:space:]]*=[[:space:]]*["'\'']([^"'\'']*)["'\''].*/\1/p' "$root/$gradle")
 if ! [[ "$android" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)(\.?[0-9]+)?)?$ ]]; then
   errors+=("${gradle}: klaviyoSdkVersion is '${android}', not a released version")
 fi

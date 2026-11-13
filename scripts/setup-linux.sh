@@ -20,7 +20,12 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TOOLS_DIR="${KLAVIYO_TOOLS_DIR:-$HOME/.cache/klaviyo-flutter-sdk-tools}"
 
 FLUTTER_VERSION="$(sed -n 's/.*"flutter": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/.fvmrc")"
-FLUTTER_SHA256="2d72de31119ccba1421391aa9ab53891a3e4905987a13f8272766ad78e3bbf93"
+# SHA-256 per version from https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json
+case "$FLUTTER_VERSION" in
+  3.38.7) FLUTTER_SHA256="2d72de31119ccba1421391aa9ab53891a3e4905987a13f8272766ad78e3bbf93" ;;
+  3.44.9) FLUTTER_SHA256="a9120fa4a01048bdef438ddc3a2d4b7389662ea98a95db86eeaf10382bc4efcb" ;;
+  *) FLUTTER_SHA256="" ;;
+esac
 FLUTTER_URL="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
 
 JDK_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.21_9.tar.gz"
@@ -64,6 +69,7 @@ install_flutter() {
     log "flutter $FLUTTER_VERSION already installed"
     return
   fi
+  [ -n "$FLUTTER_SHA256" ] || die "no Flutter SHA-256 for $FLUTTER_VERSION (from .fvmrc); add it to scripts/setup-linux.sh"
   log "installing flutter $FLUTTER_VERSION"
   rm -rf "$TOOLS_DIR/flutter"
   fetch "$FLUTTER_URL" "$TMP/flutter.tar.xz" "$FLUTTER_SHA256"
