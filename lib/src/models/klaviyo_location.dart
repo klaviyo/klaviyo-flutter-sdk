@@ -1,3 +1,5 @@
+import 'profile_property.dart';
+
 /// Represents a geographic location for user profiles
 class KlaviyoLocation {
   final String? address1;
@@ -51,15 +53,15 @@ class KlaviyoLocation {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {};
 
-    if (address1 != null) data['address1'] = address1;
-    if (address2 != null) data['address2'] = address2;
-    if (city != null) data['city'] = city;
-    if (country != null) data['country'] = country;
-    if (region != null) data['region'] = region;
-    if (zip != null) data['zip'] = zip;
-    if (latitude != null) data['latitude'] = latitude;
-    if (longitude != null) data['longitude'] = longitude;
-    if (timezone != null) data['timezone'] = timezone;
+    if (address1 != null) data[ProfileProperty.address1] = address1;
+    if (address2 != null) data[ProfileProperty.address2] = address2;
+    if (city != null) data[ProfileProperty.city] = city;
+    if (country != null) data[ProfileProperty.country] = country;
+    if (region != null) data[ProfileProperty.region] = region;
+    if (zip != null) data[ProfileProperty.zip] = zip;
+    if (latitude != null) data[ProfileProperty.latitude] = latitude;
+    if (longitude != null) data[ProfileProperty.longitude] = longitude;
+    if (timezone != null) data[ProfileProperty.timezone] = timezone;
 
     return data;
   }
@@ -67,15 +69,15 @@ class KlaviyoLocation {
   /// Create from JSON
   factory KlaviyoLocation.fromJson(Map<String, dynamic> json) {
     return KlaviyoLocation(
-      address1: json['address1'] as String?,
-      address2: json['address2'] as String?,
-      city: json['city'] as String?,
-      country: json['country'] as String?,
-      region: json['region'] as String?,
-      zip: json['zip'] as String?,
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
-      timezone: json['timezone'] as String?,
+      address1: json[ProfileProperty.address1] as String?,
+      address2: json[ProfileProperty.address2] as String?,
+      city: json[ProfileProperty.city] as String?,
+      country: json[ProfileProperty.country] as String?,
+      region: json[ProfileProperty.region] as String?,
+      zip: json[ProfileProperty.zip] as String?,
+      latitude: (json[ProfileProperty.latitude] as num?)?.toDouble(),
+      longitude: (json[ProfileProperty.longitude] as num?)?.toDouble(),
+      timezone: json[ProfileProperty.timezone] as String?,
     );
   }
 
