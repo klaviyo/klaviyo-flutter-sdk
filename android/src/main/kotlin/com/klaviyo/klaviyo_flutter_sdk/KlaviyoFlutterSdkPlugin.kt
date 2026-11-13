@@ -29,8 +29,11 @@ import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.core.utils.hasAllowedOpenUrlScheme
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
+import com.klaviyo.forms.endFormsPreview
+import com.klaviyo.forms.handleFormsPreviewLink
 import com.klaviyo.forms.registerForInAppForms
 import com.klaviyo.forms.registerFormLifecycleHandler
+import com.klaviyo.forms.startFormsPreview
 import com.klaviyo.forms.unregisterFormLifecycleHandler
 import com.klaviyo.forms.unregisterFromInAppForms
 import com.klaviyo.location.LocationManager
@@ -59,6 +62,13 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
     private var eventSink: EventChannel.EventSink? = null
+
+    // The `push_notification_opened` payload for the tap that launched the activity this
+    // plugin first attached to; read by getInitialPushNotification. Not cleared by onListen.
+    internal var initialPushNotification: Map<String, Any?>? = null
+        private set
+    private var launchIntentHandled = false
+
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
@@ -139,9 +149,9 @@ class KlaviyoFlutterSdkPlugin :
         private fun replayCachedEvents(sink: EventChannel.EventSink) {
             cachedSilentPush?.let { sink.success(it) }
             cachedSilentPush = null
-            cachedOpenedNotification?.let { sink.success(it + ("replayed" to true)) }
+            cachedOpenedNotification?.let { sink.success(it) }
             cachedOpenedNotification = null
-            cachedPushAction?.let { sink.success(it + ("replayed" to true)) }
+            cachedPushAction?.let { sink.success(it) }
             cachedPushAction = null
         }
 
@@ -211,10 +221,7 @@ class KlaviyoFlutterSdkPlugin :
                 override fun onListen(
                     arguments: Any?,
                     events: EventChannel.EventSink?,
-                ) {
-                    eventSink = events
-                    selectInstance()
-                }
+                ) = attachEventSink(events)
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
@@ -227,6 +234,11 @@ class KlaviyoFlutterSdkPlugin :
                 }
             },
         )
+    }
+
+    internal fun attachEventSink(events: EventChannel.EventSink?) {
+        eventSink = events
+        selectInstance()
     }
 
     override fun onMethodCall(
@@ -381,6 +393,11 @@ class KlaviyoFlutterSdkPlugin :
                     // Add value if provided
                     (eventJson?.get("value") as? Number)?.let { value ->
                         event = event.setValue(value.toDouble())
+                    }
+
+                    // Add valueCurrency if provided
+                    (eventJson?.get("value_currency") as? String)?.let { valueCurrency ->
+                        event = event.setValueCurrency(valueCurrency)
                     }
 
                     // Add uniqueId if provided
@@ -583,6 +600,51 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "startFormsPreview" -> {
+                try {
+                    val token = call.argument<String>("token")
+                    if (token == null) {
+                        result.error("INVALID_ARGUMENTS", "A forms preview token is required", null)
+                    } else {
+                        Klaviyo.startFormsPreview(token)
+                        result.success(null)
+                    }
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to start the forms preview", null)
+                }
+            }
+
+            "handleFormsPreviewLink" -> {
+                try {
+                    val url = call.argument<String>("url")
+                    if (url == null) {
+                        result.error("INVALID_ARGUMENTS", "A forms preview link URL is required", null)
+                    } else {
+                        result.success(Klaviyo.handleFormsPreviewLink(Uri.parse(url)))
+                    }
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to handle the forms preview link", null)
+                }
+            }
+
+            "endFormsPreview" -> {
+                try {
+                    Klaviyo.endFormsPreview()
+                    result.success(null)
+                } catch (e: MissingKlaviyoModule) {
+                    Registry.log.error("Forms not available: forms module not included", e)
+                    result.error("FORMS_NOT_AVAILABLE", e.message, null)
+                } catch (e: Exception) {
+                    result.error("FORMS_ERROR", "Failed to end the forms preview", null)
+                }
+            }
+
             "unregisterFromInAppForms" -> {
                 try {
                     Klaviyo.unregisterFormLifecycleHandler()
@@ -778,9 +840,14 @@ class KlaviyoFlutterSdkPlugin :
                 result.success(Registry.log.logLevel != Log.Level.None)
             }
 
+            "getInitialPushNotification" -> {
+                result.success(initialPushNotification)
+            }
+
             "resetProfile" -> {
                 try {
                     Klaviyo.resetProfile()
+                    initialPushNotification = null
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("RESET_ERROR", "Failed to reset profile", e.message)
@@ -938,8 +1005,10 @@ class KlaviyoFlutterSdkPlugin :
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
         // Handle the intent that launched this activity (cold start)
+        val isLaunch = !launchIntentHandled
+        launchIntentHandled = true
         binding.activity.intent?.let { intent ->
-            handleIntent(intent)
+            handleIntent(intent, isLaunch)
         }
 
         // Listen for new intents (warm start)
@@ -1008,7 +1077,10 @@ class KlaviyoFlutterSdkPlugin :
         valueOf: (String) -> T,
     ): Set<T>? = (json[key] as? List<*>)?.map { valueOf((it as String).uppercase()) }?.toSet()
 
-    private fun handleIntent(intent: Intent) {
+    internal fun handleIntent(
+        intent: Intent,
+        isLaunch: Boolean = false,
+    ) {
         try {
             // com.klaviyo.push.automatic_push_open_tracking gates only this native-backend
             // "Opened Push" tracking call, not the Dart event emission below, which stays
@@ -1054,12 +1126,15 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
-                emitOrCacheOpenedNotification(
+                val openedPayload =
                     mapOf(
                         "type" to "push_notification_opened",
                         "data" to notificationData,
-                    ),
-                )
+                    )
+                if (isLaunch) {
+                    initialPushNotification = openedPayload
+                }
+                emitOrCacheOpenedNotification(openedPayload)
 
                 cachedPushAction = null
                 forwardActionButtonTap(notificationData)

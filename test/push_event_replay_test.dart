@@ -2,9 +2,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 
-/// Exercises push event replay end to end through the `klaviyo_events`
-/// EventChannel. The wrapper is a singleton that attaches its channel listener
-/// once, so every case runs in order against the same instance.
+/// Exercises cold-start push delivery end to end through the `klaviyo_events`
+/// EventChannel and the `klaviyo_sdk` MethodChannel. The wrapper is a
+/// singleton that attaches its channel listener once, so every case runs in
+/// order against the same instance.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -12,6 +13,8 @@ void main() {
   const eventChannel = EventChannel('klaviyo_events');
 
   MockStreamHandlerEventSink? sink;
+  Map<String, dynamic>? nativeInitialPush;
+  final calls = <String>[];
 
   Map<String, dynamic> opened(String id) => {
         'type': 'push_notification_opened',
@@ -25,13 +28,21 @@ void main() {
 
   setUpAll(() async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(methodChannel, (_) async => null);
+        .setMockMethodCallHandler(methodChannel, (call) async {
+      calls.add(call.method);
+      switch (call.method) {
+        case 'getInitialPushNotification':
+          return nativeInitialPush;
+        case 'resetProfile':
+          nativeInitialPush = null;
+          return null;
+      }
+      return null;
+    });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockStreamHandler(
       eventChannel,
-      MockStreamHandler.inline(
-        onListen: (_, events) => sink = events,
-      ),
+      MockStreamHandler.inline(onListen: (_, events) => sink = events),
     );
     await KlaviyoSDK().initialize(apiKey: 'KEY');
     await pumpEventQueue();
@@ -44,147 +55,171 @@ void main() {
         .setMockStreamHandler(eventChannel, null);
   });
 
-  test('held open and action reach every subscriber', () async {
-    expect(sink, isNotNull);
-    sink!
-      ..success(opened('first'))
-      ..success(buttonTap('btn1'));
-    await pumpEventQueue();
-
-    final sdk = KlaviyoSDK();
-    final tokenListener = <Map<String, dynamic>>[];
-    final router = <Map<String, dynamic>>[];
-    final actionsA = <KlaviyoPushAction>[];
-    final actionsB = <KlaviyoPushAction>[];
-
-    final subs = [
-      sdk.onPushNotification.listen(tokenListener.add),
-      sdk.onPushAction.listen(actionsA.add),
-    ];
-    await pumpEventQueue();
-    subs.addAll([
-      sdk.onPushNotification.listen(router.add),
-      sdk.onPushAction.listen(actionsB.add),
-    ]);
-    await pumpEventQueue();
-
-    expect(tokenListener.map((e) => e['data']['id']), ['first']);
-    expect(router.map((e) => e['data']['id']), ['first']);
-    expect(actionsA.single, isA<ActionButtonTapped>());
-    expect((actionsB.single as ActionButtonTapped).buttonId, 'btn1');
-
-    for (final sub in subs) {
-      await sub.cancel();
-    }
-  });
-
-  test('a newer open replaces the held open and clears the held action',
+  group('cold-start stream delivery', () {
+    test(
+      'the first subscriber gets the buffered open and action once',
       () async {
-    sink!.success(opened('second'));
-    await pumpEventQueue();
+        expect(sink, isNotNull);
+        sink!
+          ..success(opened('first'))
+          ..success(buttonTap('btn1'));
+        await pumpEventQueue();
 
-    final sdk = KlaviyoSDK();
-    final opens = <Map<String, dynamic>>[];
-    final actions = <KlaviyoPushAction>[];
-    final subs = [
-      sdk.onPushNotification.listen(opens.add),
-      sdk.onPushAction.listen(actions.add),
-    ];
-    await pumpEventQueue();
+        final sdk = KlaviyoSDK();
+        final firstOpens = <Map<String, dynamic>>[];
+        final secondOpens = <Map<String, dynamic>>[];
+        final firstActions = <KlaviyoPushAction>[];
+        final secondActions = <KlaviyoPushAction>[];
 
-    expect(opens.map((e) => e['data']['id']), ['second']);
-    expect(actions, isEmpty);
+        final subs = [
+          sdk.onPushNotification.listen(firstOpens.add),
+          sdk.onPushAction.listen(firstActions.add),
+        ];
+        await pumpEventQueue();
+        subs.addAll([
+          sdk.onPushNotification.listen(secondOpens.add),
+          sdk.onPushAction.listen(secondActions.add),
+        ]);
+        await pumpEventQueue();
 
-    for (final sub in subs) {
-      await sub.cancel();
-    }
-  });
+        expect(firstOpens.map((e) => e['data']['id']), ['first']);
+        expect((firstActions.single as ActionButtonTapped).buttonId, 'btn1');
+        expect(secondOpens, isEmpty);
+        expect(secondActions, isEmpty);
 
-  test('an open delivered live is not replayed to later subscribers', () async {
-    final sdk = KlaviyoSDK();
-    final live = <Map<String, dynamic>>[];
-    final liveSub = sdk.onPushNotification.listen(live.add);
-    await pumpEventQueue();
-    live.clear();
+        for (final sub in subs) {
+          await sub.cancel();
+        }
 
-    sink!.success(opened('third'));
-    await pumpEventQueue();
-    expect(live.map((e) => e['data']['id']), ['third']);
-    await liveSub.cancel();
+        final later = <Map<String, dynamic>>[];
+        final laterSub = sdk.onPushNotification.listen(later.add);
+        await pumpEventQueue();
+        expect(later, isEmpty);
+        await laterSub.cancel();
+      },
+    );
 
-    final later = <Map<String, dynamic>>[];
-    final laterSub = sdk.onPushNotification.listen(later.add);
-    await pumpEventQueue();
-
-    expect(later, isEmpty);
-    await laterSub.cancel();
-  });
-
-  test('a natively replayed open is held even with a listener attached',
+    test(
+      'only the newest open is buffered, and an open clears the action',
       () async {
-    final sdk = KlaviyoSDK();
-    final early = <Map<String, dynamic>>[];
-    final earlySub = sdk.onPushNotification.listen(early.add);
-    await pumpEventQueue();
+        sink!
+          ..success(opened('older'))
+          ..success(buttonTap('btn2'))
+          ..success(opened('newer'));
+        await pumpEventQueue();
 
-    sink!.success({...opened('replayed'), 'replayed': true});
-    await pumpEventQueue();
+        final sdk = KlaviyoSDK();
+        final opens = <Map<String, dynamic>>[];
+        final actions = <KlaviyoPushAction>[];
+        final subs = [
+          sdk.onPushNotification.listen(opens.add),
+          sdk.onPushAction.listen(actions.add),
+        ];
+        await pumpEventQueue();
 
-    final later = <Map<String, dynamic>>[];
-    final laterSub = sdk.onPushNotification.listen(later.add);
-    await pumpEventQueue();
+        expect(opens.map((e) => e['data']['id']), ['newer']);
+        expect(actions, isEmpty);
 
-    expect(early.map((e) => e['data']['id']), ['replayed']);
-    expect(later.map((e) => e['data']['id']), ['replayed']);
-    expect(later.single.containsKey('replayed'), isFalse);
+        for (final sub in subs) {
+          await sub.cancel();
+        }
+      },
+    );
 
-    await earlySub.cancel();
-    await laterSub.cancel();
-  });
+    test('resetProfile drops the buffered open and action', () async {
+      sink!
+        ..success(opened('before-reset'))
+        ..success(buttonTap('btn-reset'));
+      await pumpEventQueue();
 
-  test('resetProfile drops the held open and action', () async {
-    sink!
-      ..success(opened('before-reset'))
-      ..success(buttonTap('btn-reset'));
-    await pumpEventQueue();
+      final sdk = KlaviyoSDK();
+      await sdk.resetProfile();
 
-    final sdk = KlaviyoSDK();
-    await sdk.resetProfile();
+      final opens = <Map<String, dynamic>>[];
+      final actions = <KlaviyoPushAction>[];
+      final subs = [
+        sdk.onPushNotification.listen(opens.add),
+        sdk.onPushAction.listen(actions.add),
+      ];
+      await pumpEventQueue();
 
-    final opens = <Map<String, dynamic>>[];
-    final actions = <KlaviyoPushAction>[];
-    final subs = [
-      sdk.onPushNotification.listen(opens.add),
-      sdk.onPushAction.listen(actions.add),
-    ];
-    await pumpEventQueue();
-
-    expect(opens, isEmpty);
-    expect(actions, isEmpty);
-    for (final sub in subs) {
-      await sub.cancel();
-    }
-  });
-
-  test('token events still flush to the first subscriber only', () async {
-    sink!.success({
-      'type': 'push_token_received',
-      'data': {'token': 'abc'},
+      expect(opens, isEmpty);
+      expect(actions, isEmpty);
+      for (final sub in subs) {
+        await sub.cancel();
+      }
     });
-    await pumpEventQueue();
 
-    final sdk = KlaviyoSDK();
-    final first = <Map<String, dynamic>>[];
-    final second = <Map<String, dynamic>>[];
-    final firstSub = sdk.onPushNotification.listen(first.add);
-    await pumpEventQueue();
-    final secondSub = sdk.onPushNotification.listen(second.add);
-    await pumpEventQueue();
+    test('token events still go to the first subscriber only', () async {
+      sink!.success({
+        'type': 'push_token_received',
+        'data': {'token': 'abc'},
+      });
+      await pumpEventQueue();
 
-    expect(first.map((e) => e['type']), ['push_token_received']);
-    expect(second, isEmpty);
+      final sdk = KlaviyoSDK();
+      final first = <Map<String, dynamic>>[];
+      final second = <Map<String, dynamic>>[];
+      final firstSub = sdk.onPushNotification.listen(first.add);
+      await pumpEventQueue();
+      final secondSub = sdk.onPushNotification.listen(second.add);
+      await pumpEventQueue();
 
-    await firstSub.cancel();
-    await secondSub.cancel();
+      expect(first.map((e) => e['type']), ['push_token_received']);
+      expect(second, isEmpty);
+
+      await firstSub.cancel();
+      await secondSub.cancel();
+    });
+  });
+
+  group('getInitialPushNotification', () {
+    test('returns null when the app was not launched by a push tap', () async {
+      nativeInitialPush = null;
+      expect(await KlaviyoSDK().getInitialPushNotification(), isNull);
+    });
+
+    test(
+      'returns the launch tap on every call, after the stream consumed it',
+      () async {
+        nativeInitialPush = opened('launch');
+        sink!.success(opened('launch'));
+        await pumpEventQueue();
+
+        final sdk = KlaviyoSDK();
+        final opens = <Map<String, dynamic>>[];
+        final sub = sdk.onPushNotification.listen(opens.add);
+        await pumpEventQueue();
+        await sub.cancel();
+        expect(opens.map((e) => e['data']['id']), ['launch']);
+
+        final first = await sdk.getInitialPushNotification();
+        final second = await sdk.getInitialPushNotification();
+
+        expect(first, opened('launch'));
+        expect(second, opened('launch'));
+        expect(first!['data'], isA<Map<String, dynamic>>());
+      },
+    );
+
+    test('returns null after resetProfile', () async {
+      nativeInitialPush = opened('launch');
+      final sdk = KlaviyoSDK();
+      expect(await sdk.getInitialPushNotification(), isNotNull);
+
+      await sdk.resetProfile();
+
+      expect(await sdk.getInitialPushNotification(), isNull);
+    });
+
+    test('reads from native on each call', () async {
+      calls.clear();
+      await KlaviyoSDK().getInitialPushNotification();
+      await KlaviyoSDK().getInitialPushNotification();
+      expect(
+        calls.where((m) => m == 'getInitialPushNotification'),
+        hasLength(2),
+      );
+    });
   });
 }

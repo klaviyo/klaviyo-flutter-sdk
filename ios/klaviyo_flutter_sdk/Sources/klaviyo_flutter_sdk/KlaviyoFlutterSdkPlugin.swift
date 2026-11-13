@@ -50,6 +50,14 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedSilentPush: [String: Any]?
     private var cachedPushAction: [String: Any]?
 
+    // The `push_notification_opened` payload for the tap that launched the app,
+    // recorded from the first notification response delivered before the app first
+    // became active. Read by getInitialPushNotification; not cleared by onListen.
+    private var initialPushNotification: [String: Any]?
+    private var hasBecomeActive = false
+    private var launchResponseRecorded = false
+    private var activationObserver: NSObjectProtocol?
+
     // MARK: - Flutter Plugin Registration
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -74,6 +82,25 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         if !didAddApplicationDelegate {
             didAddApplicationDelegate = true
             registrar.addApplicationDelegate(instance)
+        }
+
+        // 4. Track when the app first becomes active, to tell the launch tap apart from later taps.
+        instance.observeFirstActivation()
+    }
+
+    private func observeFirstActivation() {
+        guard activationObserver == nil, !hasBecomeActive else { return }
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.hasBecomeActive = true
+            if let observer = self.activationObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self.activationObserver = nil
+            }
         }
     }
 }
@@ -188,11 +215,13 @@ extension KlaviyoFlutterSdkPlugin {
             }
             let properties = eventData["properties"] as? [String: Any] ?? [:]
             let value = eventData["value"] as? Double
+            let valueCurrency = eventData["value_currency"] as? String
             let uniqueId = eventData["unique_id"] as? String
             let event = Event(
                 name: .customEvent(name),
                 properties: properties,
                 value: value,
+                valueCurrency: valueCurrency,
                 uniqueId: uniqueId
             )
             KlaviyoSDK().create(event: event)
@@ -267,6 +296,68 @@ extension KlaviyoFlutterSdkPlugin {
                     configuration: InAppFormsConfig(sessionTimeoutDuration: sessionTimeout)
                 )
                 self.subscribeToFormLifecycleEvents()
+            }
+            result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
+
+        case "startFormsPreview":
+            #if canImport(KlaviyoForms)
+            guard let token = (call.arguments as? [String: Any])?["token"] as? String else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "A forms preview token is required",
+                    details: nil
+                ))
+                return
+            }
+            Task { @MainActor in
+                KlaviyoSDK().startFormsPreview(token)
+            }
+            result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
+
+        case "handleFormsPreviewLink":
+            #if canImport(KlaviyoForms)
+            guard let urlString = (call.arguments as? [String: Any])?["url"] as? String,
+                  let link = URL(string: urlString)
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "A forms preview link URL is required",
+                    details: nil
+                ))
+                return
+            }
+            Task { @MainActor in
+                result(KlaviyoSDK().handleFormsPreviewLink(link))
+            }
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
+
+        case "endFormsPreview":
+            #if canImport(KlaviyoForms)
+            Task { @MainActor in
+                KlaviyoSDK().endFormsPreview()
             }
             result(nil)
             #else
@@ -364,8 +455,12 @@ extension KlaviyoFlutterSdkPlugin {
         case "respondToAuthTokenRequest":
             handleRespondToAuthTokenRequest(call: call, result: result)
 
+        case "getInitialPushNotification":
+            result(initialPushNotification)
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
+            initialPushNotification = nil
             result(nil)
 
         case "setBadgeCount":
@@ -458,7 +553,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             self.cachedError = nil
         }
         if let cachedOpenedNotification = cachedOpenedNotification {
-            events(cachedOpenedNotification.merging(["replayed": true]) { $1 })
+            events(cachedOpenedNotification)
             self.cachedOpenedNotification = nil
         }
         if let cachedSilentPush = cachedSilentPush {
@@ -466,7 +561,7 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             self.cachedSilentPush = nil
         }
         if let cachedPushAction {
-            events(cachedPushAction.merging(["replayed": true]) { $1 })
+            events(cachedPushAction)
             self.cachedPushAction = nil
         }
     }
@@ -595,6 +690,11 @@ extension KlaviyoFlutterSdkPlugin {
             "type": "push_notification_opened",
             "data": userInfo
         ]
+
+        if !hasBecomeActive && !launchResponseRecorded {
+            initialPushNotification = eventPayload
+            launchResponseRecorded = true
+        }
 
         // 2. Send to Flutter (or Cache if Flutter is asleep)
         if let eventSink = eventSink {
