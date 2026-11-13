@@ -509,8 +509,13 @@ extension KlaviyoFlutterSdkPlugin {
 
     public func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
+        let isDismiss = response.actionIdentifier == UNNotificationDismissActionIdentifier
         if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("Push notification opened")
+            if isDismiss {
+                Logger.klaviyoFlutterSDK.info("Push notification dismissed")
+            } else {
+                Logger.klaviyoFlutterSDK.info("Push notification opened")
+            }
         }
 
         // 1. Prepare Payload
@@ -519,8 +524,10 @@ extension KlaviyoFlutterSdkPlugin {
             "data": userInfo
         ]
 
-        // 2. Send to Flutter (or Cache if Flutter is asleep)
-        if let eventSink = eventSink {
+        // 2. Send to Flutter (or Cache if Flutter is asleep); a dismiss clears any cached open
+        if isDismiss {
+            cachedOpenedNotification = nil
+        } else if let eventSink = eventSink {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
