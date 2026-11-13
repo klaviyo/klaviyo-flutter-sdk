@@ -94,11 +94,11 @@ DEPENDENCIES:
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
   - klaviyo_flutter_sdk (from `.symlinks/plugins/klaviyo_flutter_sdk/ios`)
-  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews`)
-  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews`)
-  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews`)
-  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews`)
-  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `feat/in-app-forms-previews`)
+  - KlaviyoCore (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `rel/5.7.0`)
+  - KlaviyoForms (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `rel/5.7.0`)
+  - KlaviyoLocation (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `rel/5.7.0`)
+  - KlaviyoSwift (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `rel/5.7.0`)
+  - KlaviyoSwiftExtension (from `https://github.com/klaviyo/klaviyo-swift-sdk.git`, branch `rel/5.7.0`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -126,19 +126,19 @@ EXTERNAL SOURCES:
   klaviyo_flutter_sdk:
     :path: ".symlinks/plugins/klaviyo_flutter_sdk/ios"
   KlaviyoCore:
-    :branch: feat/in-app-forms-previews
+    :branch: rel/5.7.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :branch: feat/in-app-forms-previews
+    :branch: rel/5.7.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :branch: feat/in-app-forms-previews
+    :branch: rel/5.7.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :branch: feat/in-app-forms-previews
+    :branch: rel/5.7.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :branch: feat/in-app-forms-previews
+    :branch: rel/5.7.0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
@@ -149,19 +149,19 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   KlaviyoCore:
-    :commit: 38d5d565c7616c61318da6bb8be947cdda51db9d
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :commit: 38d5d565c7616c61318da6bb8be947cdda51db9d
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :commit: 38d5d565c7616c61318da6bb8be947cdda51db9d
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :commit: 38d5d565c7616c61318da6bb8be947cdda51db9d
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :commit: 38d5d565c7616c61318da6bb8be947cdda51db9d
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
 
 SPEC CHECKSUMS:
@@ -188,6 +188,6 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
 
-PODFILE CHECKSUM: 84f0146dafb6e6d5e648db87d783124dcded388b
+PODFILE CHECKSUM: 3f5a3fa4179deb6ffed6b4bb66afe026a3b0dd3f
 
 COCOAPODS: 1.16.2
