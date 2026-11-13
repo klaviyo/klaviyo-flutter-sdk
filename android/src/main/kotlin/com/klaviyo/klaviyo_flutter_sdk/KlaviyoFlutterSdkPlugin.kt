@@ -375,20 +375,12 @@ class KlaviyoFlutterSdkPlugin :
 
                 // Forward token to Klaviyo SDK
                 // setPushToken() uses safeApply which catches exceptions internally - it never throws
-                Registry.log.verbose("Setting push token: $token...")
                 Klaviyo.setPushToken(token)
                 result.success(null)
             }
 
             "getPushToken" -> {
                 val token = Klaviyo.getPushToken()
-
-                if (token != null) {
-                    Registry.log.verbose("Retrieved push token from SDK: $token")
-                } else {
-                    Registry.log.verbose("No push token available")
-                }
-
                 result.success(token)
             }
 
@@ -402,7 +394,7 @@ class KlaviyoFlutterSdkPlugin :
                         .getInstance()
                         .token
                         .addOnSuccessListener { token ->
-                            Registry.log.verbose("FCM token received: $token")
+                            Registry.log.verbose("FCM token received")
 
                             // Set the token in Klaviyo SDK
                             Klaviyo.setPushToken(token)
@@ -1010,8 +1002,6 @@ class KlaviyoFlutterSdkPlugin :
                             else -> value?.toString()
                         }
                 }
-
-                Registry.log.verbose("Push notification opened: $notificationData")
 
                 eventSink?.success(
                     mapOf(

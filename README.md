@@ -529,8 +529,7 @@ For visibility into push token events, subscribe to the `onPushNotification` str
 KlaviyoSDK().onPushNotification.listen((event) {
   switch (event['type']) {
     case 'push_token_received':
-      final token = event['data']['token'];
-      _logger.info('Token received: $token');
+      _logger.info('Push token received');
       break;
     case 'push_token_error':
       final error = event['data']['error'];
@@ -553,18 +552,6 @@ KlaviyoSDK().onPushNotification.listen((event) {
 > **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
 
 > **Known limitation (Android)**: on a cold start — app fully killed, then relaunched by tapping a notification — this event (and `ActionButtonTapped` under [Push Action Events](#push-action-events), which fires from the same code path) can be dropped if the tap is processed before your Dart listener subscribes. Native "Opened Push" backend tracking to Klaviyo is unaffected — this only affects the Dart-facing stream in your Flutter app. We plan to close this gap in a follow-up release. iOS is unaffected: its native caching mechanism replays the event once your listener attaches.
-
-#### Identifying Klaviyo Notifications
-
-Use the `isKlaviyoNotification` extension to check whether a push notification payload originated from Klaviyo:
-
-```dart
-void handlePushPayload(Map<String, dynamic> payload) {
-  if (payload.isKlaviyoNotification) {
-    // This is a Klaviyo notification
-  }
-}
-```
 
 ### Silent Push
 
@@ -1041,14 +1028,6 @@ Platform notes:
 - **iOS**: The toggle does not affect `KlaviyoSwiftExtension` (used for rich push), which runs in a separate app-extension process.
 - **Android**: The native SDK uses log levels rather than a boolean toggle. Disabling sets the level to `None`; re-enabling restores the level that was in effect before it was disabled (or the SDK default if it was never enabled at runtime). For finer-grained control of native log verbosity, use the [`com.klaviyo.core.log_level` manifest tag](#android).
 
-To adjust the verbosity of the plugin's Dart-side logs (native logs are unaffected):
-
-```dart
-KlaviyoSDK().setLogLevel(KlaviyoLogLevel.debug);
-```
-
-While logging is disabled via `setLoggingEnabled(false)`, the level passed to `setLogLevel` is stored and takes effect once logging is re-enabled.
-
 ## API Reference
 
 ### KlaviyoSDK
@@ -1126,8 +1105,6 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 |--------|-------------|
 | `setLoggingEnabled(bool enabled)` | Enable/disable SDK logging (native + Dart), callable before `initialize()`; does not affect iOS `KlaviyoSwiftExtension` — see [SDK Logging](#sdk-logging) |
 | `isLoggingEnabled()` | Whether native SDK logging is enabled, returns `Future<bool>` |
-| `setLogLevel(KlaviyoLogLevel logLevel)` | Set logging level (Flutter-side only) |
-| `dispose()` | Clean up resources |
 
 #### Properties
 
@@ -1257,10 +1234,6 @@ class FormCtaClicked extends FormLifecycleEvent {
 
 ### Enums
 
-#### KlaviyoLogLevel
-
-`none` | `error` | `warning` | `info` | `debug` | `verbose`
-
 #### EventMetric
 
 Predefined metrics:
@@ -1281,14 +1254,6 @@ Custom metrics:
 Applies to the SMS and WhatsApp channels.
 
 `marketing` | `transactional`
-
-### Extensions
-
-#### KlaviyoNotificationMap (on `Map<String, dynamic>`)
-
-| Property | Description |
-|----------|-------------|
-| `isKlaviyoNotification` | `bool` — whether the map is a Klaviyo push notification payload |
 
 ### Exceptions
 
