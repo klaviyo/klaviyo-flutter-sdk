@@ -149,19 +149,19 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   KlaviyoCore:
-    :commit: f9cb59bfad258e52caa547be83595c5d2cae4686
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoForms:
-    :commit: f9cb59bfad258e52caa547be83595c5d2cae4686
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoLocation:
-    :commit: f9cb59bfad258e52caa547be83595c5d2cae4686
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwift:
-    :commit: f9cb59bfad258e52caa547be83595c5d2cae4686
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
   KlaviyoSwiftExtension:
-    :commit: f9cb59bfad258e52caa547be83595c5d2cae4686
+    :commit: aff9298d6dd937aae38059d1a7c200d752c8c4e0
     :git: https://github.com/klaviyo/klaviyo-swift-sdk.git
 
 SPEC CHECKSUMS:
@@ -190,4 +190,4 @@ SPEC CHECKSUMS:
 
 PODFILE CHECKSUM: 3f5a3fa4179deb6ffed6b4bb66afe026a3b0dd3f
 
-COCOAPODS: 1.17.0
+COCOAPODS: 1.16.2
