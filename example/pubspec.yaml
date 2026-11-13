@@ -20,7 +20,7 @@ dependencies:
   firebase_core: 4.15.1
   shared_preferences: ^2.2.2
   go_router: ^14.6.2
-  package_info_plus: ^9.0.0
+  package_info_plus: ^10.2.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
