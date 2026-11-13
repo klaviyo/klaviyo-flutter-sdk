@@ -100,15 +100,6 @@
       }
     },
     {
-      "identity" : "klaviyo-swift-sdk",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/klaviyo/klaviyo-swift-sdk",
-      "state" : {
-        "revision" : "fcd017e47b37c4d07c9b2a55075bea08cf789fa3",
-        "version" : "5.6.0"
-      }
-    },
-    {
       "identity" : "leveldb",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/leveldb.git",
