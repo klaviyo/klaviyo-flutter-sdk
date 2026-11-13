@@ -24,6 +24,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Badge Count (iOS)](#badge-count-ios-only)
 - [In-App Forms](#in-app-forms)
   - [Personalized Forms Authentication](#personalized-forms-authentication)
+  - [Previewing Draft Forms on a Device](#previewing-draft-forms-on-a-device)
   - [Monitoring Form Lifecycle Events](#monitoring-form-lifecycle-events)
 - [Deep Linking](#deep-linking)
 - [Geofencing](#geofencing)
@@ -687,6 +688,35 @@ The SDK does not time out your provider, so your code must:
 
 For the equivalent native integration guides, see [Android Personalized Forms Authentication](https://github.com/klaviyo/klaviyo-android-sdk#personalized-forms-authentication) and [iOS Personalized Forms Authentication](https://github.com/klaviyo/klaviyo-swift-sdk#personalized-forms-authentication).
 
+### Previewing Draft Forms on a Device
+
+> Available in Flutter SDK 0.6.0 and higher, by push or by preview link.
+
+There are two ways to preview a draft form in your app. Push is the preferred one.
+
+Push: in the form editor, choose **Preview on device** > **Send push** and send it to a saved test device. Tap the notification and the draft form opens in your app. A push preview needs only the standard Klaviyo push setup (see [Push Notifications](#push-notifications)). The native SDK handles the tap, so your app needs no preview code.
+
+Preview link or token: the **Preview on device** dialog also gives you a short-lived preview token, a QR code, and a preview link for the draft form. Start a preview from a pasted token with `startFormsPreview`, and call `endFormsPreview` to return to published forms. Starting or ending a preview restarts in-app forms, like unregistering and registering again. If you haven't called `registerForInAppForms` yet, the preview starts when you do.
+
+```dart
+await KlaviyoSDK().startFormsPreview(token); // start a draft preview
+await KlaviyoSDK().endFormsPreview(); // back to published forms
+```
+
+The preview link is a deep link into your app with a `klaviyo-forms-preview` query parameter. Pass deep links to `handleFormsPreviewLink` before your own routing: it returns `true` only when the native SDK started a preview, and returns `false`, changing nothing, for every other link and on any failure. It never throws, so it is safe to call before `initialize()` for cold-start links. With go_router, check it in your `redirect`:
+
+```dart
+redirect: (context, state) async {
+  if (await KlaviyoSDK().handleFormsPreviewLink(state.uri)) {
+    return state.matchedLocation; // stay put
+  }
+  // Your own deep link handling
+  return null;
+},
+```
+
+Both work before or after `registerForInAppForms()`. Preview tokens only read a saved draft and expire after 30 minutes. The native SDKs keep them in memory only and never log them.
+
 ### Monitoring Form Lifecycle Events
 
 > Available in Flutter SDK 0.2.0 and higher. For the equivalent API on other platforms, see the [Android SDK](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) and [iOS SDK](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages) documentation.
@@ -1073,6 +1103,9 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 |--------|-------------|
 | `registerForInAppForms({InAppFormConfig? configuration})` | Register for in-app forms |
 | `unregisterFromInAppForms()` | Unregister from in-app forms |
+| `startFormsPreview(String token)` | Start a draft forms preview session, restarting forms if registered |
+| `endFormsPreview()` | End the forms preview session, restarting forms with published forms |
+| `handleFormsPreviewLink(Uri url)` | Start a forms preview from a `klaviyo-forms-preview` deep link; returns `true` only when the native SDK started the preview, never throws |
 
 #### Geofencing
 
