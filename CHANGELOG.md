@@ -6,10 +6,15 @@
 
 - **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
 - **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
+- **`KlaviyoFlutterPushService` can be subclassed (Android)** — The class is now `open`. A subclass must be declared in your app's manifest and call `super.onMessageReceived`.
 
 ### Bug Fixes
 
 - **Android: camelCase profile keys now land in standard fields** — `setProfileAttribute` and `setProfileProperties` now normalize keys for standard attributes in Dart, case-insensitively and in camelCase or snake_case, before calling the native SDKs. On Android, keys such as `firstName` or `address_1` used to be saved as custom properties; they now set the standard field, matching iOS. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
+
+### Documentation
+
+- **Using the SDK alongside `firebase_messaging` on Android** — New README section: declare `KlaviyoFlutterPushService` in your app's own manifest so Klaviyo pushes keep displaying.
 
 ## 0.5.0
 
