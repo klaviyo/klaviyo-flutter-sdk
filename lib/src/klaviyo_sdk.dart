@@ -11,6 +11,7 @@ import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
 import 'models/klaviyo_push_action.dart';
+import 'models/profile_property.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
@@ -182,8 +183,13 @@ class KlaviyoSDK {
   ///
   /// Example:
   /// ```dart
-  /// await klaviyo.setProfileAttribute('first_name', 'John');
+  /// await klaviyo.setProfileAttribute(ProfileProperty.firstName, 'John');
   /// ```
+  ///
+  /// [propertyKey] can be a [ProfileProperty] constant or any string.
+  /// camelCase and snake_case spellings of standard keys (for example
+  /// `firstName` or `first_name`) set the standard field on both platforms.
+  /// Any other key is stored as a custom property.
   Future<void> setProfileAttribute(String propertyKey, dynamic value) async {
     await setProfileProperties({propertyKey: value});
   }
@@ -299,6 +305,62 @@ class KlaviyoSDK {
       configuration: configuration?.toJson(),
     );
     _logger.info('Registered for in-app forms');
+  }
+
+  /// Start a draft in-app forms preview session with a preview token from the
+  /// Klaviyo form editor.
+  ///
+  /// Starting a preview is like unregistering and registering again: if forms
+  /// are registered, the current session is torn down, dismissing any form on
+  /// screen, and a new session starts that loads draft forms. If
+  /// [registerForInAppForms] hasn't been called yet, the token is held and the
+  /// preview starts when forms register; no forms are shown before then.
+  ///
+  /// A preview token is a short-lived credential for on-device testing of
+  /// draft forms. The native SDKs keep it in memory only and never persist or
+  /// log it. A malformed token is ignored and changes nothing.
+  /// [unregisterFromInAppForms] also ends the preview.
+  Future<void> startFormsPreview(String token) async {
+    _ensureInitialized();
+    try {
+      await _nativeWrapper.startFormsPreview(token);
+      _logger.info('Started forms preview');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to start the forms preview: ${e.message}');
+    }
+  }
+
+  /// End the draft in-app forms preview session. If forms are registered, they
+  /// restart with published forms.
+  Future<void> endFormsPreview() async {
+    _ensureInitialized();
+    try {
+      await _nativeWrapper.endFormsPreview();
+      _logger.info('Ended forms preview');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to end the forms preview: ${e.message}');
+    }
+  }
+
+  /// Start a forms preview from a deep link, such as the link or QR code from
+  /// the Klaviyo form editor's **Preview on device** button.
+  ///
+  /// Forwards [url] to the native SDK and returns true only when the native
+  /// SDK started a preview — that is, the link carries a well-formed
+  /// `klaviyo-forms-preview` token. Returns false, changing nothing, for
+  /// every other link and on any failure, so call it first from your deep
+  /// link handling and fall through when it returns false.
+  ///
+  /// Never throws: a badly encoded query or an unreachable native side
+  /// returns false. Safe to call before [initialize] for cold-start links;
+  /// the native SDKs hold the token until forms register.
+  Future<bool> handleFormsPreviewLink(Uri url) async {
+    try {
+      if (url.queryParameters.isEmpty) return false;
+    } on FormatException {
+      return false;
+    }
+    return _nativeWrapper.handleFormsPreviewLink(url.toString());
   }
 
   /// Unregister from in-app forms
