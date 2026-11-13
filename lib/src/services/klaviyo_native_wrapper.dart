@@ -7,6 +7,7 @@ import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
 import '../utils/profile_key_normalizer.dart';
+import '../utils/profile_payload.dart';
 import 'package:logging/logging.dart';
 
 class KlaviyoNativeWrapper {
@@ -87,7 +88,9 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setProfile', {'profile': profile.toJson()});
+      await _channel.invokeMethod('setProfile', {
+        'profile': resolveProfilePayload(profile.toJson()),
+      });
     } catch (e) {
       throw KlaviyoException('Failed to set profile: $e');
     }

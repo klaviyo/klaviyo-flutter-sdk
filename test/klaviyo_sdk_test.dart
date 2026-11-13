@@ -224,6 +224,133 @@ void main() {
         'profile': {'email': 'test@example.com'},
       });
     });
+
+    test('promotes standard keys in properties to standard fields', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'test@example.com',
+          properties: {
+            'first_name': 'Ada',
+            'lastName': 'Lovelace',
+            'ORGANIZATION': 'Analytical Engines',
+            'plan': 'premium',
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'email': 'test@example.com',
+          'first_name': 'Ada',
+          'last_name': 'Lovelace',
+          'organization': 'Analytical Engines',
+          'properties': {'plan': 'premium'},
+        },
+      });
+    });
+
+    test('typed fields win over the same key in properties', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          firstName: 'A',
+          properties: {'first_name': 'B', 'firstName': 'C'},
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {'first_name': 'A'},
+      });
+    });
+
+    test('promotes location keys in properties into location', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          location: const KlaviyoLocation(city: 'Boston'),
+          properties: {
+            'city': 'Cambridge',
+            'zip': '02139',
+            'address_1': '1 Main St',
+            'latitude': 42,
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'location': {
+            'city': 'Boston',
+            'zip': '02139',
+            'address1': '1 Main St',
+            'latitude': 42.0,
+          },
+        },
+      });
+    });
+
+    test('promotes snake_case identifiers in properties', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'typed@example.com',
+          properties: {
+            'email': 'nested@example.com',
+            'phone_number': '+15555550100',
+            'external_id': 'ext-1',
+            'phoneNumber': '+15555550199',
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'email': 'typed@example.com',
+          'phone_number': '+15555550100',
+          'external_id': 'ext-1',
+          'properties': {'phoneNumber': '+15555550199'},
+        },
+      });
+    });
+
+    test('passes custom keys through untouched', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          properties: {
+            'plan': 'premium',
+            'Favorite_Color': 'blue',
+            'prefs': {'push': true},
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'properties': {
+            'plan': 'premium',
+            'Favorite_Color': 'blue',
+            'prefs': {'push': true},
+          },
+        },
+      });
+    });
   });
 
   group('KlaviyoSDK.setProfileProperties', () {

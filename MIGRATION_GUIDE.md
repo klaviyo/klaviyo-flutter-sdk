@@ -9,7 +9,7 @@ This guide outlines how developers can migrate from older versions of the
 ## Migrating to v0.6.0
 
 - `KlaviyoProfile.toJson` now nests custom properties under `properties` instead of merging them into the top level, so code that reads custom keys from its output must read them from `json['properties']`; `KlaviyoProfile.fromJson` still accepts the old flat shape, but ignores unknown top-level keys when a nested `properties` map is present.
-- `properties` is for custom properties only. Set standard fields such as first name through the typed `KlaviyoProfile` fields (`firstName`, `lastName`, `location`, and so on) or `setProfileAttribute`. A key like `firstName` inside `properties` is stored as a custom property and doesn't set the first name.
+- In 0.5.0, a snake_case standard key inside `properties`, such as `first_name` or `email`, set the standard field because `toJson` flattened `properties` into the top level. It still does, on both iOS and Android, and if the matching typed field is also set, the typed field wins. Standard attribute keys are now matched in camelCase too, so `firstName` inside `properties` sets the first name as well; in 0.5.0 it was dropped. Prefer the typed `KlaviyoProfile` fields or `setProfileAttribute` for standard fields, and keep `properties` for custom keys.
 
 ## Migrating to v0.3.0
 
