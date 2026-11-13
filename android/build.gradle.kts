@@ -77,7 +77,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEa
     compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
 }
 
-val klaviyoSdkVersion = "4.6.0"
+val klaviyoSdkVersion = "feat~in-app-forms-previews-SNAPSHOT"
 
 // Matches Groovy's String.toBoolean(): "true", "y" or "1", trimmed and case-insensitive.
 fun booleanProperty(
