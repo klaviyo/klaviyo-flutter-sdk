@@ -13,6 +13,13 @@ class KlaviyoProfile {
   final String? title;
   final String? image;
   final KlaviyoLocation? location;
+
+  /// Custom profile properties.
+  ///
+  /// Keys for identifiers (`email`, `phone_number`, `external_id`) and
+  /// standard attributes (see [ProfileProperty]) are used only when the
+  /// matching typed field is null, and are never sent as custom properties.
+  /// Entries with a null value are ignored and don't clear a property.
   final Map<String, dynamic>? properties;
 
   /// Creates a new [KlaviyoProfile].

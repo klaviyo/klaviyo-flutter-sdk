@@ -326,6 +326,61 @@ void main() {
       });
     });
 
+    test('warns when a typed field wins over a properties key', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+      addTearDown(sub.cancel);
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          firstName: 'A',
+          location: const KlaviyoLocation(city: 'Boston'),
+          properties: {'first_name': 'B', 'city': 'Cambridge', 'zip': '02139'},
+        ),
+      );
+
+      final warnings = records
+          .where((r) => r.level == Level.WARNING)
+          .map((r) => r.message)
+          .toList();
+      expect(warnings, hasLength(2));
+      expect(
+        warnings.where((m) => m.contains("properties['first_name']")),
+        hasLength(1),
+      );
+      expect(
+        warnings.where((m) => m.contains("properties['city']")),
+        hasLength(1),
+      );
+    });
+
+    test('coerces standard values and drops nulls in properties', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          properties: {
+            'first_name': 5,
+            'longitude': '-71.1',
+            'plan': null,
+            'visits': 3,
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'first_name': '5',
+          'location': {'longitude': -71.1},
+          'properties': {'visits': 3},
+        },
+      });
+    });
+
     test('passes custom keys through untouched', () async {
       final sdk = KlaviyoSDK();
       await sdk.initialize(apiKey: 'KEY_1');
@@ -397,6 +452,119 @@ void main() {
 
       final call = log.singleWhere((c) => c.method == 'setProfileProperties');
       expect(call.arguments['properties'], {'first_name': 'Ada'});
+    });
+
+    test('routes identifier keys to the identifier setters', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      log.clear();
+
+      await sdk.setProfileProperties({
+        'email': 'ada@example.com',
+        'phone_number': '+15555550100',
+        'external_id': 'ext-1',
+        'plan': 'premium',
+      });
+
+      expect(log.map((c) => c.method), [
+        'setEmail',
+        'setPhoneNumber',
+        'setExternalId',
+        'setProfileProperties',
+      ]);
+      expect(log[0].arguments, {'email': 'ada@example.com'});
+      expect(log[1].arguments, {'phoneNumber': '+15555550100'});
+      expect(log[2].arguments, {'externalId': 'ext-1'});
+      expect(log[3].arguments['properties'], {'plan': 'premium'});
+    });
+
+    test('setProfileAttribute with email only calls setEmail', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      log.clear();
+
+      await sdk.setProfileAttribute('email', 'ada@example.com');
+
+      expect(log.map((c) => c.method), ['setEmail']);
+      expect(log.single.arguments, {'email': 'ada@example.com'});
+    });
+
+    test('identifier keys match exactly', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      log.clear();
+
+      await sdk.setProfileProperties({
+        'phoneNumber': '+15555550100',
+        'Email': 'ada@example.com',
+      });
+
+      expect(log.map((c) => c.method), ['setProfileProperties']);
+      expect(log.single.arguments['properties'], {
+        'phoneNumber': '+15555550100',
+        'Email': 'ada@example.com',
+      });
+    });
+
+    test('coerces standard attribute values', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileProperties({
+        'first_name': 5,
+        'zip': 2139,
+        'latitude': 42,
+        'longitude': '-71.1',
+        'external_id': 12345,
+        'visits': 3,
+      });
+
+      final ids = log.singleWhere((c) => c.method == 'setExternalId');
+      expect(ids.arguments, {'externalId': '12345'});
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'first_name': '5',
+        'zip': '2139',
+        'latitude': 42.0,
+        'longitude': -71.1,
+        'visits': 3,
+      });
+    });
+
+    test('drops and warns on values that cannot be coerced', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+      addTearDown(sub.cancel);
+
+      await sdk.setProfileProperties({'latitude': 'north', 'plan': 'premium'});
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {'plan': 'premium'});
+      expect(
+        records.where(
+          (r) => r.level == Level.WARNING && r.message.contains("'latitude'"),
+        ),
+        hasLength(1),
+      );
+    });
+
+    test('drops null values', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      log.clear();
+
+      await sdk.setProfileProperties({
+        'plan': null,
+        'first_name': null,
+        'email': null,
+        'visits': 3,
+      });
+      await sdk.setProfileAttribute('plan', null);
+
+      expect(log.map((c) => c.method), ['setProfileProperties']);
+      expect(log.single.arguments['properties'], {'visits': 3});
     });
   });
 }

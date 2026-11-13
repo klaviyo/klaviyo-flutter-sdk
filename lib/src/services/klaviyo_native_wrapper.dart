@@ -6,7 +6,6 @@ import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
-import '../utils/profile_key_normalizer.dart';
 import '../utils/profile_payload.dart';
 import 'package:logging/logging.dart';
 
@@ -172,9 +171,28 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setProfileProperties', {
-        'properties': normalizeProfileProperties(properties),
-      });
+      final update = splitProfileProperties(properties);
+      final email = update.identifiers[ProfileIdentifierKey.email];
+      final phoneNumber = update.identifiers[ProfileIdentifierKey.phoneNumber];
+      final externalId = update.identifiers[ProfileIdentifierKey.externalId];
+      if (email != null) {
+        await _channel.invokeMethod('setEmail', {'email': email});
+      }
+      if (phoneNumber != null) {
+        await _channel.invokeMethod('setPhoneNumber', {
+          'phoneNumber': phoneNumber,
+        });
+      }
+      if (externalId != null) {
+        await _channel.invokeMethod('setExternalId', {
+          'externalId': externalId,
+        });
+      }
+      if (update.properties.isNotEmpty) {
+        await _channel.invokeMethod('setProfileProperties', {
+          'properties': update.properties,
+        });
+      }
     } catch (e) {
       throw KlaviyoException('Failed to set profile properties: $e');
     }

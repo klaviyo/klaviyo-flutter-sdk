@@ -300,7 +300,7 @@ Raw strings still work. Matching ignores case and accepts camelCase or snake_cas
 | Longitude | `ProfileProperty.longitude` | `longitude` |
 | Timezone | `ProfileProperty.timezone` | `timezone`, `timeZone`, `time_zone` (Android only, see below) |
 
-Email, phone number and external ID aren't attributes; set them with `setEmail`, `setPhoneNumber` and `setExternalId`.
+The identifier keys `email`, `phone_number` and `external_id` (matched exactly) set the profile's identifiers, the same as `setEmail`, `setPhoneNumber` and `setExternalId`. Number and bool values for standard text fields are sent as strings, and latitude and longitude accept numbers or numeric strings; a value that can't be converted is dropped with a warning. Null values are ignored and don't clear a property.
 
 **Timezone on iOS:** the native iOS SDK can't set the timezone as a single attribute, so on iOS `timezone` is stored as a custom property. Both native SDKs already send the device timezone with the profile automatically. To set a timezone explicitly on both platforms, pass it in `KlaviyoProfile.location` through `setProfile`.
 
