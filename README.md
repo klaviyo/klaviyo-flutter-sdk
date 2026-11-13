@@ -568,7 +568,14 @@ void handlePushPayload(Map<String, dynamic> payload) {
 
 ### Silent Push
 
+> **Experimental**: silent push support, including the `silent_push_received` event on `onPushNotification` and the iOS `handleSilentPush` method, may change before or after 1.0.
+
 Silent push notifications (`content-available: 1`) deliver data to your app in the background without showing a banner. They are commonly used to prefetch content, sync state, or trigger background tasks.
+
+#### Known Limitations
+
+- **iOS**: your `AppDelegate` must forward `didReceiveRemoteNotification:fetchCompletionHandler:` to `KlaviyoFlutterSdkPlugin.shared.handleSilentPush` ([flutter/flutter#155479](https://github.com/flutter/flutter/issues/155479)). The [iOS Setup](#ios-setup) example calls `completionHandler` right away, so background Dart work isn't guaranteed to finish. iOS doesn't deliver silent pushes after the user swipes the app away.
+- **Android**: silent pushes reach Dart only while the app is in the foreground or background. When the app is killed, there's no Flutter engine and the push is dropped. See the workarounds under [Delivery Guarantees](#delivery-guarantees).
 
 > **iOS requirement**: Enable "Remote notifications" under **Background Modes** in Xcode (covered in [iOS Setup](#ios-setup)).
 
@@ -584,7 +591,7 @@ The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM se
 
 Your listener fires for every Klaviyo silent push, with the full payload and its JSON object values decoded to maps on both platforms. Delivery needs a live Flutter engine: foreground **and backgrounded** apps both receive events, a terminated one does not. Nothing is cached or replayed on a later launch, matching both native SDKs — a missed push is gone.
 
-> **Known limitation (Android)**: while your app isn't running — swiped away, force-stopped, or evicted — there's no Flutter engine to receive silent pushes, and nothing is queued for the next launch. The native Android SDK has no such gap, and we plan to close it. Until then, either subclass `KlaviyoFlutterPushService` and handle it in Kotlin, or use [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage`, which runs its own engine and coexists with this plugin — it receives messages via a broadcast receiver rather than the `MESSAGING_EVENT` service. It also fires while your app is running, so guard against handling a push twice. iOS is unaffected: the system relaunches your app, so the `AppDelegate` path still runs.
+> **Known limitation (Android)**: while your app isn't running — swiped away, force-stopped, or evicted — there's no Flutter engine to receive silent pushes, and nothing is queued for the next launch. The native Android SDK has no such gap, and we plan to close it. Until then, either subclass `KlaviyoFlutterPushService` and handle it in Kotlin, or use [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage`, which runs its own engine and coexists with this plugin — it receives messages via a broadcast receiver rather than the `MESSAGING_EVENT` service. It also fires while your app is running, so guard against handling a push twice. On iOS, the system relaunches an app it terminated itself, so the `AppDelegate` path still runs. iOS doesn't relaunch an app the user swiped away, and drops the push.
 
 #### Dart-Side Listener
 
