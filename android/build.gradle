@@ -93,5 +93,5 @@ dependencies {
     implementation "com.google.firebase:firebase-messaging:24.1.0"
 
     testImplementation "junit:junit:4.13.2"
-    testImplementation "io.mockk:mockk:1.13.17"
+    testImplementation "io.mockk:mockk:1.14.12"
 }
