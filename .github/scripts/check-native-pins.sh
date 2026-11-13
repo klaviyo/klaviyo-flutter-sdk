@@ -47,7 +47,7 @@ if [ "${#errors[@]}" -gt 0 ]; then
   for e in "${errors[@]}"; do
     echo "::error::${e}"
   done
-  echo "::error::Revert the pin and bump to released SDK versions before releasing."
+  echo "::error::Revert the pin and bump to released SDK versions before releasing: run ./scripts/configure-sdk.sh --android-version <version> --ios-version <version>."
   exit 1
 fi
 

@@ -6,6 +6,7 @@ import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
+import '../utils/profile_key_normalizer.dart';
 import 'package:logging/logging.dart';
 
 class KlaviyoNativeWrapper {
@@ -185,7 +186,7 @@ class KlaviyoNativeWrapper {
 
     try {
       await _channel.invokeMethod('setProfileProperties', {
-        'properties': properties,
+        'properties': normalizeProfileProperties(properties),
       });
     } catch (e) {
       throw KlaviyoException('Failed to set profile properties: $e');
@@ -301,6 +302,43 @@ class KlaviyoNativeWrapper {
       });
     } catch (e) {
       throw KlaviyoException('Failed to register for in-app forms: $e');
+    }
+  }
+
+  /// Start a forms preview session in the native SDK
+  Future<void> startFormsPreview(String token) async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('startFormsPreview', {'token': token});
+    } catch (e) {
+      throw const KlaviyoException('Failed to start the forms preview');
+    }
+  }
+
+  /// Start a forms preview from a deep link in the native SDK.
+  ///
+  /// Never throws and has no initialize guard — the native SDKs hold a
+  /// preview token until forms register, so this must work for cold-start
+  /// links. Returns false on any failure.
+  Future<bool> handleFormsPreviewLink(String url) async {
+    try {
+      return await _channel.invokeMethod<bool>('handleFormsPreviewLink', {
+            'url': url,
+          }) ??
+          false;
+    } catch (e) {
+      _logger.warning('Failed to handle the forms preview link: $e');
+      return false;
+    }
+  }
+
+  /// End the forms preview session in the native SDK
+  Future<void> endFormsPreview() async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('endFormsPreview');
+    } catch (e) {
+      throw KlaviyoException('Failed to end the forms preview: $e');
     }
   }
 

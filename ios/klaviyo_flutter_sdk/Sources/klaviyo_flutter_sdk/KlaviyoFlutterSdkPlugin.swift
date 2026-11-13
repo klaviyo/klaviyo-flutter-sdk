@@ -195,11 +195,13 @@ extension KlaviyoFlutterSdkPlugin {
             }
             let properties = eventData["properties"] as? [String: Any] ?? [:]
             let value = eventData["value"] as? Double
+            let valueCurrency = eventData["value_currency"] as? String
             let uniqueId = eventData["unique_id"] as? String
             let event = Event(
                 name: .customEvent(name),
                 properties: properties,
                 value: value,
+                valueCurrency: valueCurrency,
                 uniqueId: uniqueId
             )
             KlaviyoSDK().create(event: event)
@@ -274,6 +276,68 @@ extension KlaviyoFlutterSdkPlugin {
                     configuration: InAppFormsConfig(sessionTimeoutDuration: sessionTimeout)
                 )
                 self.subscribeToFormLifecycleEvents()
+            }
+            result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
+
+        case "startFormsPreview":
+            #if canImport(KlaviyoForms)
+            guard let token = (call.arguments as? [String: Any])?["token"] as? String else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "A forms preview token is required",
+                    details: nil
+                ))
+                return
+            }
+            Task { @MainActor in
+                KlaviyoSDK().startFormsPreview(token)
+            }
+            result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
+
+        case "handleFormsPreviewLink":
+            #if canImport(KlaviyoForms)
+            guard let urlString = (call.arguments as? [String: Any])?["url"] as? String,
+                  let link = URL(string: urlString)
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "A forms preview link URL is required",
+                    details: nil
+                ))
+                return
+            }
+            Task { @MainActor in
+                result(KlaviyoSDK().handleFormsPreviewLink(link))
+            }
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                details: nil
+            ))
+            #endif
+
+        case "endFormsPreview":
+            #if canImport(KlaviyoForms)
+            Task { @MainActor in
+                KlaviyoSDK().endFormsPreview()
             }
             result(nil)
             #else
