@@ -5,6 +5,7 @@
 ### Bug Fixes
 
 - **Android: push opens and action-button taps that launch the app now reach Dart.** On a cold start the tap was handled before your Dart listener subscribed, so the `push_notification_opened` event and `onPushAction`'s `ActionButtonTapped` were dropped. The plugin now holds the most recent open and the most recent action until Dart subscribes. Reopening the app from Recents doesn't re-deliver the original tap.
+- **Android: web-link push taps now reach Dart through `onPushAction`.** A tap on a push whose body opens a web URL (`web_url`) now emits `OpenWebUrl`, and a tap on an `open_url` action button emits `ActionButtonTapped` with `action: 'open_url'`, matching iOS. Previously the native SDK opened the browser without launching your app, so neither event fired. This covers warm taps only, made while the app process is running. A web-link tap on a fully killed app still doesn't reach Dart, because the app never starts and the plugin isn't loaded to receive it.
 - **Android: camelCase profile keys now land in standard fields** — `setProfileAttribute` and `setProfileProperties` now normalize keys for standard attributes in Dart, case-insensitively and in camelCase or snake_case, before calling the native SDKs. On Android, keys such as `firstName` or `address_1` used to be saved as custom properties; they now set the standard field, matching iOS. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
 
 ### New Features
