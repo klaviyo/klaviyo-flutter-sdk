@@ -1,3 +1,4 @@
+# Baseline rules: SDK Dependabot Bot project, see the rules page.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -6,18 +7,38 @@ updates:
       - /.github/actions/*
     schedule:
       interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+      include: scope
     groups:
-      github-actions:
+      actions-minor-patch:
+        applies-to: version-updates
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
+      actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+  # Example apps are security-only: open-pull-requests-limit 0 turns off
+  # version updates but keeps security updates. The example is pinned to its
+  # framework versions and moves by hand with the SDK.
   - package-ecosystem: bundler
     directories:
       - /example/ios
       - /example/android
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: chore
+      include: scope
     groups:
-      bundler:
+      bundler-example-security:
+        applies-to: security-updates
         patterns:
           - "*"
   # The plugin's Dart packages. `logging` and `meta` are resolved into
@@ -62,23 +83,17 @@ updates:
         exclude-patterns:
           - logging
           - meta
+  # Example app: security-only, as above.
   - package-ecosystem: pub
     directories:
       - /example
     schedule:
       interval: monthly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     commit-message:
       prefix: chore
       include: scope
     groups:
-      pub-example-minor-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
       pub-example-security:
         applies-to: security-updates
         patterns:
@@ -128,23 +143,27 @@ updates:
     ignore:
       # Bumped by hand at release.
       - dependency-name: "com.github.klaviyo.klaviyo-android-sdk:*"
+      # Held until the plugin moves to Kotlin 2. Remove in that change.
+      # Covers the `kotlin_version` property PR: Dependabot updates it through
+      # kotlin-gradle-plugin and kotlin-stdlib-jdk7, which both match.
+      - dependency-name: "org.jetbrains.kotlin:*"
+        update-types:
+          - "version-update:semver-major"
+      # Held until the build moves to AGP 9. Remove in that change.
+      - dependency-name: "com.android.tools.build:gradle"
+        update-types:
+          - "version-update:semver-major"
+  # Example app: security-only, as above.
   - package-ecosystem: gradle
     directories:
       - /example/android
     schedule:
       interval: monthly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     commit-message:
       prefix: chore
       include: scope
     groups:
-      gradle-example-minor-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
       gradle-example-security:
         applies-to: security-updates
         patterns:
