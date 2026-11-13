@@ -24,6 +24,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Badge Count (iOS)](#badge-count-ios-only)
 - [In-App Forms](#in-app-forms)
   - [Personalized Forms Authentication](#personalized-forms-authentication)
+  - [Previewing Draft Forms on a Device](#previewing-draft-forms-on-a-device)
   - [Monitoring Form Lifecycle Events](#monitoring-form-lifecycle-events)
 - [Deep Linking](#deep-linking)
 - [Geofencing](#geofencing)
@@ -62,7 +63,7 @@ Add `klaviyo_flutter_sdk` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  klaviyo_flutter_sdk: ^0.5.0
+  klaviyo_flutter_sdk: ^0.6.0
 ```
 
 A complete working example is available in the [`example/`](example/) directory.
@@ -266,7 +267,44 @@ await KlaviyoSDK().setExternalId('user123');
 await KlaviyoSDK().setProfileProperties({
   'preferences': {'notifications': true},
 });
+await KlaviyoSDK().setProfileAttribute(ProfileProperty.firstName, 'John');
 ```
+
+### Standard Profile Attributes
+
+Use the `ProfileProperty` constants as keys for `setProfileAttribute` and `setProfileProperties`:
+
+```dart
+await KlaviyoSDK().setProfileAttribute(ProfileProperty.firstName, 'Jane');
+await KlaviyoSDK().setProfileProperties({
+  ProfileProperty.city: 'Boston',
+  ProfileProperty.zip: '02110',
+  'favorite_color': 'blue', // custom property
+});
+```
+
+Raw strings still work. Matching ignores case and accepts camelCase or snake_case, so `ProfileProperty.firstName`, `'first_name'`, `'firstName'` and `'FIRST_NAME'` all set the first name. Any other key is stored as a custom property under the key you passed.
+
+| Standard field | Constant | Accepted string keys |
+|----------------|----------|----------------------|
+| First name | `ProfileProperty.firstName` | `first_name`, `firstName` |
+| Last name | `ProfileProperty.lastName` | `last_name`, `lastName` |
+| Organization | `ProfileProperty.organization` | `organization` |
+| Title | `ProfileProperty.title` | `title` |
+| Image URL | `ProfileProperty.image` | `image` |
+| Address line 1 | `ProfileProperty.address1` | `address1`, `address_1` |
+| Address line 2 | `ProfileProperty.address2` | `address2`, `address_2` |
+| City | `ProfileProperty.city` | `city` |
+| Country | `ProfileProperty.country` | `country` |
+| Region | `ProfileProperty.region` | `region` |
+| Zip | `ProfileProperty.zip` | `zip` |
+| Latitude | `ProfileProperty.latitude` | `latitude` |
+| Longitude | `ProfileProperty.longitude` | `longitude` |
+| Timezone | `ProfileProperty.timezone` | `timezone`, `timeZone`, `time_zone` (Android only, see below) |
+
+Email, phone number and external ID aren't attributes; set them with `setEmail`, `setPhoneNumber` and `setExternalId`.
+
+**Timezone on iOS:** the native iOS SDK can't set the timezone as a single attribute, so on iOS `timezone` is stored as a custom property. Both native SDKs already send the device timezone with the profile automatically. To set a timezone explicitly on both platforms, pass it in `KlaviyoProfile.location` through `setProfile`.
 
 ## Event Tracking
 
@@ -305,6 +343,18 @@ final purchaseEvent = KlaviyoEvent.custom(
   value: 99.99,
 );
 await KlaviyoSDK().createEvent(purchaseEvent);
+```
+
+Set `valueCurrency` to an ISO 4217 code (e.g. `EUR`) to say which currency `value` is in. Klaviyo rejects an event whose code is not valid ISO 4217.
+
+```dart
+// Track a purchase event with value and currency
+final euroPurchaseEvent = KlaviyoEvent.custom(
+  metric: 'Purchase Completed',
+  value: 10.0,
+  valueCurrency: 'EUR',
+);
+await KlaviyoSDK().createEvent(euroPurchaseEvent);
 ```
 
 ## Subscriptions
@@ -503,7 +553,21 @@ KlaviyoSDK().onPushNotification.listen((event) {
 
 > **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
 
-> **Cold starts and late listeners:** if the app is launched by tapping a notification, the open can arrive before your Dart code subscribes. The SDK holds the most recent `push_notification_opened` event that arrived with no listener and delivers it to **every** listener that subscribes later, so a token listener and a navigation listener both see it. A held open stays held until a newer open arrives; only one is kept. `onPushAction` holds the most recent push action the same way, and each new open clears it. Other `onPushNotification` events (tokens, token errors, silent pushes) that arrive with no listener go to the first listener only. On Android, reopening the app from the Recents screen doesn't re-deliver the tap that originally launched it.
+> **Cold starts and late listeners:** if the app is launched by tapping a notification, the open can arrive before your Dart code subscribes. The SDK buffers the most recent `push_notification_opened` event that arrived with no listener and delivers it **once, to the first listener** that subscribes. Later listeners don't receive it. `onPushAction` buffers the most recent push action the same way, and each new open clears it. Other `onPushNotification` events (tokens, token errors, silent pushes) that arrive with no listener also go to the first listener only. On Android, reopening the app from the Recents screen doesn't re-deliver the tap that originally launched it.
+
+#### Reading the Launch Tap
+
+To read the tap that launched the app at any time, for example from a router that subscribes after another listener has already taken the stream event, call `getInitialPushNotification()`. It returns the same map as the `push_notification_opened` event, or `null` if the app wasn't launched by a push tap:
+
+```dart
+Future<String> initialRoute() async {
+  final launchTap = await KlaviyoSDK().getInitialPushNotification();
+  final url = launchTap?['data']?['url'] as String?;
+  return url != null ? Uri.parse(url).path : '/';
+}
+```
+
+It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`.
 
 #### Identifying Klaviyo Notifications
 
@@ -639,6 +703,35 @@ The SDK does not time out your provider, so your code must:
 
 For the equivalent native integration guides, see [Android Personalized Forms Authentication](https://github.com/klaviyo/klaviyo-android-sdk#personalized-forms-authentication) and [iOS Personalized Forms Authentication](https://github.com/klaviyo/klaviyo-swift-sdk#personalized-forms-authentication).
 
+### Previewing Draft Forms on a Device
+
+> Available in Flutter SDK 0.6.0 and higher, by push or by preview link.
+
+There are two ways to preview a draft form in your app. Push is the preferred one.
+
+Push: in the form editor, choose **Preview on device** > **Send push** and send it to a saved test device. Tap the notification and the draft form opens in your app. A push preview needs only the standard Klaviyo push setup (see [Push Notifications](#push-notifications)). The native SDK handles the tap, so your app needs no preview code.
+
+Preview link or token: the **Preview on device** dialog also gives you a short-lived preview token, a QR code, and a preview link for the draft form. Start a preview from a pasted token with `startFormsPreview`, and call `endFormsPreview` to return to published forms. Starting or ending a preview restarts in-app forms, like unregistering and registering again. If you haven't called `registerForInAppForms` yet, the preview starts when you do.
+
+```dart
+await KlaviyoSDK().startFormsPreview(token); // start a draft preview
+await KlaviyoSDK().endFormsPreview(); // back to published forms
+```
+
+The preview link is a deep link into your app with a `klaviyo-forms-preview` query parameter. Pass deep links to `handleFormsPreviewLink` before your own routing: it returns `true` only when the native SDK started a preview, and returns `false`, changing nothing, for every other link and on any failure. It never throws, so it is safe to call before `initialize()` for cold-start links. With go_router, check it in your `redirect`:
+
+```dart
+redirect: (context, state) async {
+  if (await KlaviyoSDK().handleFormsPreviewLink(state.uri)) {
+    return state.matchedLocation; // stay put
+  }
+  // Your own deep link handling
+  return null;
+},
+```
+
+Both work before or after `registerForInAppForms()`. Preview tokens only read a saved draft and expire after 30 minutes. The native SDKs keep them in memory only and never log them.
+
 ### Monitoring Form Lifecycle Events
 
 > Available in Flutter SDK 0.2.0 and higher. For the equivalent API on other platforms, see the [Android SDK](https://github.com/klaviyo/klaviyo-android-sdk#in-app-messages) and [iOS SDK](https://github.com/klaviyo/klaviyo-swift-sdk#in-app-messages) documentation.
@@ -725,7 +818,7 @@ subscription.cancel();
 
 > **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. On **iOS**, both body `open_url` taps and action-button taps surface. On **Android**, `open_url` is dispatched to an external handler by the native SDK and does **not** reach the app, so only `deep_link` / `open_app` action-button taps surface on Android.
 
-> **Cold starts:** a push action that arrives before you subscribe is held and delivered to every listener that subscribes later — see the note under [Handling Push Notification Opens](#handling-push-notification-opens).
+> **Cold starts:** a push action that arrives before you subscribe is buffered and delivered once, to the first listener that subscribes. See the note under [Handling Push Notification Opens](#handling-push-notification-opens).
 
 ## Deep Linking
 
@@ -994,7 +1087,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `getEmail()` | Get user email |
 | `getPhoneNumber()` | Get user phone number |
 | `getExternalId()` | Get external user ID |
-| `setProfileProperties(Map<String, dynamic> properties)` | Set custom profile properties |
+| `setProfileProperties(Map<String, dynamic> properties)` | Set profile properties. [Standard attribute keys](#standard-profile-attributes) map to standard fields; other keys are custom |
 | `setProfileAttribute(String propertyKey, dynamic value)` | Set a single profile attribute |
 | `resetProfile()` | Reset user profile (logout) |
 
@@ -1025,6 +1118,9 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 |--------|-------------|
 | `registerForInAppForms({InAppFormConfig? configuration})` | Register for in-app forms |
 | `unregisterFromInAppForms()` | Unregister from in-app forms |
+| `startFormsPreview(String token)` | Start a draft forms preview session, restarting forms if registered |
+| `endFormsPreview()` | End the forms preview session, restarting forms with published forms |
+| `handleFormsPreviewLink(Uri url)` | Start a forms preview from a `klaviyo-forms-preview` deep link; returns `true` only when the native SDK started the preview, never throws |
 
 #### Geofencing
 
@@ -1084,6 +1180,7 @@ KlaviyoEvent({
   required EventMetric name,
   Map<String, dynamic>? properties,
   double? value,
+  String? valueCurrency,
   String? uniqueId,
 })
 
@@ -1092,6 +1189,7 @@ KlaviyoEvent.custom({
   required String metric,
   Map<String, dynamic>? properties,
   double? value,
+  String? valueCurrency,
   String? uniqueId,
 })
 ```
@@ -1137,6 +1235,10 @@ KlaviyoLocation({
   String? timezone,
 })
 ```
+
+#### ProfileProperty
+
+String constants for the standard profile attribute keys: `firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone`. See [Standard Profile Attributes](#standard-profile-attributes).
 
 #### InAppFormConfig
 
