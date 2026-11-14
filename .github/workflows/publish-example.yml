@@ -80,7 +80,7 @@ env:
   TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || inputs.triggered_by || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   SLACK_USERNAME: Flutter Example App
   SLACK_ICON_EMOJI: ':merlin-orb-flutter:'
-  FLUTTER_VERSION: 3.38.7
+  FLUTTER_VERSION: 3.47.9
   GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
 
 jobs:
@@ -608,6 +608,9 @@ jobs:
       group: publish-example-ios
       cancel-in-progress: false
       queue: max
+    defaults:
+      run:
+        working-directory: klaviyo_flutter_sdk
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     outputs:
@@ -626,6 +629,7 @@ jobs:
       ios_sdk_ref: ${{ steps.result.outputs.ios_sdk_ref }}
     steps:
       - name: Record job start
+        working-directory: .
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -633,6 +637,7 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: klaviyo_flutter_sdk
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
@@ -666,12 +671,11 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "IOS_MARKETING_VERSION=$MARKETING_VERSION" >> "$GITHUB_ENV"
 
-      # Runs before setup-ruby so pod install uses the runner's own CocoaPods.
       # The build number here is a placeholder; build_ipa passes the real one
       # to xcodebuild on every attempt.
-      - name: Generate Flutter config and install pods
+      - name: Generate Flutter config
         id: flutterconfig
-        working-directory: example
+        working-directory: klaviyo_flutter_sdk/example
         run: |
           flutter pub get
           flutter build ios --release --config-only --no-codesign \
@@ -682,11 +686,11 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
-          working-directory: example/ios
+          working-directory: klaviyo_flutter_sdk/example/ios
 
       - name: Check App Store Connect key only
         if: inputs.check_credentials == true
-        working-directory: example/ios
+        working-directory: klaviyo_flutter_sdk/example/ios
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
@@ -695,7 +699,7 @@ jobs:
 
       - name: Check match repo is readable
         if: inputs.check_credentials == true
-        working-directory: example/ios
+        working-directory: klaviyo_flutter_sdk/example/ios
         env:
           MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
         run: |
@@ -709,7 +713,7 @@ jobs:
       - name: Install signing identity, build and upload
         if: inputs.check_credentials != true
         id: build
-        working-directory: example/ios
+        working-directory: klaviyo_flutter_sdk/example/ios
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
