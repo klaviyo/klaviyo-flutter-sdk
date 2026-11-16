@@ -184,10 +184,13 @@ update_podspec_versions() {
         sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1, '$version'|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1, '$version'|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1, '$version'|" "$PODSPEC"
+        sedi -E "s|(s\.dependency 'KlaviyoInbox').*|\1, '$version'|" "$PODSPEC"
     else
         sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1|" "$PODSPEC"
+        # Leave the inbox line alone: it is opt-in and conditional, so a branch
+        # switch must not rewrite it into an unconditional dependency.
     fi
 }
 
@@ -404,6 +407,8 @@ includeBuild('$path') {
         substitute module('com.github.klaviyo.klaviyo-android-sdk:location-core') using project(':sdk:location-core')
         substitute module('com.github.klaviyo.klaviyo-android-sdk:forms') using project(':sdk:forms')
         substitute module('com.github.klaviyo.klaviyo-android-sdk:forms-core') using project(':sdk:forms-core')
+        substitute module('com.github.klaviyo.klaviyo-android-sdk:inbox') using project(':sdk:inbox')
+        substitute module('com.github.klaviyo.klaviyo-android-sdk:inbox-core') using project(':sdk:inbox-core')
     }
 }
 $ANDROID_MARKER_END_LITERAL

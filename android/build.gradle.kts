@@ -131,8 +131,16 @@ dependencies {
     "api"("com.github.klaviyo.klaviyo-android-sdk:push-fcm:$klaviyoSdkVersion")
 
     // Mobile Inbox: opt-in while the native module is unreleased.
+    //
+    // The inbox artifacts are not in any published release yet, so they only
+    // resolve against a JitPack branch build such as
+    // `feat~mobile-inbox-SNAPSHOT`. Point the whole SDK at one branch with
+    // `scripts/configure-sdk.sh --android-branch <branch>`, which rewrites
+    // klaviyoSdkVersion; a host can also set klaviyoInboxVersion to build the
+    // inbox module from a different ref than the rest of the SDK.
     if (includeInbox) {
-        "implementation"("com.github.klaviyo.klaviyo-android-sdk:inbox:$klaviyoSdkVersion")
+        val inboxVersion = providers.gradleProperty("klaviyoInboxVersion").orNull ?: klaviyoSdkVersion
+        "api"("com.github.klaviyo.klaviyo-android-sdk:inbox:$inboxVersion")
     }
 
     // Location: full module (includes -core transitively), or just -core for lightweight
