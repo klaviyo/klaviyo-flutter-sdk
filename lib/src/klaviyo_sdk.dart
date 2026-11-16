@@ -12,6 +12,7 @@ import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
 import 'models/klaviyo_push_action.dart';
 import 'models/profile_property.dart';
+import 'models/inbox_filters.dart';
 import 'models/inbox_message_state.dart';
 import 'models/inbox_page.dart';
 import 'enums/klaviyo_log_level.dart';
@@ -738,20 +739,53 @@ class KlaviyoSDK {
   /// 20. Pass a previous page's [InboxPage.nextCursor] as [cursor] to continue.
   /// The cursor is opaque — pass it back, never parse or build one.
   ///
+  /// [readFilter] and [archiveFilter] choose which messages the page holds.
+  /// They are independent: each narrows the page on its own axis, so
+  /// `readFilter: InboxReadFilter.unread` alone means "unread and not
+  /// archived". **Archived messages are hidden by default** — [archiveFilter]
+  /// defaults to [InboxArchiveFilter.active], so an archive view must ask for
+  /// [InboxArchiveFilter.archived] or [InboxArchiveFilter.all].
+  ///
+  /// A cursor is only valid with the filters it was issued under. Reusing one
+  /// with different filters surfaces as [KlaviyoInboxErrorReason.invalidCursor];
+  /// restart paging from the first page when that happens.
+  ///
   /// Throws [KlaviyoInboxException] when the native inbox fails. When
   /// [KlaviyoInboxErrorReason.invalidCursor] is reported, the cursor did not
-  /// come from this inbox: restart paging from the first page.
+  /// come from this inbox (or these filters): restart paging from the first
+  /// page.
   ///
   /// Example:
   /// ```dart
-  /// var page = await klaviyo.fetchInboxPage();
+  /// // Unread messages that are not archived (the default archive filter).
+  /// var page = await klaviyo.fetchInboxPage(
+  ///   readFilter: InboxReadFilter.unread,
+  /// );
   /// while (page.nextCursor != null) {
-  ///   page = await klaviyo.fetchInboxPage(cursor: page.nextCursor);
+  ///   page = await klaviyo.fetchInboxPage(
+  ///     readFilter: InboxReadFilter.unread,
+  ///     cursor: page.nextCursor,
+  ///   );
   /// }
+  ///
+  /// // The archive: archived messages only, read or unread.
+  /// final archived = await klaviyo.fetchInboxPage(
+  ///   archiveFilter: InboxArchiveFilter.archived,
+  /// );
   /// ```
-  Future<InboxPage> fetchInboxPage({int pageSize = 20, String? cursor}) async {
+  Future<InboxPage> fetchInboxPage({
+    int pageSize = 20,
+    String? cursor,
+    InboxReadFilter readFilter = InboxReadFilter.all,
+    InboxArchiveFilter archiveFilter = InboxArchiveFilter.active,
+  }) async {
     _ensureInitialized();
-    return _nativeWrapper.fetchInboxPage(pageSize: pageSize, cursor: cursor);
+    return _nativeWrapper.fetchInboxPage(
+      pageSize: pageSize,
+      cursor: cursor,
+      readFilter: readFilter,
+      archiveFilter: archiveFilter,
+    );
   }
 
   /// The number of the current company's messages that are unread and not

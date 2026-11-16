@@ -4,6 +4,7 @@ import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
 import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
+import '../models/inbox_filters.dart';
 import '../models/inbox_message_state.dart';
 import '../models/inbox_page.dart';
 import '../exceptions/klaviyo_exception.dart';
@@ -436,17 +437,28 @@ class KlaviyoNativeWrapper {
   /// an opaque token from a previous [InboxPage.nextCursor] and is never parsed
   /// here.
   ///
+  /// [readFilter] and [archiveFilter] narrow which messages the page holds.
+  /// They are forwarded verbatim; the native SDKs own their defaults and the
+  /// validation that a cursor's filters match the query's.
+  ///
   /// Throws [KlaviyoInboxException] on a native inbox failure and
   /// [KlaviyoNotInitializedException] before [initialize].
   Future<InboxPage> fetchInboxPage({
     required int pageSize,
     String? cursor,
+    required InboxReadFilter readFilter,
+    required InboxArchiveFilter archiveFilter,
   }) async {
     _ensureInitialized();
     try {
       final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'fetchInboxPage',
-        {'pageSize': pageSize, 'cursor': cursor},
+        {
+          'pageSize': pageSize,
+          'cursor': cursor,
+          'readFilter': readFilter.wireValue,
+          'archiveFilter': archiveFilter.wireValue,
+        },
       );
       if (result == null) {
         throw const KlaviyoInboxException(

@@ -85,7 +85,8 @@ void main() {
       expect(page.nextCursor, 'cursor-2');
     });
 
-    test('defaults to a page size of 20 and no cursor', () async {
+    test('defaults to a page size of 20, no cursor, and the native filters',
+        () async {
       replies['fetchInboxPage'] = () => pageMap();
 
       await KlaviyoSDK().fetchInboxPage();
@@ -93,6 +94,75 @@ void main() {
       final call = calls.lastWhere((c) => c.method == 'fetchInboxPage');
       expect(call.arguments['pageSize'], 20);
       expect(call.arguments['cursor'], isNull);
+      // Archived messages are hidden by default.
+      expect(call.arguments['readFilter'], 'all');
+      expect(call.arguments['archiveFilter'], 'active');
+    });
+
+    test('forwards both filters to native', () async {
+      replies['fetchInboxPage'] = () => pageMap();
+
+      await KlaviyoSDK().fetchInboxPage(
+        readFilter: InboxReadFilter.unread,
+        archiveFilter: InboxArchiveFilter.archived,
+      );
+
+      final call = calls.lastWhere((c) => c.method == 'fetchInboxPage');
+      expect(call.arguments['readFilter'], 'unread');
+      expect(call.arguments['archiveFilter'], 'archived');
+    });
+
+    test('sends every filter value as its wire value', () async {
+      replies['fetchInboxPage'] = () => pageMap();
+
+      for (final filter in InboxReadFilter.values) {
+        await KlaviyoSDK().fetchInboxPage(readFilter: filter);
+        final call = calls.lastWhere((c) => c.method == 'fetchInboxPage');
+        expect(call.arguments['readFilter'], filter.name);
+      }
+      for (final filter in InboxArchiveFilter.values) {
+        await KlaviyoSDK().fetchInboxPage(archiveFilter: filter);
+        final call = calls.lastWhere((c) => c.method == 'fetchInboxPage');
+        expect(call.arguments['archiveFilter'], filter.name);
+      }
+    });
+
+    test('sends filters alongside a cursor unchanged', () async {
+      replies['fetchInboxPage'] = () => pageMap();
+
+      await KlaviyoSDK().fetchInboxPage(
+        cursor: 'cursor-1',
+        readFilter: InboxReadFilter.read,
+        archiveFilter: InboxArchiveFilter.all,
+      );
+
+      final call = calls.lastWhere((c) => c.method == 'fetchInboxPage');
+      expect(call.arguments['cursor'], 'cursor-1');
+      expect(call.arguments['readFilter'], 'read');
+      expect(call.arguments['archiveFilter'], 'all');
+    });
+
+    test('maps a filter-mismatched cursor to invalidCursor', () async {
+      // Native rejects a cursor reused under different filters with the same
+      // InvalidCursor error as any other unusable token.
+      replies['fetchInboxPage'] = () => throw PlatformException(
+        code: 'INBOX_INVALID_CURSOR',
+        message: 'the cursor was issued for different filters',
+      );
+
+      await expectLater(
+        KlaviyoSDK().fetchInboxPage(
+          cursor: 'cursor-from-other-filters',
+          readFilter: InboxReadFilter.unread,
+        ),
+        throwsA(
+          isA<KlaviyoInboxException>().having(
+            (e) => e.reason,
+            'reason',
+            KlaviyoInboxErrorReason.invalidCursor,
+          ),
+        ),
+      );
     });
 
     test('forwards an out-of-range page size unclamped for native to clamp',

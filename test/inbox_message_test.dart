@@ -232,6 +232,33 @@ void main() {
     });
   });
 
+  group('inbox filters', () {
+    test('read filter wire values match the native contract', () {
+      expect(InboxReadFilter.all.wireValue, 'all');
+      expect(InboxReadFilter.unread.wireValue, 'unread');
+      expect(InboxReadFilter.read.wireValue, 'read');
+    });
+
+    test('archive filter wire values match the native contract', () {
+      // Archived messages are hidden by default, so `active` is what a caller
+      // gets without asking.
+      expect(InboxArchiveFilter.active.wireValue, 'active');
+      expect(InboxArchiveFilter.archived.wireValue, 'archived');
+      expect(InboxArchiveFilter.all.wireValue, 'all');
+    });
+
+    test('each filter has exactly the values the native SDKs expose', () {
+      expect(
+        InboxReadFilter.values.map((f) => f.wireValue),
+        ['all', 'unread', 'read'],
+      );
+      expect(
+        InboxArchiveFilter.values.map((f) => f.wireValue),
+        ['active', 'archived', 'all'],
+      );
+    });
+  });
+
   group('InboxMessageState', () {
     test('wire values match the native contract', () {
       expect(InboxMessageState.read.wireValue, 'read');
