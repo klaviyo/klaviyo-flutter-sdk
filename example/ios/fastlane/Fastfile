@@ -92,7 +92,6 @@ platform :ios do
       configuration: "Release",
       destination: "generic/platform=iOS",
       export_method: "app-store",
-      codesigning_identity: "Apple Distribution",
       # The extension hardcodes CURRENT_PROJECT_VERSION = 1; App Store Connect
       # wants it to match the host app's CFBundleVersion.
       xcargs: "CURRENT_PROJECT_VERSION=#{build_number} FLUTTER_BUILD_NUMBER=#{build_number} KLAVIYO_APP_VERSION='#{app_version}'",
