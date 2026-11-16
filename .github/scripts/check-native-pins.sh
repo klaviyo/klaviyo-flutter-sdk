@@ -28,7 +28,14 @@ while IFS= read -r line; do
 done < <(grep -nE "^[[:space:]]*s\.dependency[[:space:](]+['\"]Klaviyo[A-Za-z]*['\"][[:space:])]*(#.*)?$" "$root/$podspec" || true)
 
 if [ -f "$root/$package" ]; then
-  swift_pin=$(awk '/klaviyo-swift-sdk/ { grab = 1 } grab { print; if (/\)/) exit }' "$root/$package" | tr -d '\n')
+  # Anchor on the klaviyo-swift-sdk .package(...) declaration itself. Matching
+  # any line that mentions the package name would also catch a target's
+  # conditional product dependency (`.product(name: "KlaviyoInbox", package:
+  # "klaviyo-swift-sdk")`), which carries no version requirement of its own.
+  # Skip the conditional product dependency, which names the package but has no
+  # version requirement of its own.
+  swift_pin=$(awk '/klaviyo-swift-sdk/ && !/\.product\(/ { grab = 1 } grab { print; if (/\)/) exit }' \
+    "$root/$package" | tr -d '\n')
   if [ -z "$swift_pin" ]; then
     errors+=("${package}: no klaviyo-swift-sdk package dependency found")
   elif ! [[ "$swift_pin" =~ (from:|exact:|upToNextMinor|upToNextMajor)[^\)]*\"[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)(\.?[0-9]+)?)?\" ]]; then

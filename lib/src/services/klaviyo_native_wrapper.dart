@@ -4,6 +4,9 @@ import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
 import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
+import '../models/inbox_filters.dart';
+import '../models/inbox_message_state.dart';
+import '../models/inbox_page.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
 import '../utils/profile_key_normalizer.dart';
@@ -36,6 +39,12 @@ class KlaviyoNativeWrapper {
   final _pushActionController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
 
+  // Invalidation is a payload-free "the inbox may have changed" signal, so a
+  // burst of native changes collapses into one re-read on the Dart side.
+  final _inboxChangedController = BufferedBroadcastStreamController<void>(
+    coalesce: true,
+  );
+
   // Getters for streams
   Stream<Map<String, dynamic>> get onPushNotification =>
       _pushNotificationController.stream;
@@ -56,6 +65,14 @@ class KlaviyoNativeWrapper {
   /// typed view.
   Stream<Map<String, dynamic>> get onPushActionEvent =>
       _pushActionController.stream;
+
+  /// Stream of payload-free inbox invalidation signals.
+  ///
+  /// The native SDKs post one when a push was captured, a message's state
+  /// changed, or messages were cleared. It carries no data: re-fetch whatever
+  /// is on screen. This is best-effort, not durable delivery — see
+  /// [KlaviyoSDK.inboxChanged] for what a consumer must also do.
+  Stream<void> get onInboxChanged => _inboxChangedController.stream;
 
   /// Initialize the native SDK wrapper
   Future<void> initialize({
@@ -409,6 +426,134 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  // ============================================================================
+  // Mobile Inbox
+  // ============================================================================
+
+  /// Fetch one page of inbox messages, newest first.
+  ///
+  /// [pageSize] is clamped by the native SDKs to 1..100 (default 20); this
+  /// layer forwards it unclamped so the clamp lives in one place. [cursor] is
+  /// an opaque token from a previous [InboxPage.nextCursor] and is never parsed
+  /// here.
+  ///
+  /// [readFilter] and [archiveFilter] narrow which messages the page holds.
+  /// They are forwarded verbatim; the native SDKs own their defaults and the
+  /// validation that a cursor's filters match the query's.
+  ///
+  /// Throws [KlaviyoInboxException] on a native inbox failure and
+  /// [KlaviyoNotInitializedException] before [initialize].
+  Future<InboxPage> fetchInboxPage({
+    required int pageSize,
+    String? cursor,
+    required InboxReadFilter readFilter,
+    required InboxArchiveFilter archiveFilter,
+  }) async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'fetchInboxPage',
+        {
+          'pageSize': pageSize,
+          'cursor': cursor,
+          'readFilter': readFilter.wireValue,
+          'archiveFilter': archiveFilter.wireValue,
+        },
+      );
+      if (result == null) {
+        throw const KlaviyoInboxException(
+          'Native layer returned no inbox page',
+          reason: KlaviyoInboxErrorReason.storageFailure,
+        );
+      }
+      return InboxPage.fromMap(Map<String, dynamic>.from(result));
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
+  /// Count the current company's messages that are unread and not archived.
+  Future<int> fetchInboxUnreadCount() async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<int>('fetchInboxUnreadCount');
+      return result ?? 0;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
+  /// Apply [state] to the message identified by [messageId].
+  ///
+  /// Returns whether this device has that message, whether or not the change
+  /// altered it. Applying a state a message already reflects is idempotent.
+  Future<bool> updateInboxMessageState(
+    String messageId,
+    InboxMessageState state,
+  ) async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'updateInboxMessageState',
+        {'messageId': messageId, 'state': state.wireValue},
+      );
+      return result ?? false;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
+  /// Remove one message from this device. Returns whether it was there.
+  ///
+  /// iOS only: Android has no public clear API, so it reports
+  /// `INBOX_UNSUPPORTED`.
+  Future<bool> clearInboxMessage(String messageId) async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'clearInboxMessage',
+        {'messageId': messageId},
+      );
+      return result ?? false;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
+  /// Remove several messages from this device. Returns how many were there.
+  ///
+  /// iOS only: Android has no public clear API, so it reports
+  /// `INBOX_UNSUPPORTED`.
+  Future<int> clearInboxMessages(List<String> messageIds) async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<int>(
+        'clearInboxMessages',
+        {'messageIds': messageIds},
+      );
+      return result ?? 0;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
+  /// Maps a native inbox failure to a typed [KlaviyoInboxException].
+  KlaviyoInboxException _inboxException(
+    PlatformException error,
+    StackTrace stackTrace,
+  ) {
+    final exception = KlaviyoInboxException.fromPlatformError(
+      code: error.code,
+      message: error.message,
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+    _logger.warning(
+      'Mobile Inbox call failed: ${exception.reason.name} (${error.code})',
+    );
+    return exception;
+  }
+
   /// Reset profile using native SDK
   Future<void> resetProfile() async {
     _ensureInitialized();
@@ -504,6 +649,12 @@ class KlaviyoNativeWrapper {
           _logger.info('Native push action event: $eventType');
           _pushActionController.add(eventData);
           break;
+        case 'inbox_changed':
+          // Payload-free invalidation: never log the map, there is nothing in
+          // it to log and consumers only need the fact that it arrived.
+          _logger.fine('Native inbox invalidation event received');
+          _inboxChangedController.add(null);
+          break;
         default:
           // Handle unknown event types
           break;
@@ -557,5 +708,6 @@ class KlaviyoNativeWrapper {
     _formEventController.close();
     _authTokenRequestController.close();
     _pushActionController.close();
+    _inboxChangedController.close();
   }
 }
