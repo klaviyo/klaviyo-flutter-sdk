@@ -145,15 +145,20 @@ class KlaviyoFlutterSdkPlugin :
                     // native change becomes one `inbox_changed` event. No
                     // caching here — a missed change is covered by the
                     // consumer's fetch-on-startup and fetch-on-resume.
+                    //
+                    // The bridge collects the native signal off the main thread
+                    // (so no store work lands here) and invokes this on the main
+                    // thread, so `eventSink` is touched only from the main thread.
                     InboxBridge.registerChangeObserver {
-                        Handler(Looper.getMainLooper()).post {
-                            eventSink?.success(mapOf("type" to "inbox_changed"))
-                        }
+                        eventSink?.success(mapOf("type" to "inbox_changed"))
                     }
                 }
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
+                    // Stop collecting the native inbox signal so the listener
+                    // does not outlive this engine and call into a dead sink.
+                    InboxBridge.unregisterChangeObserver()
                     // The Dart side keeps a permanent auth-event listener, so this
                     // fires at engine teardown. Tear the auth bridge down here too
                     // (parity with iOS onCancel) so in-flight requests fail promptly
@@ -779,8 +784,16 @@ class KlaviyoFlutterSdkPlugin :
             "fetchInboxPage" -> {
                 val pageSize = call.argument<Int>("pageSize") ?: InboxBridge.DEFAULT_PAGE_SIZE
                 val cursor = call.argument<String>("cursor")
+                val readFilter = call.argument<String>("readFilter")
+                val archiveFilter = call.argument<String>("archiveFilter")
                 deliverInboxResult(result) { done ->
-                    InboxBridge.fetchPage(pageSize, cursor, done)
+                    InboxBridge.fetchPage(
+                        pageSize = pageSize,
+                        cursor = cursor,
+                        readFilter = readFilter,
+                        archiveFilter = archiveFilter,
+                        onResult = done,
+                    )
                 }
             }
 
@@ -922,6 +935,11 @@ class KlaviyoFlutterSdkPlugin :
             instance = null
         }
         eventSink = null
+        // Unregister the inbox change listener so the native SDK stops
+        // retaining this now-detached plugin instance's lambda. onCancel
+        // normally does this already; repeating it here covers an engine that
+        // detaches without cancelling the stream, and is idempotent.
+        InboxBridge.unregisterChangeObserver()
         // Unregister the auth token provider so the Klaviyo singleton stops
         // retaining (and invoking) this now-detached plugin instance's bridge
         // lambda after the engine is gone, and drain pending callbacks.

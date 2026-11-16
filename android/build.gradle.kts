@@ -110,6 +110,18 @@ extensions.configure<com.android.build.api.dsl.LibraryExtension> {
         getByName("main") {
             java.srcDir(if (includeInbox) "src/inboxEnabled/kotlin" else "src/inboxDisabled/kotlin")
         }
+        // Each bridge's own tests, compiled only alongside that bridge: the
+        // disabled tests assert INBOX_UNAVAILABLE and the enabled ones assert
+        // the native observer contract, so neither applies to the other build.
+        getByName("test") {
+            java.srcDir(
+                if (includeInbox) {
+                    "src/inboxEnabled/test/kotlin"
+                } else {
+                    "src/inboxDisabled/test/kotlin"
+                },
+            )
+        }
     }
 }
 

@@ -8,6 +8,9 @@ package com.klaviyo.klaviyo_flutter_sdk
  * [InboxErrorCodes.UNAVAILABLE], which the Dart layer surfaces as a typed
  * `KlaviyoInboxException` rather than a confusing null or a missing-method
  * error.
+ *
+ * The signatures mirror the enabled bridge exactly, so the plugin code that
+ * calls them is identical in both builds.
  */
 internal object InboxBridge {
     const val IS_AVAILABLE: Boolean = false
@@ -25,6 +28,8 @@ internal object InboxBridge {
     fun fetchPage(
         pageSize: Int,
         cursor: String?,
+        readFilter: String?,
+        archiveFilter: String?,
         onResult: (InboxBridgeResult<Map<String, Any?>>) -> Unit,
     ) = onResult(unavailable)
 
@@ -37,14 +42,12 @@ internal object InboxBridge {
     ) = onResult(unavailable)
 
     /**
-     * No-op: without the inbox module no inbox change can be observed.
-     *
-     * TODO(MAGE-1102): register the native inbox change listener here once the
-     * Android SDK exposes one, and forward each change to
-     * `eventSink.success(mapOf("type" to "inbox_changed"))` so Dart's
-     * `inboxChanged` stream matches iOS.
+     * No-op: without the inbox module there is no change signal to collect.
      */
     fun registerChangeObserver(
         @Suppress("UNUSED_PARAMETER") onChanged: () -> Unit,
     ) = Unit
+
+    /** No-op: nothing is ever registered in this build. */
+    fun unregisterChangeObserver() = Unit
 }

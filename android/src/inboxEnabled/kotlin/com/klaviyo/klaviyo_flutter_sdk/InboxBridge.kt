@@ -1,11 +1,14 @@
 package com.klaviyo.klaviyo_flutter_sdk
 
+import com.klaviyo.inbox.InboxArchiveFilter
+import com.klaviyo.inbox.InboxChangeListener
 import com.klaviyo.inbox.InboxCursor
 import com.klaviyo.inbox.InboxDestination
 import com.klaviyo.inbox.InboxException
 import com.klaviyo.inbox.InboxMessage
 import com.klaviyo.inbox.InboxPage
 import com.klaviyo.inbox.InboxQuery
+import com.klaviyo.inbox.InboxReadFilter
 import com.klaviyo.inbox.InboxResult
 import com.klaviyo.inbox.InboxStateChange
 import com.klaviyo.inbox.KlaviyoInbox
@@ -33,15 +36,24 @@ internal object InboxBridge {
     fun fetchPage(
         pageSize: Int,
         cursor: String?,
+        readFilter: String?,
+        archiveFilter: String?,
         onResult: (InboxBridgeResult<Map<String, Any?>>) -> Unit,
     ) {
         val query =
-            InboxQuery(
-                // InboxQuery clamps pageSize to 1..100 itself; pass it through
-                // rather than duplicating the clamp here.
-                pageSize = pageSize,
-                cursor = cursor?.let(::InboxCursor),
-            )
+            try {
+                InboxQuery(
+                    // InboxQuery clamps pageSize to 1..100 itself; pass it
+                    // through rather than duplicating the clamp here.
+                    pageSize = pageSize,
+                    cursor = cursor?.let(::InboxCursor),
+                    readFilter = readFilter.toReadFilter(),
+                    archiveFilter = archiveFilter.toArchiveFilter(),
+                )
+            } catch (e: IllegalArgumentException) {
+                onResult(InboxBridgeResult.Failure(InboxErrorCodes.STORAGE_FAILURE, e.message))
+                return
+            }
         deliver(onResult, { page -> page.toBridgeMap() }) { done ->
             KlaviyoInbox.fetchPage(query, done)
         }
@@ -72,20 +84,38 @@ internal object InboxBridge {
     }
 
     /**
-     * No-op until the native module exposes a change signal.
+     * Collects the native inbox change signal while Dart is subscribed.
      *
-     * TODO(MAGE-1102): the Android SDK has no inbox change/invalidation API
-     * yet. When it adds one, subscribe here and invoke [onChanged] on each
-     * notification; the plugin forwards that to the event channel as a
-     * payload-free `inbox_changed` event, matching iOS's
-     * `MobileInbox.changes`. Until then Android's `inboxChanged` stream stays
-     * silent and consumers rely on fetch-on-startup and fetch-on-resume.
+     * `KlaviyoInbox.addChangeListener` collects `MobileInbox.changes` off the
+     * main thread and invokes the listener on it, so no store work happens on
+     * the main thread here. The listener is held until
+     * [unregisterChangeObserver], which the plugin calls when the event channel
+     * is cancelled, so it does not outlive the engine.
+     *
+     * Registering twice replaces the previous listener rather than leaking one.
      */
     fun registerChangeObserver(onChanged: () -> Unit) {
-        // Intentionally empty — see the TODO above.
-        @Suppress("UNUSED_EXPRESSION")
-        onChanged
+        unregisterChangeObserver()
+        val listener = InboxChangeListener { onChanged() }
+        changeListener = listener
+        KlaviyoInbox.addChangeListener(listener)
     }
+
+    /**
+     * Stops collecting the native change signal. Safe to call when none is
+     * registered.
+     */
+    fun unregisterChangeObserver() {
+        changeListener?.let(KlaviyoInbox::removeChangeListener)
+        changeListener = null
+    }
+
+    /**
+     * The listener currently registered, if any. Held so it can be removed: the
+     * native SDK keeps a reference until it is.
+     */
+    @Volatile
+    private var changeListener: InboxChangeListener? = null
 
     /**
      * Bridges the native `InboxResult` shape onto [InboxBridgeResult], mapping
@@ -112,8 +142,8 @@ internal object InboxBridge {
 
     /**
      * Maps a native inbox failure onto the Dart-facing error code. The native
-     * module reports `InvalidCursor` for a bad cursor and `StorageFailure` for
-     * everything else.
+     * module reports `InvalidCursor` for a bad cursor — including one issued
+     * under different filters — and `StorageFailure` for everything else.
      */
     private fun codeFor(error: Throwable): String =
         when (error) {
@@ -159,6 +189,27 @@ internal object InboxBridge {
             "type" to type.rawValue,
             "url" to url,
         )
+
+    /**
+     * The Dart wire value is the lowercased filter name. An absent value keeps
+     * the native default rather than being an error.
+     */
+    private fun String?.toReadFilter(): InboxReadFilter =
+        when (this?.lowercase()) {
+            null, "all" -> InboxReadFilter.ALL
+            "unread" -> InboxReadFilter.UNREAD
+            "read" -> InboxReadFilter.READ
+            else -> throw IllegalArgumentException("Unknown inbox read filter: $this")
+        }
+
+    /** @see toReadFilter */
+    private fun String?.toArchiveFilter(): InboxArchiveFilter =
+        when (this?.lowercase()) {
+            null, "active" -> InboxArchiveFilter.ACTIVE
+            "archived" -> InboxArchiveFilter.ARCHIVED
+            "all" -> InboxArchiveFilter.ALL
+            else -> throw IllegalArgumentException("Unknown inbox archive filter: $this")
+        }
 
     /** The Dart wire value is the lowercased state name. */
     private fun String.toStateChange(): InboxStateChange =

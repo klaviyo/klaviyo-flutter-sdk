@@ -64,6 +64,33 @@ class KlaviyoFlutterSdkPluginInboxTest {
     }
 
     @Test
+    fun `fetchInboxPage forwards both filters`() {
+        plugin.onMethodCall(
+            MethodCall(
+                "fetchInboxPage",
+                mapOf(
+                    "pageSize" to 10,
+                    "readFilter" to "unread",
+                    "archiveFilter" to "archived",
+                ),
+            ),
+            result,
+        )
+
+        verify(exactly = 1) { result.error(InboxErrorCodes.UNAVAILABLE, any(), null) }
+        confirmVerified(result)
+    }
+
+    @Test
+    fun `fetchInboxPage without filters still reports unavailable`() {
+        // An absent filter keeps the native default; it must not be an error.
+        plugin.onMethodCall(MethodCall("fetchInboxPage", mapOf("pageSize" to 20)), result)
+
+        verify(exactly = 1) { result.error(InboxErrorCodes.UNAVAILABLE, any(), null) }
+        confirmVerified(result)
+    }
+
+    @Test
     fun `fetchInboxUnreadCount reports INBOX_UNAVAILABLE without the module`() {
         plugin.onMethodCall(MethodCall("fetchInboxUnreadCount", null), result)
 
@@ -115,7 +142,7 @@ class KlaviyoFlutterSdkPluginInboxTest {
     fun `the disabled bridge fails every call with the unavailable code`() {
         val outcomes = mutableListOf<InboxBridgeResult<*>>()
 
-        InboxBridge.fetchPage(20, null) { outcomes.add(it) }
+        InboxBridge.fetchPage(20, null, null, null) { outcomes.add(it) }
         InboxBridge.fetchUnreadCount { outcomes.add(it) }
         InboxBridge.updateMessageState("msg-1", "read") { outcomes.add(it) }
 
@@ -129,9 +156,35 @@ class KlaviyoFlutterSdkPluginInboxTest {
     }
 
     @Test
-    fun `registerChangeObserver is a safe no-op without the module`() {
-        // Must not throw: it runs on every event-channel listen.
+    fun `filters do not change the disabled bridge outcome`() {
+        // With no module, the outcome is unavailable regardless of the filters,
+        // so an archive view fails the same clear way as the default one.
+        val outcomes = mutableListOf<InboxBridgeResult<*>>()
+
+        InboxBridge.fetchPage(20, null, "read", "archived") { outcomes.add(it) }
+        InboxBridge.fetchPage(20, null, "unread", "all") { outcomes.add(it) }
+
+        assertEquals(2, outcomes.size)
+        outcomes.forEach { outcome ->
+            assertEquals(
+                InboxErrorCodes.UNAVAILABLE,
+                (outcome as InboxBridgeResult.Failure).code,
+            )
+        }
+    }
+
+    @Test
+    fun `registering the change observer is a safe no-op without the module`() {
+        // Runs on every event-channel listen, so it must not throw.
         InboxBridge.registerChangeObserver { }
+    }
+
+    @Test
+    fun `unregistering the change observer is safe when none is registered`() {
+        // Runs on every event-channel cancel and on engine detach, so it must
+        // be idempotent and must not throw.
+        InboxBridge.unregisterChangeObserver()
+        InboxBridge.unregisterChangeObserver()
     }
 
     @Test
