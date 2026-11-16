@@ -29,6 +29,14 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
     s.dependency 'KlaviyoLocation'
   end
 
+  # Mobile Inbox: opt-in while the native module is unreleased.
+  # Default is FALSE. The Dart API works either way; without this the native
+  # side reports INBOX_UNAVAILABLE.
+  include_inbox = ENV['KLAVIYO_INCLUDE_INBOX'] == 'true'
+  if include_inbox
+    s.dependency 'KlaviyoInbox'
+  end
+
   s.platform = :ios, '13.0'
 
   # Flutter.framework does not contain a i386 slice.
