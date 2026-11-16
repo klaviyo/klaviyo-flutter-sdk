@@ -20,7 +20,7 @@ EXAMPLE_PUBSPEC="${EXAMPLE_PUBSPEC:-$REPO_ROOT/example/pubspec.yaml}"
 PODFILE_LOCK="${PODFILE_LOCK:-$REPO_ROOT/example/ios/Podfile.lock}"
 PODFILE="${PODFILE:-$REPO_ROOT/example/ios/Podfile}"
 PODSPEC="${PODSPEC:-$REPO_ROOT/ios/klaviyo_flutter_sdk.podspec}"
-ANDROID_BUILD_GRADLE="${ANDROID_BUILD_GRADLE:-$REPO_ROOT/android/build.gradle}"
+ANDROID_BUILD_GRADLE="${ANDROID_BUILD_GRADLE:-$REPO_ROOT/android/build.gradle.kts}"
 ANDROID_SETTINGS_GRADLE="${ANDROID_SETTINGS_GRADLE:-$REPO_ROOT/example/android/settings.gradle}"
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
 ANDROID_REPO="https://github.com/klaviyo/klaviyo-android-sdk.git"
@@ -209,7 +209,7 @@ resolve_android_ref() {
   fi
 
   local coordinate
-  coordinate="$(sed -n 's/^def klaviyoSdkVersion = "\([^"]*\)".*/\1/p' "$ANDROID_BUILD_GRADLE" 2>/dev/null | head -1)"
+  coordinate="$(sed -n 's/^val klaviyoSdkVersion = "\([^"]*\)".*/\1/p' "$ANDROID_BUILD_GRADLE" 2>/dev/null | head -1)"
   [ -n "$coordinate" ] || { printf 'unknown'; return; }
 
   if is_semver "$coordinate"; then

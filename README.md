@@ -55,7 +55,9 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
 | iOS      | 15.0+          |
 | Android `minSdkVersion` | 23+ |
 | Android `compileSdkVersion` | 35+ (tracks `flutter.compileSdkVersion`) |
-| Kotlin   | 1.8.0+         |
+| Android Gradle Plugin (AGP) | 8.6+ (AGP 9 supported, with or without built-in Kotlin) |
+| Gradle   | 8.7+           |
+| Kotlin Gradle Plugin | 1.9.0+ (not needed under AGP 9 built-in Kotlin) |
 
 ## Installation
 
