@@ -287,7 +287,6 @@ class KlaviyoFlutterSdkPluginEngineTest {
         headless.listen()
         assertSame(headless.plugin, KlaviyoFlutterSdkPlugin.instance)
         assertEquals(1, headless.pushOpens().size)
-        assertEquals(true, headless.pushOpens().single()["replayed"])
 
         ui.listen()
         assertSame(ui.plugin, KlaviyoFlutterSdkPlugin.instance)
@@ -295,14 +294,14 @@ class KlaviyoFlutterSdkPluginEngineTest {
     }
 
     @Test
-    fun `held push open and action replay once with the replayed marker`() {
+    fun `held push open and action replay once`() {
         val ui = attach()
         ui.attachActivity(pushOpenIntent(buttonId = "btn-1"))
 
         ui.listen()
 
-        assertEquals(true, ui.pushOpens().single()["replayed"])
-        assertEquals(true, ui.pushActions().single()["replayed"])
+        assertEquals(1, ui.pushOpens().size)
+        assertEquals(1, ui.pushActions().size)
 
         ui.cancel()
         ui.listen()
@@ -322,7 +321,6 @@ class KlaviyoFlutterSdkPluginEngineTest {
         ui.deliverNewIntent(pushOpenIntent())
 
         assertEquals(1, ui.pushOpens().size)
-        assertNull(ui.pushOpens().single()["replayed"])
         assertEquals(0, headless.pushOpens().size)
     }
 

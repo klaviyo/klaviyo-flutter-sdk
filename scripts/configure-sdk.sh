@@ -239,10 +239,53 @@ resolve_path() {
     (cd "$path" && pwd)
 }
 
-# Update the klaviyo-swift-sdk pin in Package.swift to .upToNextMinor(from: "<version>").
+# Point the klaviyo-swift-sdk package in Package.swift at a requirement:
+#   version <X.Y.Z> | branch <name> | revision <sha> | path <dir>
+set_package_swift_requirement() {
+    python3 - "$PACKAGE_SWIFT" "$1" "$2" <<'PY'
+import sys
+
+manifest, kind, value = sys.argv[1:]
+text = open(manifest).read()
+
+def entry_bounds(text):
+    pos = 0
+    while True:
+        start = text.find(".package(", pos)
+        if start < 0:
+            return None
+        depth, i = 0, start + len(".package")
+        while i < len(text):
+            if text[i] == "(":
+                depth += 1
+            elif text[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        if "klaviyo-swift-sdk" in text[start:i + 1]:
+            return start, i + 1
+        pos = i + 1
+
+bounds = entry_bounds(text)
+if not bounds:
+    sys.exit(f"klaviyo-swift-sdk dependency not found in {manifest}")
+url = '"https://github.com/klaviyo/klaviyo-swift-sdk"'
+requirement = {
+    "version": f'.upToNextMinor(from: "{value}")',
+    "branch": f'branch: "{value}"',
+    "revision": f'revision: "{value}"',
+}
+if kind == "path":
+    replacement = f'.package(name: "klaviyo-swift-sdk", path: "{value}")'
+else:
+    replacement = f'.package(\n            url: {url},\n            {requirement[kind]}\n        )'
+open(manifest, "w").write(text[:bounds[0]] + replacement + text[bounds[1]:])
+PY
+}
+
 update_package_swift_version() {
-    local version="$1"
-    sedi -E "s|(\.upToNextMinor\(from: )\"[^\"]+\"|\1\"$version\"|" "$PACKAGE_SWIFT"
+    set_package_swift_requirement version "$1"
 }
 
 configure_ios_version() {
@@ -261,8 +304,8 @@ configure_ios_version() {
             return 1
         fi
     done
-    if ! grep -qE '\.upToNextMinor\(from: "[^"]+"' "$PACKAGE_SWIFT"; then
-        error "Expected SPM version pin not found in $PACKAGE_SWIFT"
+    if ! grep -q 'klaviyo-swift-sdk' "$PACKAGE_SWIFT"; then
+        error "Expected klaviyo-swift-sdk dependency not found in $PACKAGE_SWIFT"
         return 1
     fi
     remove_ios_override
@@ -283,6 +326,7 @@ pod 'KlaviyoCore', :git => '$SWIFT_REPO', :branch => '$branch'
 pod 'KlaviyoForms', :git => '$SWIFT_REPO', :branch => '$branch'
 pod 'KlaviyoLocation', :git => '$SWIFT_REPO', :branch => '$branch'"
     update_podfile_extension "'KlaviyoSwiftExtension', :git => '$SWIFT_REPO', :branch => '$branch'"
+    set_package_swift_requirement branch "$branch"
     success "iOS SDK → branch '$branch'"
 }
 
@@ -296,6 +340,7 @@ pod 'KlaviyoCore', :git => '$SWIFT_REPO', :commit => '$commit'
 pod 'KlaviyoForms', :git => '$SWIFT_REPO', :commit => '$commit'
 pod 'KlaviyoLocation', :git => '$SWIFT_REPO', :commit => '$commit'"
     update_podfile_extension "'KlaviyoSwiftExtension', :git => '$SWIFT_REPO', :commit => '$commit'"
+    set_package_swift_requirement revision "$commit"
     success "iOS SDK → commit '$commit'"
 }
 
@@ -310,6 +355,7 @@ pod 'KlaviyoCore', :path => '$path'
 pod 'KlaviyoForms', :path => '$path'
 pod 'KlaviyoLocation', :path => '$path'"
     update_podfile_extension "'KlaviyoSwiftExtension', :path => '$path'"
+    set_package_swift_requirement path "$path"
     success "iOS SDK → local path '$path'"
 }
 

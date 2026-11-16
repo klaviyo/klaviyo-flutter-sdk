@@ -1,61 +1,41 @@
 import 'dart:async';
 
-/// A broadcast [StreamController] that keeps events arriving while no
-/// listener is subscribed.
+/// A broadcast [StreamController] that buffers events arriving while no
+/// listener is subscribed, then flushes them to the next subscriber once.
 ///
-/// Events for which [holdKey] returns a non-null key are held in one slot per
-/// key. A held event is replayed to every subscriber when it subscribes, and
-/// stays held until another event with the same key arrives. That newer event
-/// replaces the held one if no listener is subscribed or it is added with
-/// `hold: true`, and otherwise clears the slot when it is delivered live.
-///
-/// All other events are queued and flushed to the first subscriber, then
-/// cleared.
+/// Events for which [holdKey] returns a non-null key take one buffer slot per
+/// key: a newer event with the same key replaces the buffered one. All other
+/// events are buffered in arrival order.
 class BufferedBroadcastStreamController<T> {
   BufferedBroadcastStreamController({Object? Function(T event)? holdKey})
       : _holdKey = holdKey;
 
   final Object? Function(T event)? _holdKey;
   final _buffer = <T>[];
-  final _held = <Object, T>{};
   late final StreamController<T> _controller = StreamController<T>.broadcast(
     onListen: _flush,
   );
 
-  late final Stream<T> stream =
-      Stream<T>.multi(_onSubscribe, isBroadcast: true);
-
+  Stream<T> get stream => _controller.stream;
   bool get hasListener => _controller.hasListener;
 
-  /// Adds [event]. With [hold], an event that has a hold key is delivered to
-  /// current listeners and also held for later subscribers.
-  void add(T event, {bool hold = false}) {
+  void add(T event) {
+    if (_controller.hasListener) {
+      _controller.add(event);
+      return;
+    }
     final key = _holdKey?.call(event);
     if (key != null) {
-      _held.remove(key);
-      if (hold || !_controller.hasListener) {
-        _held[key] = event;
-      }
-      if (!_controller.hasListener) return;
+      _buffer.removeWhere((buffered) => _holdKey?.call(buffered) == key);
     }
-    _controller.hasListener ? _controller.add(event) : _buffer.add(event);
+    _buffer.add(event);
   }
 
-  /// Drops every held event.
-  void clearHeld() => _held.clear();
-
-  void _onSubscribe(MultiStreamController<T> subscriber) {
-    final replay = _held.values.toList();
-    final subscription = _controller.stream.listen(
-      subscriber.addSync,
-      onError: subscriber.addErrorSync,
-      onDone: subscriber.closeSync,
-    );
-    subscriber
-      ..onPause = subscription.pause
-      ..onResume = subscription.resume
-      ..onCancel = subscription.cancel;
-    replay.forEach(subscriber.add);
+  /// Drops every buffered event that has a hold key.
+  void clearHeld() {
+    final holdKey = _holdKey;
+    if (holdKey == null) return;
+    _buffer.removeWhere((buffered) => holdKey(buffered) != null);
   }
 
   void _flush() {
@@ -65,7 +45,6 @@ class BufferedBroadcastStreamController<T> {
 
   void close() {
     _buffer.clear();
-    _held.clear();
     _controller.close();
   }
 }

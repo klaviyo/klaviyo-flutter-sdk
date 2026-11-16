@@ -24,20 +24,20 @@ repos:
       # ----- Dart / Flutter -----
       - id: dart-fix
         name: dart fix
-        entry: dart fix --apply
+        entry: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE dart fix --apply
         language: system
         files: \.dart$
         pass_filenames: false
 
       - id: dart-format
         name: dart format
-        entry: dart format
+        entry: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE dart format
         language: system
         files: \.dart$
 
       - id: flutter-analyze
         name: flutter analyze
-        entry: flutter analyze --no-fatal-infos
+        entry: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE flutter analyze --no-fatal-infos
         language: system
         pass_filenames: false
 
