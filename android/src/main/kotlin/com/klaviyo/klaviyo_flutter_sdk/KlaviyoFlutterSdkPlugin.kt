@@ -141,6 +141,15 @@ class KlaviyoFlutterSdkPlugin :
                     // Replay a silent push that arrived before Flutter subscribed.
                     cachedSilentPush?.let { events?.success(it) }
                     cachedSilentPush = null
+                    // Inbox invalidation is best-effort and payload-free: each
+                    // native change becomes one `inbox_changed` event. No
+                    // caching here — a missed change is covered by the
+                    // consumer's fetch-on-startup and fetch-on-resume.
+                    InboxBridge.registerChangeObserver {
+                        Handler(Looper.getMainLooper()).post {
+                            eventSink?.success(mapOf("type" to "inbox_changed"))
+                        }
+                    }
                 }
 
                 override fun onCancel(arguments: Any?) {
@@ -767,6 +776,35 @@ class KlaviyoFlutterSdkPlugin :
                 result.success(null)
             }
 
+            "fetchInboxPage" -> {
+                val pageSize = call.argument<Int>("pageSize") ?: InboxBridge.DEFAULT_PAGE_SIZE
+                val cursor = call.argument<String>("cursor")
+                deliverInboxResult(result) { done ->
+                    InboxBridge.fetchPage(pageSize, cursor, done)
+                }
+            }
+
+            "fetchInboxUnreadCount" ->
+                deliverInboxResult(result) { done ->
+                    InboxBridge.fetchUnreadCount(done)
+                }
+
+            "updateInboxMessageState" -> {
+                val messageId = call.argument<String>("messageId")
+                val state = call.argument<String>("state")
+                if (messageId == null || state == null) {
+                    result.error(
+                        "INVALID_ARGUMENTS",
+                        "An inbox message id and state are required",
+                        null,
+                    )
+                    return
+                }
+                deliverInboxResult(result) { done ->
+                    InboxBridge.updateMessageState(messageId, state, done)
+                }
+            }
+
             "handleUniversalTrackingLink" -> {
                 val url = call.argument<String>("url")
 
@@ -785,6 +823,27 @@ class KlaviyoFlutterSdkPlugin :
 
             else -> {
                 result.notImplemented()
+            }
+        }
+    }
+
+    /**
+     * Runs a Mobile Inbox call and reports the outcome to Dart.
+     *
+     * The native inbox module does its store work off the main thread and
+     * delivers each result on the main thread, so nothing here puts database
+     * work on the main thread. Failures are mapped onto the Dart-facing error
+     * codes inside the bridge.
+     */
+    private fun <T> deliverInboxResult(
+        result: Result,
+        call: ((InboxBridgeResult<T>) -> Unit) -> Unit,
+    ) {
+        call { outcome ->
+            when (outcome) {
+                is InboxBridgeResult.Success -> result.success(outcome.value)
+                is InboxBridgeResult.Failure ->
+                    result.error(outcome.code, outcome.message, null)
             }
         }
     }
