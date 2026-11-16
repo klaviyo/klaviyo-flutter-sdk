@@ -49,22 +49,27 @@ bool _isStandardKey(String key) =>
 
 /// Converts [value] to the type the native SDKs expect for [key].
 ///
-/// [key] must already be normalized. For latitude and longitude, a number or
-/// numeric string becomes a [double], and any other value can't be converted.
-/// For other identifier and standard attribute keys, a [num] or [bool]
-/// becomes a [String]. Other values, and values for custom keys, are returned
-/// unchanged. Returns null when [value] is null or can't be converted.
+/// [key] must already be normalized. For latitude and longitude, a [num] or
+/// numeric [String] becomes a [double]; the result must be finite. For other
+/// identifier and standard attribute keys, a [String] is returned unchanged
+/// and a [num] or [bool] becomes a [String]. Values for custom keys are
+/// returned unchanged. Returns null when [value] is null or can't be
+/// converted, including NaN or +/-Infinity for latitude and longitude and a
+/// [Map], [List] or any other type under a standard or identifier key.
 Object? coerceProfileValue(String key, Object? value) {
   if (value == null) return null;
   if (_locationNumberKeys.contains(key)) {
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value);
-    return null;
+    final number = value is num
+        ? value.toDouble()
+        : value is String
+            ? double.tryParse(value)
+            : null;
+    return number != null && number.isFinite ? number : null;
   }
-  if (_isStandardKey(key) && (value is num || value is bool)) {
-    return value.toString();
-  }
-  return value;
+  if (!_isStandardKey(key)) return value;
+  if (value is String) return value;
+  if (value is num || value is bool) return value.toString();
+  return null;
 }
 
 Object? _coerceOrWarn(String source, String key, Object? value) {

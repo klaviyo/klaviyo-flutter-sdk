@@ -8,11 +8,13 @@ final Logger _logger = Logger('KlaviyoSDK');
 /// `StandardMessageCodec` can encode.
 ///
 /// [DateTime] values become UTC ISO 8601 strings, through nested maps and
-/// lists. `null`, [bool], [num], [String], [Uint8List], [Int32List],
-/// [Int64List], [Float32List], [Float64List], [List] and [Map] with [String]
-/// keys are kept. Any other value, and any nested map with a non-[String]
-/// key, is dropped and logged as a warning that names its path. [source]
-/// names the calling API in the warning.
+/// lists. `null`, [bool], [int], finite [double], [String], [Uint8List],
+/// [Int32List], [Int64List], [Float32List], [Float64List], [List] and [Map]
+/// with [String] keys are kept. A non-finite [double] (NaN or +/-Infinity),
+/// any other value, and any nested map entry with a non-[String] key are
+/// dropped and logged as a warning that names their path. Typed lists are
+/// passed through without checking their elements. [source] names the
+/// calling API in the warning.
 Map<String, dynamic> sanitizeChannelProperties(
   Map<String, dynamic> properties, {
   required String source,
@@ -28,6 +30,10 @@ Map<String, dynamic> sanitizeChannelProperties(
 const Object _dropped = Object();
 
 Object? _sanitize(Object? value, String path, String source) {
+  if (value is double && !value.isFinite) {
+    _warn(source, path, value);
+    return _dropped;
+  }
   if (value == null ||
       value is bool ||
       value is num ||

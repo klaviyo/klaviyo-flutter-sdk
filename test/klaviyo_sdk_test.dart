@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
@@ -735,6 +737,188 @@ void main() {
           .toList();
       expect(warnings.where((m) => m.contains("'link'")), hasLength(1));
       expect(warnings.where((m) => m.contains("'map[1]'")), hasLength(1));
+    });
+  });
+
+  group('Non-finite numbers and wrong-type standard values', () {
+    List<String> captureWarnings() {
+      final messages = <String>[];
+      final sub = Logger('KlaviyoSDK')
+          .onRecord
+          .where((r) => r.level == Level.WARNING)
+          .listen((r) => messages.add(r.message));
+      addTearDown(sub.cancel);
+      return messages;
+    }
+
+    void expectWarnedOnce(List<String> warnings, String path) {
+      expect(
+        warnings.where((m) => m.contains("'$path'")),
+        hasLength(1),
+        reason: 'expected one warning naming $path in $warnings',
+      );
+    }
+
+    test(
+      'setProfile drops NaN and Infinity custom values with a warning',
+      () async {
+        final sdk = KlaviyoSDK();
+        await sdk.initialize(apiKey: 'KEY_1');
+        final warnings = captureWarnings();
+
+        await sdk.setProfile(
+          KlaviyoProfile(
+            email: 'test@example.com',
+            properties: {
+              'ratio': 0 / 0,
+              'limit': double.infinity,
+              'plan': 'premium',
+              'stats': {
+                'avg': double.negativeInfinity,
+                'list': [1.5, 0 / 0, 2],
+                'ok': 1,
+              },
+            },
+          ),
+        );
+
+        final call = log.singleWhere((c) => c.method == 'setProfile');
+        expect(call.arguments, {
+          'profile': {
+            'email': 'test@example.com',
+            'properties': {
+              'plan': 'premium',
+              'stats': {
+                'list': [1.5, 2],
+                'ok': 1,
+              },
+            },
+          },
+        });
+        expectWarnedOnce(warnings, 'ratio');
+        expectWarnedOnce(warnings, 'limit');
+        expectWarnedOnce(warnings, 'stats.avg');
+        expectWarnedOnce(warnings, 'stats.list[1]');
+      },
+    );
+
+    test(
+      'setProfile drops a NaN latitude and a map under first_name',
+      () async {
+        final sdk = KlaviyoSDK();
+        await sdk.initialize(apiKey: 'KEY_1');
+        final warnings = captureWarnings();
+
+        await sdk.setProfile(
+          KlaviyoProfile(
+            email: 'test@example.com',
+            location: const KlaviyoLocation(city: 'Boston'),
+            properties: {
+              'latitude': 'NaN',
+              'longitude': double.nan,
+              'first_name': {'given': 'Ada'},
+              'plan': 'premium',
+            },
+          ),
+        );
+
+        final call = log.singleWhere((c) => c.method == 'setProfile');
+        expect(call.arguments, {
+          'profile': {
+            'email': 'test@example.com',
+            'location': {'city': 'Boston'},
+            'properties': {'plan': 'premium'},
+          },
+        });
+        expectWarnedOnce(warnings, 'latitude');
+        expectWarnedOnce(warnings, 'longitude');
+        expectWarnedOnce(warnings, 'first_name');
+      },
+    );
+
+    test(
+        'setProfileProperties drops NaN and Infinity custom values '
+        'with a warning', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final warnings = captureWarnings();
+
+      await sdk.setProfileProperties({
+        'ratio': 0 / 0,
+        'limit': double.infinity,
+        'plan': 'premium',
+        'stats': {
+          'avg': double.nan,
+          'list': [double.infinity, 3],
+          'ok': 1,
+        },
+      });
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'plan': 'premium',
+        'stats': {
+          'list': [3],
+          'ok': 1,
+        },
+      });
+      expectWarnedOnce(warnings, 'ratio');
+      expectWarnedOnce(warnings, 'limit');
+      expectWarnedOnce(warnings, 'stats.avg');
+      expectWarnedOnce(warnings, 'stats.list[0]');
+    });
+
+    test(
+        'setProfileProperties drops a NaN latitude and a map under '
+        'first_name', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final warnings = captureWarnings();
+
+      await sdk.setProfileProperties({
+        'latitude': 'NaN',
+        'longitude': double.nan,
+        'first_name': {'given': 'Ada'},
+        'last_name': ['Love', 'lace'],
+        'plan': 'premium',
+      });
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {'plan': 'premium'});
+      expectWarnedOnce(warnings, 'latitude');
+      expectWarnedOnce(warnings, 'longitude');
+      expectWarnedOnce(warnings, 'first_name');
+      expectWarnedOnce(warnings, 'last_name');
+    });
+
+    test('setProfileAttribute drops a NaN latitude with a warning', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final warnings = captureWarnings();
+      log.clear();
+
+      await sdk.setProfileAttribute('latitude', 0 / 0);
+
+      expect(log, isEmpty);
+      expectWarnedOnce(warnings, 'latitude');
+    });
+
+    test('keeps finite doubles and typed lists', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileProperties({
+        'latitude': '42.5',
+        'score': 1.25,
+        'samples': Float64List.fromList([1.0, 2.0]),
+      });
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'latitude': 42.5,
+        'score': 1.25,
+        'samples': Float64List.fromList([1.0, 2.0]),
+      });
     });
   });
 }
