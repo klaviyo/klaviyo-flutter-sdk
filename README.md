@@ -242,9 +242,9 @@ Android delivers `MESSAGING_EVENT` to exactly one service, so the plugin also re
 
 #### Using with firebase_messaging (or another FCM library)
 
-FCM delivers each `MESSAGING_EVENT` to exactly one service. `firebase_messaging` registers its own, and it wins over this plugin's by default, so Klaviyo pushes never display and silent pushes never reach Dart.
+FCM delivers each `MESSAGING_EVENT` to exactly one service: the one with the highest `android:priority`, then the first in merged-manifest order. `firebase_messaging` registers its own service, and Flutter merges its manifest before this plugin's, so it wins every message. If your app uses `firebase_messaging` and skips the step below, Klaviyo pushes never display and silent pushes never reach Dart.
 
-Declare `KlaviyoFlutterPushService` in your app's own `android/app/src/main/AndroidManifest.xml`, inside `<application>`. Your app's manifest merges ahead of every library manifest, so this declaration wins:
+Declare `KlaviyoFlutterPushService` in your app's own `android/app/src/main/AndroidManifest.xml`, inside `<application>`. Your app's manifest merges ahead of every library manifest, so this declaration comes first and wins over `firebase_messaging`'s service, which uses the default priority (0):
 
 ```xml
 <service
@@ -256,9 +256,45 @@ Declare `KlaviyoFlutterPushService` in your app's own `android/app/src/main/Andr
 </service>
 ```
 
-To use your own subclass instead, put its class name in `android:name` and call `super.onMessageReceived(message)` in any `onMessageReceived` override. Subclasses need `com.google.firebase:firebase-messaging` on the app's compile classpath. For subclassing and custom handling, see the [Android SDK's Advanced Setup](https://github.com/klaviyo/klaviyo-android-sdk#advanced-setup).
+Optionally, add `android:priority="1"` to the intent-filter as a safeguard: FCM then picks Klaviyo by priority instead of manifest order, in case your declaration doesn't end up first in the merged manifest.
 
-`firebase_messaging`'s `onMessage` and `onBackgroundMessage` still fire, since it receives messages through its own broadcast receiver. `onTokenRefresh` stops firing; `getToken()` still works.
+With this declaration, Klaviyo's service receives every FCM message. It displays Klaviyo pushes and forwards Klaviyo silent pushes to Dart. Non-Klaviyo messages get the same treatment as in the native `KlaviyoPushService`: Firebase's base service still displays `notification` messages while your app is in the background, and the Klaviyo code logs and ignores them otherwise. Nothing is passed on to the other library's service. For the other library, that means:
+
+- `firebase_messaging`: `onMessage` and `onBackgroundMessage` keep firing for all messages, including Klaviyo's, because `firebase_messaging` receives them through its own broadcast receiver, not its service. `onTokenRefresh` no longer fires on Android, because FCM hands new tokens to the same single service. `getToken()` still works.
+- A library that handles messages inside its own `FirebaseMessagingService`: it stops receiving them, since that service no longer runs.
+
+Klaviyo still gets rotated tokens: `KlaviyoFlutterPushService` forwards each new token to Klaviyo unless `com.klaviyo.push.automatic_push_token_forwarding` is set to `false` (see [Automatic Token Forwarding](#automatic-token-forwarding)). If that flag is `false`, or your app needs rotation events itself (for example, to update your own backend), subclass `KlaviyoFlutterPushService` and override `onNewToken`, as shown below.
+
+##### Subclassing KlaviyoFlutterPushService
+
+Put your subclass's fully qualified class name in `android:name` instead of `KlaviyoFlutterPushService`. Declare only one service for `MESSAGING_EVENT` in your app manifest. The plugin's own `KlaviyoFlutterPushService` declaration is still merged in from its library manifest, but it lands after yours, so your subclass still receives every message and you don't need to remove it. If your subclass overrides `onMessageReceived`, call `super.onMessageReceived(message)` first, or Klaviyo pushes won't display and silent pushes won't reach Dart.
+
+To handle token rotation, override `onNewToken`, call `super`, and then forward the token. If `automatic_push_token_forwarding` is `false`, `super` doesn't send it to Klaviyo, so call `Klaviyo.setPushToken` yourself:
+
+```kotlin
+class MyPushService : KlaviyoFlutterPushService() {
+    override fun onNewToken(newToken: String) {
+        super.onNewToken(newToken)
+        // Klaviyo.setPushToken(newToken) if automatic forwarding is off,
+        // and/or send newToken to your own backend.
+    }
+}
+```
+
+The plugin declares `firebase-messaging` as an `implementation` dependency, so `RemoteMessage` and the rest of the FCM API aren't on your app's compile classpath. Add it to `android/app/build.gradle.kts` before your subclass will compile. Use the Firebase BoM, or match the version your Firebase plugins already resolve:
+
+```kotlin
+dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:<version>"))
+    implementation("com.google.firebase:firebase-messaging")
+}
+```
+
+In a Groovy `android/app/build.gradle`, use `implementation platform("com.google.firebase:firebase-bom:<version>")` and `implementation "com.google.firebase:firebase-messaging"`.
+
+Optionally, to make the choice explicit instead of relying on manifest order, remove the plugin's base service with `<service android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterPushService" tools:node="remove" />` (this needs `xmlns:tools="http://schemas.android.com/tools"` on your `<manifest>` element), or add `android:priority="1"` to your subclass's intent-filter. For more on custom push handling, see the [Android SDK's Advanced Setup](https://github.com/klaviyo/klaviyo-android-sdk#advanced-setup).
+
+This is a workaround. Moving the native SDK's FCM handling to a broadcast receiver, so it no longer competes for the service, is tracked separately.
 
 ## Profile Management
 
@@ -532,6 +568,8 @@ if (Platform.isAndroid) {
 }
 ```
 
+On Android, once you declare `KlaviyoFlutterPushService` in your app manifest (required with `firebase_messaging`, see [Using with firebase_messaging (or another FCM library)](#using-with-firebase_messaging-or-another-fcm-library)), `onTokenRefresh` no longer fires. The listener above is harmless but won't run. `KlaviyoFlutterPushService` forwards rotated tokens to Klaviyo itself unless `com.klaviyo.push.automatic_push_token_forwarding` is `false`; if you set it to `false`, handle rotation in a subclass's `onNewToken`.
+
 #### Option B: Built-in Registration
 
 The simplest approach — the SDK automatically fetches the push token without requiring `firebase_messaging` as a direct dependency:
@@ -603,7 +641,7 @@ The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM se
 
 Your listener fires for every Klaviyo silent push, with the full payload and its JSON object values decoded to maps on both platforms. Delivery needs a live Flutter engine: foreground **and backgrounded** apps both receive events, a terminated one does not. Nothing is cached or replayed on a later launch, matching both native SDKs — a missed push is gone.
 
-> **Known limitation (Android)**: while your app isn't running — swiped away, force-stopped, or evicted — there's no Flutter engine to receive silent pushes, and nothing is queued for the next launch. The native Android SDK has no such gap, and we plan to close it. Until then, either subclass `KlaviyoFlutterPushService` and handle it in Kotlin, or use [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage`, which runs its own engine and coexists with this plugin — it receives messages via a broadcast receiver rather than the `MESSAGING_EVENT` service. If you add `firebase_messaging`, also [declare `KlaviyoFlutterPushService` in your app manifest](#using-with-firebase_messaging-or-another-fcm-library). It also fires while your app is running, so guard against handling a push twice. iOS is unaffected: the system relaunches your app, so the `AppDelegate` path still runs.
+> **Known limitation (Android)**: while your app isn't running — swiped away, force-stopped, or evicted — there's no Flutter engine to receive silent pushes, and nothing is queued for the next launch. The native Android SDK has no such gap, and we plan to close it. Until then, for the swiped-away and evicted cases, either subclass `KlaviyoFlutterPushService` and handle it in Kotlin, or use [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage`. Neither helps after a force stop: Android delivers no messages to a force-stopped app until the user opens it again. `onBackgroundMessage` runs its own engine and receives messages through a broadcast receiver rather than the `MESSAGING_EVENT` service. Adding `firebase_messaging` means you must also declare `KlaviyoFlutterPushService` in your app manifest, as described in [Using with firebase_messaging (or another FCM library)](#using-with-firebase_messaging-or-another-fcm-library). `onBackgroundMessage` also fires while your app is running, so guard against handling a push twice. On iOS, the system launches a terminated app in the background for a silent push, so the `AppDelegate` path still runs, unless the user force-quit the app. iOS doesn't launch a force-quit app for silent pushes until the user opens it again or restarts the device.
 
 #### Dart-Side Listener
 
@@ -1303,7 +1341,7 @@ All SDK exceptions extend `KlaviyoException`:
 - If "Opened Push" shows up in Klaviyo despite setting that flag to `false`, check for a leftover manual `Klaviyo.handlePush()` call in your own code from an older SDK version — it bypasses the flag entirely, since it's a separate call site outside the plugin's own gate.
 - If the Dart `push_notification_opened` event fires on a warm start (app backgrounded) but not on a cold start (app fully killed), this is a known limitation — see [Handling Push Notification Opens](#handling-push-notification-opens).
 
-**Push notifications not displaying** — Check Firebase setup (`google-services.json`, plugin applied in `build.gradle`). On Android 13+, runtime notification permission is required. Test with Firebase Console first to rule out Klaviyo-specific issues. If your app also uses `firebase_messaging` or another FCM library, [declare `KlaviyoFlutterPushService` in your app manifest](#using-with-firebase_messaging-or-another-fcm-library).
+**Push notifications not displaying** — If your app uses `firebase_messaging` or another FCM library, declare `KlaviyoFlutterPushService` in your app manifest (see [Using with firebase_messaging (or another FCM library)](#using-with-firebase_messaging-or-another-fcm-library)). Check Firebase setup (`google-services.json`, plugin applied in `build.gradle`). On Android 13+, runtime notification permission is required. Test with Firebase Console first to rule out Klaviyo-specific issues.
 
 **Push tokens not being set** — Ensure Firebase is initialized before calling `FirebaseMessaging.instance.getToken()`. Initialize the SDK before calling `setPushToken()`.
 

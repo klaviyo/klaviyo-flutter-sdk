@@ -6,7 +6,7 @@
 
 - **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
 - **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
-- **`KlaviyoFlutterPushService` can be subclassed (Android)** — The class is now `open`. A subclass must be declared in your app's manifest and call `super.onMessageReceived`.
+- **`KlaviyoFlutterPushService` can be subclassed (Android)** — The class is now `open`, so apps can extend it for custom FCM handling, as the README describes. A subclass that overrides `onMessageReceived` must call `super.onMessageReceived` to keep Klaviyo display and silent push forwarding, and must be declared in your app's manifest in place of `KlaviyoFlutterPushService`. Your app also needs `com.google.firebase:firebase-messaging` as its own dependency for the subclass to compile.
 
 ### Bug Fixes
 
@@ -14,7 +14,8 @@
 
 ### Documentation
 
-- **Using the SDK alongside `firebase_messaging` on Android** — New README section: declare `KlaviyoFlutterPushService` in your app's own manifest so Klaviyo pushes keep displaying.
+- **iOS silent push after a force quit** — The Delivery Guarantees note no longer says iOS is unaffected. iOS doesn't launch a force-quit app for silent pushes until the user opens it again or restarts the device.
+- **Using the SDK alongside `firebase_messaging` on Android** — FCM delivers each message to one service, and `firebase_messaging`'s service wins by default, so Klaviyo pushes never displayed in apps that also use it. The README now has a "Using with firebase_messaging (or another FCM library)" section: declare `KlaviyoFlutterPushService` in your app's own manifest. Adding `android:priority="1"` to its `MESSAGING_EVENT` intent filter is an optional extra safeguard. The example app's manifest now includes the declaration.
 
 ## 0.5.0
 
