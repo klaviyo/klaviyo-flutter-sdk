@@ -72,7 +72,7 @@ platform :ios do
   end
 
   # Expects `flutter build ios --release --config-only` to have run first so
-  # Pods are in place; it runs again here so Generated.xcconfig carries the
+  # the plugin config is in place; it runs again here so Generated.xcconfig carries the
   # real build number and derived version.
   desc "Archive + export a signed IPA to example/build/ios/ipa/Runner.ipa"
   lane :build_ipa do |options|

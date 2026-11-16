@@ -38,7 +38,7 @@ jobs:
     steps:
       - name: Checkout Slack action
         continue-on-error: true
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -70,6 +70,8 @@ jobs:
 
   validate:
     runs-on: macos-15
+    permissions:
+      contents: read
     outputs:
       already_live: ${{ steps.pubdev.outputs.already_live }}
     steps:
@@ -80,11 +82,13 @@ jobs:
           echo "When using 'Run workflow', select a tag from the Tags tab."
           exit 1
 
-      - uses: actions/checkout@v7
-
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          flutter-version: 3.38.7
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.47.9
           cache: true
 
       - name: Install dependencies
@@ -128,7 +132,7 @@ jobs:
     if: needs.validate.outputs.already_live != 'true'
     permissions:
       id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1
     with:
       environment: pub.dev
 
@@ -166,7 +170,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -206,7 +210,7 @@ jobs:
     env:
       VERSION: ${{ github.ref_name }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -286,7 +290,7 @@ jobs:
     steps:
       - name: Checkout Slack action
         continue-on-error: true
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions

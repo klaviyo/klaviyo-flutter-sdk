@@ -24,6 +24,7 @@ FLUTTER_VERSION="$(sed -n 's/.*"flutter": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/.fvmr
 case "$FLUTTER_VERSION" in
   3.38.7) FLUTTER_SHA256="2d72de31119ccba1421391aa9ab53891a3e4905987a13f8272766ad78e3bbf93" ;;
   3.44.9) FLUTTER_SHA256="a9120fa4a01048bdef438ddc3a2d4b7389662ea98a95db86eeaf10382bc4efcb" ;;
+  3.47.9) FLUTTER_SHA256="25ed8c3c29d51a7353f2a944310b478af8214920639524b19c50a19e6c044c5a" ;;
   *) FLUTTER_SHA256="" ;;
 esac
 FLUTTER_URL="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
