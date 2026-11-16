@@ -18,6 +18,7 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
   MockStreamHandlerEventSink? sink;
+  Map<String, dynamic>? nativeInitialPush;
   // Always-attached listeners so buffered token and push data events don't
   // carry over between tests.
   late List<StreamSubscription<Object>> drains;
@@ -39,7 +40,10 @@ void main() {
       };
 
   setUpAll(() async {
-    messenger.setMockMethodCallHandler(methodChannel, (_) async => null);
+    messenger.setMockMethodCallHandler(methodChannel, (call) async {
+      if (call.method == 'getInitialPushNotification') return nativeInitialPush;
+      return null;
+    });
     messenger.setMockStreamHandler(
       eventChannel,
       MockStreamHandler.inline(onListen: (_, events) => sink = events),
@@ -60,8 +64,8 @@ void main() {
     messenger.setMockStreamHandler(eventChannel, null);
   });
 
-  group('onPushOpened replay', () {
-    test('held open reaches every late subscriber', () async {
+  group('onPushOpened cold start', () {
+    test('the first subscriber gets the held open once', () async {
       sink!.success(opened('cold', action: buttonTap('btn1')));
       await pumpEventQueue();
 
@@ -72,22 +76,40 @@ void main() {
       final subB = KlaviyoSDK().onPushOpened.listen(second.add);
       await pumpEventQueue();
 
-      for (final events in [first, second]) {
-        expect(events, hasLength(1));
-        expect(events.single.payload['id'], 'cold');
-        expect(events.single.tap, KlaviyoPushTap.actionButton);
-        expect(events.single.button?.id, 'btn1');
-      }
+      expect(first, hasLength(1));
+      expect(first.single.payload['id'], 'cold');
+      expect(first.single.tap, KlaviyoPushTap.actionButton);
+      expect(first.single.button?.id, 'btn1');
+      expect(second, isEmpty);
 
       await subA.cancel();
       await subB.cancel();
+
+      final later = <KlaviyoPushOpened>[];
+      final laterSub = KlaviyoSDK().onPushOpened.listen(later.add);
+      await pumpEventQueue();
+      expect(later, isEmpty);
+      await laterSub.cancel();
     });
 
-    test('a live open replaces the held one', () async {
+    test('only the newest open is held', () async {
+      sink!
+        ..success(opened('older'))
+        ..success(opened('newer'));
+      await pumpEventQueue();
+
+      final events = <KlaviyoPushOpened>[];
+      final sub = KlaviyoSDK().onPushOpened.listen(events.add);
+      await pumpEventQueue();
+
+      expect(events.map((e) => e.payload['id']), ['newer']);
+      await sub.cancel();
+    });
+
+    test('a live open is not held for later subscribers', () async {
       final live = <KlaviyoPushOpened>[];
       final sub = KlaviyoSDK().onPushOpened.listen(live.add);
       await pumpEventQueue();
-      live.clear();
 
       sink!.success(opened('warm'));
       await pumpEventQueue();
@@ -101,23 +123,35 @@ void main() {
       await lateSub.cancel();
     });
 
-    test('an open replayed by native is held for later subscribers', () async {
-      final live = <KlaviyoPushOpened>[];
-      final sub = KlaviyoSDK().onPushOpened.listen(live.add);
-      sink!.success({...opened('native-cached'), 'replayed': true});
+    test('the launch tap stays readable after a subscriber took it', () async {
+      final launch = opened('launch', action: buttonTap('btn1'));
+      nativeInitialPush = launch;
+      sink!.success(launch);
       await pumpEventQueue();
-      expect(live.single.payload['id'], 'native-cached');
+
+      final events = <KlaviyoPushOpened>[];
+      final sub = KlaviyoSDK().onPushOpened.listen(events.add);
+      await pumpEventQueue();
       await sub.cancel();
+      expect(events.single.payload['id'], 'launch');
+
+      final initial = await KlaviyoSDK().getInitialPushNotification();
+      expect(initial, launch);
+      final typed = KlaviyoPushOpened.fromMap(initial!);
+      expect(typed.tap, KlaviyoPushTap.actionButton);
+      expect(typed.button?.id, 'btn1');
 
       final late = <KlaviyoPushOpened>[];
       final lateSub = KlaviyoSDK().onPushOpened.listen(late.add);
       await pumpEventQueue();
-      expect(late.single.payload['id'], 'native-cached');
-      expect(late.single.payload.containsKey('replayed'), isFalse);
+      expect(late, isEmpty);
       await lateSub.cancel();
+      nativeInitialPush = null;
     });
 
     test('resetProfile clears the held open', () async {
+      sink!.success(opened('before-reset'));
+      await pumpEventQueue();
       await KlaviyoSDK().resetProfile();
 
       final late = <KlaviyoPushOpened>[];

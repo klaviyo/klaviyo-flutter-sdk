@@ -413,7 +413,7 @@ class KlaviyoFlutterSdkPluginEngineTest {
     }
 
     @Test
-    fun `web-link tap before any engine listens is replayed once to the primary`() {
+    fun `web-link tap before any engine listens is held and delivered once to the primary`() {
         val observers = registerState()
         val engine = attach()
         engine.attachActivity()
@@ -433,7 +433,6 @@ class KlaviyoFlutterSdkPluginEngineTest {
         engine.listen()
 
         assertEquals(1, engine.pushOpens().size)
-        assertEquals(true, engine.pushOpens().single()["replayed"])
         assertEquals(1, engine.pushActions().size)
         assertEquals("open_url", (engine.pushActions().single()["data"] as Map<*, *>)["action"])
     }
