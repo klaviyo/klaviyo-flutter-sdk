@@ -43,5 +43,19 @@ void main() {
         throwsA(isA<KlaviyoException>()),
       );
     });
+
+    test('clearInboxMessage throws before initialize', () async {
+      await expectLater(
+        KlaviyoSDK().clearInboxMessage('msg-1'),
+        throwsA(isA<KlaviyoException>()),
+      );
+    });
+
+    test('clearInboxMessages throws before initialize', () async {
+      await expectLater(
+        KlaviyoSDK().clearInboxMessages(['msg-1']),
+        throwsA(isA<KlaviyoException>()),
+      );
+    });
   });
 }

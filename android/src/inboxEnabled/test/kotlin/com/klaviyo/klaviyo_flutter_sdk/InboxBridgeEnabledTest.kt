@@ -9,6 +9,7 @@ import io.mockk.runs
 import io.mockk.unmockkStatic
 import io.mockk.verify
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 
@@ -105,6 +106,33 @@ class InboxBridgeEnabledTest {
         added.single().onChange()
 
         assert(changes == 1)
+    }
+
+    @Test
+    fun `clearMessage is unsupported and never calls the native module`() {
+        // Native keeps its clear APIs internal, so the bridge must not reach
+        // for them; it reports the stable unsupported code instead.
+        var outcome: InboxBridgeResult<Boolean>? = null
+
+        InboxBridge.clearMessage("msg-1") { outcome = it }
+
+        assertEquals(
+            InboxErrorCodes.UNSUPPORTED,
+            (outcome as InboxBridgeResult.Failure).code,
+        )
+        verify(exactly = 0) { KlaviyoInbox.addChangeListener(any()) }
+    }
+
+    @Test
+    fun `clearMessages is unsupported`() {
+        var outcome: InboxBridgeResult<Int>? = null
+
+        InboxBridge.clearMessages(listOf("a", "b")) { outcome = it }
+
+        assertEquals(
+            InboxErrorCodes.UNSUPPORTED,
+            (outcome as InboxBridgeResult.Failure).code,
+        )
     }
 
     @Test

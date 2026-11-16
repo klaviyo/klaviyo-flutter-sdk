@@ -84,6 +84,31 @@ internal object InboxBridge {
     }
 
     /**
+     * Clearing a message is not supported on Android yet: the native module
+     * keeps `clearByCompanyId`/`clearAll` internal and does not surface a
+     * host-facing clear, so there is nothing to call.
+     *
+     * TODO(MAGE-1102 follow-up): forward to the native clear API here once the
+     * Android SDK exposes one, and drop the INBOX_UNSUPPORTED result.
+     */
+    fun clearMessage(
+        messageId: String,
+        onResult: (InboxBridgeResult<Boolean>) -> Unit,
+    ) = onResult(clearUnsupported())
+
+    /** @see clearMessage */
+    fun clearMessages(
+        messageIds: List<String>,
+        onResult: (InboxBridgeResult<Int>) -> Unit,
+    ) = onResult(clearUnsupported())
+
+    private fun clearUnsupported() =
+        InboxBridgeResult.Failure(
+            InboxErrorCodes.UNSUPPORTED,
+            "Clearing inbox messages is not available on Android yet",
+        )
+
+    /**
      * Collects the native inbox change signal while Dart is subscribed.
      *
      * `KlaviyoInbox.addChangeListener` collects `MobileInbox.changes` off the
@@ -179,6 +204,15 @@ internal object InboxBridge {
             "receivedAt" to receivedAt,
             "collapseId" to collapseId,
             "badge" to badge,
+            // The native module stores read/archived/expiry timestamps on its
+            // entity but does not expose them on the public InboxMessage, so
+            // they are omitted here and read as null in Dart. Android also has
+            // no catch-all updated-at in its storage.
+            //
+            // TODO(MAGE-1722/MAGE-1723): add readUpdatedAt, archivedUpdatedAt,
+            // updatedAt and expiredAt here once the public InboxMessage carries
+            // them. Note Android spells the expiry instant `expiresAt`; the Dart
+            // field is `expiredAt`.
             "isRead" to isRead,
             "isArchived" to isArchived,
             "source" to source.rawValue,

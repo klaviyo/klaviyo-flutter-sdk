@@ -503,6 +503,40 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Remove one message from this device. Returns whether it was there.
+  ///
+  /// iOS only: Android has no public clear API, so it reports
+  /// `INBOX_UNSUPPORTED`.
+  Future<bool> clearInboxMessage(String messageId) async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'clearInboxMessage',
+        {'messageId': messageId},
+      );
+      return result ?? false;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
+  /// Remove several messages from this device. Returns how many were there.
+  ///
+  /// iOS only: Android has no public clear API, so it reports
+  /// `INBOX_UNSUPPORTED`.
+  Future<int> clearInboxMessages(List<String> messageIds) async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<int>(
+        'clearInboxMessages',
+        {'messageIds': messageIds},
+      );
+      return result ?? 0;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
   /// Maps a native inbox failure to a typed [KlaviyoInboxException].
   KlaviyoInboxException _inboxException(
     PlatformException error,

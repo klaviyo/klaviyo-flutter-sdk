@@ -259,6 +259,130 @@ void main() {
     });
   });
 
+  group('InboxMessage timestamp fields', () {
+    Map<String, dynamic> mapWith(Map<String, dynamic> timestamps) =>
+        fullMessageMap()..addAll(timestamps);
+
+    test('maps every timestamp from epoch milliseconds to UTC', () {
+      final message = InboxMessage.fromMap(
+        mapWith({
+          'readUpdatedAt': 1700000010000,
+          'archivedUpdatedAt': 1700000020000,
+          'updatedAt': 1700000030000,
+          'expiredAt': 1700000040000,
+        }),
+      );
+
+      expect(message.readUpdatedAt, DateTime.utc(2023, 11, 14, 22, 13, 30));
+      expect(message.archivedUpdatedAt, DateTime.utc(2023, 11, 14, 22, 13, 40));
+      expect(message.updatedAt, DateTime.utc(2023, 11, 14, 22, 13, 50));
+      expect(message.expiredAt, DateTime.utc(2023, 11, 14, 22, 14));
+      expect(message.readUpdatedAt!.isUtc, isTrue);
+      expect(message.expiredAt!.isUtc, isTrue);
+    });
+
+    test('defaults every timestamp to null when absent', () {
+      final message = InboxMessage.fromMap(fullMessageMap());
+
+      expect(message.readUpdatedAt, isNull);
+      expect(message.archivedUpdatedAt, isNull);
+      expect(message.updatedAt, isNull);
+      expect(message.expiredAt, isNull);
+    });
+
+    test('treats explicit nulls as absent', () {
+      final message = InboxMessage.fromMap(
+        mapWith({
+          'readUpdatedAt': null,
+          'archivedUpdatedAt': null,
+          'updatedAt': null,
+          'expiredAt': null,
+        }),
+      );
+
+      expect(message.readUpdatedAt, isNull);
+      expect(message.archivedUpdatedAt, isNull);
+      expect(message.updatedAt, isNull);
+      expect(message.expiredAt, isNull);
+    });
+
+    test('ignores malformed timestamps instead of failing the message', () {
+      // These fields are optional and non-critical: one bad value must not
+      // discard the whole message.
+      final cases = <dynamic>[
+        'not-a-number',
+        '',
+        true,
+        <String, dynamic>{},
+        <dynamic>[],
+        1.5,
+        double.nan,
+        9223372036854775807,
+      ];
+
+      for (final bad in cases) {
+        final message = InboxMessage.fromMap(mapWith({'readUpdatedAt': bad}));
+
+        expect(message.readUpdatedAt, isNull, reason: 'value: $bad');
+        // The rest of the message still parsed.
+        expect(message.id, 'msg-1');
+        expect(message.title, 'Your order shipped');
+      }
+    });
+
+    test('accepts a whole-valued double as epoch milliseconds', () {
+      final message = InboxMessage.fromMap(
+        mapWith({'updatedAt': 1700000000000.0}),
+      );
+
+      expect(message.updatedAt, DateTime.utc(2023, 11, 14, 22, 13, 20));
+    });
+
+    test('round trips through toMap', () {
+      final original = InboxMessage.fromMap(
+        mapWith({
+          'readUpdatedAt': 1700000010000,
+          'archivedUpdatedAt': 1700000020000,
+          'updatedAt': 1700000030000,
+          'expiredAt': 1700000040000,
+        }),
+      );
+
+      final restored = InboxMessage.fromMap(original.toMap());
+
+      expect(restored, original);
+      expect(restored.hashCode, original.hashCode);
+      expect(restored.readUpdatedAt, original.readUpdatedAt);
+      expect(restored.expiredAt, original.expiredAt);
+    });
+
+    test('toMap emits epoch milliseconds', () {
+      final map = InboxMessage.fromMap(
+        mapWith({'readUpdatedAt': 1700000010000, 'expiredAt': 1700000040000}),
+      ).toMap();
+
+      expect(map['readUpdatedAt'], 1700000010000);
+      expect(map['expiredAt'], 1700000040000);
+    });
+
+    test('a present timestamp makes the message unequal to one without', () {
+      final without = InboxMessage.fromMap(fullMessageMap());
+      final withTimestamp = InboxMessage.fromMap(
+        mapWith({'readUpdatedAt': 1700000010000}),
+      );
+
+      expect(without, isNot(withTimestamp));
+    });
+
+    test('differing timestamps make messages unequal', () {
+      final first = InboxMessage.fromMap(mapWith({'updatedAt': 1700000010000}));
+      final second =
+          InboxMessage.fromMap(mapWith({'updatedAt': 1700000020000}));
+
+      expect(first, isNot(second));
+    });
+  });
+
   group('InboxMessageState', () {
     test('wire values match the native contract', () {
       expect(InboxMessageState.read.wireValue, 'read');

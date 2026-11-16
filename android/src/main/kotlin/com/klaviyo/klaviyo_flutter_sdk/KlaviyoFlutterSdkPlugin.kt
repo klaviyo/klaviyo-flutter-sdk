@@ -802,6 +802,28 @@ class KlaviyoFlutterSdkPlugin :
                     InboxBridge.fetchUnreadCount(done)
                 }
 
+            "clearInboxMessage" -> {
+                val messageId = call.argument<String>("messageId")
+                if (messageId.isNullOrEmpty()) {
+                    result.error("INVALID_ARGUMENTS", "An inbox message id is required", null)
+                    return
+                }
+                deliverInboxResult(result) { done ->
+                    InboxBridge.clearMessage(messageId, done)
+                }
+            }
+
+            "clearInboxMessages" -> {
+                val messageIds = call.argument<List<String>>("messageIds")
+                if (messageIds.isNullOrEmpty()) {
+                    result.error("INVALID_ARGUMENTS", "Inbox message ids are required", null)
+                    return
+                }
+                deliverInboxResult(result) { done ->
+                    InboxBridge.clearMessages(messageIds, done)
+                }
+            }
+
             "updateInboxMessageState" -> {
                 val messageId = call.argument<String>("messageId")
                 val state = call.argument<String>("state")

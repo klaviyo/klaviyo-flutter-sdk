@@ -146,9 +146,9 @@ void main() {
       // Native rejects a cursor reused under different filters with the same
       // InvalidCursor error as any other unusable token.
       replies['fetchInboxPage'] = () => throw PlatformException(
-        code: 'INBOX_INVALID_CURSOR',
-        message: 'the cursor was issued for different filters',
-      );
+            code: 'INBOX_INVALID_CURSOR',
+            message: 'the cursor was issued for different filters',
+          );
 
       await expectLater(
         KlaviyoSDK().fetchInboxPage(
@@ -290,6 +290,139 @@ void main() {
             (e) => e.reason,
             'reason',
             KlaviyoInboxErrorReason.unavailable,
+          ),
+        ),
+      );
+    });
+  });
+
+  group('clearInboxMessage', () {
+    test('sends the message id and returns the native result', () async {
+      replies['clearInboxMessage'] = () => true;
+
+      final removed = await KlaviyoSDK().clearInboxMessage('msg-1');
+
+      final call = calls.lastWhere((c) => c.method == 'clearInboxMessage');
+      expect(call.arguments['messageId'], 'msg-1');
+      expect(removed, isTrue);
+    });
+
+    test('returns false when the device did not have the message', () async {
+      replies['clearInboxMessage'] = () => false;
+
+      expect(await KlaviyoSDK().clearInboxMessage('gone'), isFalse);
+    });
+
+    test('treats a null native result as false', () async {
+      expect(await KlaviyoSDK().clearInboxMessage('msg-1'), isFalse);
+    });
+
+    test('rejects an empty id without calling native', () async {
+      await expectLater(
+        KlaviyoSDK().clearInboxMessage(''),
+        throwsArgumentError,
+      );
+      expect(calls.any((c) => c.method == 'clearInboxMessage'), isFalse);
+    });
+
+    test('maps INBOX_UNSUPPORTED to the unsupported reason', () async {
+      // Android reports this until its native inbox gains a clear API.
+      replies['clearInboxMessage'] = () => throw PlatformException(
+            code: 'INBOX_UNSUPPORTED',
+            message: 'Clearing inbox messages is not available on Android yet',
+          );
+
+      await expectLater(
+        KlaviyoSDK().clearInboxMessage('msg-1'),
+        throwsA(
+          isA<KlaviyoInboxException>()
+              .having(
+                (e) => e.reason,
+                'reason',
+                KlaviyoInboxErrorReason.unsupported,
+              )
+              .having((e) => e.code, 'code', 'INBOX_UNSUPPORTED'),
+        ),
+      );
+    });
+
+    test('maps a storage failure distinctly from unsupported', () async {
+      replies['clearInboxMessage'] = () => throw PlatformException(
+            code: 'INBOX_STORAGE_FAILURE',
+          );
+
+      await expectLater(
+        KlaviyoSDK().clearInboxMessage('msg-1'),
+        throwsA(
+          isA<KlaviyoInboxException>().having(
+            (e) => e.reason,
+            'reason',
+            KlaviyoInboxErrorReason.storageFailure,
+          ),
+        ),
+      );
+    });
+  });
+
+  group('clearInboxMessages', () {
+    test('sends the ids and returns how many were there', () async {
+      replies['clearInboxMessages'] = () => 2;
+
+      final removed = await KlaviyoSDK().clearInboxMessages(['a', 'b', 'c']);
+
+      final call = calls.lastWhere((c) => c.method == 'clearInboxMessages');
+      expect(call.arguments['messageIds'], ['a', 'b', 'c']);
+      expect(removed, 2);
+    });
+
+    test('returns zero when the device had none', () async {
+      replies['clearInboxMessages'] = () => 0;
+
+      expect(await KlaviyoSDK().clearInboxMessages(['gone']), 0);
+    });
+
+    test('treats a null native result as zero', () async {
+      expect(await KlaviyoSDK().clearInboxMessages(['a']), 0);
+    });
+
+    test('de-duplicates ids so the count cannot be inflated', () async {
+      replies['clearInboxMessages'] = () => 1;
+
+      await KlaviyoSDK().clearInboxMessages(['a', 'a', 'b', 'a']);
+
+      final call = calls.lastWhere((c) => c.method == 'clearInboxMessages');
+      expect(call.arguments['messageIds'], ['a', 'b']);
+    });
+
+    test('rejects an empty list without calling native', () async {
+      await expectLater(
+        KlaviyoSDK().clearInboxMessages([]),
+        throwsArgumentError,
+      );
+      expect(calls.any((c) => c.method == 'clearInboxMessages'), isFalse);
+    });
+
+    test('rejects a list containing an empty id without calling native',
+        () async {
+      await expectLater(
+        KlaviyoSDK().clearInboxMessages(['a', '']),
+        throwsArgumentError,
+      );
+      expect(calls.any((c) => c.method == 'clearInboxMessages'), isFalse);
+    });
+
+    test('maps INBOX_UNSUPPORTED to the unsupported reason', () async {
+      replies['clearInboxMessages'] = () => throw PlatformException(
+            code: 'INBOX_UNSUPPORTED',
+          );
+
+      await expectLater(
+        KlaviyoSDK().clearInboxMessages(['a']),
+        throwsA(
+          isA<KlaviyoInboxException>().having(
+            (e) => e.reason,
+            'reason',
+            KlaviyoInboxErrorReason.unsupported,
           ),
         ),
       );

@@ -608,6 +608,12 @@ class KlaviyoSDK {
 
   /// Reset the current profile (useful for logout)
   /// Profile state is managed by the native SDK
+  ///
+  /// **iOS also clears the entire Mobile Inbox**, for every company, so one
+  /// profile's messages are never shown to the next. That happens natively and
+  /// is not something this call does on Android: Android's inbox has no clear
+  /// API yet, so its messages are left in place. Do not rely on either
+  /// behavior for Android — see [supportsInboxClear].
   Future<void> resetProfile() async {
     _ensureInitialized();
 
@@ -829,6 +835,62 @@ class KlaviyoSDK {
   /// Android has no native invalidation signal yet, so this stream stays silent
   /// there; the startup/resume fetches are what keep Android correct.
   Stream<void> get inboxChanged => _nativeWrapper.onInboxChanged;
+
+  /// Remove a single message from this device's inbox.
+  ///
+  /// Returns whether this device had the message. Removing a message the
+  /// device does not have, for example because retention already dropped it,
+  /// returns false rather than failing.
+  ///
+  /// **iOS only.** Android's native inbox has no public clear API yet, so this
+  /// throws [KlaviyoInboxException] with reason
+  /// [KlaviyoInboxErrorReason.unsupported]. Feature-detect with
+  /// [supportsInboxClear] rather than catching.
+  ///
+  /// Throws an [ArgumentError] when [messageId] is empty.
+  Future<bool> clearInboxMessage(String messageId) async {
+    _ensureInitialized();
+    if (messageId.isEmpty) {
+      throw ArgumentError.value(messageId, 'messageId', 'must not be empty');
+    }
+    return _nativeWrapper.clearInboxMessage(messageId);
+  }
+
+  /// Remove several messages from this device's inbox.
+  ///
+  /// Returns how many of the messages this device had. Ids it does not have are
+  /// skipped, so the result can be smaller than [messageIds]. Duplicate ids are
+  /// removed before the call, so a repeated id counts once.
+  ///
+  /// **iOS only.** Android's native inbox has no public clear API yet, so this
+  /// throws [KlaviyoInboxException] with reason
+  /// [KlaviyoInboxErrorReason.unsupported]. Feature-detect with
+  /// [supportsInboxClear] rather than catching.
+  ///
+  /// Throws an [ArgumentError] when [messageIds] is empty or contains an empty
+  /// id.
+  Future<int> clearInboxMessages(List<String> messageIds) async {
+    _ensureInitialized();
+    if (messageIds.isEmpty) {
+      throw ArgumentError.value(messageIds, 'messageIds', 'must not be empty');
+    }
+    if (messageIds.any((id) => id.isEmpty)) {
+      throw ArgumentError.value(
+        messageIds,
+        'messageIds',
+        'must not contain an empty id',
+      );
+    }
+    // De-duplicate so a repeated id cannot inflate the returned count.
+    final uniqueIds = <String>{...messageIds}.toList(growable: false);
+    return _nativeWrapper.clearInboxMessages(uniqueIds);
+  }
+
+  /// Whether this platform's native inbox can remove messages.
+  ///
+  /// False on Android, whose inbox has no public clear API yet; true on iOS.
+  /// Check this instead of catching [KlaviyoInboxErrorReason.unsupported].
+  bool get supportsInboxClear => Platform.isIOS;
 
   /// Private methods
   void _ensureInitialized() {

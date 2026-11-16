@@ -527,6 +527,55 @@ extension KlaviyoFlutterSdkPlugin {
             result(Self.inboxUnavailableError())
             #endif
 
+        case "clearInboxMessage":
+            #if canImport(KlaviyoInbox)
+            guard let args = call.arguments as? [String: Any],
+                  let messageId = args["messageId"] as? String,
+                  !messageId.isEmpty
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "An inbox message id is required",
+                    details: nil
+                ))
+                return
+            }
+            Task {
+                do {
+                    result(try await KlaviyoSDK().mobileInbox.clear(id: messageId))
+                } catch {
+                    result(Self.inboxError(error))
+                }
+            }
+            #else
+            result(Self.inboxUnavailableError())
+            #endif
+
+        case "clearInboxMessages":
+            #if canImport(KlaviyoInbox)
+            guard let args = call.arguments as? [String: Any],
+                  let messageIds = args["messageIds"] as? [String],
+                  !messageIds.isEmpty,
+                  !messageIds.contains(where: { $0.isEmpty })
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "A non-empty list of inbox message ids is required",
+                    details: nil
+                ))
+                return
+            }
+            Task {
+                do {
+                    result(try await KlaviyoSDK().mobileInbox.clear(ids: messageIds))
+                } catch {
+                    result(Self.inboxError(error))
+                }
+            }
+            #else
+            result(Self.inboxUnavailableError())
+            #endif
+
         case "handleUniversalTrackingLink":
             guard let args = call.arguments as? [String: Any],
                   let urlString = args["url"] as? String,
@@ -1162,6 +1211,13 @@ extension KlaviyoFlutterSdkPlugin {
             // Dart model exposes, preferring the configured value and falling
             // back to aps.badge.
             "badge": message.badge.map { $0.value ?? $0.apsBadge } ?? nil,
+            // The native SDK stores read/archived/expiry timestamps but does
+            // not expose them on its public InboxMessage yet, so they are
+            // omitted here and read as null in Dart.
+            //
+            // Follow-up (MAGE-1722/MAGE-1723): add readUpdatedAt,
+            // archivedUpdatedAt, updatedAt and expiredAt here (epoch millis via
+            // `epochMillis`) once the native message carries them.
             "isRead": message.isRead,
             "isArchived": message.isArchived,
             "source": message.source.rawValue

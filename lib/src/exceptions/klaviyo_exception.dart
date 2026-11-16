@@ -120,6 +120,13 @@ enum KlaviyoInboxErrorReason {
   /// The inbox module is not available in this build.
   unavailable,
 
+  /// The platform's native inbox does not support this operation yet.
+  ///
+  /// Reported for clearing messages on Android, which has no public clear
+  /// API. Distinct from [unavailable], which means the module is missing
+  /// entirely.
+  unsupported,
+
   /// The native layer reported some other failure.
   unknown,
 }
@@ -143,9 +150,10 @@ class KlaviyoInboxException extends KlaviyoException {
 
   /// Maps a platform error code to an inbox exception.
   ///
-  /// The native layers report `INBOX_STORAGE_FAILURE`, `INBOX_INVALID_CURSOR`
-  /// and `INBOX_UNAVAILABLE`; anything else is [KlaviyoInboxErrorReason.unknown]
-  /// and keeps its code so the original failure is not lost.
+  /// The native layers report `INBOX_STORAGE_FAILURE`, `INBOX_INVALID_CURSOR`,
+  /// `INBOX_UNAVAILABLE` and `INBOX_UNSUPPORTED`; anything else is
+  /// [KlaviyoInboxErrorReason.unknown] and keeps its code so the original
+  /// failure is not lost.
   factory KlaviyoInboxException.fromPlatformError({
     required String? code,
     required String? message,
@@ -156,6 +164,7 @@ class KlaviyoInboxException extends KlaviyoException {
       'INBOX_STORAGE_FAILURE' => KlaviyoInboxErrorReason.storageFailure,
       'INBOX_INVALID_CURSOR' => KlaviyoInboxErrorReason.invalidCursor,
       'INBOX_UNAVAILABLE' => KlaviyoInboxErrorReason.unavailable,
+      'INBOX_UNSUPPORTED' => KlaviyoInboxErrorReason.unsupported,
       _ => KlaviyoInboxErrorReason.unknown,
     };
 

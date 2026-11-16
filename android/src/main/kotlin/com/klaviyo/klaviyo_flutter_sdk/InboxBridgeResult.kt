@@ -43,4 +43,11 @@ internal object InboxErrorCodes {
     const val UNAVAILABLE = "INBOX_UNAVAILABLE"
     const val STORAGE_FAILURE = "INBOX_STORAGE_FAILURE"
     const val INVALID_CURSOR = "INBOX_INVALID_CURSOR"
+
+    /**
+     * The native inbox does not support this operation yet. Distinct from
+     * [UNAVAILABLE], which means the module is missing from the build
+     * entirely.
+     */
+    const val UNSUPPORTED = "INBOX_UNSUPPORTED"
 }

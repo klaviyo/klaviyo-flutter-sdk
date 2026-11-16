@@ -188,11 +188,76 @@ class KlaviyoFlutterSdkPluginInboxTest {
     }
 
     @Test
+    fun `clearInboxMessage reports INBOX_UNSUPPORTED, not unavailable`() {
+        // Clear is unsupported on Android whether or not the module is present,
+        // so the code must be the stable unsupported one rather than the
+        // missing-module one.
+        plugin.onMethodCall(
+            MethodCall("clearInboxMessage", mapOf("messageId" to "msg-1")),
+            result,
+        )
+
+        verify(exactly = 1) { result.error(InboxErrorCodes.UNSUPPORTED, any(), null) }
+        confirmVerified(result)
+    }
+
+    @Test
+    fun `clearInboxMessages reports INBOX_UNSUPPORTED`() {
+        plugin.onMethodCall(
+            MethodCall("clearInboxMessages", mapOf("messageIds" to listOf("a", "b"))),
+            result,
+        )
+
+        verify(exactly = 1) { result.error(InboxErrorCodes.UNSUPPORTED, any(), null) }
+        confirmVerified(result)
+    }
+
+    @Test
+    fun `clearInboxMessage requires a message id`() {
+        plugin.onMethodCall(MethodCall("clearInboxMessage", emptyMap<String, Any>()), result)
+
+        verify(exactly = 1) {
+            result.error("INVALID_ARGUMENTS", "An inbox message id is required", null)
+        }
+        confirmVerified(result)
+    }
+
+    @Test
+    fun `clearInboxMessages requires a non-empty id list`() {
+        plugin.onMethodCall(
+            MethodCall("clearInboxMessages", mapOf("messageIds" to emptyList<String>())),
+            result,
+        )
+
+        verify(exactly = 1) {
+            result.error("INVALID_ARGUMENTS", "Inbox message ids are required", null)
+        }
+        confirmVerified(result)
+    }
+
+    @Test
+    fun `both bridges report clear as unsupported`() {
+        val outcomes = mutableListOf<InboxBridgeResult<*>>()
+
+        InboxBridge.clearMessage("msg-1") { outcomes.add(it) }
+        InboxBridge.clearMessages(listOf("a", "b")) { outcomes.add(it) }
+
+        assertEquals(2, outcomes.size)
+        outcomes.forEach { outcome ->
+            assertEquals(
+                InboxErrorCodes.UNSUPPORTED,
+                (outcome as InboxBridgeResult.Failure).code,
+            )
+        }
+    }
+
+    @Test
     fun `error codes match the Dart contract`() {
         // These strings are the wire contract the Dart layer maps to
         // KlaviyoInboxErrorReason; changing one silently breaks error mapping.
         assertEquals("INBOX_UNAVAILABLE", InboxErrorCodes.UNAVAILABLE)
         assertEquals("INBOX_STORAGE_FAILURE", InboxErrorCodes.STORAGE_FAILURE)
         assertEquals("INBOX_INVALID_CURSOR", InboxErrorCodes.INVALID_CURSOR)
+        assertEquals("INBOX_UNSUPPORTED", InboxErrorCodes.UNSUPPORTED)
     }
 }

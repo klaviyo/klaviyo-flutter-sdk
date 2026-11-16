@@ -42,6 +42,32 @@ internal object InboxBridge {
     ) = onResult(unavailable)
 
     /**
+     * Clearing is unsupported on Android whether or not the module is present,
+     * so this build reports the same INBOX_UNSUPPORTED result the enabled build
+     * does rather than INBOX_UNAVAILABLE.
+     *
+     * TODO(MAGE-1102 follow-up): switch to INBOX_UNAVAILABLE for a missing
+     * module once Android ships a native clear and the enabled build forwards
+     * to it.
+     */
+    fun clearMessage(
+        messageId: String,
+        onResult: (InboxBridgeResult<Boolean>) -> Unit,
+    ) = onResult(clearUnsupported())
+
+    /** @see clearMessage */
+    fun clearMessages(
+        messageIds: List<String>,
+        onResult: (InboxBridgeResult<Int>) -> Unit,
+    ) = onResult(clearUnsupported())
+
+    private fun clearUnsupported() =
+        InboxBridgeResult.Failure(
+            InboxErrorCodes.UNSUPPORTED,
+            "Clearing inbox messages is not available on Android yet",
+        )
+
+    /**
      * No-op: without the inbox module there is no change signal to collect.
      */
     fun registerChangeObserver(

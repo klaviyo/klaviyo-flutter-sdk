@@ -90,6 +90,42 @@ class InboxMessage {
   /// `KlaviyoSDK.inbox.fetchUnreadCount()`, not this field.
   final int? badge;
 
+  /// When the message's read state last changed on this device.
+  ///
+  /// Null until the host marks it read or unread. UTC, like [sentAt].
+  ///
+  /// Platform availability: the native SDKs track this in their storage but do
+  /// not expose it on their public message type yet, so this is null on both
+  /// platforms until they do.
+  final DateTime? readUpdatedAt;
+
+  /// When the message's archived state last changed on this device.
+  ///
+  /// Null until the host archives or unarchives it. UTC, like [sentAt].
+  ///
+  /// Tracked separately from [readUpdatedAt] because read and archived change
+  /// independently. Platform availability matches [readUpdatedAt].
+  final DateTime? archivedUpdatedAt;
+
+  /// When the message's stored state last changed, whichever state changed.
+  ///
+  /// UTC, like [sentAt]. Platform availability is worse than the per-state
+  /// fields: iOS tracks a catch-all updated-at in storage, but the Android
+  /// storage added for messages does not, so this is null on Android even once
+  /// the native SDKs expose it.
+  final DateTime? updatedAt;
+
+  /// When the server expires the message.
+  ///
+  /// Null when the message does not expire, which is the case for a message
+  /// captured from a delivered push. UTC, like [sentAt].
+  ///
+  /// Named `expiredAt` to match the MAGE-1722/MAGE-1723 work and the iOS
+  /// storage. The Android storage calls the same instant `expiresAt`; the
+  /// naming differs between the platforms and only one spelling can appear
+  /// here. Platform availability matches [readUpdatedAt].
+  final DateTime? expiredAt;
+
   /// Whether the message has been read.
   final bool isRead;
 
@@ -112,6 +148,10 @@ class InboxMessage {
     this.receivedAt,
     this.collapseId,
     this.badge,
+    this.readUpdatedAt,
+    this.archivedUpdatedAt,
+    this.updatedAt,
+    this.expiredAt,
     required this.isRead,
     required this.isArchived,
     required this.source,
@@ -146,6 +186,10 @@ class InboxMessage {
       receivedAt: _epochMillis(map['receivedAt']),
       collapseId: map['collapseId'] as String?,
       badge: map['badge'] as int?,
+      readUpdatedAt: _epochMillis(map['readUpdatedAt']),
+      archivedUpdatedAt: _epochMillis(map['archivedUpdatedAt']),
+      updatedAt: _epochMillis(map['updatedAt']),
+      expiredAt: _epochMillis(map['expiredAt']),
       isRead: _requireBool(map, 'isRead'),
       isArchived: _requireBool(map, 'isArchived'),
       source: InboxMessageSource(_requireString(map, 'source')),
@@ -166,6 +210,10 @@ class InboxMessage {
         'receivedAt': receivedAt?.millisecondsSinceEpoch,
         'collapseId': collapseId,
         'badge': badge,
+        'readUpdatedAt': readUpdatedAt?.millisecondsSinceEpoch,
+        'archivedUpdatedAt': archivedUpdatedAt?.millisecondsSinceEpoch,
+        'updatedAt': updatedAt?.millisecondsSinceEpoch,
+        'expiredAt': expiredAt?.millisecondsSinceEpoch,
         'isRead': isRead,
         'isArchived': isArchived,
         'source': source.rawValue,
@@ -211,9 +259,30 @@ class InboxMessage {
   }
 
   /// Converts epoch milliseconds to a UTC [DateTime].
+  /// Converts epoch milliseconds to a UTC [DateTime], or null.
+  ///
+  /// Tolerant by design: these values are optional and non-critical, so an
+  /// absent, null or malformed value yields null rather than throwing and
+  /// failing the whole message. Accepts an int or a whole-valued double, and
+  /// ignores anything else, including a value outside the range a [DateTime]
+  /// can represent.
   static DateTime? _epochMillis(dynamic value) {
-    if (value is! int) return null;
-    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+    final int? millis;
+    if (value is int) {
+      millis = value;
+    } else if (value is double && value == value.truncateToDouble()) {
+      millis = value.toInt();
+    } else {
+      return null;
+    }
+
+    try {
+      return DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+    } on ArgumentError {
+      // RangeError is an ArgumentError, so this covers an out-of-range value
+      // as well as any malformed input.
+      return null;
+    }
   }
 
   @override
@@ -235,6 +304,10 @@ class InboxMessage {
         other.receivedAt != receivedAt ||
         other.collapseId != collapseId ||
         other.badge != badge ||
+        other.readUpdatedAt != readUpdatedAt ||
+        other.archivedUpdatedAt != archivedUpdatedAt ||
+        other.updatedAt != updatedAt ||
+        other.expiredAt != expiredAt ||
         other.isRead != isRead ||
         other.isArchived != isArchived ||
         other.source != source ||
@@ -271,6 +344,10 @@ class InboxMessage {
         receivedAt,
         collapseId,
         badge,
+        readUpdatedAt,
+        archivedUpdatedAt,
+        updatedAt,
+        expiredAt,
         isRead,
         isArchived,
         source,
