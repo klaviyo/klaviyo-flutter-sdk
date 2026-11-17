@@ -574,7 +574,7 @@ class KlaviyoSDK {
   ///   routes: [...],
   ///   redirect: (context, state) {
   ///     // Fire-and-forget - Klaviyo tracks in background
-  ///     Klaviyo.handleUniversalTrackingLink(state.uri.toString());
+  ///     KlaviyoSDK().handleUniversalTrackingLink(state.uri.toString());
   ///     return null; // Continue with normal navigation
   ///   },
   /// );
