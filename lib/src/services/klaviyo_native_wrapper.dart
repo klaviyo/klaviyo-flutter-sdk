@@ -506,23 +506,18 @@ class KlaviyoNativeWrapper {
       final String eventType = eventData['type'] as String? ?? '';
 
       switch (eventType) {
-        case 'push_notification_received':
         case 'push_notification_opened':
         case 'silent_push_received':
         case 'push_token_received':
         case 'push_token_error':
-          _logger.info('Native push notification event: $eventData');
+          _logger.info('Native push notification event: $eventType');
           _pushNotificationController.add(eventData);
           break;
-        case 'form_event':
         case 'form_lifecycle_event':
-          _logger.info('Native form event: $eventData');
+          _logger.info('Native form event: $eventType');
           _formEventController.add(eventData);
           break;
         case 'auth_token_requested':
-          // Bridge diagnostic only — the request payload carries a correlation
-          // id, never a token, so this is safe to log.
-          _logger.info('Native auth token request event received');
           _authTokenRequestController.add(eventData);
           break;
         case 'push_open_web_url':
@@ -578,12 +573,4 @@ class KlaviyoNativeWrapper {
 
   /// Get current API key
   String? get apiKey => _apiKey;
-
-  /// Dispose resources
-  void dispose() {
-    _pushNotificationController.close();
-    _formEventController.close();
-    _authTokenRequestController.close();
-    _pushActionController.close();
-  }
 }

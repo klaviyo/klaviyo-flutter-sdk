@@ -6,6 +6,38 @@ This guide outlines how developers can migrate from older versions of the
 > Migrating from the community [`klaviyo_flutter`](https://pub.dev/packages/klaviyo_flutter)
 > package to the official SDK? See [MIGRATION.md](./MIGRATION.md) instead.
 
+## Migrating to v1.0.0
+
+1.0 removes the APIs that 0.6.0 deprecated. Fix the 0.6.0 deprecation warnings first and your app is ready for 1.0.
+
+| Removed | Replacement |
+|---|---|
+| `KlaviyoSDK().handlePushNotificationReceived(...)` | Delete the call. Push tracking is automatic. |
+| `KlaviyoSDK().handlePushNotificationOpened(...)` | Delete the call. Push opens are tracked automatically and arrive on `onPushNotification` as `push_notification_opened`. |
+| The `Klaviyo` class (`Klaviyo.instance`) | `KlaviyoSDK()`. [MIGRATION.md](./MIGRATION.md#quick-reference) maps every method. |
+| `KlaviyoSDK().onFormEvent` | `KlaviyoSDK().onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s instead of raw maps. |
+| `map.isKlaviyoNotification` | Delete the check. Klaviyo push events arrive on `KlaviyoSDK`'s streams, such as `onPushNotification` and `onPushAction`. |
+| `KlaviyoSDK().dispose()` | Delete the call. If you used it to stop supplying tokens for personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()`. To cancel your own listeners, cancel their `StreamSubscription`s. |
+| `KlaviyoNativeWrapper` (including its `dispose()` and `track()`) | `KlaviyoSDK()`. The class is internal and no longer exported. Use `createEvent(KlaviyoEvent.custom(...))` in place of `track()`. |
+
+Before and after, for the form stream:
+
+```dart
+// Before
+KlaviyoSDK().onFormEvent.listen((event) {
+  if (event['type'] == 'form_lifecycle_event') { ... }
+});
+
+// After
+KlaviyoSDK().onFormLifecycleEvent.listen((event) {
+  switch (event) {
+    case FormShown(): ...
+    case FormDismissed(): ...
+    case FormCtaClicked(): ...
+  }
+});
+```
+
 ## Migrating to v0.6.0
 
 - `KlaviyoProfile.toJson` now nests custom properties under `properties` instead of merging them into the top level, so code that reads custom keys from its output must read them from `json['properties']`; `KlaviyoProfile.fromJson` still accepts the old flat shape, but ignores unknown top-level keys when a nested `properties` map is present.
