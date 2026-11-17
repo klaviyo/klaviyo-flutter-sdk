@@ -10,6 +10,8 @@ import '../utils/channel_value_sanitizer.dart';
 import '../utils/profile_payload.dart';
 import 'package:logging/logging.dart';
 
+/// Bridge to the native Klaviyo SDKs over the `klaviyo_sdk` method channel
+/// and the `klaviyo_events` event channel. Internal; use [KlaviyoSDK].
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
   static const EventChannel _eventChannel = EventChannel('klaviyo_events');
@@ -17,6 +19,7 @@ class KlaviyoNativeWrapper {
   static final KlaviyoNativeWrapper _instance =
       KlaviyoNativeWrapper._internal();
 
+  /// Returns the shared wrapper instance.
   factory KlaviyoNativeWrapper() => _instance;
 
   KlaviyoNativeWrapper._internal();
@@ -64,6 +67,7 @@ class KlaviyoNativeWrapper {
   Stream<Map<String, dynamic>> get onPushNotification =>
       _pushNotificationController.stream;
 
+  /// Raw form events from the native SDKs.
   Stream<Map<String, dynamic>> get onFormEvent => _formEventController.stream;
 
   /// Stream of native `auth_token_requested` events. Each event carries a

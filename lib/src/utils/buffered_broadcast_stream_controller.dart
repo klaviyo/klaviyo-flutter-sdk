@@ -7,6 +7,7 @@ import 'dart:async';
 /// key: a newer event with the same key replaces the buffered one. All other
 /// events are buffered in arrival order.
 class BufferedBroadcastStreamController<T> {
+  /// Creates a controller. See the class docs for [holdKey].
   BufferedBroadcastStreamController({Object? Function(T event)? holdKey})
       : _holdKey = holdKey;
 
@@ -16,9 +17,13 @@ class BufferedBroadcastStreamController<T> {
     onListen: _flush,
   );
 
+  /// The broadcast stream of events.
   Stream<T> get stream => _controller.stream;
+
+  /// Whether the stream has a listener.
   bool get hasListener => _controller.hasListener;
 
+  /// Delivers [event] to listeners, or buffers it if there are none.
   void add(T event) {
     if (_controller.hasListener) {
       _controller.add(event);
@@ -43,6 +48,7 @@ class BufferedBroadcastStreamController<T> {
     _buffer.clear();
   }
 
+  /// Drops the buffer and closes the stream.
   void close() {
     _buffer.clear();
     _controller.close();

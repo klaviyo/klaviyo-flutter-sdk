@@ -1,14 +1,28 @@
 import 'package:logging/logging.dart';
 
 @Deprecated('Use KlaviyoSDK.setLoggingEnabled instead. Will be removed in 1.0.')
+
+/// Log levels for the plugin's Dart-side logging.
 enum KlaviyoLogLevel {
+  /// No logging.
   none,
+
+  /// Errors only.
   error,
+
+  /// Warnings and errors.
   warning,
+
+  /// Informational messages, warnings and errors.
   info,
+
+  /// Debug messages and everything above.
   debug,
+
+  /// Every message.
   verbose;
 
+  /// The matching `package:logging` [Level].
   Level toLevel() {
     switch (this) {
       case KlaviyoLogLevel.none:
@@ -26,6 +40,7 @@ enum KlaviyoLogLevel {
     }
   }
 
+  /// Parses [value] case-insensitively, falling back to [info].
   static KlaviyoLogLevel fromString(String value) {
     switch (value.toLowerCase()) {
       case 'none':

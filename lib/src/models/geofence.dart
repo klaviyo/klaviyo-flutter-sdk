@@ -15,6 +15,8 @@ class Geofence {
   /// Radius of the geofence in meters
   final double radius;
 
+  /// Creates a geofence centered on [latitude] and [longitude] with the given
+  /// [radius] in meters.
   const Geofence({
     required this.identifier,
     required this.latitude,

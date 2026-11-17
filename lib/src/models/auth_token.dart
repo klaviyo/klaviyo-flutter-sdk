@@ -35,6 +35,7 @@ class ClassifiedProviderError {
   /// retry recognizes.
   final bool isConnectivityError;
 
+  /// Creates a classified provider error.
   const ClassifiedProviderError({
     required this.message,
     required this.isConnectivityError,

@@ -133,6 +133,7 @@ class OpenWebUrl extends KlaviyoPushAction {
   /// The external web URL to open.
   final String url;
 
+  /// Creates an [OpenWebUrl] action for [url].
   const OpenWebUrl({required this.url});
 
   @override
@@ -174,6 +175,7 @@ class ActionButtonTapped extends KlaviyoPushAction {
   /// Present for `deep_link` and `open_url` actions; null for `open_app`.
   final String? url;
 
+  /// Creates an [ActionButtonTapped] action.
   const ActionButtonTapped({
     required this.buttonId,
     required this.label,
