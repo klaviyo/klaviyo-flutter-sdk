@@ -769,18 +769,19 @@ class KlaviyoSDK {
   /// The push notification tap that launched the app from a killed state, or
   /// `null` if the app wasn't launched by a push tap.
   ///
-  /// The map has the same shape as the `push_notification_opened` event. Pass
-  /// it to [KlaviyoPushOpened.fromMap] for the typed view. When the tap was on
-  /// an action button it carries the button under `action`. Every call returns
-  /// the same value for the life of the process, including after the first
+  /// Returns the same [KlaviyoPushOpened] that [onPushOpened] emits for that
+  /// tap, with [KlaviyoPushOpened.tap], [KlaviyoPushOpened.button] and
+  /// [KlaviyoPushOpened.webUrl] set the same way. Every call returns the same
+  /// tap for the life of the process, including after the first
   /// [onPushOpened] subscriber has received that event, so it can be read
   /// whenever it's needed (for example, by a router at startup). Taps while
   /// the app is running never set it, and [resetProfile] clears it.
   ///
   /// Safe to call before [initialize].
-  Future<Map<String, dynamic>?> getInitialPushNotification() async {
+  Future<KlaviyoPushOpened?> getInitialPushNotification() async {
     try {
-      return await _nativeWrapper.getInitialPushNotification();
+      final launchTap = await _nativeWrapper.getInitialPushNotification();
+      return launchTap == null ? null : KlaviyoPushOpened.fromMap(launchTap);
     } catch (e) {
       throw KlaviyoException('Failed to get initial push notification: $e');
     }

@@ -136,16 +136,45 @@ void main() {
       expect(events.single.payload['id'], 'launch');
 
       final initial = await KlaviyoSDK().getInitialPushNotification();
-      expect(initial, launch);
-      final typed = KlaviyoPushOpened.fromMap(initial!);
-      expect(typed.tap, KlaviyoPushTap.actionButton);
-      expect(typed.button?.id, 'btn1');
+      expect(initial, isA<KlaviyoPushOpened>());
+      expect(initial!.payload['id'], 'launch');
+      expect(initial.tap, KlaviyoPushTap.actionButton);
+      expect(initial.button?.id, 'btn1');
+      expect(initial.tap, events.single.tap);
+      expect(initial.button, events.single.button);
 
       final late = <KlaviyoPushOpened>[];
       final lateSub = KlaviyoSDK().onPushOpened.listen(late.add);
       await pumpEventQueue();
       expect(late, isEmpty);
       await lateSub.cancel();
+      nativeInitialPush = null;
+    });
+
+    test('the launch tap is typed the same as the onPushOpened event',
+        () async {
+      final launch = opened(
+        'web-launch',
+        action: {
+          'type': 'push_open_web_url',
+          'data': {'url': 'https://www.klaviyo.com'},
+        },
+      );
+      nativeInitialPush = launch;
+      sink!.success(launch);
+      await pumpEventQueue();
+
+      final events = <KlaviyoPushOpened>[];
+      final sub = KlaviyoSDK().onPushOpened.listen(events.add);
+      await pumpEventQueue();
+      await sub.cancel();
+
+      final initial = await KlaviyoSDK().getInitialPushNotification();
+      expect(initial?.tap, KlaviyoPushTap.webUrl);
+      expect(initial?.webUrl, 'https://www.klaviyo.com');
+      expect(initial?.tap, events.single.tap);
+      expect(initial?.webUrl, events.single.webUrl);
+      expect(initial?.payload, events.single.payload);
       nativeInitialPush = null;
     });
 

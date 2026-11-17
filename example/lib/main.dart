@@ -168,9 +168,8 @@ String describePushOpened(KlaviyoPushOpened opened) {
 }
 
 /// One-line summary of a `getInitialPushNotification()` result.
-String describeLaunchTap(Map<String, dynamic>? launchTap) => launchTap == null
-    ? 'null'
-    : describePushOpened(KlaviyoPushOpened.fromMap(launchTap));
+String describeLaunchTap(KlaviyoPushOpened? launchTap) =>
+    launchTap == null ? 'null' : describePushOpened(launchTap);
 
 /// Set up listener for silent push notifications.
 /// Called from ProfileTab after SDK initialization.

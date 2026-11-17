@@ -597,12 +597,12 @@ One tap emits one event. Before 0.6.0, an iOS action-button or web URL tap emitt
 
 #### Reading the Launch Tap
 
-To read the tap that launched the app at any time, for example from a router that subscribes after another listener has already taken the `onPushOpened` event, call `getInitialPushNotification()`. It is the equivalent of `firebase_messaging`'s `getInitialMessage()`. It returns the same map as the `push_notification_opened` event, including the tapped button under `action` when the tap was on an action button, or `null` if the app wasn't launched by a push tap. Pass the map to `KlaviyoPushOpened.fromMap` for the typed view:
+To read the tap that launched the app at any time, for example from a router that subscribes after another listener has already taken the `onPushOpened` event, call `getInitialPushNotification()`. It is the equivalent of `firebase_messaging`'s `getInitialMessage()`. It returns the same `KlaviyoPushOpened` that `onPushOpened` emits for that tap, with `tap`, `button` and `webUrl` set the same way, or `null` if the app wasn't launched by a push tap:
 
 ```dart
 Future<String> initialRoute() async {
   final launchTap = await KlaviyoSDK().getInitialPushNotification();
-  final url = launchTap?['data']?['url'] as String?;
+  final url = launchTap?.payload['url'] as String?;
   return url != null ? Uri.parse(url).path : '/';
 }
 ```
