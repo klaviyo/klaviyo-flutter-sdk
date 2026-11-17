@@ -4,7 +4,7 @@ For agents and humans editing workflows and actions here. `CLAUDE.md` in this di
 
 ## Slack
 
-- Use only `klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci` for Slack. It wraps slackapi/slack-github-action, so don't call slackapi or curl directly.
+- Use only `klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master` for Slack. It wraps slackapi/slack-github-action, so don't call slackapi or curl directly.
 - `token: ${{ secrets.SLACK_BOT_TOKEN }}`. An empty token skips, so no presence checks.
 - One message per release or deploy, updated through `ts` (job output or dispatch input). Failure details go in a `thread_ts` reply.
 - Each workflow sets `SLACK_USERNAME` and `SLACK_ICON_EMOJI` in its top-level `env:` ("Flutter SDK" for the release workflows, "Flutter Example App" for `publish-example.yml`, both `:merlin-orb-flutter:`).

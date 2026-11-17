@@ -330,7 +330,7 @@ jobs:
       - name: Notify Slack deploy started
         id: slack
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts }}
@@ -374,7 +374,7 @@ jobs:
 
       - name: Update the Slack deploy message
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
@@ -535,7 +535,7 @@ jobs:
       - name: Notify Slack on success
         if: success() && inputs.check_credentials != true
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -556,7 +556,7 @@ jobs:
       - name: Notify Slack on failure
         if: failure() || (cancelled() && steps.stop.outputs.timed_out == 'true')
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -769,7 +769,7 @@ jobs:
       - name: Notify Slack on success
         if: success() && inputs.check_credentials != true
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -791,7 +791,7 @@ jobs:
       - name: Notify Slack on failure
         if: failure() || (cancelled() && steps.stop.outputs.timed_out == 'true')
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -881,7 +881,7 @@ jobs:
       - name: Warn in Slack that What to Test failed
         if: failure()
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -1001,7 +1001,7 @@ jobs:
 
       - name: Update the Slack deploy message
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
@@ -1035,4 +1035,4 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: klaviyo/klaviyo-react-native-sdk/.github/shared/remove-deploy-label@ecm/mage-1726/shared-ci
+      - uses: klaviyo/klaviyo-react-native-sdk/.github/shared/remove-deploy-label@master

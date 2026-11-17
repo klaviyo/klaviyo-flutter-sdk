@@ -45,7 +45,7 @@ jobs:
       - name: Notify Slack release awaiting approval
         id: slack
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: pending
@@ -157,7 +157,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: klaviyo/klaviyo-react-native-sdk/.github/shared/linear-release-sync@ecm/mage-1726/shared-ci
+      - uses: klaviyo/klaviyo-react-native-sdk/.github/shared/linear-release-sync@master
         with:
           version: ${{ github.ref_name }}
           token: ${{ secrets.LINEAR_ACCESS_KEY }}
@@ -306,7 +306,7 @@ jobs:
       - name: Notify Slack
         id: slack
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ inputs.slack_ts || needs.announce.outputs.slack_ts }}
@@ -326,7 +326,7 @@ jobs:
       - name: Reply with failure details
         if: steps.result.outputs.result != 'success' && steps.slack.outputs.ts != ''
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ steps.slack.outputs.ts }}
