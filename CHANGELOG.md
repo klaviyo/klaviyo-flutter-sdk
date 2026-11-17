@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- **iOS: Swift Package Manager is the primary install path, and CocoaPods is frozen at native iOS SDK 5.7.0** — CocoaPods trunk stops accepting releases on December 2, 2026. The plugin's podspec now pins `KlaviyoSwift`, `KlaviyoForms` and `KlaviyoLocation` to `~> 5.7.0`, the last native release on trunk, and later releases of this plugin won't move those pins. Swift Package Manager needs Flutter 3.41+, is the default from Flutter 3.44, and follows new native iOS SDK releases. Apps on Flutter 3.27–3.40, or with Swift Package Manager turned off, still install through CocoaPods but get no native iOS fixes released after December 2, 2026, and a later 1.x may stop building with CocoaPods once it needs a newer native API. See the README's "CocoaPods (legacy)" section.
+- **iOS: `KLAVIYO_INCLUDE_FORMS` and `KLAVIYO_INCLUDE_LOCATION` apply to CocoaPods only** — Swift Package Manager builds always link `KlaviyoForms` and `KlaviyoLocation`. The `FORMS_NOT_AVAILABLE` and `GEOFENCING_NOT_AVAILABLE` error messages now say so.
+
 ### What's New
 
 - **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
@@ -20,6 +25,7 @@
 
 ### Documentation
 
+- **Swift Package Manager setup for the iOS Notification Service Extension** — New README steps for adding `KlaviyoSwiftExtension` to a notification service extension with Swift Package Manager, with the frozen CocoaPods pod line for legacy apps.
 - **iOS silent push after a force quit** — The README no longer says iOS is unaffected: a force-quit app gets no silent pushes until the user reopens it or restarts the device.
 - **Using the SDK alongside `firebase_messaging` on Android** — New README section: declare `KlaviyoFlutterPushService` in your app manifest, or `firebase_messaging`'s service wins and Klaviyo pushes never display; the example app does this.
 
