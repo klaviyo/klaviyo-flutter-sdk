@@ -72,7 +72,7 @@ platform :ios do
   end
 
   # Expects `flutter build ios --release --config-only` to have run first so
-  # Pods are in place; it runs again here so Generated.xcconfig carries the
+  # the plugin config is in place; it runs again here so Generated.xcconfig carries the
   # real build number and derived version.
   desc "Archive + export a signed IPA to example/build/ios/ipa/Runner.ipa"
   lane :build_ipa do |options|
@@ -92,7 +92,6 @@ platform :ios do
       configuration: "Release",
       destination: "generic/platform=iOS",
       export_method: "app-store",
-      codesigning_identity: "Apple Distribution",
       # The extension hardcodes CURRENT_PROJECT_VERSION = 1; App Store Connect
       # wants it to match the host app's CFBundleVersion.
       xcargs: "CURRENT_PROJECT_VERSION=#{build_number} FLUTTER_BUILD_NUMBER=#{build_number} KLAVIYO_APP_VERSION='#{app_version}'",
