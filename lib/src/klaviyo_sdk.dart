@@ -165,6 +165,17 @@ class KlaviyoSDK {
 
   /// Set profile properties
   /// Calls the native SDK directly - native SDK manages profile state
+  ///
+  /// Keys for standard attributes (see [ProfileProperty]) set the standard
+  /// field. The identifier keys `email`, `phone_number` and `external_id` set
+  /// the profile's identifiers, the same as [setEmail], [setPhoneNumber] and
+  /// [setExternalId]. Number and bool values for standard text fields are sent
+  /// as strings, and latitude and longitude accept numbers or numeric strings.
+  /// Null values are ignored and don't clear a property. [DateTime] values,
+  /// including nested ones, are sent as UTC ISO 8601 strings. Values the
+  /// platform channel can't encode, such as [Duration], [Uri] or custom
+  /// classes, are dropped with a warning and the other keys are still sent.
+  /// Any other key is stored as a custom property.
   Future<void> setProfileProperties(Map<String, dynamic> properties) async {
     _ensureInitialized();
 
@@ -189,7 +200,11 @@ class KlaviyoSDK {
   /// [propertyKey] can be a [ProfileProperty] constant or any string.
   /// camelCase and snake_case spellings of standard keys (for example
   /// `firstName` or `first_name`) set the standard field on both platforms.
-  /// Any other key is stored as a custom property.
+  /// `email`, `phone_number` and `external_id` set the identifier. Any other
+  /// key is stored as a custom property. A null [value] is ignored, a
+  /// [DateTime] is sent as a UTC ISO 8601 string, and a value the platform
+  /// channel can't encode is dropped with a warning. See
+  /// [setProfileProperties] for how values are converted.
   Future<void> setProfileAttribute(String propertyKey, dynamic value) async {
     await setProfileProperties({propertyKey: value});
   }
@@ -309,6 +324,62 @@ class KlaviyoSDK {
     } on KlaviyoException catch (e) {
       _logger.warning('Failed to register for in-app forms: ${e.message}');
     }
+  }
+
+  /// Start a draft in-app forms preview session with a preview token from the
+  /// Klaviyo form editor.
+  ///
+  /// Starting a preview is like unregistering and registering again: if forms
+  /// are registered, the current session is torn down, dismissing any form on
+  /// screen, and a new session starts that loads draft forms. If
+  /// [registerForInAppForms] hasn't been called yet, the token is held and the
+  /// preview starts when forms register; no forms are shown before then.
+  ///
+  /// A preview token is a short-lived credential for on-device testing of
+  /// draft forms. The native SDKs keep it in memory only and never persist or
+  /// log it. A malformed token is ignored and changes nothing.
+  /// [unregisterFromInAppForms] also ends the preview.
+  Future<void> startFormsPreview(String token) async {
+    _ensureInitialized();
+    try {
+      await _nativeWrapper.startFormsPreview(token);
+      _logger.info('Started forms preview');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to start the forms preview: ${e.message}');
+    }
+  }
+
+  /// End the draft in-app forms preview session. If forms are registered, they
+  /// restart with published forms.
+  Future<void> endFormsPreview() async {
+    _ensureInitialized();
+    try {
+      await _nativeWrapper.endFormsPreview();
+      _logger.info('Ended forms preview');
+    } on KlaviyoException catch (e) {
+      _logger.warning('Failed to end the forms preview: ${e.message}');
+    }
+  }
+
+  /// Start a forms preview from a deep link, such as the link or QR code from
+  /// the Klaviyo form editor's **Preview on device** button.
+  ///
+  /// Forwards [url] to the native SDK and returns true only when the native
+  /// SDK started a preview — that is, the link carries a well-formed
+  /// `klaviyo-forms-preview` token. Returns false, changing nothing, for
+  /// every other link and on any failure, so call it first from your deep
+  /// link handling and fall through when it returns false.
+  ///
+  /// Never throws: a badly encoded query or an unreachable native side
+  /// returns false. Safe to call before [initialize] for cold-start links;
+  /// the native SDKs hold the token until forms register.
+  Future<bool> handleFormsPreviewLink(Uri url) async {
+    try {
+      if (url.queryParameters.isEmpty) return false;
+    } on FormatException {
+      return false;
+    }
+    return _nativeWrapper.handleFormsPreviewLink(url.toString());
   }
 
   /// Unregister from in-app forms

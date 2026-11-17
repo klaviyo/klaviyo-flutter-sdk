@@ -6,7 +6,8 @@ import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
-import '../utils/profile_key_normalizer.dart';
+import '../utils/channel_value_sanitizer.dart';
+import '../utils/profile_payload.dart';
 import 'package:logging/logging.dart';
 
 class KlaviyoNativeWrapper {
@@ -87,7 +88,9 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setProfile', {'profile': profile.toJson()});
+      await _channel.invokeMethod('setProfile', {
+        'profile': resolveProfilePayload(profile.toJson()),
+      });
     } catch (e) {
       throw KlaviyoException('Failed to set profile: $e');
     }
@@ -169,9 +172,28 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setProfileProperties', {
-        'properties': normalizeProfileProperties(properties),
-      });
+      final update = splitProfileProperties(properties);
+      final email = update.identifiers[ProfileIdentifierKey.email];
+      final phoneNumber = update.identifiers[ProfileIdentifierKey.phoneNumber];
+      final externalId = update.identifiers[ProfileIdentifierKey.externalId];
+      if (email != null) {
+        await _channel.invokeMethod('setEmail', {'email': email});
+      }
+      if (phoneNumber != null) {
+        await _channel.invokeMethod('setPhoneNumber', {
+          'phoneNumber': phoneNumber,
+        });
+      }
+      if (externalId != null) {
+        await _channel.invokeMethod('setExternalId', {
+          'externalId': externalId,
+        });
+      }
+      if (update.properties.isNotEmpty) {
+        await _channel.invokeMethod('setProfileProperties', {
+          'properties': update.properties,
+        });
+      }
     } catch (e) {
       throw KlaviyoException('Failed to set profile properties: $e');
     }
@@ -182,7 +204,13 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('trackEvent', {'event': event.toJson()});
+      final eventJson = event.toJson();
+      final properties = eventJson['properties'];
+      if (properties is Map<String, dynamic>) {
+        eventJson['properties'] =
+            sanitizeChannelProperties(properties, source: 'createEvent');
+      }
+      await _channel.invokeMethod('trackEvent', {'event': eventJson});
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
     }
@@ -267,6 +295,43 @@ class KlaviyoNativeWrapper {
       });
     } catch (e) {
       throw KlaviyoException('Failed to register for in-app forms: $e');
+    }
+  }
+
+  /// Start a forms preview session in the native SDK
+  Future<void> startFormsPreview(String token) async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('startFormsPreview', {'token': token});
+    } catch (e) {
+      throw const KlaviyoException('Failed to start the forms preview');
+    }
+  }
+
+  /// Start a forms preview from a deep link in the native SDK.
+  ///
+  /// Never throws and has no initialize guard — the native SDKs hold a
+  /// preview token until forms register, so this must work for cold-start
+  /// links. Returns false on any failure.
+  Future<bool> handleFormsPreviewLink(String url) async {
+    try {
+      return await _channel.invokeMethod<bool>('handleFormsPreviewLink', {
+            'url': url,
+          }) ??
+          false;
+    } catch (e) {
+      _logger.warning('Failed to handle the forms preview link: $e');
+      return false;
+    }
+  }
+
+  /// End the forms preview session in the native SDK
+  Future<void> endFormsPreview() async {
+    _ensureInitialized();
+    try {
+      await _channel.invokeMethod('endFormsPreview');
+    } catch (e) {
+      throw KlaviyoException('Failed to end the forms preview: $e');
     }
   }
 
