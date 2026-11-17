@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
@@ -173,6 +174,70 @@ void main() {
       await firstSub.cancel();
       await secondSub.cancel();
     });
+  });
+
+  group('onPushToken replay', () {
+    test(
+      'rotated tokens that arrive before any listener go to the first '
+      'onPushToken subscriber once as FCM tokens',
+      () async {
+        final previousPlatform = debugDefaultTargetPlatformOverride;
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        addTearDown(
+          () => debugDefaultTargetPlatformOverride = previousPlatform,
+        );
+
+        const registered = KlaviyoPushToken(
+          token: 'registered',
+          type: KlaviyoPushTokenType.fcm,
+        );
+        const rotated = KlaviyoPushToken(
+          token: 'rotated',
+          type: KlaviyoPushTokenType.fcm,
+        );
+        const rotatedAgain = KlaviyoPushToken(
+          token: 'rotated-again',
+          type: KlaviyoPushTokenType.fcm,
+        );
+
+        await KlaviyoSDK().onPushToken.listen((_) {}).cancel();
+        sink!
+          ..success({
+            'type': 'push_token_received',
+            'data': {'token': 'registered'},
+          })
+          ..success({
+            'type': 'push_token_received',
+            'data': {'token': 'rotated'},
+          });
+        await pumpEventQueue();
+
+        final first = <KlaviyoPushToken>[];
+        final second = <KlaviyoPushToken>[];
+        final firstSub = KlaviyoSDK().onPushToken.listen(first.add);
+        await pumpEventQueue();
+        final secondSub = KlaviyoSDK().onPushToken.listen(second.add);
+        await pumpEventQueue();
+
+        expect(first, [registered, rotated]);
+        expect(second, isEmpty);
+
+        sink!.success({
+          'type': 'push_token_received',
+          'data': {'token': 'rotated-again'},
+        });
+        await pumpEventQueue();
+
+        expect(first, [registered, rotated, rotatedAgain]);
+        expect(second, [rotatedAgain]);
+
+        await firstSub.cancel();
+        await secondSub.cancel();
+        final drain = KlaviyoSDK().onPushNotification.listen((_) {});
+        await pumpEventQueue();
+        await drain.cancel();
+      },
+    );
   });
 
   group('getInitialPushNotification', () {
