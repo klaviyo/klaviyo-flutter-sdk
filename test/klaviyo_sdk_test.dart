@@ -301,6 +301,47 @@ void main() {
       });
     });
 
+    test('promotes timezone spellings in properties into location', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      for (final key in ['timezone', 'timeZone', 'time_zone']) {
+        log.clear();
+        await sdk.setProfile(
+          KlaviyoProfile(properties: {key: 'America/New_York'}),
+        );
+
+        final call = log.singleWhere((c) => c.method == 'setProfile');
+        expect(
+          call.arguments,
+          {
+            'profile': {
+              'location': {'timezone': 'America/New_York'},
+            },
+          },
+          reason: key,
+        );
+      }
+    });
+
+    test('sends KlaviyoLocation.timezone under location', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          location: const KlaviyoLocation(timezone: 'America/New_York'),
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'location': {'timezone': 'America/New_York'},
+        },
+      });
+    });
+
     test('promotes snake_case identifiers in properties', () async {
       final sdk = KlaviyoSDK();
       await sdk.initialize(apiKey: 'KEY_1');
@@ -454,6 +495,29 @@ void main() {
 
       final call = log.singleWhere((c) => c.method == 'setProfileProperties');
       expect(call.arguments['properties'], {'first_name': 'Ada'});
+    });
+
+    test('setProfileAttribute sends every timezone spelling as timezone',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      for (final key in [
+        ProfileProperty.timezone,
+        'timeZone',
+        'time_zone',
+        'TimeZone',
+      ]) {
+        log.clear();
+        await sdk.setProfileAttribute(key, 'America/New_York');
+
+        final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+        expect(
+          call.arguments['properties'],
+          {'timezone': 'America/New_York'},
+          reason: key,
+        );
+      }
     });
 
     test('routes identifier keys to the identifier setters', () async {
