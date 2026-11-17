@@ -58,6 +58,11 @@ lint: format-check analyze ktlint swiftlint ## Every check in the lint CI job
 test: deps ## Dart unit tests with coverage (CI: test)
 	flutter test --coverage
 
+.PHONY: coverage
+coverage: deps ## Dart unit tests with coverage, then per-file line coverage for lib/
+	flutter test --coverage
+	scripts/coverage-summary.sh coverage/lcov.info
+
 .PHONY: test-example
 test-example: deps ## Example app widget tests
 	cd example && flutter test
