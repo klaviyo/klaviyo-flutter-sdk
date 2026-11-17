@@ -903,7 +903,7 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/klaviyo/klaviyo-swift-sdk";
 			requirement = {
-				branch = rel/5.7.0;
+				branch = "ecm/spm-wrapper-attribution";
 				kind = branch;
 			};
 		};
