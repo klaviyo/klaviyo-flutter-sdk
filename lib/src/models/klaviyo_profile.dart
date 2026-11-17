@@ -3,7 +3,7 @@ import 'klaviyo_location.dart';
 import 'profile_property.dart';
 
 /// Represents a user profile in Klaviyo
-class KlaviyoProfile {
+final class KlaviyoProfile {
   /// Individual's email address.
   final String? email;
 

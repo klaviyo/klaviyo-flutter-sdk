@@ -2,7 +2,7 @@ const int _infiniteTimeoutSentinel = -1;
 
 /// Configuration for in-app forms, passed to
 /// [KlaviyoSDK.registerForInAppForms].
-class InAppFormConfig {
+final class InAppFormConfig {
   /// How long the forms session survives while the app is in the background.
   ///
   /// - null → platform default (1 hour)
