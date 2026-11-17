@@ -12,6 +12,7 @@ These APIs were deprecated in 0.6.0 and are now removed. See the [Migration Guid
 - **The `isKlaviyoNotification` extension on `Map<String, dynamic>`** is removed. Klaviyo push events arrive on `KlaviyoSDK`'s streams, such as `onPushNotification` and `onPushAction`.
 - **`KlaviyoSDK.dispose()`** is removed. To stop supplying tokens for personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()`. Otherwise, delete the call.
 - **`KlaviyoNativeWrapper` is no longer exported**, along with its `dispose()` and `track()`. Use `KlaviyoSDK`.
+- **Public data classes are now `final`.** `KlaviyoProfile`, `KlaviyoLocation`, `KlaviyoEvent`, `KlaviyoSubscription`, `KlaviyoSubscriptionChannels`, `InAppFormConfig`, `Geofence`, `ClassifiedProviderError`, `FormShown`, `FormDismissed`, `FormCtaClicked`, `KlaviyoPushOpened`, `KlaviyoPushButton` and `KlaviyoPushData` can no longer be extended, implemented or mixed in outside the package. Construct them instead. This lets later 1.x releases add fields without breaking your code.
 
 ## Unreleased
 
