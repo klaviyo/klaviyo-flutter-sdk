@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:klaviyo_flutter_sdk/src/services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
 
 void main() {

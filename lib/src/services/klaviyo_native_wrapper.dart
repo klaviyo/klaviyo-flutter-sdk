@@ -12,9 +12,6 @@ import 'package:logging/logging.dart';
 
 const _maxBufferedPushEvents = 50;
 
-@Deprecated(
-  'Use KlaviyoSDK instead; this class becomes internal. Will be removed in 1.0.',
-)
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
   static const EventChannel _eventChannel = EventChannel('klaviyo_events');
@@ -686,8 +683,4 @@ class KlaviyoNativeWrapper {
 
   /// Get current API key
   String? get apiKey => _apiKey;
-
-  /// No-op. Event streams stay open for the life of the app.
-  @Deprecated('No longer needed. Will be removed in 1.0.')
-  void dispose() {}
 }

@@ -6,6 +6,15 @@
 
 - **iOS: minimum deployment target raised from 13.0 to 15.0** — `Package.swift` and the podspec now declare iOS 15.0, matching the README. Apps must set their iOS deployment target to 15.0 or higher. iOS 15 runs on every device that runs iOS 13 (iPhone 6s and newer), so no devices are dropped. The plugin's iOS 13 code paths are gone; logging that used to be skipped below iOS 14 now always runs.
 
+These APIs were deprecated in 0.6.0 and are now removed. See the [Migration Guide](MIGRATION_GUIDE.md#migrating-to-v100) for replacements.
+
+- **`KlaviyoSDK.handlePushNotificationReceived` and `KlaviyoSDK.handlePushNotificationOpened`** are removed. They only logged a message; push tracking is automatic.
+- **The `Klaviyo` compatibility class** (`Klaviyo.instance`, from the `klaviyo_flutter` community package) is removed. Use `KlaviyoSDK()`; [MIGRATION.md](MIGRATION.md) maps each method.
+- **`KlaviyoSDK.onFormEvent`** is removed. Use `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s.
+- **The `isKlaviyoNotification` extension on `Map<String, dynamic>`** is removed. Klaviyo push events arrive on `KlaviyoSDK`'s streams, such as `onPushNotification` and `onPushAction`.
+- **`KlaviyoSDK.dispose()`** is removed. To stop supplying tokens for personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()`. Otherwise, delete the call.
+- **`KlaviyoNativeWrapper` is no longer exported**, along with its `dispose()` and `track()`. Use `KlaviyoSDK`.
+
 ### Platform Support
 
 - **iOS**: Minimum deployment target 15.0

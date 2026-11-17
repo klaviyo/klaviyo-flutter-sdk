@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:klaviyo_flutter_sdk/src/services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
 
 void main() {
@@ -65,8 +66,8 @@ void main() {
     'push_token_error',
   ]) {
     test('$type goes to onPushNotification only', () async {
-      final forms = <Map<String, dynamic>>[];
-      final formSub = sdk.onFormEvent.listen(forms.add);
+      final forms = <FormLifecycleEvent>[];
+      final formSub = sdk.onFormLifecycleEvent.listen(forms.add);
       final actions = <Map<String, dynamic>>[];
       final actionSub = wrapper.onPushActionEvent.listen(actions.add);
 
@@ -82,17 +83,6 @@ void main() {
       expect(actions, isEmpty);
     });
   }
-
-  test('form_lifecycle_event goes to onFormEvent', () async {
-    final received = await collect(
-      sdk.onFormEvent,
-      () => sink.success({
-        'type': 'form_lifecycle_event',
-        'data': <String, dynamic>{},
-      }),
-    );
-    expect(received.map((e) => e['type']), ['form_lifecycle_event']);
-  });
 
   test('push_token_error delivers the native error message', () async {
     final received = await collect(
@@ -184,7 +174,7 @@ void main() {
     final push = <Map<String, dynamic>>[];
     final pushSub = sdk.onPushNotification.listen(push.add);
     final forms = await collect(
-      sdk.onFormEvent,
+      sdk.onFormLifecycleEvent,
       () => sink.success({'type': 'something_new', 'data': 1}),
     );
     await pushSub.cancel();

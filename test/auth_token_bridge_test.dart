@@ -242,43 +242,5 @@ void main() {
       ),
       hasLength(1),
     );
-
-    // --- dispose() unregisters the provider and leaves streams open -------
-    await sdk.registerAuthTokenProvider(() async => 'jwt-dispose');
-    final unregisterBeforeDispose =
-        log.where((c) => c.method == 'unregisterAuthTokenProvider').length;
-    // ignore: deprecated_member_use_from_same_package
-    sdk.dispose();
-    await pumpEventQueue();
-    expect(
-      log.where((c) => c.method == 'unregisterAuthTokenProvider').length,
-      unregisterBeforeDispose + 1,
-      reason: 'dispose must unregister the native auth provider',
-    );
-
-    capturedSink!.success({
-      'type': 'auth_token_requested',
-      'data': {'id': 'req-after-dispose'},
-    });
-    await pumpEventQueue();
-    final afterDispose = log.lastWhere(
-      (call) =>
-          call.method == 'respondToAuthTokenRequest' &&
-          call.arguments['id'] == 'req-after-dispose',
-    );
-    expect(afterDispose.arguments['jwt'], isNull);
-    expect(
-      afterDispose.arguments['error'],
-      'No auth token provider registered',
-    );
-
-    await sdk.registerAuthTokenProvider(() async => 'jwt-after-dispose');
-    capturedSink!.success({
-      'type': 'auth_token_requested',
-      'data': {'id': 'req-reregistered'},
-    });
-    await pumpEventQueue();
-    expect(lastRespond().arguments['id'], 'req-reregistered');
-    expect(lastRespond().arguments['jwt'], 'jwt-after-dispose');
   });
 }

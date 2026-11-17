@@ -39,7 +39,6 @@ class KlaviyoSDK {
   }
 
   // Native wrapper service — singleton, safe to construct eagerly
-  // ignore: deprecated_member_use_from_same_package
   final KlaviyoNativeWrapper _nativeWrapper = KlaviyoNativeWrapper();
   final Logger _logger = Logger('KlaviyoSDK');
 
@@ -294,30 +293,6 @@ class KlaviyoSDK {
   Future<String?> getPushToken() async {
     _ensureInitialized();
     return await _nativeWrapper.getPushToken();
-  }
-
-  /// Handle push notification received
-  @Deprecated(
-    'No longer needed; push tracking is automatic. Will be removed in 1.0.',
-  )
-  Future<void> handlePushNotificationReceived(
-    Map<String, dynamic> userInfo,
-  ) async {
-    _ensureInitialized();
-    // Native SDK handles this automatically
-    _logger.info('Push notification received');
-  }
-
-  /// Handle push notification opened
-  @Deprecated(
-    'No longer needed; push tracking is automatic. Will be removed in 1.0.',
-  )
-  Future<void> handlePushNotificationOpened(
-    Map<String, dynamic> userInfo,
-  ) async {
-    _ensureInitialized();
-    // Native SDK handles this automatically
-    _logger.info('Push notification opened');
   }
 
   /// Register for in-app forms
@@ -639,8 +614,9 @@ class KlaviyoSDK {
     }
   }
 
-  /// Reset the current profile (useful for logout)
-  /// Profile state is managed by the native SDK
+  /// Set the app icon badge count.
+  ///
+  /// iOS only. On Android this is a no-op that logs a warning.
   void setBadgeCount(int count) {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       _ensureInitialized();
@@ -847,10 +823,6 @@ class KlaviyoSDK {
     }
   }
 
-  /// Get form events stream
-  @Deprecated('Use onFormLifecycleEvent instead. Will be removed in 1.0.')
-  Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
-
   /// Get typed form lifecycle events stream.
   ///
   /// Filters for `form_lifecycle_event` type and parses the native map into a
@@ -906,22 +878,6 @@ class KlaviyoSDK {
       throw const KlaviyoException(
         'SDK not initialized. Call initialize() first.',
       );
-    }
-  }
-
-  /// Unregisters the auth token provider, if one is registered.
-  ///
-  /// Event streams stay open, so the SDK keeps working after this call.
-  @Deprecated('No longer needed. Will be removed in 1.0.')
-  void dispose() {
-    if (_authTokenProvider != null) {
-      _authTokenProvider = null;
-      // dispose() is synchronous; fire-and-forget the native unregister.
-      _nativeWrapper.unregisterAuthTokenProvider().catchError((Object e) {
-        _logger.warning(
-          'Failed to unregister auth token provider on dispose: $e',
-        );
-      });
     }
   }
 }
