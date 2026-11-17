@@ -104,6 +104,7 @@ sealed class FormLifecycleEvent {
 ///
 /// Fired after the SDK has initiated form presentation.
 class FormShown extends FormLifecycleEvent {
+  /// Creates a [FormShown] event for the form with [formId] and [formName].
   const FormShown({required super.formId, required super.formName});
 
   @override
@@ -130,6 +131,7 @@ class FormShown extends FormLifecycleEvent {
 /// Does not fire when the SDK tears down the form internally
 /// (session timeouts, aborts).
 class FormDismissed extends FormLifecycleEvent {
+  /// Creates a [FormDismissed] event for the form with [formId] and [formName].
   const FormDismissed({required super.formId, required super.formName});
 
   @override
@@ -167,6 +169,7 @@ class FormCtaClicked extends FormLifecycleEvent {
   /// SDK when a deep link URL is configured for the CTA button.
   final String deepLinkUrl;
 
+  /// Creates a [FormCtaClicked] event.
   const FormCtaClicked({
     required super.formId,
     required super.formName,

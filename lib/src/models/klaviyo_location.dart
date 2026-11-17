@@ -2,16 +2,37 @@ import 'profile_property.dart';
 
 /// Represents a geographic location for user profiles
 class KlaviyoLocation {
+  /// First line of street address.
   final String? address1;
+
+  /// Second line of street address.
   final String? address2;
+
+  /// City name.
   final String? city;
+
+  /// Country name.
   final String? country;
+
+  /// Region within a country, such as state or province.
   final String? region;
+
+  /// Zip code.
   final String? zip;
+
+  /// Latitude coordinate. We recommend providing a precision of four decimal
+  /// places.
   final double? latitude;
+
+  /// Longitude coordinate. We recommend providing a precision of four decimal
+  /// places.
   final double? longitude;
+
+  /// Time zone name. We recommend using time zones from the IANA Time Zone
+  /// Database.
   final String? timezone;
 
+  /// Creates a location. Every field is optional.
   const KlaviyoLocation({
     this.address1,
     this.address2,

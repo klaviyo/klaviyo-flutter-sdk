@@ -71,6 +71,7 @@ final class KlaviyoPushButtonAction {
 /// The action button a user tapped on a push.
 @immutable
 class KlaviyoPushButton {
+  /// Creates a push action button.
   const KlaviyoPushButton({
     required this.id,
     required this.label,

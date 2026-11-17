@@ -11,10 +11,16 @@ final Logger _logger = Logger('KlaviyoSDK');
 
 /// Wire keys of the profile identifiers.
 abstract final class ProfileIdentifierKey {
+  /// The email key.
   static const String email = 'email';
+
+  /// The phone number key.
   static const String phoneNumber = 'phone_number';
+
+  /// The external ID key.
   static const String externalId = 'external_id';
 
+  /// Every identifier key.
   static const Set<String> all = {email, phoneNumber, externalId};
 }
 
@@ -85,6 +91,7 @@ Object? _coerceOrWarn(String source, String key, Object? value) {
 
 /// The result of [splitProfileProperties].
 class ProfilePropertiesUpdate {
+  /// Creates an update from [identifiers] and [properties].
   const ProfilePropertiesUpdate(this.identifiers, this.properties);
 
   /// Identifier values keyed by [ProfileIdentifierKey].

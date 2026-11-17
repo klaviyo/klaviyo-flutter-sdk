@@ -12,6 +12,8 @@ import 'package:logging/logging.dart';
 
 const _maxBufferedPushEvents = 50;
 
+/// Bridge to the native SDKs over the `klaviyo_sdk` method channel and the
+/// `klaviyo_events` event channel. Use [KlaviyoSDK] in apps.
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
   static const EventChannel _eventChannel = EventChannel('klaviyo_events');
@@ -19,6 +21,7 @@ class KlaviyoNativeWrapper {
   static final KlaviyoNativeWrapper _instance =
       KlaviyoNativeWrapper._internal();
 
+  /// Returns the shared wrapper instance.
   factory KlaviyoNativeWrapper() => _instance;
 
   KlaviyoNativeWrapper._internal();
@@ -49,6 +52,7 @@ class KlaviyoNativeWrapper {
 
   // Getters for streams
 
+  /// Raw form lifecycle events from the native SDKs.
   Stream<Map<String, dynamic>> get onFormEvent => _formEventController.stream;
 
   /// Stream of native `auth_token_requested` events. Each event carries a

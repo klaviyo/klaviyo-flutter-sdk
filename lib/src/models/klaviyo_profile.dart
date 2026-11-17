@@ -4,14 +4,33 @@ import 'profile_property.dart';
 
 /// Represents a user profile in Klaviyo
 class KlaviyoProfile {
+  /// Individual's email address.
   final String? email;
+
+  /// Individual's phone number in E.164 format.
   final String? phoneNumber;
+
+  /// A unique identifier used to associate the Klaviyo profile with a profile
+  /// in an external system, such as a point-of-sale system.
   final String? externalId;
+
+  /// Individual's first name.
   final String? firstName;
+
+  /// Individual's last name.
   final String? lastName;
+
+  /// Name of the company or organization within the company for whom the
+  /// individual works.
   final String? organization;
+
+  /// Individual's job title.
   final String? title;
+
+  /// URL pointing to the location of a profile image.
   final String? image;
+
+  /// Location information for this profile.
   final KlaviyoLocation? location;
 
   /// Custom profile properties.

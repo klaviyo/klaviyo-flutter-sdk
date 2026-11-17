@@ -26,6 +26,8 @@ import 'exceptions/klaviyo_exception.dart';
 /// All state is managed by the native SDKs - this class only forwards calls
 class KlaviyoSDK {
   static final KlaviyoSDK _instance = KlaviyoSDK._internal();
+
+  /// Returns the shared [KlaviyoSDK] instance.
   factory KlaviyoSDK() => _instance;
   KlaviyoSDK._internal() {
     // Required for per-logger level control. This is a global setting in
@@ -55,7 +57,7 @@ class KlaviyoSDK {
   StreamSubscription<Map<String, dynamic>>? _authTokenSubscription;
   AuthTokenProvider? _authTokenProvider;
 
-  // Getters
+  /// Whether [initialize] has completed successfully.
   bool get isInitialized => _isInitialized;
 
   /// Initialize the Klaviyo SDK with your public API key.

@@ -1,3 +1,8 @@
+/// Flutter plugin for Klaviyo's native iOS and Android SDKs.
+///
+/// Start with [KlaviyoSDK]: call [KlaviyoSDK.initialize] with your public
+/// API key, then identify profiles, track events, register for push
+/// notifications, and show in-app forms.
 library;
 
 export 'src/klaviyo_sdk.dart';
