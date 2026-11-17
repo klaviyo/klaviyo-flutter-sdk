@@ -50,13 +50,15 @@ Push/form events flow back via `EventChannel` streams.
 - `ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/KlaviyoFlutterSdkPlugin.swift` — `FlutterPlugin` wrapping KlaviyoSwift
 - `android/src/main/kotlin/com/klaviyo/klaviyo_flutter_sdk/KlaviyoFlutterSdkPlugin.kt` — `FlutterPlugin` wrapping klaviyo-android-sdk
 
-Native SDK versions are pinned in two places — keep them in sync when bumping:
-- **iOS**: `ios/klaviyo_flutter_sdk.podspec` — `KlaviyoSwift ~> X.Y.Z`
+Native SDK versions are pinned here; bump them with `scripts/configure-sdk.sh`:
+- **iOS**: `ios/klaviyo_flutter_sdk/Package.swift` — `.upToNextMinor(from: "X.Y.Z")`, mirrored in the example's Xcode project
 - **Android**: `android/build.gradle.kts` — `klaviyoSdkVersion = "X.Y.Z"`
 
-Optional features controlled by host app build properties:
-- **Forms** (`klaviyoIncludeForms`): defaults to **true**
-- **Geofencing** (`klaviyoIncludeLocation`): defaults to **false**, opt-in
+The podspec (`ios/klaviyo_flutter_sdk.podspec`) is frozen at `KlaviyoSwift ~> 5.7.0`, the last release on CocoaPods trunk (trunk stops taking releases Dec 2, 2026). Never bump its Klaviyo* pins; `check-native-pins.sh` fails if they move.
+
+Optional features controlled by host app build properties (Android Gradle properties; on iOS, CocoaPods env vars only, since SwiftPM always links Forms and Location):
+- **Forms** (`klaviyoIncludeForms` / `KLAVIYO_INCLUDE_FORMS`): defaults to **true**
+- **Geofencing** (`klaviyoIncludeLocation` / `KLAVIYO_INCLUDE_LOCATION`): defaults to **false**, opt-in
 
 ### Code Style
 
