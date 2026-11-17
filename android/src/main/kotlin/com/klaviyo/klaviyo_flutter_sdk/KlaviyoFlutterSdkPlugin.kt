@@ -18,12 +18,15 @@ import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.analytics.model.Subscription
+import com.klaviyo.analytics.state.ProfileEventObserver
+import com.klaviyo.analytics.state.State
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
 import com.klaviyo.core.config.Log
 import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
+import com.klaviyo.core.utils.hasAllowedOpenUrlScheme
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.endFormsPreview
@@ -158,6 +161,48 @@ class KlaviyoFlutterSdkPlugin :
             sink.success(payload)
             return true
         }
+
+        private const val OPENED_PUSH_METRIC = "\$opened_push"
+
+        private val webLinkTapObserver: ProfileEventObserver = { event ->
+            webLinkTapPayload(event)?.let { payload ->
+                Handler(Looper.getMainLooper()).post {
+                    instance?.emitOrCachePushAction(payload) ?: run { cachedPushAction = payload }
+                }
+            }
+        }
+
+        /** Registers [webLinkTapObserver] once, if the native SDK is initialized. */
+        internal fun observeWebLinkTaps() {
+            Registry.getOrNull<State>()?.run {
+                offProfileEvent(webLinkTapObserver)
+                onProfileEvent(webLinkTapObserver)
+            }
+        }
+
+        /**
+         * Maps an "Opened Push" event for a web-link tap (an `open_url` button, or a body
+         * tap with an allowed `web_url` and no deep-link `url`) to the iOS push-action
+         * payload. Returns null for every other event.
+         */
+        internal fun webLinkTapPayload(event: Event): Map<String, Any?>? {
+            if (event.metric.name != OPENED_PUSH_METRIC) return null
+            val props = event.toMap()
+
+            val buttonId = props["Button ID"] as? String
+            if (buttonId != null) {
+                if (props["Button Action"] != "Open URL") return null
+                val url = props[Constants.BUTTON_LINK_PARAMETER] as? String ?: return null
+                val data = mutableMapOf<String, Any?>("id" to buttonId, "action" to "open_url", "url" to url)
+                (props["Button Label"] as? String)?.let { data["label"] = it }
+                return mapOf("type" to "push_action_button_tapped", "data" to data)
+            }
+
+            if (props.containsKey(Constants.URL_PARAMETER)) return null
+            val webUrl = (props["web_url"] as? String)?.takeIf { it.isNotBlank() } ?: return null
+            if (!Uri.parse(webUrl).hasAllowedOpenUrlScheme()) return null
+            return mapOf("type" to "push_open_web_url", "data" to mapOf("url" to webUrl))
+        }
     }
 
     override fun onAttachedToEngine(
@@ -165,6 +210,7 @@ class KlaviyoFlutterSdkPlugin :
     ) {
         activePlugins.add(this)
         selectInstance()
+        observeWebLinkTaps()
         applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
@@ -206,6 +252,7 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     // Initialize Klaviyo SDK
                     Klaviyo.initialize(apiKey!!, applicationContext)
+                    observeWebLinkTaps()
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("INIT_ERROR", "Failed to initialize Klaviyo", e.message)
@@ -1144,7 +1191,7 @@ class KlaviyoFlutterSdkPlugin :
         }
     }
 
-    private fun emitOrCachePushAction(payload: Map<String, Any?>) {
+    internal fun emitOrCachePushAction(payload: Map<String, Any?>) {
         if (!emitToPrimary(payload)) {
             Registry.log.verbose("Flutter not ready. Caching push action event.")
             cachedPushAction = payload
