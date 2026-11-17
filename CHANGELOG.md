@@ -17,6 +17,8 @@
 - **Null profile property values are ignored on both platforms** — `setProfile`, `setProfileAttribute` and `setProfileProperties` now drop null values in Dart. Android skipped them, while iOS forwarded them as JSON null, so the platforms disagreed. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
 - **`setProfile` logs conflicts between typed fields and `properties`** — when a typed field such as `firstName` and the same key inside `properties` are both set, the typed value is kept and a warning names the ignored key. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
 - **DateTime values in profile and event properties no longer make the call fail; they are sent as ISO 8601 strings.** `setProfile`, `setProfileAttribute`, `setProfileProperties` and `createEvent` convert a `DateTime`, including nested ones, to a UTC ISO 8601 string. Values the platform channel can't encode, such as `Duration`, `Uri` or custom classes, are dropped with a warning naming the key, and the rest of the call goes through. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- **`InAppFormConfig.copyWith` dropped the infinite timeout** — copying an `InAppFormConfig.infinite()` with no arguments returned a config with the default one-hour timeout. The copy now stays infinite unless you pass a `sessionTimeoutDuration` or `isInfinite: false`.
+- **iOS: `setBadgeCount` failures no longer escape as uncaught errors** — a native error from `setBadgeCount` used to reach the app's zone as an uncaught async error. It is now logged as a warning.
 
 ### Documentation
 
