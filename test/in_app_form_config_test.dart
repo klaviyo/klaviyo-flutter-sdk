@@ -56,6 +56,45 @@ void main() {
     });
   });
 
+  group('InAppFormConfig.toJson duration encoding', () {
+    Object? encode(Duration duration) =>
+        InAppFormConfig(sessionTimeoutDuration: duration)
+            .toJson()['sessionTimeoutDuration'];
+
+    test('whole seconds are sent unchanged', () {
+      expect(encode(Duration.zero), 0);
+      expect(encode(const Duration(seconds: 1)), 1);
+      expect(encode(const Duration(minutes: 5)), 300);
+    });
+
+    test('a negative duration is sent as 0, not the infinite sentinel', () {
+      expect(encode(const Duration(seconds: -1)), 0);
+      expect(encode(const Duration(minutes: -5)), 0);
+      expect(encode(const Duration(microseconds: -1)), 0);
+    });
+
+    test('a sub-second duration rounds up to 1 second', () {
+      expect(encode(const Duration(microseconds: 1)), 1);
+      expect(encode(const Duration(milliseconds: 500)), 1);
+      expect(encode(const Duration(milliseconds: 999)), 1);
+    });
+
+    test('a fractional duration rounds up to the next second', () {
+      expect(encode(const Duration(seconds: 1, milliseconds: 1)), 2);
+      expect(encode(const Duration(seconds: 59, milliseconds: 500)), 60);
+    });
+
+    test('a negative duration does not decode as infinite', () {
+      final restored = InAppFormConfig.fromJson(
+        const InAppFormConfig(sessionTimeoutDuration: Duration(seconds: -1))
+            .toJson(),
+      );
+
+      expect(restored.isInfinite, isFalse);
+      expect(restored.sessionTimeoutDuration, Duration.zero);
+    });
+  });
+
   group('InAppFormConfig channel payload', () {
     TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -97,6 +136,26 @@ void main() {
       );
 
       expect(sentConfiguration(), {'sessionTimeoutDuration': 120});
+    });
+
+    test('a negative duration is sent as 0', () async {
+      await KlaviyoSDK().registerForInAppForms(
+        configuration: const InAppFormConfig(
+          sessionTimeoutDuration: Duration(seconds: -1),
+        ),
+      );
+
+      expect(sentConfiguration(), {'sessionTimeoutDuration': 0});
+    });
+
+    test('a sub-second duration is sent as 1 second', () async {
+      await KlaviyoSDK().registerForInAppForms(
+        configuration: const InAppFormConfig(
+          sessionTimeoutDuration: Duration(milliseconds: 250),
+        ),
+      );
+
+      expect(sentConfiguration(), {'sessionTimeoutDuration': 1});
     });
 
     test('the sent payload decodes back to the same config', () async {
