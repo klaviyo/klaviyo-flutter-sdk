@@ -121,17 +121,14 @@ class KlaviyoFlutterSdkPlugin :
         @Volatile
         internal var instance: KlaviyoFlutterSdkPlugin? = null
 
-        // Most recent silent push, push open and push action that arrived while no
-        // engine was listening; replayed to the primary engine once it listens. One
-        // slot each, matching iOS.
+        // Most recent silent push and push open that arrived while no engine was
+        // listening; replayed to the primary engine once it listens. One slot each,
+        // matching iOS.
         @Volatile
         private var cachedSilentPush: Map<String, Any?>? = null
 
         @Volatile
         private var cachedOpenedNotification: Map<String, Any?>? = null
-
-        @Volatile
-        private var cachedPushAction: Map<String, Any?>? = null
 
         // Plugin instances whose engine is currently attached, in attach order.
         // Mutated only from engine attach/detach on the main thread.
@@ -152,8 +149,6 @@ class KlaviyoFlutterSdkPlugin :
             cachedSilentPush = null
             cachedOpenedNotification?.let { sink.success(it) }
             cachedOpenedNotification = null
-            cachedPushAction?.let { sink.success(it) }
-            cachedPushAction = null
         }
 
         // Sends to the primary engine, or returns false if no engine is listening.
@@ -225,23 +220,16 @@ class KlaviyoFlutterSdkPlugin :
         }
 
         /**
-         * Emits a web-link tap built by [webLinkOpenedPayload] to the primary engine: the open
-         * for `onPushOpened`, then its action for `onPushAction`. Each is cached until an
-         * engine listens. Main thread only.
+         * Emits a web-link tap built by [webLinkOpenedPayload] to the primary engine for
+         * `onPushOpened`, or caches it until an engine listens. Main thread only.
          */
         @Suppress("UNCHECKED_CAST")
         internal fun emitWebLinkOpen(payload: Map<String, Any?>) {
             val data = payload["data"] as? Map<String, Any?> ?: return
             if (!markOpenEmitted(data)) return
-            cachedPushAction = null
             if (!emitToPrimary(payload)) {
                 Registry.log.verbose("Flutter not ready. Caching notification open event.")
                 cachedOpenedNotification = payload
-            }
-            val action = payload["action"] as? Map<String, Any?> ?: return
-            if (!emitToPrimary(action)) {
-                Registry.log.verbose("Flutter not ready. Caching push action event.")
-                cachedPushAction = action
             }
         }
 
@@ -1194,7 +1182,6 @@ class KlaviyoFlutterSdkPlugin :
                     return
                 }
 
-                cachedPushAction = null
                 val pushAction = actionButtonTapPayload(notificationData)
 
                 val openedPayload =
@@ -1207,8 +1194,6 @@ class KlaviyoFlutterSdkPlugin :
                     initialPushNotification = openedPayload
                 }
                 emitOrCacheOpenedNotification(openedPayload)
-
-                pushAction?.let { emitOrCachePushAction(it) }
             }
         } catch (e: Exception) {
             Registry.log.error("Error handling push: ${e.message}", e)
@@ -1217,9 +1202,8 @@ class KlaviyoFlutterSdkPlugin :
 
     /**
      * Builds the `push_action_button_tapped` event for an action-button tap, or
-     * null if the open was not a button tap. It is sent on its own for
-     * `onPushAction` and embedded as `action` in the `push_notification_opened`
-     * event for `onPushOpened`.
+     * null if the open was not a button tap. It is embedded as `action` in the
+     * `push_notification_opened` event for `onPushOpened`.
      *
      * The native SDK only launches the host app (carrying these `Button *`
      * extras) for `deep_link` / `open_app` buttons; `open_url` buttons are
@@ -1259,13 +1243,6 @@ class KlaviyoFlutterSdkPlugin :
         if (!emitToPrimary(payload)) {
             Registry.log.verbose("Flutter not ready. Caching notification open event.")
             cachedOpenedNotification = payload
-        }
-    }
-
-    internal fun emitOrCachePushAction(payload: Map<String, Any?>) {
-        if (!emitToPrimary(payload)) {
-            Registry.log.verbose("Flutter not ready. Caching push action event.")
-            cachedPushAction = payload
         }
     }
 }

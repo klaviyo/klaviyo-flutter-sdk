@@ -10,11 +10,9 @@ import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
-import 'models/klaviyo_push_action.dart';
 import 'models/klaviyo_push_data.dart';
 import 'models/klaviyo_push_opened.dart';
 import 'models/profile_property.dart';
-import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
 
@@ -32,7 +30,7 @@ class KlaviyoSDK {
     // share the root logger's level. Setting it to true is additive and is
     // the standard pattern for Dart libraries that manage their own log level.
     hierarchicalLoggingEnabled = true;
-    _logger.level = _dartLogLevel;
+    _logger.level = _defaultLogLevel;
   }
 
   // Native wrapper service — singleton, safe to construct eagerly
@@ -41,9 +39,7 @@ class KlaviyoSDK {
 
   // State
   bool _isInitialized = false;
-  String? _apiKey;
-  bool _loggingEnabled = true;
-  Level _dartLogLevel = Level.INFO;
+  static final Level _defaultLogLevel = Level.INFO;
 
   // A single, permanent subscription to native `auth_token_requested` events,
   // attached lazily on first registration and never cancelled. The events flow
@@ -58,7 +54,6 @@ class KlaviyoSDK {
 
   // Getters
   bool get isInitialized => _isInitialized;
-  String? get apiKey => _apiKey;
 
   /// Initialize the Klaviyo SDK with your public API key.
   ///
@@ -68,7 +63,6 @@ class KlaviyoSDK {
     try {
       await _nativeWrapper.initialize(apiKey: apiKey);
 
-      _apiKey = apiKey;
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
 
@@ -624,18 +618,6 @@ class KlaviyoSDK {
     }
   }
 
-  /// Set log level for Flutter-side logging only
-  /// Note: This only affects Flutter console logs, not native SDK logs.
-  /// While logging is disabled via [setLoggingEnabled], the new level is
-  /// stored and takes effect once logging is re-enabled.
-  @Deprecated('Use setLoggingEnabled instead. Will be removed in 1.0.')
-  void setLogLevel(KlaviyoLogLevel logLevel) {
-    _dartLogLevel = logLevel.toLevel();
-    if (_loggingEnabled) {
-      _logger.level = _dartLogLevel;
-    }
-  }
-
   /// Enable or disable all Klaviyo SDK logging.
   ///
   /// This one toggle controls both the native SDK loggers and this plugin's
@@ -657,8 +639,7 @@ class KlaviyoSDK {
 
     // Only mirror the state on the Dart side once the native call succeeds,
     // so Dart and native logging can't disagree after a failure.
-    _loggingEnabled = enabled;
-    _logger.level = enabled ? _dartLogLevel : Level.OFF;
+    _logger.level = enabled ? _defaultLogLevel : Level.OFF;
   }
 
   /// Whether native SDK logging is currently enabled.
@@ -671,20 +652,6 @@ class KlaviyoSDK {
       throw KlaviyoException('Failed to get logging state: $e');
     }
   }
-
-  /// Get push notification events stream
-  ///
-  /// A `push_notification_opened` event that arrives before anyone subscribes
-  /// (for example, the tap that launched the app) is buffered; only the most
-  /// recent one is kept. The first subscriber receives it once, then the
-  /// buffer is cleared, so later subscribers don't receive it. Use
-  /// [getInitialPushNotification] to read the launch tap whenever you need it.
-  @Deprecated(
-    'Use onPushToken for tokens and token errors, onPushOpened for opens, '
-    'and onPushData for silent pushes. Will be removed in 1.0.',
-  )
-  Stream<Map<String, dynamic>> get onPushNotification =>
-      _nativeWrapper.onPushNotification;
 
   /// Push tokens the native SDK registers with Klaviyo.
   ///
@@ -780,38 +747,6 @@ class KlaviyoSDK {
           return [FormLifecycleEvent.fromMap(event)];
         } catch (e) {
           _logger.warning('Dropping malformed form lifecycle event: $e');
-          return [];
-        }
-      });
-
-  /// Get typed push action events stream.
-  ///
-  /// Emits a [KlaviyoPushAction] when a user taps a push whose action opens an
-  /// external web URL ([OpenWebUrl]), or taps an action button on a push
-  /// ([ActionButtonTapped]). Filters for the `push_open_web_url` and
-  /// `push_action_button_tapped` event types and parses the native map.
-  /// Malformed events are logged and dropped rather than crashing the stream.
-  ///
-  /// A push action that arrives before anyone subscribes is buffered; only the
-  /// most recent one is kept, and each new push open clears it. The first
-  /// subscriber receives it once, then the buffer is cleared, so later
-  /// subscribers don't receive it. Use [getInitialPushNotification] to read
-  /// the launch tap whenever you need it.
-  @Deprecated(
-    'Use onPushOpened instead; it carries the tapped button or web URL. '
-    'Will be removed in 1.0.',
-  )
-  Stream<KlaviyoPushAction> get onPushAction => _nativeWrapper.onPushActionEvent
-          .where(
-        (event) =>
-            event['type'] == 'push_open_web_url' ||
-            event['type'] == 'push_action_button_tapped',
-      )
-          .expand((event) {
-        try {
-          return [KlaviyoPushAction.fromMap(event)];
-        } catch (e) {
-          _logger.warning('Dropping malformed push action event: $e');
           return [];
         }
       });

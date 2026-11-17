@@ -568,9 +568,7 @@ Push events arrive on one typed stream per concern, the same split `firebase_mes
 
 `KlaviyoPushOpened` and `KlaviyoPushData` both expose the full push `payload` and the push's Klaviyo key/value pairs as `keyValuePairs` (null when there are none).
 
-> **Deprecated:** `onPushNotification`, `onPushAction` and the `KlaviyoPushAction` types (`OpenWebUrl`, `ActionButtonTapped`) still work, but they are deprecated in favor of the typed streams and will be removed in 1.0.
-
-Migrating: `onPushNotification`'s `push_token_received` and `push_token_error` events move to `onPushToken`, `push_notification_opened` moves to `onPushOpened`, and `silent_push_received` moves to `onPushData`. Every `onPushAction` event is now an `onPushOpened` event with `tap` set to `KlaviyoPushTap.actionButton` or `KlaviyoPushTap.webUrl`.
+Upgrading from 0.x? `onPushNotification`, `onPushAction` and the `KlaviyoPushAction` types were removed in 1.0. The [Migration Guide](MIGRATION_GUIDE.md#migrating-to-v100) maps each one to its typed stream.
 
 ### Handling Push Notification Opens
 
@@ -587,13 +585,13 @@ KlaviyoSDK().onPushOpened.listen((opened) {
 });
 ```
 
-One tap emits one event. Before 0.6.0, an iOS action-button or web URL tap emitted both `push_notification_opened` and an `onPushAction` event. `webUrl` is set for a web URL push and for an `open_url` action button. `KlaviyoPushTap` and `KlaviyoPushButtonAction` are not enums, because later releases may add new kinds, so keep a `default` case when you switch on them.
+One tap emits one event. `webUrl` is set for a web URL push and for an `open_url` action button. `KlaviyoPushTap` and `KlaviyoPushButtonAction` are not enums, because later releases may add new kinds, so keep a `default` case when you switch on them.
 
-> **Android web-link taps:** a tap on a web URL push or an `open_url` button opens the browser without launching your app's activity, so the plugin reads it from the native SDK's "Opened Push" event instead. It reaches `onPushOpened` only while your app's process is running (foreground or background). A web-link tap on a fully killed app doesn't reach Dart. The same limit applies to `onPushAction`.
+> **Android web-link taps:** a tap on a web URL push or an `open_url` button opens the browser without launching your app's activity, so the plugin reads it from the native SDK's "Opened Push" event instead. It reaches `onPushOpened` only while your app's process is running (foreground or background). A web-link tap on a fully killed app doesn't reach Dart.
 
 > **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
 
-> **Cold starts and late listeners:** if the app is launched by tapping a notification, the open can arrive before your Dart code subscribes. The SDK holds the most recent open that arrived with no listener and delivers it **once, to the first listener** that subscribes, on `onPushOpened` and on the deprecated `onPushNotification`. Later listeners don't receive it; only one open is held, and a newer open replaces it. `onPushAction` holds the most recent push action the same way, and each new open clears it. Tokens, token errors and push data that arrive with no listener also go to the first listener only. On Android, reopening the app from the Recents screen doesn't re-deliver the tap that originally launched it.
+> **Cold starts and late listeners:** if the app is launched by tapping a notification, the open can arrive before your Dart code subscribes. The SDK holds the most recent open that arrived with no listener and delivers it **once, to the first listener** that subscribes to `onPushOpened`. Later listeners don't receive it; only one open is held, and a newer open replaces it. Tokens, token errors and push data that arrive with no listener also go to the first listener only. On Android, reopening the app from the Recents screen doesn't re-deliver the tap that originally launched it.
 
 #### Reading the Launch Tap
 
@@ -803,52 +801,6 @@ subscription.cancel();
 | `formName` | `String` | All | Display name configured in Klaviyo dashboard |
 | `buttonLabel` | `String` | `FormCtaClicked` only | Label of the tapped CTA button |
 | `deepLinkUrl` | `String` | `FormCtaClicked` only | Deep link URL configured for the CTA |
-
-## Push Action Events
-
-> **Deprecated:** `onPushAction` will be removed in 1.0. Use [`onPushOpened`](#handling-push-notification-opens), which emits one event per tap and carries the tapped button (`button`) or web URL (`webUrl`).
-
-Subscribe to `onPushAction` to observe taps on Klaviyo pushes that carry an **Open External URL** (`open_url`) action or **action buttons**. Events are typed via the sealed `KlaviyoPushAction` class, so Dart pattern matching is exhaustive.
-
-This stream is **observation-only**: the native SDK still performs all navigation (opening the URL, launching the app, or routing the deep link) with no integration changes required — as described in [Action Buttons](#action-buttons). `onPushAction` simply lets your app react in parallel (analytics, in-app routing, UI updates).
-
-```dart
-import 'dart:async';
-import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
-import 'package:logging/logging.dart';
-
-final _logger = Logger('MyApp');
-
-final StreamSubscription<KlaviyoPushAction> subscription =
-    KlaviyoSDK().onPushAction.listen((action) {
-  switch (action) {
-    case OpenWebUrl():
-      _logger.info('Open external URL: ${action.url}');
-    case ActionButtonTapped():
-      _logger.info(
-        'Action button "${action.label}" (${action.action}) — '
-        'id: ${action.buttonId}, url: ${action.url}',
-      );
-  }
-});
-
-// Cancel when no longer needed (e.g. in dispose())
-subscription.cancel();
-```
-
-**Field reference:**
-
-| Field | Type | Subtypes | Notes |
-|-------|------|----------|-------|
-| `url` | `String` | `OpenWebUrl` | The external URL. May be `http(s)` or a special scheme such as `mailto:`, `tel:`, `sms:` |
-| `buttonId` | `String` | `ActionButtonTapped` | Identifier of the tapped action button |
-| `label` | `String` | `ActionButtonTapped` | Display label of the tapped button |
-| `action` | `String` | `ActionButtonTapped` | One of `open_app`, `deep_link`, `open_url` |
-| `url` | `String?` | `ActionButtonTapped` | URL for `deep_link` / `open_url` buttons; `null` for `open_app` |
-
-> **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. Body `open_url` taps (`OpenWebUrl`) and every kind of action-button tap surface on both platforms. On **Android**, a web-link tap opens the browser without launching your app's activity, so the plugin reads it from the native SDK's "Opened Push" event instead. This only works for warm taps, made while your app's process is running and the plugin is attached (app in the foreground or background). A web-link tap on a fully killed app doesn't reach Dart. The browser opens without starting your app, so no Flutter engine or plugin exists to receive the event. "Opened Push" tracking to Klaviyo is separate from this Dart event.
-
-> **Cold starts:** a push action that arrives before you subscribe is buffered and delivered once, to the first listener that subscribes. See the note under [Handling Push Notification Opens](#handling-push-notification-opens).
 
 ## Deep Linking
 
@@ -1169,10 +1121,10 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | Property | Type | Description |
 |----------|------|-------------|
 | `isInitialized` | `bool` | Whether the SDK is initialized |
-| `apiKey` | `String?` | Current API key |
-| `onPushNotification` | `Stream<Map<String, dynamic>>` | Push notification events |
+| `onPushToken` | `Stream<String>` | Push tokens; registration errors arrive through `onError` |
+| `onPushOpened` | `Stream<KlaviyoPushOpened>` | One event per tap on a Klaviyo push |
+| `onPushData` | `Stream<KlaviyoPushData>` | Push data received in the foreground (experimental) |
 | `onFormLifecycleEvent` | `Stream<FormLifecycleEvent>` | Typed in-app form lifecycle events |
-| `onPushAction` | `Stream<KlaviyoPushAction>` | Typed `open_url` / action-button push tap events |
 
 ### Models
 
@@ -1270,6 +1222,10 @@ InAppFormConfig({
 
 // Infinite session timeout (no timeout)
 InAppFormConfig.infinite()
+
+// Copy with a new timeout. Passing a duration makes the copy finite; with no
+// argument the copy keeps the original timeout, including infinite.
+config.copyWith(sessionTimeoutDuration: const Duration(minutes: 5))
 ```
 
 #### FormLifecycleEvent
@@ -1315,19 +1271,11 @@ Applies to the SMS and WhatsApp channels.
 
 ### Exceptions
 
-All SDK exceptions extend `KlaviyoException`:
+The SDK throws `KlaviyoException`, and adds it as the error on its streams. It carries a `message`, and an optional `code`, `originalError` (`Object?`) and `stackTrace`. `code` is `null` unless one of these applies:
 
-| Exception | Description |
-|-----------|-------------|
-| `KlaviyoNotInitializedException` | SDK used before `initialize()` |
-| `KlaviyoInvalidApiKeyException` | Invalid API key provided |
-| `KlaviyoNetworkException` | Network request failed (includes `statusCode`, `responseBody`) |
-| `KlaviyoProfileException` | Profile operation failed |
-| `KlaviyoEventException` | Event tracking failed |
-| `KlaviyoPushException` | Push notification operation failed |
-| `KlaviyoFormException` | In-app forms operation failed |
-| `KlaviyoConfigurationException` | Configuration error |
-| `KlaviyoPermissionException` | Missing required permission |
+| `code` | When |
+|--------|------|
+| `PUSH_TOKEN_ERROR` | Push token registration failed. Delivered as an error on `onPushToken`. |
 
 ## Troubleshooting
 

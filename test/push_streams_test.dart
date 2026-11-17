@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use_from_same_package
-
 import 'dart:async';
 
 import 'package:flutter/services.dart';
@@ -164,28 +162,15 @@ void main() {
 
   group('onPushOpened', () {
     late List<KlaviyoPushOpened> events;
-    late List<KlaviyoPushAction> actions;
-    late List<Map<String, dynamic>> raw;
-    final subs = <Object>[];
+    late StreamSubscription<KlaviyoPushOpened> sub;
 
     setUp(() {
       events = [];
-      actions = [];
-      raw = [];
-      final sdk = KlaviyoSDK();
-      subs
-        ..clear()
-        ..addAll([
-          sdk.onPushOpened.listen(events.add),
-          sdk.onPushAction.listen(actions.add),
-          sdk.onPushNotification.listen(raw.add),
-        ]);
+      sub = KlaviyoSDK().onPushOpened.listen(events.add);
     });
 
     tearDown(() async {
-      for (final sub in subs) {
-        await (sub as dynamic).cancel();
-      }
+      await sub.cancel();
     });
 
     test('body tap emits one notification open', () async {
@@ -196,14 +181,10 @@ void main() {
       expect(events.single.tap, KlaviyoPushTap.notification);
       expect(events.single.button, isNull);
       expect(events.single.webUrl, isNull);
-      expect(actions, isEmpty);
     });
 
-    test('button tap emits one open and keeps onPushAction working', () async {
-      final action = buttonTap('b1');
-      sink!
-        ..success(opened('btn', action: action))
-        ..success(action);
+    test('button tap emits one open carrying the button', () async {
+      sink!.success(opened('btn', action: buttonTap('b1')));
       await pumpEventQueue();
 
       expect(events, hasLength(1));
@@ -218,9 +199,6 @@ void main() {
         ),
       );
       expect(events.single.webUrl, isNull);
-      expect(actions.single, isA<ActionButtonTapped>());
-      expect(raw.single['type'], 'push_notification_opened');
-      expect(raw.single.containsKey('action'), isFalse);
     });
 
     test('web URL tap emits one open carrying the URL', () async {
@@ -228,15 +206,12 @@ void main() {
         'type': 'push_open_web_url',
         'data': {'url': 'https://example.com'},
       };
-      sink!
-        ..success(opened('web', action: action))
-        ..success(action);
+      sink!.success(opened('web', action: action));
       await pumpEventQueue();
 
       expect(events, hasLength(1));
       expect(events.single.tap, KlaviyoPushTap.webUrl);
       expect(events.single.webUrl, 'https://example.com');
-      expect(actions.single, const OpenWebUrl(url: 'https://example.com'));
     });
 
     test('Android open_url button tap emits one webUrl open', () async {
@@ -249,17 +224,15 @@ void main() {
           'url': 'https://example.com/shop',
         },
       };
-      sink!
-        ..success({
-          'type': 'push_notification_opened',
-          'data': {
-            'Button ID': 'b1',
-            'Button Action': 'Open URL',
-            'Button Link': 'https://example.com/shop',
-          },
-          'action': action,
-        })
-        ..success(action);
+      sink!.success({
+        'type': 'push_notification_opened',
+        'data': {
+          'Button ID': 'b1',
+          'Button Action': 'Open URL',
+          'Button Link': 'https://example.com/shop',
+        },
+        'action': action,
+      });
       await pumpEventQueue();
 
       expect(events, hasLength(1));
@@ -267,15 +240,6 @@ void main() {
       expect(events.single.button?.action, KlaviyoPushButtonAction.openUrl);
       expect(events.single.button?.url, 'https://example.com/shop');
       expect(events.single.webUrl, 'https://example.com/shop');
-      expect(
-        actions.single,
-        const ActionButtonTapped(
-          buttonId: 'b1',
-          label: 'Open Site',
-          action: 'open_url',
-          url: 'https://example.com/shop',
-        ),
-      );
     });
 
     test('ignores token and push data events', () async {

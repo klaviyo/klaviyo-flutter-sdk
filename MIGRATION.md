@@ -181,11 +181,10 @@ The official SDK also provides an automatic approach that doesn't require
 await KlaviyoSDK().registerForPushNotifications();
 
 // Listen for token events
-KlaviyoSDK().onPushNotification.listen((event) {
-  if (event['type'] == 'push_token_received') {
-    print('Push token received');
-  }
-});
+KlaviyoSDK().onPushToken.listen(
+  (token) => print('Push token received'),
+  onError: (Object error) => print('Push token error: $error'),
+);
 ```
 
 ### Push notification handling
@@ -212,7 +211,7 @@ if (Klaviyo.instance.isKlaviyoPush(message.data)) { ... }
 
 // After — remove the check
 // Klaviyo push events arrive on KlaviyoSDK's own streams, such as
-// onPushNotification and onPushAction, so there is no raw payload to inspect.
+// onPushOpened and onPushData, so there is no raw payload to inspect.
 // The isKlaviyoNotification extension was deprecated in 0.6.0 and removed in
 // 1.0.
 ```
@@ -416,8 +415,8 @@ community SDK:
   integration support.
 - **Automatic push token registration:** `registerForPushNotifications()`
   without needing `firebase_messaging` as a dependency.
-- **Push event stream:** `onPushNotification` for token events, open events,
-  and errors.
+- **Typed push streams:** `onPushToken` for tokens and token errors,
+  `onPushOpened` for taps, and `onPushData` for push data.
 - **Logging toggle:** `setLoggingEnabled(bool)` turns native and Dart-side
   logging on or off.
 

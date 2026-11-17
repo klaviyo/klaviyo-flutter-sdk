@@ -116,12 +116,12 @@ class PushLaunchTapTest {
     }
 
     @Test
-    fun `cold-start action button tap is flushed after the open`() {
+    fun `cold-start action button tap is flushed as one open`() {
         launchActivityWith(tapIntent("launch", buttonId = "btn1"))
 
         plugin.attachEventSink(sink)
 
-        assertEquals(listOf("push_notification_opened", "push_action_button_tapped"), sent.map { (it as Map<*, *>)["type"] })
+        assertEquals(listOf("push_notification_opened"), sent.map { (it as Map<*, *>)["type"] })
     }
 
     @Test
@@ -166,7 +166,7 @@ class PushLaunchTapTest {
     }
 
     @Test
-    fun `a new tap clears the cached action from an earlier tap`() {
+    fun `a new tap replaces the cached open from an earlier tap`() {
         plugin.handleIntent(tapIntent("first", buttonId = "btn1"))
         plugin.handleIntent(tapIntent("second"))
 
