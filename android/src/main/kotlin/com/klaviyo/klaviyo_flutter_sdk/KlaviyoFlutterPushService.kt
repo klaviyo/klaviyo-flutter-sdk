@@ -14,15 +14,23 @@ import org.json.JSONObject
  * FCM service that forwards Klaviyo push data (every silent push, and every
  * visible push that carries `key_value_pairs`) to the Flutter `EventChannel` as
  * `{type: 'silent_push_received', data: <RemoteMessage.data>}`, mirroring the iOS
- * `handleSilentPush` path.
+ * `handleSilentPush` path, and every token FCM delivers to [onNewToken] as
+ * `{type: 'push_token_received', data: {token: <token>}}`.
  *
  * Auto-registered for `com.google.firebase.MESSAGING_EVENT` via the plugin's
  * `AndroidManifest.xml`. Apps can subclass it for custom FCM handling; a subclass
  * that overrides [onMessageReceived] must call `super.onMessageReceived` to keep
- * Klaviyo display and silent push forwarding, and must be declared in the app's
- * manifest in place of this class.
+ * Klaviyo display and silent push forwarding, a subclass that overrides
+ * [onNewToken] must call `super.onNewToken` to keep token forwarding and
+ * `onPushToken`, and the subclass must be declared in the app's manifest in place
+ * of this class.
  */
 open class KlaviyoFlutterPushService : KlaviyoPushService() {
+    override fun onNewToken(newToken: String) {
+        super.onNewToken(newToken)
+        KlaviyoFlutterSdkPlugin.handleNewToken(newToken)
+    }
+
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 

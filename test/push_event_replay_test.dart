@@ -175,6 +175,51 @@ void main() {
     });
   });
 
+  group('onPushToken replay', () {
+    test(
+      'rotated tokens that arrive before any listener go to the first '
+      'onPushToken subscriber once',
+      () async {
+        await KlaviyoSDK().onPushToken.listen((_) {}).cancel();
+        sink!
+          ..success({
+            'type': 'push_token_received',
+            'data': {'token': 'registered'},
+          })
+          ..success({
+            'type': 'push_token_received',
+            'data': {'token': 'rotated'},
+          });
+        await pumpEventQueue();
+
+        final first = <String>[];
+        final second = <String>[];
+        final firstSub = KlaviyoSDK().onPushToken.listen(first.add);
+        await pumpEventQueue();
+        final secondSub = KlaviyoSDK().onPushToken.listen(second.add);
+        await pumpEventQueue();
+
+        expect(first, ['registered', 'rotated']);
+        expect(second, isEmpty);
+
+        sink!.success({
+          'type': 'push_token_received',
+          'data': {'token': 'rotated-again'},
+        });
+        await pumpEventQueue();
+
+        expect(first, ['registered', 'rotated', 'rotated-again']);
+        expect(second, ['rotated-again']);
+
+        await firstSub.cancel();
+        await secondSub.cancel();
+        final drain = KlaviyoSDK().onPushNotification.listen((_) {});
+        await pumpEventQueue();
+        await drain.cancel();
+      },
+    );
+  });
+
   group('getInitialPushNotification', () {
     test('returns null when the app was not launched by a push tap', () async {
       nativeInitialPush = null;

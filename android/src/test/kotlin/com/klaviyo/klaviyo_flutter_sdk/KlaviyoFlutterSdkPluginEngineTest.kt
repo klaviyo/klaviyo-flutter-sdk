@@ -28,6 +28,7 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.mockk.verify
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -36,6 +37,7 @@ import org.junit.Assert.assertSame
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
@@ -132,6 +134,11 @@ class KlaviyoFlutterSdkPluginEngineTest {
             )
 
         fun formEvents() = messenger.sent.filter { it["type"] == "form_lifecycle_event" }
+
+        fun pushTokens() =
+            messenger.sent
+                .filter { it["type"] == "push_token_received" }
+                .map { (it["data"] as Map<*, *>)["token"] }
     }
 
     private val attached = mutableListOf<Engine>()
@@ -161,6 +168,7 @@ class KlaviyoFlutterSdkPluginEngineTest {
     fun tearDown() {
         attached.toList().forEach { detach(it) }
         KlaviyoFlutterSdkPlugin.resetEmittedOpens()
+        KlaviyoFlutterSdkPlugin.resetCachedPushToken()
         Registry.unregister<State>()
         unmockkAll()
     }
@@ -435,5 +443,82 @@ class KlaviyoFlutterSdkPluginEngineTest {
         assertEquals(1, engine.pushOpens().size)
         assertEquals(1, engine.pushActions().size)
         assertEquals("open_url", (engine.pushActions().single()["data"] as Map<*, *>)["action"])
+    }
+
+    class SubclassedPushService : KlaviyoFlutterPushService() {
+        val seen = mutableListOf<String>()
+
+        override fun onNewToken(newToken: String) {
+            seen += newToken
+            super.onNewToken(newToken)
+        }
+    }
+
+    private fun rotateToken(
+        token: String,
+        service: KlaviyoFlutterPushService =
+            Robolectric.buildService(KlaviyoFlutterPushService::class.java).create().get(),
+    ) {
+        service.onNewToken(token)
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    @Test
+    fun `token rotation reaches the listening engine and Klaviyo`() {
+        registerState()
+        val engine = attach()
+        engine.listen()
+
+        rotateToken("rotated-1")
+
+        assertEquals(listOf("rotated-1"), engine.pushTokens())
+        verify(exactly = 1) { Registry.get<State>().pushToken = "rotated-1" }
+    }
+
+    @Test
+    fun `token rotation before any engine listens is held and delivered once to the first listener`() {
+        rotateToken("stale")
+        rotateToken("fresh")
+        val engine = attach()
+        engine.attachActivity()
+        assertEquals(emptyList<Any?>(), engine.pushTokens())
+
+        engine.listen()
+        assertEquals(listOf("fresh"), engine.pushTokens())
+
+        val later = attach()
+        later.listen()
+        engine.cancel()
+        engine.listen()
+        assertEquals(listOf("fresh"), engine.pushTokens())
+        assertEquals(emptyList<Any?>(), later.pushTokens())
+    }
+
+    @Test
+    fun `token rotation with two engines attached emits once to the primary`() {
+        val primary = attach()
+        primary.attachActivity()
+        primary.listen()
+        val secondary = attach()
+        secondary.listen()
+
+        rotateToken("rotated-2")
+
+        assertEquals(listOf("rotated-2"), primary.pushTokens())
+        assertEquals(emptyList<Any?>(), secondary.pushTokens())
+    }
+
+    @Test
+    fun `a subclass that overrides onNewToken and calls super still emits and forwards`() {
+        registerState()
+        val engine = attach()
+        engine.listen()
+        val service = Robolectric.buildService(SubclassedPushService::class.java).create().get()
+
+        rotateToken("rotated-3", service)
+
+        assertEquals(listOf("rotated-3"), service.seen)
+        assertEquals(listOf("rotated-3"), engine.pushTokens())
+        verify(exactly = 1) { Registry.get<State>().pushToken = "rotated-3" }
     }
 }
