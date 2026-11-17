@@ -28,6 +28,7 @@ import org.junit.Test
 
 class PushLaunchTapTest {
     private lateinit var plugin: KlaviyoFlutterSdkPlugin
+    private lateinit var engineBinding: FlutterPlugin.FlutterPluginBinding
     private val sent = mutableListOf<Any?>()
     private val sink =
         mockk<EventChannel.EventSink>(relaxed = true).also {
@@ -48,7 +49,7 @@ class PushLaunchTapTest {
         every { any<Context>().hasManifestKey(any()) } returns false
 
         plugin = KlaviyoFlutterSdkPlugin()
-        val engineBinding =
+        engineBinding =
             mockk<FlutterPlugin.FlutterPluginBinding>(relaxed = true) {
                 every { applicationContext } returns mockk(relaxed = true)
             }
@@ -57,6 +58,7 @@ class PushLaunchTapTest {
 
     @After
     fun tearDown() {
+        plugin.onDetachedFromEngine(engineBinding)
         KlaviyoFlutterSdkPlugin.instance = null
         unmockkAll()
     }
