@@ -31,6 +31,6 @@ void main() {
         .setMockMethodCallHandler(methodChannel, (_) async => null);
     await KlaviyoSDK().initialize(apiKey: 'KEY');
     expect(KlaviyoSDK().isInitialized, isTrue);
-    expect(KlaviyoNativeWrapper().apiKey, 'KEY');
+    expect(KlaviyoNativeWrapper().isInitialized, isTrue);
   });
 }

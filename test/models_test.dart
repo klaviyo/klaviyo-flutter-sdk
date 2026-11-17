@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
-import 'package:logging/logging.dart';
 
 void main() {
   group('Geofence', () {
@@ -438,31 +437,6 @@ void main() {
         KlaviyoPushTokenType.fcm.toString(),
         'KlaviyoPushTokenType(fcm)',
       );
-    });
-  });
-
-  group('KlaviyoLogLevel', () {
-    test('maps each level to package:logging and back from its name', () {
-      const expected = {
-        KlaviyoLogLevel.none: Level.OFF,
-        KlaviyoLogLevel.error: Level.SEVERE,
-        KlaviyoLogLevel.warning: Level.WARNING,
-        KlaviyoLogLevel.info: Level.INFO,
-        KlaviyoLogLevel.debug: Level.FINE,
-        KlaviyoLogLevel.verbose: Level.FINER,
-      };
-      for (final level in KlaviyoLogLevel.values) {
-        expect(level.toLevel(), expected[level], reason: '$level');
-        expect(KlaviyoLogLevel.fromString(level.toString()), level);
-        expect(
-          KlaviyoLogLevel.fromString(level.toString().toUpperCase()),
-          level,
-        );
-      }
-    });
-
-    test('an unknown string falls back to info', () {
-      expect(KlaviyoLogLevel.fromString('loud'), KlaviyoLogLevel.info);
     });
   });
 }

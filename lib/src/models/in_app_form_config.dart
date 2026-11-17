@@ -55,17 +55,13 @@ class InAppFormConfig {
         Duration.microsecondsPerSecond;
   }
 
-  InAppFormConfig copyWith({
-    Duration? sessionTimeoutDuration,
-    bool? isInfinite,
-  }) {
-    if (isInfinite == true) {
-      return const InAppFormConfig.infinite();
-    }
-
-    if (isInfinite == null &&
-        sessionTimeoutDuration == null &&
-        this.isInfinite) {
+  /// Returns a copy with [sessionTimeoutDuration] replaced.
+  ///
+  /// Passing a duration makes the copy finite. With no argument, the copy
+  /// keeps this config's timeout, including [InAppFormConfig.infinite]. Use
+  /// [InAppFormConfig.infinite] to make a config infinite.
+  InAppFormConfig copyWith({Duration? sessionTimeoutDuration}) {
+    if (sessionTimeoutDuration == null && isInfinite) {
       return const InAppFormConfig.infinite();
     }
 

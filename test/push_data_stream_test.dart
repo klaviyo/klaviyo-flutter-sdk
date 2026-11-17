@@ -32,9 +32,7 @@ void main() {
   group('KlaviyoSDK.onPushData', () {
     test('emits typed push data for silent_push_received events', () async {
       final typed = <KlaviyoPushData>[];
-      final raw = <Map<String, dynamic>>[];
       final typedSub = KlaviyoSDK().onPushData.listen(typed.add);
-      final rawSub = KlaviyoSDK().onPushNotification.listen(raw.add);
 
       sink!.success({
         'type': 'silent_push_received',
@@ -48,10 +46,8 @@ void main() {
       expect(typed, hasLength(1));
       expect(typed.single.keyValuePairs, {'promo': 'fall', 'count': '2'});
       expect(typed.single.payload['_k'], {'c': 'abc'});
-      expect(raw.single['type'], 'silent_push_received');
 
       await typedSub.cancel();
-      await rawSub.cancel();
     });
 
     test('ignores other push events', () async {

@@ -244,12 +244,9 @@ void main() {
   });
 
   group('routing contract', () {
-    test('a background push never reaches onPushNotification or onPushData',
-        () async {
+    test('a background push never reaches the foreground stream', () async {
       await KlaviyoSDK.onBackgroundPushData(_recordingHandler);
-      final streamEvents = <Map<String, dynamic>>[];
       final typedEvents = <KlaviyoPushData>[];
-      final sub = KlaviyoSDK().onPushNotification.listen(streamEvents.add);
       final typedSub = KlaviyoSDK().onPushData.listen(typedEvents.add);
 
       await invokeFromNative(
@@ -260,9 +257,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(_received, hasLength(1));
-      expect(streamEvents, isEmpty);
       expect(typedEvents, isEmpty);
-      await sub.cancel();
       await typedSub.cancel();
     });
 

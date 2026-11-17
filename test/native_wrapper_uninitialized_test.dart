@@ -73,16 +73,14 @@ void main() {
 
     test('getters report the uninitialized state', () {
       expect(sdk.isInitialized, isFalse);
-      expect(sdk.apiKey, isNull);
     });
   });
 
   group('KlaviyoNativeWrapper before initialize', () {
     final wrapper = KlaviyoNativeWrapper();
 
-    test('throws KlaviyoNotInitializedException for guarded calls', () async {
+    test('throws KlaviyoException for guarded calls', () async {
       expect(wrapper.isInitialized, isFalse);
-      expect(wrapper.apiKey, isNull);
       await expectLater(
         wrapper.registerAuthTokenProvider(),
         throwsA(isA<KlaviyoException>()),
@@ -93,7 +91,7 @@ void main() {
       );
       await expectLater(
         wrapper.setBadgeCount(1),
-        throwsA(isA<KlaviyoNotInitializedException>()),
+        throwsA(isA<KlaviyoException>()),
       );
       expect(log, isEmpty);
     });

@@ -21,17 +21,8 @@ void main() {
       expect(copy.toJson(), {'sessionTimeoutDuration': 300});
     });
 
-    test('isInfinite: true makes a finite config infinite', () {
-      final copy = const InAppFormConfig(
-        sessionTimeoutDuration: Duration(minutes: 5),
-      ).copyWith(isInfinite: true);
-
-      expect(copy.isInfinite, isTrue);
-      expect(copy.sessionTimeoutDuration, isNull);
-    });
-
-    test('isInfinite: false with no duration falls back to the default', () {
-      final copy = const InAppFormConfig.infinite().copyWith(isInfinite: false);
+    test('copying the default config with no args keeps the default', () {
+      final copy = const InAppFormConfig().copyWith();
 
       expect(copy.isInfinite, isFalse);
       expect(copy.sessionTimeoutDuration, isNull);

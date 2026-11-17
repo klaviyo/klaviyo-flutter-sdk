@@ -415,28 +415,15 @@ void main() {
 
   group('logging', () {
     tearDown(() async {
-      sdk.setLogLevel(KlaviyoLogLevel.info);
       await sdk.setLoggingEnabled(true);
     });
 
-    test('setLogLevel changes which Dart logs are emitted', () async {
-      sdk.setLogLevel(KlaviyoLogLevel.error);
-      expect(Logger('KlaviyoSDK').level, Level.SEVERE);
-
-      await sdk.registerGeofencing();
-      failOn('registerGeofencing');
-      await sdk.registerGeofencing();
-      expect(warnings, isEmpty);
-    });
-
-    test('setLogLevel while disabled applies once logging is re-enabled',
-        () async {
+    test('setLoggingEnabled restores the default Dart log level', () async {
       await sdk.setLoggingEnabled(false);
-      sdk.setLogLevel(KlaviyoLogLevel.debug);
       expect(Logger('KlaviyoSDK').level, Level.OFF);
 
       await sdk.setLoggingEnabled(true);
-      expect(Logger('KlaviyoSDK').level, Level.FINE);
+      expect(Logger('KlaviyoSDK').level, Level.INFO);
     });
 
     test('isLoggingEnabled defaults to true when native returns null',

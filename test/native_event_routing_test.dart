@@ -41,65 +41,6 @@ void main() {
     return received;
   }
 
-  test('events sent before anyone listens are delivered to the first listener',
-      () async {
-    sink.success({
-      'type': 'push_token_received',
-      'data': {'token': 'early'},
-    });
-    await pumpEventQueue();
-
-    final received = await collect(sdk.onPushNotification, () {});
-
-    expect(received, [
-      {
-        'type': 'push_token_received',
-        'data': {'token': 'early'},
-      },
-    ]);
-  });
-
-  for (final type in [
-    'push_notification_opened',
-    'silent_push_received',
-    'push_token_received',
-    'push_token_error',
-  ]) {
-    test('$type goes to onPushNotification only', () async {
-      final forms = <FormLifecycleEvent>[];
-      final formSub = sdk.onFormLifecycleEvent.listen(forms.add);
-      final actions = <Map<String, dynamic>>[];
-      final actionSub = wrapper.onPushActionEvent.listen(actions.add);
-
-      final push = await collect(
-        sdk.onPushNotification,
-        () => sink.success({'type': type, 'data': <String, dynamic>{}}),
-      );
-      await formSub.cancel();
-      await actionSub.cancel();
-
-      expect(push.map((e) => e['type']), [type]);
-      expect(forms, isEmpty);
-      expect(actions, isEmpty);
-    });
-  }
-
-  test('push_token_error delivers the native error message', () async {
-    final received = await collect(
-      sdk.onPushNotification,
-      () => sink.success({
-        'type': 'push_token_error',
-        'data': {'error': 'SERVICE_NOT_AVAILABLE'},
-      }),
-    );
-    expect(received, [
-      {
-        'type': 'push_token_error',
-        'data': {'error': 'SERVICE_NOT_AVAILABLE'},
-      },
-    ]);
-  });
-
   test('form lifecycle events are parsed into typed events', () async {
     final received = await collect(
       sdk.onFormLifecycleEvent,
@@ -120,42 +61,36 @@ void main() {
     expect(logMessages, contains(startsWith('Dropping malformed form')));
   });
 
-  test('push action events go to onPushAction, not onPushNotification',
-      () async {
-    final push = <Map<String, dynamic>>[];
-    final pushSub = sdk.onPushNotification.listen(push.add);
-
-    final received = await collect(sdk.onPushAction, () {
+  test('push opens do not log payload data or action URLs', () async {
+    final received = await collect(sdk.onPushOpened, () {
       sink.success({
-        'type': 'push_open_web_url',
-        'data': {'url': 'https://example.com/private?email=a@b.com'},
-      });
-      sink.success({
-        'type': 'push_action_button_tapped',
-        'data': {'id': 'b1', 'action': 'open_app'},
-      });
-      sink.success({
-        'type': 'push_open_web_url',
-        'data': <String, dynamic>{},
+        'type': 'push_notification_opened',
+        'data': {'email': 'push-payload@example.com'},
+        'action': {
+          'type': 'push_open_web_url',
+          'data': {'url': 'https://example.com/private'},
+        },
       });
     });
-    await pushSub.cancel();
 
-    expect(received, hasLength(2));
-    expect(received[0], isA<OpenWebUrl>());
-    expect(received[1], isA<ActionButtonTapped>());
-    expect(push, isEmpty);
-    expect(logMessages, contains(startsWith('Dropping malformed push action')));
+    expect(received.single.webUrl, 'https://example.com/private');
     expect(
-      logMessages.where((m) => m.contains('a@b.com')),
-      isEmpty,
-      reason: 'push action URLs must not be logged',
+      logMessages,
+      contains('Native push notification event: push_notification_opened'),
+    );
+    expect(
+      logMessages,
+      isNot(contains(contains('push-payload@example.com'))),
+    );
+    expect(
+      logMessages,
+      isNot(contains(contains('https://example.com/private'))),
     );
   });
 
   test('auth token requests go to the internal auth stream only', () async {
-    final push = <Map<String, dynamic>>[];
-    final pushSub = sdk.onPushNotification.listen(push.add);
+    final opens = <KlaviyoPushOpened>[];
+    final opensSub = sdk.onPushOpened.listen(opens.add);
 
     final received = await collect(
       wrapper.onAuthTokenRequested,
@@ -164,28 +99,28 @@ void main() {
         'data': {'id': 'req-1'},
       }),
     );
-    await pushSub.cancel();
+    await opensSub.cancel();
 
     expect(received.single['data'], {'id': 'req-1'});
-    expect(push, isEmpty);
+    expect(opens, isEmpty);
   });
 
   test('unknown event types are dropped', () async {
-    final push = <Map<String, dynamic>>[];
-    final pushSub = sdk.onPushNotification.listen(push.add);
+    final opens = <KlaviyoPushOpened>[];
+    final opensSub = sdk.onPushOpened.listen(opens.add);
     final forms = await collect(
       sdk.onFormLifecycleEvent,
       () => sink.success({'type': 'something_new', 'data': 1}),
     );
-    await pushSub.cancel();
+    await opensSub.cancel();
 
-    expect(push, isEmpty);
+    expect(opens, isEmpty);
     expect(forms, isEmpty);
   });
 
   test('nested platform maps and lists become String-keyed maps', () async {
     final received = await collect(
-      sdk.onPushNotification,
+      sdk.onPushOpened,
       () => sink.success(<Object?, Object?>{
         'type': 'push_notification_opened',
         'data': <Object?, Object?>{
@@ -198,7 +133,7 @@ void main() {
       }),
     );
 
-    final data = received.single['data'];
+    final data = received.single.payload;
     expect(data, isA<Map<String, dynamic>>());
     expect(data['body'], isA<Map<String, dynamic>>());
     expect(data['body'], {'_k': 'x', '1': 'int key'});
@@ -214,8 +149,11 @@ void main() {
     await pumpEventQueue();
 
     final received = await collect(
-      sdk.onPushNotification,
-      () => sink.success({'type': 'push_token_received', 'data': {}}),
+      sdk.onPushToken,
+      () => sink.success({
+        'type': 'push_token_received',
+        'data': {'token': 'rotated'},
+      }),
     );
     expect(received, hasLength(1));
   });

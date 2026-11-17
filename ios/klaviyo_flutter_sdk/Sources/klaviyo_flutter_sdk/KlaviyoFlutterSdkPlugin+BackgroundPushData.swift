@@ -63,8 +63,8 @@ extension KlaviyoFlutterSdkPlugin {
     /// `aps.alert` (silent) or `key_value_pairs`. Other pushes complete with `.noData` without
     /// reaching Dart.
     ///
-    /// - Foreground or inactive: emitted on `KlaviyoSDK.onPushData`, and on `onPushNotification` as
-    ///   `silent_push_received`; `completionHandler` is called right away.
+    /// - Foreground or inactive: emitted on `KlaviyoSDK.onPushData`.
+    ///   `completionHandler` is called right away.
     /// - Background, including a relaunch from killed: passed to the Dart handler registered with
     ///   `KlaviyoSDK.onBackgroundPushData`. `completionHandler` is called when the handler finishes,
     ///   or after 25 seconds. If Dart isn't running yet, the most recent push waits in memory for

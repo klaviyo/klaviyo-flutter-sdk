@@ -43,7 +43,7 @@ class PushLaunchTapTest {
         }
 
     private fun clearStaticEventCaches() {
-        listOf("cachedSilentPush", "cachedOpenedNotification", "cachedPushAction").forEach { name ->
+        listOf("cachedSilentPush", "cachedOpenedNotification").forEach { name ->
             KlaviyoFlutterSdkPlugin::class.java.getDeclaredField(name).apply {
                 isAccessible = true
                 set(null, null)
@@ -153,12 +153,12 @@ class PushLaunchTapTest {
     }
 
     @Test
-    fun `cold-start action button tap is flushed after the open`() {
+    fun `cold-start action button tap is flushed as one open`() {
         launchActivityWith(tapIntent("launch", buttonId = "btn1"))
 
         plugin.attachEventSink(sink)
 
-        assertEquals(listOf("push_notification_opened", "push_action_button_tapped"), sent.map { (it as Map<*, *>)["type"] })
+        assertEquals(listOf("push_notification_opened"), sent.map { (it as Map<*, *>)["type"] })
     }
 
     @Test
@@ -238,7 +238,7 @@ class PushLaunchTapTest {
     }
 
     @Test
-    fun `a new tap clears the cached action from an earlier tap`() {
+    fun `a new tap replaces the cached open from an earlier tap`() {
         plugin.handleIntent(tapIntent("first", buttonId = "btn1"))
         plugin.handleIntent(tapIntent("second"))
 
@@ -257,19 +257,12 @@ class PushLaunchTapTest {
     }
 
     @Test
-    fun `resetProfile clears a held push action`() {
-        KlaviyoFlutterSdkPlugin::class.java.getDeclaredField("cachedPushAction").apply {
-            isAccessible = true
-            set(null, mapOf("type" to "push_open_web_url", "data" to mapOf("url" to "https://example.com")))
-        }
+    fun `resetProfile clears a held push open`() {
+        plugin.handleIntent(tapIntent("held", buttonId = "btn1"))
 
         plugin.onMethodCall(MethodCall("resetProfile", null), mockk(relaxed = true))
+        plugin.attachEventSink(sink)
 
-        val held =
-            KlaviyoFlutterSdkPlugin::class.java.getDeclaredField("cachedPushAction").run {
-                isAccessible = true
-                get(null)
-            }
-        assertNull(held)
+        assertEquals(emptyList<Any?>(), sent)
     }
 }
