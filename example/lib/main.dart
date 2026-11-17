@@ -1,3 +1,5 @@
+// ignore_for_file: experimental_member_use
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
@@ -98,38 +100,77 @@ Future<void> _setupFCM() async {
 
 /// Subscription for silent push notifications.
 /// Tracked to prevent duplicate subscriptions on SDK re-initialization.
-StreamSubscription<Map<String, dynamic>>? _silentPushSubscription;
+StreamSubscription<KlaviyoPushData>? _silentPushSubscription;
 
-/// Subscription for push action (open_url / action button) events.
-/// Tracked to prevent duplicate subscriptions on SDK re-initialization.
-StreamSubscription<KlaviyoPushAction>? _pushActionSubscription;
+/// Subscription for push open events, including action-button and web URL
+/// taps. Tracked to prevent duplicate subscriptions on SDK re-initialization.
+StreamSubscription<KlaviyoPushOpened>? _pushOpenedSubscription;
 
-/// Set up listener for push action events (open_url taps and action buttons).
+/// Set up listener for push opens (body taps, action buttons, web URLs).
 /// Called from ProfileTab after SDK initialization.
 void setupPushActionListener() {
   final klaviyo = KlaviyoSDK();
   if (!klaviyo.isInitialized) {
     _logger.warning(
-      'Cannot set up push action listener: SDK not initialized',
+      'Cannot set up push open listener: SDK not initialized',
     );
     return;
   }
 
   // Cancel any existing subscription to prevent duplicates
-  _pushActionSubscription?.cancel();
+  _pushOpenedSubscription?.cancel();
 
-  _pushActionSubscription = klaviyo.onPushAction.listen((action) {
-    switch (action) {
-      case OpenWebUrl():
+  _pushOpenedSubscription = klaviyo.onPushOpened.listen((opened) {
+    logPushTest('onPushOpened source=main ${describePushOpened(opened)}');
+    switch (opened.tap) {
+      case KlaviyoPushTap.webUrl:
         _logger.info('Push open_url tapped');
-      case ActionButtonTapped():
+      case KlaviyoPushTap.actionButton:
         _logger.info(
-          'Push action button tapped — id: ${action.buttonId}, '
-          'action: ${action.action}',
+          'Push action button tapped — id: ${opened.button?.id}, '
+          'action: ${opened.button?.action.name}',
         );
+      default:
+        _logger.info('Push notification opened');
     }
   });
+
+  klaviyo.getInitialPushNotification().then(
+        (launchTap) => logPushTest(
+          'getInitialPushNotification source=main '
+          '${describeLaunchTap(launchTap)}',
+        ),
+      );
 }
+
+/// Writes a `[push-test]` line to the device log (logcat on Android, the
+/// unified log on iOS).
+void logPushTest(String message) => debugPrint('[push-test] $message');
+
+/// The push title on either platform: a top-level `title` on Android, or
+/// `aps.alert.title` on iOS.
+String? pushTitle(Map<String, dynamic> payload) {
+  final title = payload['title'];
+  if (title is String) return title;
+  final aps = payload['aps'];
+  final alert = aps is Map ? aps['alert'] : null;
+  final alertTitle = alert is Map ? alert['title'] : null;
+  return alertTitle is String ? alertTitle : null;
+}
+
+/// One-line summary of [opened] for `[push-test]` logs.
+String describePushOpened(KlaviyoPushOpened opened) {
+  final button = opened.button;
+  final buttonText =
+      button == null ? null : '${button.id}/${button.action.name}';
+  return 'tap=${opened.tap.name} title=${pushTitle(opened.payload)} '
+      'button=$buttonText webUrl=${opened.webUrl}';
+}
+
+/// One-line summary of a `getInitialPushNotification()` result.
+String describeLaunchTap(Map<String, dynamic>? launchTap) => launchTap == null
+    ? 'null'
+    : describePushOpened(KlaviyoPushOpened.fromMap(launchTap));
 
 /// Set up listener for silent push notifications.
 /// Called from ProfileTab after SDK initialization.
@@ -145,17 +186,9 @@ void setupSilentPushListener() {
   // Cancel any existing subscription to prevent duplicates
   _silentPushSubscription?.cancel();
 
-  _silentPushSubscription = klaviyo.onPushNotification.listen((eventData) {
-    final eventType = eventData['type'] as String? ?? '';
-
-    if (eventType == 'silent_push_received') {
-      final data = eventData['data'];
-      final userInfo =
-          data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-
-      _logger.info('Silent push received: $userInfo');
-      _showSilentPushAlert(userInfo);
-    }
+  _silentPushSubscription = klaviyo.onPushData.listen((data) {
+    _logger.info('Silent push received: ${data.payload}');
+    _showSilentPushAlert(data.payload);
   });
 }
 
