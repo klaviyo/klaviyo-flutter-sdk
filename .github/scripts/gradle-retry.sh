@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Runs a flutter build command, retrying only when Android dependency
-# resolution fails. android/build.gradle resolves com.github.klaviyo.*
+# resolution fails. android/build.gradle.kts resolves com.github.klaviyo.*
 # artifacts from JitPack, which builds branch/commit/SNAPSHOT targets on first
 # request — the first fetch can time out or 404, and Gradle caches the 404, so
 # each retry first refreshes the dependency cache with a resolution-only
