@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0 (unreleased)
+
+### Breaking
+
+These APIs were deprecated in 0.6.0 and are now removed. See the [Migration Guide](MIGRATION_GUIDE.md#migrating-to-v100) for replacements.
+
+- **`KlaviyoSDK.handlePushNotificationReceived` and `KlaviyoSDK.handlePushNotificationOpened`** are removed. They only logged a message; push tracking is automatic.
+- **The `Klaviyo` compatibility class** (`Klaviyo.instance`, from the `klaviyo_flutter` community package) is removed. Use `KlaviyoSDK()`; [MIGRATION.md](MIGRATION.md) maps each method.
+- **`KlaviyoSDK.onFormEvent`** is removed. Use `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s.
+- **The `isKlaviyoNotification` extension on `Map<String, dynamic>`** is removed. Klaviyo push events arrive on `KlaviyoSDK`'s streams, such as `onPushNotification` and `onPushAction`.
+- **`KlaviyoSDK.dispose()`** is removed. To stop supplying tokens for personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()`. Otherwise, delete the call.
+- **`KlaviyoNativeWrapper` is no longer exported**, along with its `dispose()` and `track()`. Use `KlaviyoSDK`.
+
 ## Unreleased
 
 ### Deprecated
