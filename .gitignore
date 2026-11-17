@@ -72,3 +72,4 @@ flutter_macos_arm64_stable.zip
 
 # SwiftPM build artifacts
 ios/klaviyo_flutter_sdk/.build/
+coverage/
