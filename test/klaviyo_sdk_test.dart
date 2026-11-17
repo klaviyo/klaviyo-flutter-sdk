@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
@@ -919,6 +922,58 @@ void main() {
         'score': 1.25,
         'samples': Float64List.fromList([1.0, 2.0]),
       });
+    });
+  });
+
+  group('KlaviyoSDK.setBadgeCount', () {
+    setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.iOS);
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('sends the count to the native layer on iOS', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      sdk.setBadgeCount(3);
+      await pumpEventQueue();
+
+      final call = log.singleWhere((c) => c.method == 'setBadgeCount');
+      expect(call.arguments, {'count': 3});
+    });
+
+    test('logs a channel error instead of letting it escape', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        throw PlatformException(code: 'BADGE_ERROR', message: 'native failure');
+      });
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+      addTearDown(sub.cancel);
+
+      final uncaught = <Object>[];
+      await runZonedGuarded(
+        () async {
+          sdk.setBadgeCount(7);
+          await pumpEventQueue();
+        },
+        (error, _) => uncaught.add(error),
+      );
+
+      expect(uncaught, isEmpty);
+      expect(
+        records.where(
+          (r) =>
+              r.level == Level.WARNING &&
+              r.message.contains('Failed to set the badge count to 7') &&
+              r.message.contains('native failure'),
+        ),
+        hasLength(1),
+      );
+      expect(
+        records.where((r) => r.message.contains('Set the badge count')),
+        isEmpty,
+      );
     });
   });
 }
