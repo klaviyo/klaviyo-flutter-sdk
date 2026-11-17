@@ -2,7 +2,7 @@
 ///
 /// A geofence defines a circular region using a center point (latitude/longitude)
 /// and radius in meters. The SDK can monitor when users enter or exit these regions.
-class Geofence {
+final class Geofence {
   /// Unique identifier for this geofence
   final String identifier;
 

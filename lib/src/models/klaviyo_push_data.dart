@@ -8,7 +8,7 @@ import 'package:meta/meta.dart';
 /// key/value pairs.
 @experimental
 @immutable
-class KlaviyoPushData {
+final class KlaviyoPushData {
   /// Creates push data from the full push [payload].
   KlaviyoPushData(Map<String, dynamic> payload)
       : payload = Map.unmodifiable(payload);

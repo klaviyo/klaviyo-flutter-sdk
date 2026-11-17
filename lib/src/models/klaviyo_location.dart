@@ -1,7 +1,7 @@
 import 'profile_property.dart';
 
 /// Represents a geographic location for user profiles
-class KlaviyoLocation {
+final class KlaviyoLocation {
   /// First line of street address.
   final String? address1;
 

@@ -103,7 +103,7 @@ sealed class FormLifecycleEvent {
 /// Triggered when a form is shown to the user.
 ///
 /// Fired after the SDK has initiated form presentation.
-class FormShown extends FormLifecycleEvent {
+final class FormShown extends FormLifecycleEvent {
   /// Creates a [FormShown] event for the form with [formId] and [formName].
   const FormShown({required super.formId, required super.formName});
 
@@ -130,7 +130,7 @@ class FormShown extends FormLifecycleEvent {
 /// user-initiated dismissals (e.g. tapping outside, close button).
 /// Does not fire when the SDK tears down the form internally
 /// (session timeouts, aborts).
-class FormDismissed extends FormLifecycleEvent {
+final class FormDismissed extends FormLifecycleEvent {
   /// Creates a [FormDismissed] event for the form with [formId] and [formName].
   const FormDismissed({required super.formId, required super.formName});
 
@@ -156,7 +156,7 @@ class FormDismissed extends FormLifecycleEvent {
 ///
 /// Fired after the SDK has initiated deep link navigation. Not emitted
 /// if no deep link URL is configured for the CTA.
-class FormCtaClicked extends FormLifecycleEvent {
+final class FormCtaClicked extends FormLifecycleEvent {
   /// The text label of the CTA button.
   ///
   /// Defaults to an empty string if absent from the native event (e.g. the
