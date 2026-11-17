@@ -54,6 +54,12 @@ class InAppFormConfig {
       return const InAppFormConfig.infinite();
     }
 
+    if (isInfinite == null &&
+        sessionTimeoutDuration == null &&
+        this.isInfinite) {
+      return const InAppFormConfig.infinite();
+    }
+
     return InAppFormConfig(
       sessionTimeoutDuration:
           sessionTimeoutDuration ?? this.sessionTimeoutDuration,
