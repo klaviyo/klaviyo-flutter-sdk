@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart';
 
+@Deprecated('Use KlaviyoSDK.setLoggingEnabled instead. Will be removed in 1.0.')
 enum KlaviyoLogLevel {
   none,
   error,
