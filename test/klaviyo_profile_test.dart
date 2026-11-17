@@ -65,9 +65,99 @@ void main() {
 
       final json = profile.toJson();
 
-      expect(json['email'], 'test@example.com');
-      expect(json['custom_field'], 'custom_value');
-      expect(json['age'], 25);
+      expect(json, {
+        'email': 'test@example.com',
+        'properties': {'custom_field': 'custom_value', 'age': 25},
+      });
+    });
+
+    test('toJson omits properties when null', () {
+      final json = KlaviyoProfile(email: 'test@example.com').toJson();
+
+      expect(json.containsKey('properties'), isFalse);
+    });
+
+    test('toJson omits properties when empty', () {
+      final json = KlaviyoProfile(
+        email: 'test@example.com',
+        properties: {},
+      ).toJson();
+
+      expect(json.containsKey('properties'), isFalse);
+    });
+
+    test('fromJson reads an empty nested properties map as null', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'properties': <String, dynamic>{},
+      });
+
+      expect(profile.properties, isNull);
+    });
+
+    test('fromJson reads nested properties', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'properties': {'custom_field': 'custom_value', 'age': 25},
+      });
+
+      expect(profile.email, 'test@example.com');
+      expect(profile.properties, {'custom_field': 'custom_value', 'age': 25});
+    });
+
+    test('fromJson leaves properties null when absent', () {
+      final profile = KlaviyoProfile.fromJson({'email': 'test@example.com'});
+
+      expect(profile.properties, isNull);
+    });
+
+    test('fromJson reads top-level properties from the pre-0.6.0 shape', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'first_name': 'Jane',
+        'custom_field': 'custom_value',
+        'age': 25,
+      });
+
+      expect(profile.email, 'test@example.com');
+      expect(profile.firstName, 'Jane');
+      expect(profile.properties, {'custom_field': 'custom_value', 'age': 25});
+      expect(profile.toJson()['properties'], {
+        'custom_field': 'custom_value',
+        'age': 25,
+      });
+    });
+
+    test('fromJson keeps a legacy scalar property named properties', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'properties': 'rental',
+        'age': 25,
+      });
+
+      expect(profile.properties, {'properties': 'rental', 'age': 25});
+    });
+
+    test('fromJson ignores top-level keys when nested properties exist', () {
+      final profile = KlaviyoProfile.fromJson({
+        'email': 'test@example.com',
+        'stray': 'value',
+        'properties': {'custom_field': 'custom_value'},
+      });
+
+      expect(profile.properties, {'custom_field': 'custom_value'});
+    });
+
+    test('toJson and fromJson round-trip properties', () {
+      final original = KlaviyoProfile(
+        email: 'test@example.com',
+        properties: {'custom_field': 'custom_value', 'age': 25},
+      );
+
+      final restored = KlaviyoProfile.fromJson(original.toJson());
+
+      expect(restored, original);
+      expect(restored.properties, original.properties);
     });
   });
 }
