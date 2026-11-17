@@ -6,7 +6,17 @@ This guide outlines how developers can migrate from older versions of the
 > Migrating from the community [`klaviyo_flutter`](https://pub.dev/packages/klaviyo_flutter)
 > package to the official SDK? See [MIGRATION.md](./MIGRATION.md) instead.
 
-## Migrating to v0.6.0
+## Migrating to v1.0.0
+
+### iOS 15.0 is the minimum deployment target
+
+The plugin now requires iOS 15.0 or later; 0.x declared 13.0. Builds fail if your app targets anything lower, so set the iOS deployment target to 15.0 or higher:
+
+- **Xcode**: in `ios/Runner.xcodeproj`, set **iOS Deployment Target** to 15.0 for every target, including any notification service extension.
+- **CocoaPods**: if your `ios/Podfile` has a `platform :ios` line, change it to `platform :ios, '15.0'` and run `pod install`.
+
+iOS 15 supports the same devices as iOS 13 (iPhone 6s and newer), so this doesn't drop any devices. Flutter itself requires iOS 15 as of 3.47.
+
 
 - `KlaviyoProfile.toJson` now nests custom properties under `properties` instead of merging them into the top level, so code that reads custom keys from its output must read them from `json['properties']`; `KlaviyoProfile.fromJson` still accepts the old flat shape, but ignores unknown top-level keys when a nested `properties` map is present.
 - In 0.5.0, a snake_case standard key inside `properties`, such as `first_name` or `email`, set the standard field because `toJson` flattened `properties` into the top level. It still does, on both iOS and Android, and if the matching typed field is also set, the typed field wins. Standard attribute keys are now matched in camelCase too, so `firstName` inside `properties` sets the first name as well; in 0.5.0 it was dropped. Prefer the typed `KlaviyoProfile` fields or `setProfileAttribute` for standard fields, and keep `properties` for custom keys.
