@@ -127,6 +127,35 @@ jobs:
             echo "already_live=false" >> "$GITHUB_OUTPUT"
           fi
 
+  cocoapods-build-check:
+    name: CocoaPods build check (warning only)
+    needs: validate
+    runs-on: macos-15
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Build a CocoaPods-only host app against the frozen podspec
+        run: |
+          set -o pipefail
+          flutter config --no-enable-swift-package-manager
+          host="$RUNNER_TEMP/cocoapods_host"
+          flutter create --platforms=ios --project-name cocoapods_host "$host"
+          (cd "$host" && flutter pub add klaviyo_flutter_sdk --path "$GITHUB_WORKSPACE")
+          if ! (cd "$host" && flutter build ios --no-codesign --debug) 2>&1 | tee "$RUNNER_TEMP/cocoapods-build.log"; then
+            echo "::warning title=CocoaPods install no longer builds::A CocoaPods-only Flutter app fails to build this release against the frozen KlaviyoSwift pin in ios/klaviyo_flutter_sdk.podspec. CocoaPods users would break on this version. See the job log."
+            exit 1
+          fi
+
   publish:
     needs: validate
     if: needs.validate.outputs.already_live != 'true'
