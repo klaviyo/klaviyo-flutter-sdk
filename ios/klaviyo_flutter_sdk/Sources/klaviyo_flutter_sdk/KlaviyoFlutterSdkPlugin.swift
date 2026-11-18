@@ -37,6 +37,14 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedSilentPush: [String: Any]?
     private var cachedPushAction: [String: Any]?
 
+    // The `push_notification_opened` payload for the tap that launched the app,
+    // recorded from the first notification response delivered before the app first
+    // became active. Read by getInitialPushNotification; not cleared by onListen.
+    private var initialPushNotification: [String: Any]?
+    private var hasBecomeActive = false
+    private var launchResponseRecorded = false
+    private var activationObserver: NSObjectProtocol?
+
     // MARK: - Flutter Plugin Registration
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -55,6 +63,25 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         // This allows us to automatically intercept 'didRegisterForRemoteNotifications'
         // without requiring code in the Host App's AppDelegate.
         registrar.addApplicationDelegate(instance)
+
+        // 4. Track when the app first becomes active, to tell the launch tap apart from later taps.
+        instance.observeFirstActivation()
+    }
+
+    private func observeFirstActivation() {
+        guard activationObserver == nil, !hasBecomeActive else { return }
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.hasBecomeActive = true
+            if let observer = self.activationObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self.activationObserver = nil
+            }
+        }
     }
 }
 
@@ -408,8 +435,12 @@ extension KlaviyoFlutterSdkPlugin {
         case "respondToAuthTokenRequest":
             handleRespondToAuthTokenRequest(call: call, result: result)
 
+        case "getInitialPushNotification":
+            result(initialPushNotification)
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
+            initialPushNotification = nil
             result(nil)
 
         case "setBadgeCount":
@@ -580,6 +611,11 @@ extension KlaviyoFlutterSdkPlugin {
             "type": "push_notification_opened",
             "data": userInfo
         ]
+
+        if !hasBecomeActive && !launchResponseRecorded {
+            initialPushNotification = eventPayload
+            launchResponseRecorded = true
+        }
 
         // 2. Send to Flutter (or Cache if Flutter is asleep)
         if let eventSink = eventSink {

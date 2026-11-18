@@ -2,14 +2,9 @@
 
 ## Unreleased
 
-### What's New
-
-- **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
-- **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
-- **`KlaviyoFlutterPushService` can be subclassed (Android)** — The class is now `open`; a subclass is declared in your app manifest, calls `super.onMessageReceived`, and needs `firebase-messaging` as an app dependency.
-
 ### Bug Fixes
 
+- **Android: push opens and action-button taps that launch the app now reach Dart.** On a cold start the tap was handled before your Dart listener subscribed, so the `push_notification_opened` event and `onPushAction`'s `ActionButtonTapped` were dropped. The plugin now holds the most recent open and the most recent action until Dart subscribes. Reopening the app from Recents doesn't re-deliver the original tap.
 - **Android: camelCase profile keys now land in standard fields** — `setProfileAttribute` and `setProfileProperties` now normalize keys for standard attributes in Dart, case-insensitively and in camelCase or snake_case, before calling the native SDKs. On Android, keys such as `firstName` or `address_1` used to be saved as custom properties; they now set the standard field, matching iOS. Other keys stay custom. On iOS, `timezone` is still a custom property because the native iOS SDK can't set it as a single attribute. The README lists the supported keys.
 - **`setProfile` dropped custom properties on iOS and Android** — `KlaviyoProfile.toJson` merged `properties` into the top level of the profile map, but both native plugins read them from a nested `properties` key, so custom properties passed to `setProfile` never reached Klaviyo. They are now sent under `properties`. `KlaviyoProfile.fromJson` reads them from the same nested key and still accepts JSON saved in the old top-level shape. Standard keys inside `properties`, such as `first_name`, `firstName`, `email` or `city`, set the standard field on both platforms, and the matching typed field wins if both are set. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
 - **iOS: identifier keys in `setProfileAttribute` and `setProfileProperties` now set the identifier** — `email`, `phone_number` and `external_id` are now routed to `setEmail`, `setPhoneNumber` and `setExternalId` on both platforms. On iOS they used to be stored as custom properties. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
@@ -17,6 +12,20 @@
 - **Null profile property values are ignored on both platforms** — `setProfile`, `setProfileAttribute` and `setProfileProperties` now drop null values in Dart. Android skipped them, while iOS forwarded them as JSON null, so the platforms disagreed. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
 - **`setProfile` logs conflicts between typed fields and `properties`** — when a typed field such as `firstName` and the same key inside `properties` are both set, the typed value is kept and a warning names the ignored key. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
 - **DateTime values in profile and event properties no longer make the call fail; they are sent as ISO 8601 strings.** `setProfile`, `setProfileAttribute`, `setProfileProperties` and `createEvent` convert a `DateTime`, including nested ones, to a UTC ISO 8601 string. Values the platform channel can't encode, such as `Duration`, `Uri` or custom classes, are dropped with a warning naming the key, and the rest of the call goes through. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+
+### New Features
+
+- **`KlaviyoSDK().getInitialPushNotification()`** returns the push tap that launched the app from a killed state, or `null`. The map has the same shape as the `push_notification_opened` event. It returns the same value on every call for the life of the process, even after a stream listener received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
+
+### Changes
+
+- **Cold-start push opens and actions go to the first subscriber once.** A push open or push action that arrives before anyone subscribes is buffered, one of each, newest wins, and a new open clears a buffered action. The first `onPushNotification` / `onPushAction` subscriber receives it once, then the buffer is cleared. Later subscribers don't receive it; use `getInitialPushNotification()` to read the launch tap whenever you need it. `resetProfile()` drops a buffered open and action.
+
+### What's New
+
+- **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
+- **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
+- **`KlaviyoFlutterPushService` can be subclassed (Android)** — The class is now `open`; a subclass is declared in your app manifest, calls `super.onMessageReceived`, and needs `firebase-messaging` as an app dependency.
 
 ### Documentation
 

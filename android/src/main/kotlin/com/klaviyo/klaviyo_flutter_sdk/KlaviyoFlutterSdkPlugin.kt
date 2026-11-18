@@ -59,6 +59,18 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
     private var eventSink: EventChannel.EventSink? = null
+
+    // Most recent push open and push action emitted before Flutter subscribed;
+    // replayed on the next onListen. One slot each, matching iOS.
+    private var cachedOpenedNotification: Map<String, Any?>? = null
+    private var cachedPushAction: Map<String, Any?>? = null
+
+    // The `push_notification_opened` payload for the tap that launched the activity this
+    // plugin first attached to; read by getInitialPushNotification. Not cleared by onListen.
+    internal var initialPushNotification: Map<String, Any?>? = null
+        private set
+    private var launchIntentHandled = false
+
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
 
@@ -134,14 +146,7 @@ class KlaviyoFlutterSdkPlugin :
                 override fun onListen(
                     arguments: Any?,
                     events: EventChannel.EventSink?,
-                ) {
-                    eventSink = events
-                    // Whichever engine has a live Dart listener owns event delivery.
-                    instance = this@KlaviyoFlutterSdkPlugin
-                    // Replay a silent push that arrived before Flutter subscribed.
-                    cachedSilentPush?.let { events?.success(it) }
-                    cachedSilentPush = null
-                }
+                ) = attachEventSink(events)
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
@@ -153,6 +158,20 @@ class KlaviyoFlutterSdkPlugin :
                 }
             },
         )
+    }
+
+    internal fun attachEventSink(events: EventChannel.EventSink?) {
+        eventSink = events
+        // Whichever engine has a live Dart listener owns event delivery.
+        instance = this
+        // Replay a silent push that arrived before Flutter subscribed.
+        cachedSilentPush?.let { events?.success(it) }
+        cachedSilentPush = null
+        // Replay a push open and push action that arrived before Flutter subscribed.
+        cachedOpenedNotification?.let { events?.success(it) }
+        cachedOpenedNotification = null
+        cachedPushAction?.let { events?.success(it) }
+        cachedPushAction = null
     }
 
     override fun onMethodCall(
@@ -752,9 +771,14 @@ class KlaviyoFlutterSdkPlugin :
                 result.success(Registry.log.logLevel != Log.Level.None)
             }
 
+            "getInitialPushNotification" -> {
+                result.success(initialPushNotification)
+            }
+
             "resetProfile" -> {
                 try {
                     Klaviyo.resetProfile()
+                    initialPushNotification = null
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("RESET_ERROR", "Failed to reset profile", e.message)
@@ -909,8 +933,10 @@ class KlaviyoFlutterSdkPlugin :
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
         // Handle the intent that launched this activity (cold start)
+        val isLaunch = !launchIntentHandled
+        launchIntentHandled = true
         binding.activity.intent?.let { intent ->
-            handleIntent(intent)
+            handleIntent(intent, isLaunch)
         }
 
         // Listen for new intents (warm start)
@@ -974,7 +1000,10 @@ class KlaviyoFlutterSdkPlugin :
         valueOf: (String) -> T,
     ): Set<T>? = (json[key] as? List<*>)?.map { valueOf((it as String).uppercase()) }?.toSet()
 
-    private fun handleIntent(intent: Intent) {
+    internal fun handleIntent(
+        intent: Intent,
+        isLaunch: Boolean = false,
+    ) {
         try {
             // com.klaviyo.push.automatic_push_open_tracking gates only this native-backend
             // "Opened Push" tracking call, not the Dart event emission below, which stays
@@ -989,6 +1018,13 @@ class KlaviyoFlutterSdkPlugin :
             // this whole handler via the catch below on a genuine cold start.
             if (!applicationContext.hasManifestKey(Constants.AUTOMATIC_PUSH_OPEN_TRACKING)) {
                 Klaviyo.handlePush(intent)
+            }
+
+            // Reopening from Recents hands back the original launch intent, including
+            // after process death, so it is not emitted to Dart as a new open.
+            if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) {
+                Registry.log.verbose("Not emitting push open for intent relaunched from history")
+                return
             }
 
             val extras = intent.extras
@@ -1013,13 +1049,17 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
-                eventSink?.success(
+                val openedPayload =
                     mapOf(
                         "type" to "push_notification_opened",
                         "data" to notificationData,
-                    ),
-                )
+                    )
+                if (isLaunch) {
+                    initialPushNotification = openedPayload
+                }
+                emitOrCacheOpenedNotification(openedPayload)
 
+                cachedPushAction = null
                 forwardActionButtonTap(notificationData)
             }
         } catch (e: Exception) {
@@ -1059,11 +1099,25 @@ class KlaviyoFlutterSdkPlugin :
         (notificationData["Button Label"] as? String)?.let { data["label"] = it }
         (notificationData["Button Link"] as? String)?.let { data["url"] = it }
 
-        eventSink?.success(
+        emitOrCachePushAction(
             mapOf(
                 "type" to "push_action_button_tapped",
                 "data" to data,
             ),
         )
+    }
+
+    private fun emitOrCacheOpenedNotification(payload: Map<String, Any?>) {
+        eventSink?.let { it.success(payload) } ?: run {
+            Registry.log.verbose("Flutter not ready. Caching notification open event.")
+            cachedOpenedNotification = payload
+        }
+    }
+
+    private fun emitOrCachePushAction(payload: Map<String, Any?>) {
+        eventSink?.let { it.success(payload) } ?: run {
+            Registry.log.verbose("Flutter not ready. Caching push action event.")
+            cachedPushAction = payload
+        }
     }
 }
