@@ -36,15 +36,6 @@ jobs:
     outputs:
       slack_ts: ${{ steps.slack.outputs.ts }}
     steps:
-      - name: Checkout Slack action
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Short commit
         id: sha
         env:
@@ -54,7 +45,7 @@ jobs:
       - name: Notify Slack release awaiting approval
         id: slack
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: pending
@@ -170,29 +161,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: klaviyo/klaviyo-react-native-sdk/.github/shared/linear-release-sync@master
         with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Sync release to Linear
-        id: linear-sync
-        continue-on-error: true
-        uses: linear/linear-release-action@dd4fc407f860b9460d2cf0b3fb1edd8985cf443f # v0.18.2
-        with:
-          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
-          command: sync
           version: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-
-      - name: Complete release in Linear
-        if: steps.linear-sync.outcome == 'success'
-        continue-on-error: true
-        uses: linear/linear-release-action@dd4fc407f860b9460d2cf0b3fb1edd8985cf443f # v0.18.2
-        with:
-          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
-          command: complete
-          version: ${{ github.ref_name }}
+          token: ${{ secrets.LINEAR_ACCESS_KEY }}
 
   # Publishes the GitHub release after pub.dev has the version, then
   # dispatches publish-example.yml. The dispatch path leaves the release a
@@ -288,15 +260,6 @@ jobs:
       contents: read
       actions: read
     steps:
-      - name: Checkout Slack action
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Summarize result
         id: result
         env:
@@ -347,7 +310,7 @@ jobs:
       - name: Notify Slack
         id: slack
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ inputs.slack_ts || needs.announce.outputs.slack_ts }}
@@ -367,7 +330,7 @@ jobs:
       - name: Reply with failure details
         if: steps.result.outputs.result != 'success' && steps.slack.outputs.ts != ''
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ steps.slack.outputs.ts }}

@@ -3,8 +3,10 @@
 # X.Y.Z-rc.1 is published as a GitHub prerelease) instead of publishing a draft
 # release in the GitHub UI.
 #
-#   prepare  checks the version, CHANGELOG, CI and pub.dev packaging on the
-#            commit, then finds or creates the draft GitHub release.
+#   prepare  runs the shared release-preflight.yml from klaviyo-react-native-sdk:
+#            checks the version, branch, tag, CHANGELOG, native pins and CI on
+#            the commit, then finds or creates the draft GitHub release.
+#   pub-dry-run  runs `dart pub publish --dry-run` on the commit.
 #   publish  creates the tag, dispatches release.yml at it, and posts ⏳ to
 #            Slack. The pub.dev upload in release.yml waits for approval in
 #            the `pub.dev` environment, the only approval on this path.
@@ -55,142 +57,63 @@ env:
 
 jobs:
   prepare:
+    uses: klaviyo/klaviyo-react-native-sdk/.github/workflows/release-preflight.yml@master
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
+      ref: ${{ inputs.ref }}
+      prefer-rel-branch: true
+      dry-run: ${{ inputs.dry_run == true }}
+      skip-ci-check: ${{ inputs.skip_ci_check == true }}
+      required-workflows: test,lint,build-android,build-ios,version-check
+      ci-event: ''
+      ignore-workflows: publish-example,Promotion Check,PR Target Branch Check
+      sdk-checks: |
+        raw=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+        if [ "$raw" != "$VERSION" ]; then
+          echo "::error::pubspec.yaml version is '${raw}', expected ${VERSION}"
+          exit 1
+        fi
+        ./.github/scripts/check-native-pins.sh
+        ./scripts/sync_version.sh
+        files=(
+          ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist
+          example/pubspec.yaml
+          example/ios/Runner.xcodeproj/project.pbxproj
+        )
+        if ! git diff --exit-code "${files[@]}"; then
+          echo "::error::Files synced from pubspec.yaml are out of date. Run ./scripts/sync_version.sh and commit the result."
+          exit 1
+        fi
+        if ! grep -Eq "^## \[?${VERSION//./\\.}\]?([[:space:]]|$)" CHANGELOG.md; then
+          echo "::error::CHANGELOG.md has no '## ${VERSION}' entry"
+          exit 1
+        fi
+      sdk-name: Flutter SDK
+      slack-username: Flutter SDK
+      slack-icon-emoji: ':merlin-orb-flutter:'
+      slack-pending: false
+      approval-instructions: Next, the publish job creates the tag and dispatches release.yml. Approve `pub.dev` on that run.
+
+  pub-dry-run:
+    name: Dry-run the pub.dev publish
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write
-      checks: read
-      pull-requests: read
-    outputs:
-      sha: ${{ steps.ref.outputs.sha }}
-      sha_short: ${{ steps.ref.outputs.sha_short }}
-      release_url: ${{ steps.draft.outputs.url }}
-      ci_skipped: ${{ inputs.skip_ci_check == true }}
+      contents: read
     env:
-      VERSION: ${{ inputs.version }}
-      PRERELEASE: ${{ contains(inputs.version, '-') }}
-      INPUT_REF: ${{ inputs.ref }}
-      SKIP_CI: ${{ inputs.skip_ci_check == true }}
       FLUTTER_VERSION: 3.47.9
     steps:
-      - name: Validate version and tag
-        id: validate
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::version '${VERSION}' is not X.Y.Z or X.Y.Z-suffix"
-            exit 1
-          fi
-          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" > /dev/null 2>&1; then
-            echo "::error::Tag ${VERSION} already exists. To retry a stopped release, run release.yml at the tag from the Actions tab."
-            exit 1
-          fi
-
-      - name: Resolve commit
-        id: ref
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ref="$INPUT_REF"
-          if [ -z "$ref" ]; then
-            if gh api "repos/${GITHUB_REPOSITORY}/branches/rel/${VERSION}" > /dev/null 2>&1; then
-              ref="rel/${VERSION}"
-            elif gh api "repos/${GITHUB_REPOSITORY}/branches/rel/${VERSION%%-*}" > /dev/null 2>&1; then
-              ref="rel/${VERSION%%-*}"
-            else
-              ref=$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)
-            fi
-          fi
-          sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${ref}" --jq .sha)
-          echo "Releasing ${ref} at ${sha}"
-          {
-            echo "ref=${ref}"
-            echo "sha=${sha}"
-            echo "sha_short=${sha::7}"
-          } >> "$GITHUB_OUTPUT"
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
         with:
-          ref: ${{ steps.ref.outputs.sha }}
-          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
-
-      - name: Require a commit on master or rel/*
-        id: branch
-        env:
-          SHA: ${{ steps.ref.outputs.sha }}
-        run: |
-          git fetch --no-tags --quiet origin '+refs/heads/master:refs/remotes/origin/master' '+refs/heads/rel/*:refs/remotes/origin/rel/*'
-          if ! git branch -r --contains "$SHA" | grep -Eq 'origin/master$|origin/rel/'; then
-            echo "::error::${SHA} is not on master or a rel/* branch"
-            exit 1
-          fi
-
-      - name: Check pubspec version
-        id: pubspec
-        run: |
-          raw=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-          if [ "$raw" != "$VERSION" ]; then
-            echo "::error::pubspec.yaml version is '${raw}', expected ${VERSION}"
-            exit 1
-          fi
-
-      - name: Check native SDK pins
-        id: pins
-        run: ./.github/scripts/check-native-pins.sh
-
-      - name: Check synced version files
-        id: synced
-        run: |
-          ./scripts/sync_version.sh
-          files=(
-            ios/klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist
-            example/pubspec.yaml
-            example/ios/Runner.xcodeproj/project.pbxproj
-          )
-          if ! git diff --exit-code "${files[@]}"; then
-            echo "::error::Files synced from pubspec.yaml are out of date. Run ./scripts/sync_version.sh and commit the result."
-            exit 1
-          fi
-
-      - name: Check CHANGELOG entry
-        id: changelog
-        run: |
-          if ! grep -Eq "^## \[?${VERSION//./\\.}\]?([[:space:]]|$)" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## ${VERSION}' entry"
-            exit 1
-          fi
-
-      - name: Skip CI check
-        if: inputs.skip_ci_check == true
-        run: echo "::warning::CI check skipped by request; the commit's CI was not verified"
-
-      - name: Check CI on the commit
-        id: ci
-        if: inputs.skip_ci_check != true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ steps.ref.outputs.sha }}
-        run: |
-          ci_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" \
-            --jq "[.[] | select(.merge_commit_sha == \"${SHA}\")][0].head.sha // empty")
-          ci_sha=${ci_sha:-$SHA}
-          echo "Checking CI on ${ci_sha}"
-          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${ci_sha}/check-runs" \
-            --jq '.check_runs[] | select(.name | test("^(test|lint|build-android|build-ios|verify-version-sync)$")) | "\(.status) \(.conclusion) \(.name)"')
-          if [ -z "$runs" ]; then
-            echo "::error::No test, lint, build or version-check runs found on ${ci_sha}"
-            exit 1
-          fi
-          echo "$runs"
-          bad=$(echo "$runs" | awk '$1 != "completed" || ($2 != "success" && $2 != "skipped" && $2 != "neutral")')
-          if [ -n "$bad" ]; then
-            echo "::error::CI is not green on ${SHA}:"
-            echo "$bad"
-            exit 1
-          fi
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         id: flutter
@@ -204,114 +127,43 @@ jobs:
           flutter pub get
           dart pub publish --dry-run
 
-      - name: Find or create draft release
-        id: draft
-        if: ${{ !inputs.dry_run }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ steps.ref.outputs.sha }}
-        run: |
-          existing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \
-            --jq ".[] | select(.tag_name == \"${VERSION}\") | \"\(.draft) \(.html_url)\"" | head -n1)
-          if [ -n "$existing" ]; then
-            if [ "${existing%% *}" != "true" ]; then
-              echo "::error::Release ${VERSION} is already published"
-              exit 1
-            fi
-            url="${existing#* }"
-            echo "Using existing draft ${url}; notes are left as written"
-            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --target "$SHA" "--prerelease=${PRERELEASE}" > /dev/null
-          else
-            url=$(gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" --draft \
-              --title "$VERSION" --target "$SHA" --generate-notes "--prerelease=${PRERELEASE}")
-            echo "Created draft ${url}"
-          fi
-          echo "url=${url}" >> "$GITHUB_OUTPUT"
-
-      - name: Write summary
-        id: summary
-        env:
-          SHA: ${{ steps.ref.outputs.sha }}
-          RELEASE_URL: ${{ steps.draft.outputs.url }}
-        run: |
-          {
-            echo "### klaviyo_flutter_sdk ${VERSION}${{ inputs.dry_run && ' (dry run)' || '' }} prepared"
-            echo
-            echo "- Commit: \`${SHA}\`"
-            [ -z "$RELEASE_URL" ] || echo "- [Release notes](${RELEASE_URL})"
-            if [ "$SKIP_CI" = "true" ]; then
-              echo "- ⚠️ CI check skipped by request"
-            fi
-            if [ "${{ inputs.dry_run }}" = "true" ]; then
-              echo
-              echo "Dry run: no release, tag or dispatch."
-            else
-              echo
-              echo "Next: create the tag and dispatch release.yml, then approve \`pub.dev\` on that run."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Checkout Slack action
-        if: failure()
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Find failed step
         id: failed
         if: failure()
         env:
           STEPS_JSON: ${{ toJSON(steps) }}
-          COMMIT_SHA: ${{ steps.ref.outputs.sha || github.sha }}
         run: |
           step=$(jq -r '
             {
-              validate: "Validate version and tag",
-              ref: "Resolve commit",
               checkout: "Checkout",
-              branch: "Require a commit on master or rel/*",
-              pubspec: "Check pubspec version",
-              pins: "Check native SDK pins",
-              synced: "Check synced version files",
-              changelog: "Check CHANGELOG entry",
-              ci: "Check CI on the commit",
               flutter: "Set up Flutter",
-              dryrun: "Dry-run the pub.dev publish",
-              draft: "Find or create draft release",
-              summary: "Write summary",
-              tag: "Create the tag",
-              dispatch: "Dispatch release.yml at the tag"
+              dryrun: "Dry-run the pub.dev publish"
             } as $names
             | ([to_entries[] | select(.value.conclusion == "failure")][0].key) as $key
             | if $key == null then "unknown step" else ($names[$key] // $key) end
           ' <<<"$STEPS_JSON")
           echo "step=$step" >> "$GITHUB_OUTPUT"
-          echo "commit_short=${COMMIT_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack on failure
         id: slack_failure
         if: failure()
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: failure
           title: Flutter SDK `${{ inputs.version }}` release failed${{ inputs.dry_run && ' (dry run)' || '' }}
           fields: |
             Version: `${{ inputs.version }}`
-            Commit: `${{ steps.failed.outputs.commit_short }}`
+            Commit: `${{ needs.prepare.outputs.short_sha }}`
             Stage: Prepare
             Triggered by: `${{ env.TRIGGERED_BY }}`
-          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.ref.outputs.sha || github.sha }}
+          links: Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
 
       - name: Reply with failure details
         if: failure() && steps.slack_failure.outputs.ts != ''
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ steps.slack_failure.outputs.ts }}
@@ -319,7 +171,7 @@ jobs:
           title: Failed at `${{ steps.failed.outputs.step }}`
 
   publish:
-    needs: prepare
+    needs: [prepare, pub-dry-run]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -332,15 +184,6 @@ jobs:
       SHA: ${{ needs.prepare.outputs.sha }}
       SKIP_CI: ${{ needs.prepare.outputs.ci_skipped }}
     steps:
-      - name: Checkout Slack action
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Create the tag
         id: tag
         run: |
@@ -355,7 +198,7 @@ jobs:
       - name: Notify Slack release awaiting approval
         id: slack_pending
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: pending
@@ -363,7 +206,7 @@ jobs:
           body: Approve the `pub.dev` environment on the `release.yml` run. This message updates with the result.
           fields: |
             Version: `${{ inputs.version }}`
-            Commit: `${{ needs.prepare.outputs.sha_short }}`
+            Commit: `${{ needs.prepare.outputs.short_sha }}`
             Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Draft release|${{ needs.prepare.outputs.release_url }}
@@ -403,19 +246,6 @@ jobs:
         run: |
           step=$(jq -r '
             {
-              validate: "Validate version and tag",
-              ref: "Resolve commit",
-              checkout: "Checkout",
-              branch: "Require a commit on master or rel/*",
-              pubspec: "Check pubspec version",
-              pins: "Check native SDK pins",
-              synced: "Check synced version files",
-              changelog: "Check CHANGELOG entry",
-              ci: "Check CI on the commit",
-              flutter: "Set up Flutter",
-              dryrun: "Dry-run the pub.dev publish",
-              draft: "Find or create draft release",
-              summary: "Write summary",
               tag: "Create the tag",
               dispatch: "Dispatch release.yml at the tag"
             } as $names
@@ -428,7 +258,7 @@ jobs:
         id: slack_failure
         if: failure()
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ steps.slack_pending.outputs.ts }}
@@ -436,7 +266,7 @@ jobs:
           title: Flutter SDK `${{ inputs.version }}` release failed
           fields: |
             Version: `${{ inputs.version }}`
-            Commit: `${{ needs.prepare.outputs.sha_short }}`
+            Commit: `${{ needs.prepare.outputs.short_sha }}`
             Stage: Publish
             Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
@@ -446,7 +276,7 @@ jobs:
       - name: Reply with failure details
         if: failure() && steps.slack_failure.outputs.ts != ''
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ steps.slack_failure.outputs.ts }}
@@ -456,7 +286,7 @@ jobs:
       - name: Notify Slack that the release stopped
         if: cancelled() && steps.slack_pending.outputs.ts != ''
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ steps.slack_pending.outputs.ts }}
@@ -465,7 +295,7 @@ jobs:
           body: The run was cancelled before it finished. If `release.yml` did not start, run it at the tag to retry.
           fields: |
             Version: `${{ inputs.version }}`
-            Commit: `${{ needs.prepare.outputs.sha_short }}`
+            Commit: `${{ needs.prepare.outputs.short_sha }}`
             Stage: Publish
             Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
