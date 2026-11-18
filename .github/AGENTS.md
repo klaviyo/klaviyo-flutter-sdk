@@ -19,6 +19,7 @@ For agents and humans editing workflows and actions here. `CLAUDE.md` in this di
 - Shared CI lives in klaviyo-react-native-sdk `.github/shared/` (`notify-slack`, `promotion-check`, `pr-target-check`, `linear-release-sync`, `stale`, `remove-deploy-label`) plus `.github/workflows/release-preflight.yml` and `.github/workflows/rel-branch-core.yml`. Don't copy it here; call it remotely and pass this repo's values as inputs. The contract is that repo's `.github/shared/README.md`.
 - Its inputs are additive only. If this repo needs something the contract lacks, add an optional input there rather than forking a copy here.
 - `publish-release.yml` calls `release-preflight.yml` (with `prefer-rel-branch: true` and `slack-pending: false`; pubspec, native pin, synced-file and CHANGELOG checks go in `sdk-checks`) and keeps its own `pub-dry-run` and `publish` jobs. `rel-branch.yml` calls `rel-branch-core.yml` and keeps its own `pin` job.
+- The native SDKs start `rel-branch.yml` with a `repository_dispatch` of type `native-rel-branch` carrying `client_payload` `{android|ios: "rel/X.Y.Z", triggered_by: "<person>"}`. Keep that listener and read the pin branch from `github.event.client_payload` as well as `inputs`; `pin` runs on either.
 
 ## Workflow conventions
 
