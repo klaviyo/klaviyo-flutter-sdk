@@ -1,5 +1,6 @@
 package com.klaviyo.klaviyo_flutter_sdk
 
+import android.content.Context
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.model.Event
 import com.klaviyo.analytics.model.EventKey
@@ -377,11 +378,18 @@ class KlaviyoFlutterSdkPluginMethodCallTest {
     }
 
     @Test
-    fun `handleUniversalTrackingLink returns the native verdict`() {
+    fun `handleUniversalTrackingLink registers lifecycle callbacks before initialize and returns the native verdict`() {
+        val appContext = mockk<Context>(relaxed = true)
+        KlaviyoFlutterSdkPlugin::class.java.getDeclaredField("applicationContext").apply {
+            isAccessible = true
+            set(plugin, appContext)
+        }
+        every { Klaviyo.registerForLifecycleCallbacks(any()) } returns Klaviyo
         every { Klaviyo.handleUniversalTrackingLink(any<String>()) } returns true
 
         call("handleUniversalTrackingLink", mapOf("url" to "https://trk.example.com/u/abc"))
 
+        verify { Klaviyo.registerForLifecycleCallbacks(appContext) }
         verify { Klaviyo.handleUniversalTrackingLink("https://trk.example.com/u/abc") }
         verify { result.success(true) }
     }
