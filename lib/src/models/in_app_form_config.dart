@@ -3,7 +3,9 @@ const int _infiniteTimeoutSentinel = -1;
 class InAppFormConfig {
   /// - null → platform default (1 hour)
   /// - 0 → timeout immediately when app backgrounds
-  /// - >0 → timeout after inactivity
+  /// - >0 → timeout after inactivity, sent to the native SDK in whole seconds
+  ///   rounded up, so a sub-second duration becomes 1 second
+  /// - <0 → treated as 0, matching the native SDKs
   /// - infinite() → no timeout
   final Duration? sessionTimeoutDuration;
   final bool isInfinite;
@@ -42,8 +44,15 @@ class InAppFormConfig {
     return {
       'sessionTimeoutDuration': isInfinite
           ? _infiniteTimeoutSentinel
-          : sessionTimeoutDuration?.inSeconds,
+          : _encodeSeconds(sessionTimeoutDuration),
     };
+  }
+
+  static int? _encodeSeconds(Duration? duration) {
+    if (duration == null) return null;
+    if (duration <= Duration.zero) return 0;
+    return (duration.inMicroseconds + Duration.microsecondsPerSecond - 1) ~/
+        Duration.microsecondsPerSecond;
   }
 
   InAppFormConfig copyWith({
@@ -51,6 +60,12 @@ class InAppFormConfig {
     bool? isInfinite,
   }) {
     if (isInfinite == true) {
+      return const InAppFormConfig.infinite();
+    }
+
+    if (isInfinite == null &&
+        sessionTimeoutDuration == null &&
+        this.isInfinite) {
       return const InAppFormConfig.infinite();
     }
 

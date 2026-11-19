@@ -73,6 +73,13 @@ on:
   pull_request:
     types: [labeled]
 
+# A newer push to the same branch cancels the run in flight. Release, manual
+# and PR-label runs are never cancelled by this group. Deploy jobs also queue
+# per platform (see deploy-android's concurrency).
+concurrency:
+  group: publish-example-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
 permissions:
   contents: read
 
@@ -288,17 +295,17 @@ jobs:
       commit_short: ${{ steps.info.outputs.commit_short }}
       commit_sha: ${{ steps.info.outputs.commit_sha }}
     steps:
-      - name: Checkout Slack action
+      - name: Checkout run metadata
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: |
-            .github
+            .github/scripts
             pubspec.yaml
           sparse-checkout-cone-mode: false
           persist-credentials: false
-          path: _slack
+          path: _meta
 
       - name: Describe the run
         id: info
@@ -311,8 +318,8 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          version=$(grep '^version:' _slack/pubspec.yaml | awk '{print $2}' | cut -d+ -f1 || true)
-          source_label=$(_slack/.github/scripts/source-label.sh || true)
+          version=$(grep '^version:' _meta/pubspec.yaml | awk '{print $2}' | cut -d+ -f1 || true)
+          source_label=$(_meta/.github/scripts/source-label.sh || true)
           {
             echo "version=${version:-unknown}"
             echo "source_label=${source_label:-unknown}"
@@ -323,7 +330,7 @@ jobs:
       - name: Notify Slack deploy started
         id: slack
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts }}
@@ -365,18 +372,9 @@ jobs:
           [ "$READY_IOS" = "true" ] && list="${list:+$list + }iOS"
           echo "list=${list:-no platform}" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout Slack action
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Update the Slack deploy message
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
@@ -534,20 +532,10 @@ jobs:
             echo "timed_out=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout Slack action
-        if: always()
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Notify Slack on success
         if: success() && inputs.check_credentials != true
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -568,7 +556,7 @@ jobs:
       - name: Notify Slack on failure
         if: failure() || (cancelled() && steps.stop.outputs.timed_out == 'true')
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -782,20 +770,10 @@ jobs:
             echo "timed_out=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout Slack action
-        if: always()
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Notify Slack on success
         if: success() && inputs.check_credentials != true
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -817,7 +795,7 @@ jobs:
       - name: Notify Slack on failure
         if: failure() || (cancelled() && steps.stop.outputs.timed_out == 'true')
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -907,7 +885,7 @@ jobs:
       - name: Warn in Slack that What to Test failed
         if: failure()
         continue-on-error: true
-        uses: ./.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ needs.announce.outputs.thread_ts || inputs.slack_thread_ts }}
@@ -1025,19 +1003,9 @@ jobs:
             echo "body=$body"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Checkout Slack action
-        if: always()
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Update the Slack deploy message
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
@@ -1071,20 +1039,4 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - name: Remove label
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v7
-        env:
-          LABEL_NAME: ${{ github.event.label.name }}
-        with:
-          script: |
-            try {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                name: process.env.LABEL_NAME,
-              });
-            } catch (e) {
-              // 404 = label already gone (e.g. removed manually mid-run).
-              if (e.status !== 404) throw e;
-            }
+      - uses: klaviyo/klaviyo-react-native-sdk/.github/shared/remove-deploy-label@master
