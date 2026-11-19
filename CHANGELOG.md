@@ -4,8 +4,9 @@
 
 ### Breaking
 
-These APIs are removed. Most were deprecated in 0.6.0. See the [Migration Guide](MIGRATION_GUIDE.md#migrating-to-v100) for replacements.
+1.0 requires iOS 15 and removes the APIs below. Most were deprecated in 0.6.0. See the [Migration Guide](MIGRATION_GUIDE.md#migrating-to-v100) for replacements.
 
+- **iOS: minimum deployment target raised from 13.0 to 15.0** — `Package.swift` and the podspec now declare iOS 15.0, matching the README. Apps must set their iOS deployment target to 15.0 or higher. iOS 15 runs on every device that runs iOS 13 (iPhone 6s and newer), so no devices are dropped. The plugin's iOS 13 code paths are gone; logging that used to be skipped below iOS 14 now always runs.
 - **`KlaviyoSDK.handlePushNotificationReceived` and `KlaviyoSDK.handlePushNotificationOpened`** are removed. They only logged a message; push tracking is automatic.
 - **The `Klaviyo` compatibility class** (`Klaviyo.instance`, from the `klaviyo_flutter` community package) is removed. Use `KlaviyoSDK()`; [MIGRATION.md](MIGRATION.md) maps each method.
 - **`KlaviyoSDK.onFormEvent`** is removed. Use `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s.
@@ -19,6 +20,10 @@ These APIs are removed. Most were deprecated in 0.6.0. See the [Migration Guide]
 - **`auth_token.dart` exports only `AuthTokenProvider`.** `ClassifiedProviderError`, `classifyAuthTokenProviderError` and `parseAuthTokenRequestedEventId` are internal.
 - **`InAppFormConfig.copyWith` no longer takes `isInfinite`.** Passing a duration makes the copy finite, a call with no arguments keeps the original timeout (including infinite), and `InAppFormConfig.infinite()` makes an infinite config. The `isInfinite` getter stays.
 - **`KlaviyoSDK.apiKey` is removed.** The native SDKs own the API key.
+
+### Platform Support
+
+- **iOS**: Minimum deployment target 15.0
 
 ## Unreleased
 

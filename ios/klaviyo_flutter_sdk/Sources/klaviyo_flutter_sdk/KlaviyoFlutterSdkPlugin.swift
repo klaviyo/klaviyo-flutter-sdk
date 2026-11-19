@@ -13,7 +13,6 @@ import UserNotifications
 
 // MARK: - Logger
 
-@available(iOS 14.0, *)
 extension Logger {
     private static let enabledKlaviyoFlutterSDK = Logger(
         subsystem: "com.klaviyo.flutter",
@@ -250,9 +249,7 @@ extension KlaviyoFlutterSdkPlugin {
             }
 
             guard !token.isEmpty else {
-                if #available(iOS 14.0, *) {
-                    Logger.klaviyoFlutterSDK.warning("Attempted to set empty push token")
-                }
+                Logger.klaviyoFlutterSDK.warning("Attempted to set empty push token")
                 result(FlutterError(
                     code: "INVALID_TOKEN",
                     message: "Push token cannot be empty",
@@ -612,9 +609,7 @@ extension KlaviyoFlutterSdkPlugin {
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
-        if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("APNs token received")
-        }
+        Logger.klaviyoFlutterSDK.info("APNs token received")
 
         // Respect `klaviyo_automatic_push_token_forwarding` in Info.plist when explicitly set:
         // unset -> no other path is active, this plugin forwards (today's default, unchanged).
@@ -637,9 +632,7 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink {
             eventSink(eventData)
         } else {
-            if #available(iOS 14.0, *) {
-                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token event.")
-            }
+            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token event.")
             cachedToken = eventData
         }
     }
@@ -649,12 +642,10 @@ extension KlaviyoFlutterSdkPlugin {
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
-        if #available(iOS 14.0, *) {
-            let description = error.localizedDescription
-            Logger.klaviyoFlutterSDK.warning(
-                "Failed to register for remote notifications: \(description, privacy: .public)"
-            )
-        }
+        let description = error.localizedDescription
+        Logger.klaviyoFlutterSDK.warning(
+            "Failed to register for remote notifications: \(description, privacy: .public)"
+        )
 
         // Create error payload
         let errorData: [String: Any] = [
@@ -666,18 +657,14 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink {
             eventSink(errorData)
         } else {
-            if #available(iOS 14.0, *) {
-                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token error event.")
-            }
+            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push token error event.")
             cachedError = errorData
         }
     }
 
     public func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
-        if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("Push notification opened")
-        }
+        Logger.klaviyoFlutterSDK.info("Push notification opened")
 
         let pushAction = pushActionPayload(for: response, userInfo: userInfo)
 
@@ -699,9 +686,7 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink = eventSink {
             eventSink(eventPayload)
         } else {
-            if #available(iOS 14.0, *) {
-                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching notification open event.")
-            }
+            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching notification open event.")
             cachedOpenedNotification = eventPayload
         }
 
@@ -748,21 +733,17 @@ extension KlaviyoFlutterSdkPlugin {
                   let button = buttons.first(where: {
                       $0["id"] as? String == actionIdentifier
                   }) else {
-                if #available(iOS 14.0, *) {
-                    Logger.klaviyoFlutterSDK.warning(
-                        "No action button matches identifier '\(actionIdentifier)'; dropping tap."
-                    )
-                }
+                Logger.klaviyoFlutterSDK.warning(
+                    "No action button matches identifier '\(actionIdentifier)'; dropping tap."
+                )
                 return nil
             }
             // Dart's KlaviyoPushOpened.fromMap needs `action` to build the
             // button, so drop incomplete taps here with a log.
             guard let action = button["action"] as? String else {
-                if #available(iOS 14.0, *) {
-                    Logger.klaviyoFlutterSDK.warning(
-                        "Action button '\(actionIdentifier)' has no action type; dropping tap."
-                    )
-                }
+                Logger.klaviyoFlutterSDK.warning(
+                    "Action button '\(actionIdentifier)' has no action type; dropping tap."
+                )
                 return nil
             }
             var data: [String: Any] = ["id": actionIdentifier, "action": action]
@@ -791,9 +772,7 @@ extension KlaviyoFlutterSdkPlugin {
         let isSilent = (userInfo["aps"] as? [String: Any])?["alert"] == nil
         guard isSilent || userInfo["key_value_pairs"] != nil else { return }
 
-        if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("Silent push received")
-        }
+        Logger.klaviyoFlutterSDK.info("Silent push received")
 
         // Prepare payload
         let eventPayload: [String: Any] = [
@@ -805,9 +784,7 @@ extension KlaviyoFlutterSdkPlugin {
         if let eventSink = eventSink {
             eventSink(eventPayload)
         } else {
-            if #available(iOS 14.0, *) {
-                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching silent push event.")
-            }
+            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching silent push event.")
             cachedSilentPush = eventPayload
         }
     }
@@ -1217,9 +1194,7 @@ extension KlaviyoFlutterSdkPlugin {
             }
         }
         #else
-        if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.warning("Form lifecycle events not available: forms module not included")
-        }
+        Logger.klaviyoFlutterSDK.warning("Form lifecycle events not available: forms module not included")
         #endif
     }
 }
