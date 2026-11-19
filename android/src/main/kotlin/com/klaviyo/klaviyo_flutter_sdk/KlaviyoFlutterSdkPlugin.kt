@@ -47,7 +47,6 @@ import io.flutter.plugin.common.MethodChannel.Result
 import java.net.SocketException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.concurrent.Volatile
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.INFINITE
 import kotlin.time.Duration.Companion.seconds
