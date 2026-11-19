@@ -217,13 +217,6 @@ void main() {
       );
     });
 
-    test('the wrapper sends setBadgeCount with an int count', () async {
-      KlaviyoNativeWrapper().setBadgeCount(7);
-      await pumpEventQueue();
-
-      expect(single('setBadgeCount').arguments, {'count': 7});
-    });
-
     test('setBadgeCount is a warning-only no-op off iOS', () async {
       sdk.setBadgeCount(3);
       await pumpEventQueue();

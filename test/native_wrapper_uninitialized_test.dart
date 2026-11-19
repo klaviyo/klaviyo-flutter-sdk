@@ -87,8 +87,8 @@ void main() {
         wrapper.respondToAuthTokenRequest('id', jwt: 'jwt'),
         throwsA(isA<KlaviyoException>()),
       );
-      expect(
-        () => wrapper.setBadgeCount(1),
+      await expectLater(
+        wrapper.setBadgeCount(1),
         throwsA(isA<KlaviyoNotInitializedException>()),
       );
       expect(log, isEmpty);
