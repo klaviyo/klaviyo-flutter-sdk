@@ -52,9 +52,5 @@ abstract final class ProfileProperty {
 
   /// Time zone name. We recommend using time zones from the IANA Time Zone
   /// Database.
-  ///
-  /// On iOS this key is stored as a custom property. Use
-  /// [KlaviyoLocation.timezone] with [KlaviyoSDK.setProfile] to set the
-  /// profile's timezone on both platforms.
   static const String timezone = 'timezone';
 }
