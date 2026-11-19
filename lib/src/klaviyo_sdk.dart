@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
@@ -572,7 +573,7 @@ class KlaviyoSDK {
   ///   routes: [...],
   ///   redirect: (context, state) {
   ///     // Fire-and-forget - Klaviyo tracks in background
-  ///     Klaviyo.handleUniversalTrackingLink(state.uri.toString());
+  ///     KlaviyoSDK().handleUniversalTrackingLink(state.uri.toString());
   ///     return null; // Continue with normal navigation
   ///   },
   /// );
@@ -633,10 +634,13 @@ class KlaviyoSDK {
   /// Reset the current profile (useful for logout)
   /// Profile state is managed by the native SDK
   void setBadgeCount(int count) {
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       _ensureInitialized();
-      _nativeWrapper.setBadgeCount(count);
-      _logger.info('Set the badge count to $count');
+      _nativeWrapper.setBadgeCount(count).then((_) {
+        _logger.info('Set the badge count to $count');
+      }).catchError((Object e) {
+        _logger.warning('Failed to set the badge count to $count: $e');
+      });
     } else {
       // Android does not support badge count
       _logger.warning(
@@ -773,18 +777,19 @@ class KlaviyoSDK {
   /// The push notification tap that launched the app from a killed state, or
   /// `null` if the app wasn't launched by a push tap.
   ///
-  /// The map has the same shape as the `push_notification_opened` event. Pass
-  /// it to [KlaviyoPushOpened.fromMap] for the typed view. When the tap was on
-  /// an action button it carries the button under `action`. Every call returns
-  /// the same value for the life of the process, including after the first
+  /// Returns the same [KlaviyoPushOpened] that [onPushOpened] emits for that
+  /// tap, with [KlaviyoPushOpened.tap], [KlaviyoPushOpened.button] and
+  /// [KlaviyoPushOpened.webUrl] set the same way. Every call returns the same
+  /// tap for the life of the process, including after the first
   /// [onPushOpened] subscriber has received that event, so it can be read
   /// whenever it's needed (for example, by a router at startup). Taps while
   /// the app is running never set it, and [resetProfile] clears it.
   ///
   /// Safe to call before [initialize].
-  Future<Map<String, dynamic>?> getInitialPushNotification() async {
+  Future<KlaviyoPushOpened?> getInitialPushNotification() async {
     try {
-      return await _nativeWrapper.getInitialPushNotification();
+      final launchTap = await _nativeWrapper.getInitialPushNotification();
+      return launchTap == null ? null : KlaviyoPushOpened.fromMap(launchTap);
     } catch (e) {
       throw KlaviyoException('Failed to get initial push notification: $e');
     }

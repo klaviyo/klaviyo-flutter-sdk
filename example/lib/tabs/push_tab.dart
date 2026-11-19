@@ -6,6 +6,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../main.dart' show describeLaunchTap, describePushOpened, logPushTest;
 import '../widgets/test_id.dart';
 
 final _logger = Logger('KlaviyoExample');
@@ -60,10 +61,22 @@ class _PushTabState extends State<PushTab> {
     );
 
     _pushOpenedSubscription = _klaviyo.onPushOpened.listen((opened) {
+      final summary = describePushOpened(opened);
+      logPushTest('onPushOpened source=push_tab $summary');
       setState(() {
-        _status =
-            'Push notification opened: ${opened.payload['title'] ?? 'Unknown'}';
+        _status = 'Push notification opened: $summary';
       });
+    });
+  }
+
+  Future<void> _readLaunchTap() async {
+    final summary = describeLaunchTap(
+      await _klaviyo.getInitialPushNotification(),
+    );
+    logPushTest('getInitialPushNotification source=push_tab $summary');
+    if (!mounted) return;
+    setState(() {
+      _status = 'Launch tap: $summary';
     });
   }
 
@@ -246,6 +259,15 @@ class _PushTabState extends State<PushTab> {
               ),
               const SizedBox(height: 10),
             ],
+
+            TestId(
+              'push_read_launch_tap_button',
+              child: OutlinedButton(
+                onPressed: _readLaunchTap,
+                child: const Text('Read Launch Tap'),
+              ),
+            ),
+            const SizedBox(height: 10),
 
             TestId(
               'push_request_permission_button',

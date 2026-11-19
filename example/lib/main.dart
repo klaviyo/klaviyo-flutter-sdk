@@ -121,6 +121,7 @@ void setupPushActionListener() {
   _pushOpenedSubscription?.cancel();
 
   _pushOpenedSubscription = klaviyo.onPushOpened.listen((opened) {
+    logPushTest('onPushOpened source=main ${describePushOpened(opened)}');
     switch (opened.tap) {
       case KlaviyoPushTap.webUrl:
         _logger.info('Push open_url tapped');
@@ -133,7 +134,42 @@ void setupPushActionListener() {
         _logger.info('Push notification opened');
     }
   });
+
+  klaviyo.getInitialPushNotification().then(
+        (launchTap) => logPushTest(
+          'getInitialPushNotification source=main '
+          '${describeLaunchTap(launchTap)}',
+        ),
+      );
 }
+
+/// Writes a `[push-test]` line to the device log (logcat on Android, the
+/// unified log on iOS).
+void logPushTest(String message) => debugPrint('[push-test] $message');
+
+/// The push title on either platform: a top-level `title` on Android, or
+/// `aps.alert.title` on iOS.
+String? pushTitle(Map<String, dynamic> payload) {
+  final title = payload['title'];
+  if (title is String) return title;
+  final aps = payload['aps'];
+  final alert = aps is Map ? aps['alert'] : null;
+  final alertTitle = alert is Map ? alert['title'] : null;
+  return alertTitle is String ? alertTitle : null;
+}
+
+/// One-line summary of [opened] for `[push-test]` logs.
+String describePushOpened(KlaviyoPushOpened opened) {
+  final button = opened.button;
+  final buttonText =
+      button == null ? null : '${button.id}/${button.action.name}';
+  return 'tap=${opened.tap.name} title=${pushTitle(opened.payload)} '
+      'button=$buttonText webUrl=${opened.webUrl}';
+}
+
+/// One-line summary of a `getInitialPushNotification()` result.
+String describeLaunchTap(KlaviyoPushOpened? launchTap) =>
+    launchTap == null ? 'null' : describePushOpened(launchTap);
 
 /// Set up listener for silent push notifications.
 /// Called from ProfileTab after SDK initialization.

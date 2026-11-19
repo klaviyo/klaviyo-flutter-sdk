@@ -243,9 +243,9 @@ void main() {
         final first = await sdk.getInitialPushNotification();
         final second = await sdk.getInitialPushNotification();
 
-        expect(first, opened('launch'));
-        expect(second, opened('launch'));
-        expect(first!['data'], isA<Map<String, dynamic>>());
+        expect(first?.payload, {'id': 'launch'});
+        expect(second?.payload, {'id': 'launch'});
+        expect(first?.tap, KlaviyoPushTap.notification);
       },
     );
 
