@@ -57,7 +57,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
 | Android `compileSdkVersion` | 35+ (tracks `flutter.compileSdkVersion`) |
 | Android Gradle Plugin (AGP) | 8.6+ (AGP 9 supported, with or without built-in Kotlin) |
 | Gradle   | 8.7+           |
-| Kotlin Gradle Plugin | 1.9.0+, declared by your app (not needed under AGP 9 built-in Kotlin) |
+| Kotlin Gradle Plugin | 1.8.0+, declared by your app (not needed under AGP 9 built-in Kotlin) |
 
 ## Installation
 
@@ -984,6 +984,8 @@ void main() async {
 6. **Native SDK resolves** the link and your Flutter routing library handles the final destination
 
 **Note**: `handleUniversalTrackingLink()` is synchronous - it validates the URL and returns a bool immediately, while the native tracking happens asynchronously in the background.
+
+`handleUniversalTrackingLink()` never throws, including before `initialize()`, and resolves the link right away on both platforms. If that resolve fails before `initialize()`, Android queues the click and retries it, but iOS drops it unless the native SDK's pre-init disk capture is enabled, so the click isn't recorded. The click is tracked as soon as you call it, before any profile is identified, which can create an anonymous profile in Klaviyo. If your app must wait for consent before tracking, keep the URL and call `handleUniversalTrackingLink()` once consent is given.
 
 ## Geofencing
 
