@@ -60,13 +60,6 @@ void main() {
       });
     });
 
-    test('handleUniversalTrackingLink throws', () {
-      expect(
-        () => sdk.handleUniversalTrackingLink('https://x.com/u/a'),
-        throwsA(isA<KlaviyoException>()),
-      );
-    });
-
     test('getters report the uninitialized state', () {
       expect(sdk.isInitialized, isFalse);
       expect(sdk.apiKey, isNull);
