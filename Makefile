@@ -3,8 +3,15 @@
 
 KLAVIYO_TOOLS_DIR ?= $(HOME)/.cache/klaviyo-flutter-sdk-tools
 
+empty :=
+space := $(empty) $(empty)
+
 ifneq ($(wildcard $(KLAVIYO_TOOLS_DIR)/env.sh),)
-export PATH := $(KLAVIYO_TOOLS_DIR)/bin:$(KLAVIYO_TOOLS_DIR)/flutter/bin:$(KLAVIYO_TOOLS_DIR)/jdk/bin:$(PATH)
+# Only directories setup-linux.sh installed into; tools it skipped come from PATH.
+KLAVIYO_TOOLS_PATH := $(wildcard $(KLAVIYO_TOOLS_DIR)/bin $(KLAVIYO_TOOLS_DIR)/flutter/bin $(KLAVIYO_TOOLS_DIR)/jdk/bin)
+ifneq ($(KLAVIYO_TOOLS_PATH),)
+export PATH := $(subst $(space),:,$(KLAVIYO_TOOLS_PATH)):$(PATH)
+endif
 ifneq ($(wildcard $(KLAVIYO_TOOLS_DIR)/jdk),)
 export JAVA_HOME := $(KLAVIYO_TOOLS_DIR)/jdk
 endif
