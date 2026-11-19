@@ -48,7 +48,9 @@ visible pushes with key/value pairs.
    `completionHandler` call: the plugin now decides which pushes are push data and calls the
    completion handler for every push. If another provider also handles this callback, branch on its
    payload before the Klaviyo call and complete those pushes yourself. See
-   [iOS Setup](README.md#ios-setup). `handleSilentPush(userInfo:)` still compiles but is deprecated.
+   [iOS Setup](README.md#ios-setup). `handleSilentPush(userInfo:)` still compiles but is deprecated. It runs the same routing, so
+   a push that arrives in the background is dropped when no `KlaviyoSDK.onBackgroundPushData` handler
+   is registered, even if a stream listener is attached.
 
    Until you update, the old snippet keeps filtering out pushes with an `alert`, so visible pushes
    with key/value pairs never reach Dart.
