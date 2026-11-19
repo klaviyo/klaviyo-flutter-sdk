@@ -6,6 +6,7 @@
 .pub-cache/
 .pub/
 build/
+coverage/
 /pubspec.lock
 /example/pubspec.lock
 example/build-info.json
