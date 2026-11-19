@@ -25,7 +25,7 @@ import 'dart:io';
 typedef AuthTokenProvider = Future<String> Function();
 
 /// Result of classifying a provider failure before it is sent back to native.
-class ClassifiedProviderError {
+final class ClassifiedProviderError {
   /// Human-readable failure message. Never contains a token.
   final String message;
 
@@ -35,6 +35,7 @@ class ClassifiedProviderError {
   /// retry recognizes.
   final bool isConnectivityError;
 
+  /// Creates a classified provider error.
   const ClassifiedProviderError({
     required this.message,
     required this.isConnectivityError,

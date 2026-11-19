@@ -23,6 +23,9 @@
 ///   }
 /// });
 /// ```
+@Deprecated(
+  'Use KlaviyoPushOpened from onPushOpened. Will be removed in 1.0.',
+)
 sealed class KlaviyoPushAction {
   const KlaviyoPushAction();
 
@@ -122,10 +125,15 @@ sealed class KlaviyoPushAction {
 
 /// Triggered when a user taps a push notification whose configured action
 /// opens an external web URL (`open_url`).
+@Deprecated(
+  'Use KlaviyoPushOpened with tap == KlaviyoPushTap.webUrl and its webUrl. '
+  'Will be removed in 1.0.',
+)
 class OpenWebUrl extends KlaviyoPushAction {
   /// The external web URL to open.
   final String url;
 
+  /// Creates an [OpenWebUrl] action for [url].
   const OpenWebUrl({required this.url});
 
   @override
@@ -146,6 +154,10 @@ class OpenWebUrl extends KlaviyoPushAction {
 ///
 /// [action] is one of `open_app`, `deep_link`, or `open_url`. [url] is present
 /// for `deep_link` and `open_url` buttons and null for `open_app`.
+@Deprecated(
+  'Use KlaviyoPushOpened with tap == KlaviyoPushTap.actionButton and its '
+  'button. Will be removed in 1.0.',
+)
 class ActionButtonTapped extends KlaviyoPushAction {
   /// The identifier of the tapped action button.
   final String buttonId;
@@ -163,6 +175,7 @@ class ActionButtonTapped extends KlaviyoPushAction {
   /// Present for `deep_link` and `open_url` actions; null for `open_app`.
   final String? url;
 
+  /// Creates an [ActionButtonTapped] action.
   const ActionButtonTapped({
     required this.buttonId,
     required this.label,
