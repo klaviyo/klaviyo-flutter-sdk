@@ -19,7 +19,7 @@ PUBSPEC="${PUBSPEC:-$REPO_ROOT/pubspec.yaml}"
 EXAMPLE_PUBSPEC="${EXAMPLE_PUBSPEC:-$REPO_ROOT/example/pubspec.yaml}"
 PACKAGE_RESOLVED="${PACKAGE_RESOLVED:-$REPO_ROOT/example/ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved}"
 EXAMPLE_PBXPROJ="${EXAMPLE_PBXPROJ:-$REPO_ROOT/example/ios/Runner.xcodeproj/project.pbxproj}"
-PODSPEC="${PODSPEC:-$REPO_ROOT/ios/klaviyo_flutter_sdk.podspec}"
+PACKAGE_SWIFT="${PACKAGE_SWIFT:-$REPO_ROOT/ios/klaviyo_flutter_sdk/Package.swift}"
 ANDROID_BUILD_GRADLE="${ANDROID_BUILD_GRADLE:-$REPO_ROOT/android/build.gradle.kts}"
 ANDROID_SETTINGS_GRADLE="${ANDROID_SETTINGS_GRADLE:-$REPO_ROOT/example/android/settings.gradle}"
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
@@ -157,9 +157,10 @@ resolve_ios_ref() {
     printf '%s' "$ref"
     return
   fi
-  # Fallback: the ~> pin in the podspec.
+  # Fallback: the klaviyo-swift-sdk version requirement in Package.swift.
   local pin
-  pin="$(sed -n "s/.*s\.dependency 'KlaviyoSwift', *'~> *\([^']*\)'.*/\1/p" "$PODSPEC" 2>/dev/null | head -1)"
+  # shellcheck disable=SC2016
+  pin="$(perl -0ne 'print $1 if /klaviyo-swift-sdk(?:\.git)?"\s*,\s*(?:\.\w+\()?\s*(?:from|exact):\s*"([^"]+)"/' "$PACKAGE_SWIFT" 2>/dev/null)"
   printf '%s' "${pin:-unknown}"
 }
 

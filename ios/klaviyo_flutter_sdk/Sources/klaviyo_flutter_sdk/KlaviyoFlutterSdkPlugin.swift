@@ -250,7 +250,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "FORMS_NOT_AVAILABLE",
                 message: "In-App Forms requires the forms module. " +
-                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
                 details: nil
             ))
             #endif
@@ -273,7 +274,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "FORMS_NOT_AVAILABLE",
                 message: "In-App Forms requires the forms module. " +
-                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
                 details: nil
             ))
             #endif
@@ -297,7 +299,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "FORMS_NOT_AVAILABLE",
                 message: "In-App Forms requires the forms module. " +
-                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
                 details: nil
             ))
             #endif
@@ -312,7 +315,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "FORMS_NOT_AVAILABLE",
                 message: "In-App Forms requires the forms module. " +
-                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
                 details: nil
             ))
             #endif
@@ -328,7 +332,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "FORMS_NOT_AVAILABLE",
                 message: "In-App Forms requires the forms module. " +
-                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
                 details: nil
             ))
             #endif
@@ -343,7 +348,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
-                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                    "CocoaPods only: set KLAVIYO_INCLUDE_LOCATION=true in your Podfile. " +
+                    "Swift Package Manager builds always include the location module.",
                 details: nil
             ))
             #endif
@@ -358,7 +364,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
-                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                    "CocoaPods only: set KLAVIYO_INCLUDE_LOCATION=true in your Podfile. " +
+                    "Swift Package Manager builds always include the location module.",
                 details: nil
             ))
             #endif
@@ -381,7 +388,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
-                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                    "CocoaPods only: set KLAVIYO_INCLUDE_LOCATION=true in your Podfile. " +
+                    "Swift Package Manager builds always include the location module.",
                 details: nil
             ))
             #endif
