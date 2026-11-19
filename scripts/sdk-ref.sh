@@ -21,7 +21,7 @@ PACKAGE_RESOLVED="${PACKAGE_RESOLVED:-$REPO_ROOT/example/ios/Runner.xcworkspace/
 EXAMPLE_PBXPROJ="${EXAMPLE_PBXPROJ:-$REPO_ROOT/example/ios/Runner.xcodeproj/project.pbxproj}"
 PODSPEC="${PODSPEC:-$REPO_ROOT/ios/klaviyo_flutter_sdk.podspec}"
 ANDROID_BUILD_GRADLE="${ANDROID_BUILD_GRADLE:-$REPO_ROOT/android/build.gradle.kts}"
-ANDROID_SETTINGS_GRADLE="${ANDROID_SETTINGS_GRADLE:-$REPO_ROOT/example/android/settings.gradle}"
+ANDROID_SETTINGS_GRADLE="${ANDROID_SETTINGS_GRADLE:-$REPO_ROOT/example/android/settings.gradle.kts}"
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
 ANDROID_REPO="https://github.com/klaviyo/klaviyo-android-sdk.git"
 OUT="${1:-$REPO_ROOT/example/build-info.json}"
@@ -166,12 +166,12 @@ resolve_ios_ref() {
 # ─── Android (klaviyo-android-sdk) ────────────────────────────────────
 
 resolve_android_ref() {
-  # Local includeBuild override in settings.gradle (configure-sdk.sh).
+  # Local includeBuild override in settings.gradle.kts (configure-sdk.sh).
   if [ -f "$ANDROID_SETTINGS_GRADLE" ] \
     && grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$ANDROID_SETTINGS_GRADLE" 2>/dev/null; then
     local path
     path="$(sed -n "/KLAVIYO-SDK-OVERRIDE-START/,/KLAVIYO-SDK-OVERRIDE-END/p" "$ANDROID_SETTINGS_GRADLE" \
-      | sed -n "s/.*includeBuild('\([^']*\)').*/\1/p" | head -1)"
+      | sed -n 's/.*includeBuild("\([^"]*\)").*/\1/p' | head -1)"
     if [ -n "$path" ]; then
       case "$path" in
         /*) : ;;

@@ -57,7 +57,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
 | Android `compileSdkVersion` | 35+ (tracks `flutter.compileSdkVersion`) |
 | Android Gradle Plugin (AGP) | 8.6+ (AGP 9 supported, with or without built-in Kotlin) |
 | Gradle   | 8.7+           |
-| Kotlin Gradle Plugin | 1.9.0+ (not needed under AGP 9 built-in Kotlin) |
+| Kotlin Gradle Plugin | 1.8.0+, declared by your app (not needed under AGP 9 built-in Kotlin) |
 
 ## Installation
 
@@ -321,11 +321,9 @@ Raw strings still work. Matching ignores case and accepts camelCase or snake_cas
 | Zip | `ProfileProperty.zip` | `zip` |
 | Latitude | `ProfileProperty.latitude` | `latitude` |
 | Longitude | `ProfileProperty.longitude` | `longitude` |
-| Timezone | `ProfileProperty.timezone` | `timezone`, `timeZone`, `time_zone` (Android only, see below) |
+| Timezone | `ProfileProperty.timezone` | `timezone`, `timeZone`, `time_zone` |
 
 The identifier keys `email`, `phone_number` and `external_id` (matched exactly) set the profile's identifiers, the same as `setEmail`, `setPhoneNumber` and `setExternalId`. Number and bool values for standard text fields are sent as strings, and latitude and longitude accept numbers or numeric strings; a value that can't be converted is dropped with a warning. Null values are ignored and don't clear a property.
-
-**Timezone on iOS:** the native iOS SDK can't set the timezone as a single attribute, so on iOS `timezone` is stored as a custom property. Both native SDKs already send the device timezone with the profile automatically. To set a timezone explicitly on both platforms, pass it in `KlaviyoProfile.location` through `setProfile`.
 
 ## Event Tracking
 
@@ -1012,6 +1010,8 @@ void main() async {
 
 **Note**: `handleUniversalTrackingLink()` is synchronous - it validates the URL and returns a bool immediately, while the native tracking happens asynchronously in the background.
 
+`handleUniversalTrackingLink()` never throws, including before `initialize()`, and resolves the link right away on both platforms. If that resolve fails before `initialize()`, Android queues the click and retries it, but iOS drops it unless the native SDK's pre-init disk capture is enabled, so the click isn't recorded. The click is tracked as soon as you call it, before any profile is identified, which can create an anonymous profile in Klaviyo. If your app must wait for consent before tracking, keep the URL and call `handleUniversalTrackingLink()` once consent is given.
+
 ## Geofencing
 
 The Klaviyo Flutter SDK supports geofencing for location-based event tracking. On Android, the full location module is **not included by default**. On iOS, it depends on how the app pulls in the plugin: Swift Package Manager builds include it automatically, and CocoaPods builds need to opt in. See [Enabling Geofencing](#enabling-geofencing) for setup.
@@ -1387,7 +1387,7 @@ All SDK exceptions extend `KlaviyoException`:
 - If "Opened Push" shows up in Klaviyo despite setting that flag to `false`, check for a leftover manual `Klaviyo.handlePush()` call in your own code from an older SDK version — it bypasses the flag entirely, since it's a separate call site outside the plugin's own gate.
 - If the Dart `push_notification_opened` event fires on a warm start (app backgrounded) but not on a cold start (app fully killed), this is a known limitation — see [Handling Push Notification Opens](#handling-push-notification-opens).
 
-**Push notifications not displaying** — If your app uses `firebase_messaging` or another FCM library, declare `KlaviyoFlutterPushService` in your app manifest (see [Using with firebase_messaging (or another FCM library)](#using-with-firebase_messaging-or-another-fcm-library)). Check Firebase setup (`google-services.json`, plugin applied in `build.gradle`). On Android 13+, runtime notification permission is required. Test with Firebase Console first to rule out Klaviyo-specific issues.
+**Push notifications not displaying** — If your app uses `firebase_messaging` or another FCM library, declare `KlaviyoFlutterPushService` in your app manifest (see [Using with firebase_messaging (or another FCM library)](#using-with-firebase_messaging-or-another-fcm-library)). Check Firebase setup (`google-services.json`, plugin applied in `build.gradle` or `build.gradle.kts`). On Android 13+, runtime notification permission is required. Test with Firebase Console first to rule out Klaviyo-specific issues.
 
 **Push tokens not being set** — Ensure Firebase is initialized before calling `FirebaseMessaging.instance.getToken()`. Initialize the SDK before calling `setPushToken()`.
 
