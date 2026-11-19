@@ -8,6 +8,17 @@ This guide outlines how developers can migrate from older versions of the
 
 ## Migrating to v1.0.0
 
+### iOS 15.0 is the minimum deployment target
+
+The plugin now requires iOS 15.0 or later; 0.x declared 13.0. Builds fail if your app targets anything lower, so set the iOS deployment target to 15.0 or higher:
+
+- **Xcode**: in `ios/Runner.xcodeproj`, set **iOS Deployment Target** to 15.0 for every target, including any notification service extension.
+- **CocoaPods**: if your `ios/Podfile` has a `platform :ios` line, change it to `platform :ios, '15.0'` and run `pod install`.
+
+iOS 15 supports the same devices as iOS 13 (iPhone 6s and newer), so this doesn't drop any devices. Flutter itself requires iOS 15 as of 3.47.
+
+### Removed APIs
+
 1.0 removes the APIs that 0.6.0 deprecated. Fix the 0.6.0 deprecation warnings first and your app is ready for 1.0.
 
 | Removed | Replacement |
