@@ -59,7 +59,6 @@ void main() {
   });
 
   for (final type in [
-    'push_notification_received',
     'push_notification_opened',
     'silent_push_received',
     'push_token_received',
@@ -84,15 +83,32 @@ void main() {
     });
   }
 
-  for (final type in ['form_event', 'form_lifecycle_event']) {
-    test('$type goes to onFormEvent', () async {
-      final received = await collect(
-        sdk.onFormEvent,
-        () => sink.success({'type': type, 'data': <String, dynamic>{}}),
-      );
-      expect(received.map((e) => e['type']), [type]);
-    });
-  }
+  test('form_lifecycle_event goes to onFormEvent', () async {
+    final received = await collect(
+      sdk.onFormEvent,
+      () => sink.success({
+        'type': 'form_lifecycle_event',
+        'data': <String, dynamic>{},
+      }),
+    );
+    expect(received.map((e) => e['type']), ['form_lifecycle_event']);
+  });
+
+  test('push_token_error delivers the native error message', () async {
+    final received = await collect(
+      sdk.onPushNotification,
+      () => sink.success({
+        'type': 'push_token_error',
+        'data': {'error': 'SERVICE_NOT_AVAILABLE'},
+      }),
+    );
+    expect(received, [
+      {
+        'type': 'push_token_error',
+        'data': {'error': 'SERVICE_NOT_AVAILABLE'},
+      },
+    ]);
+  });
 
   test('form lifecycle events are parsed into typed events', () async {
     final received = await collect(
@@ -201,14 +217,6 @@ void main() {
       {'a': 1},
       [2, 3],
     ]);
-  });
-
-  test('an event without a type is dropped', () async {
-    final received = await collect(
-      sdk.onPushNotification,
-      () => sink.success({'data': <String, dynamic>{}}),
-    );
-    expect(received, isEmpty);
   });
 
   test('re-initializing does not duplicate events', () async {

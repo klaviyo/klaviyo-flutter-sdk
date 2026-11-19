@@ -16,6 +16,8 @@ import com.klaviyo.forms.registerFormLifecycleHandler
 import com.klaviyo.forms.startFormsPreview
 import com.klaviyo.forms.unregisterFormLifecycleHandler
 import com.klaviyo.forms.unregisterFromInAppForms
+import com.klaviyo.location.KlaviyoGeofence
+import com.klaviyo.location.LocationManager
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.mockk.every
@@ -380,7 +382,38 @@ class KlaviyoFlutterSdkPluginMethodCallTest {
 
         call("handleUniversalTrackingLink", mapOf("url" to "https://trk.example.com/u/abc"))
 
+        verify { Klaviyo.handleUniversalTrackingLink("https://trk.example.com/u/abc") }
         verify { result.success(true) }
+    }
+
+    @Test
+    fun `getCurrentGeofences returns each fence under the keys Dart reads`() {
+        val locationManager = mockk<LocationManager>()
+        every { locationManager.getStoredGeofences() } returns
+            listOf(KlaviyoGeofence("store-1", -74.0, 40.7, 100f))
+        Registry.register<LocationManager>(locationManager)
+
+        try {
+            call("getCurrentGeofences")
+        } finally {
+            Registry.unregister<LocationManager>()
+        }
+
+        verify {
+            result.success(
+                mapOf(
+                    "geofences" to
+                        listOf(
+                            mapOf(
+                                "identifier" to "store-1",
+                                "latitude" to 40.7,
+                                "longitude" to -74.0,
+                                "radius" to 100.0,
+                            ),
+                        ),
+                ),
+            )
+        }
     }
 
     @Test

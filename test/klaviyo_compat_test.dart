@@ -11,8 +11,7 @@ void main() {
   final log = <MethodCall>[];
   final klaviyo = Klaviyo.instance;
 
-  setUp(() {
-    log.clear();
+  setUp(() async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(methodChannel, (call) async {
       log.add(call);
@@ -23,6 +22,8 @@ void main() {
         _ => null,
       };
     });
+    await klaviyo.initialize('KEY');
+    log.clear();
   });
 
   tearDown(() {
@@ -31,11 +32,12 @@ void main() {
   });
 
   test('initialize forwards the key and is shared with KlaviyoSDK', () async {
-    await klaviyo.initialize('KEY');
+    await klaviyo.initialize('KEY_2');
 
     expect(klaviyo.isInitialized, isTrue);
-    expect(KlaviyoSDK().apiKey, 'KEY');
-    expect(log.single.arguments, {'apiKey': 'KEY'});
+    expect(KlaviyoSDK().apiKey, 'KEY_2');
+    expect(log.single.method, 'initialize');
+    expect(log.single.arguments, {'apiKey': 'KEY_2'});
     expect(identical(Klaviyo.instance, klaviyo), isTrue);
   });
 
@@ -122,11 +124,6 @@ void main() {
 
   test('handlePush is a no-op that returns true', () async {
     expect(await klaviyo.handlePush({'_k': 'x'}), isTrue);
-    expect(log, isEmpty);
-  });
-
-  test('setBadgeCount completes without a native call off iOS', () async {
-    await klaviyo.setBadgeCount(1);
     expect(log, isEmpty);
   });
 

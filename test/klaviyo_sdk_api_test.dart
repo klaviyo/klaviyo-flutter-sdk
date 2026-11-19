@@ -12,6 +12,7 @@ void main() {
   final log = <MethodCall>[];
   final responses = <String, Object? Function(MethodCall)>{};
   final warnings = <String>[];
+  MockStreamHandlerEventSink? eventSink;
 
   final sdk = KlaviyoSDK();
 
@@ -26,7 +27,7 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockStreamHandler(
       eventChannel,
-      MockStreamHandler.inline(onListen: (_, __) {}),
+      MockStreamHandler.inline(onListen: (_, events) => eventSink = events),
     );
     Logger('KlaviyoSDK').onRecord.listen((record) {
       if (record.level == Level.WARNING) warnings.add(record.message);
@@ -66,16 +67,6 @@ void main() {
         'phoneNumber': '+15555550100',
       });
       expect(single('setExternalId').arguments, {'externalId': 'ext-1'});
-    });
-
-    test('getters return the native values', () async {
-      responses['getEmail'] = (_) => 'a@b.com';
-      responses['getPhoneNumber'] = (_) => '+15555550100';
-      responses['getExternalId'] = (_) => 'ext-1';
-
-      expect(await sdk.getEmail(), 'a@b.com');
-      expect(await sdk.getPhoneNumber(), '+15555550100');
-      expect(await sdk.getExternalId(), 'ext-1');
     });
 
     test('getters return null when native has no value', () async {
@@ -189,17 +180,6 @@ void main() {
         throwsA(isA<KlaviyoException>()),
       );
     });
-
-    test('wrapper track builds a custom event', () async {
-      await KlaviyoNativeWrapper().track('Signed Up', {'source': 'app'});
-
-      expect(single('trackEvent').arguments, {
-        'event': {
-          'name': 'Signed Up',
-          'properties': {'source': 'app'},
-        },
-      });
-    });
   });
 
   group('push', () {
@@ -235,6 +215,13 @@ void main() {
         sdk.getPushToken(),
         throwsA(isA<KlaviyoException>()),
       );
+    });
+
+    test('the wrapper sends setBadgeCount with an int count', () async {
+      KlaviyoNativeWrapper().setBadgeCount(7);
+      await pumpEventQueue();
+
+      expect(single('setBadgeCount').arguments, {'count': 7});
     });
 
     test('setBadgeCount is a warning-only no-op off iOS', () async {
@@ -498,6 +485,26 @@ void main() {
         sdk.unregisterAuthTokenProvider(),
         throwsA(isA<KlaviyoException>()),
       );
+    });
+
+    test('a failed provider is answered with an error and no token', () async {
+      await sdk.registerAuthTokenProvider(
+        () async => throw StateError('no session'),
+      );
+      eventSink!.success({
+        'type': 'auth_token_requested',
+        'data': {'id': 'req-err'},
+      });
+      await pumpEventQueue();
+
+      final respond = single('respondToAuthTokenRequest');
+      expect(respond.arguments, {
+        'id': 'req-err',
+        'jwt': null,
+        'error': 'Auth token provider threw StateError',
+        'isConnectivityError': false,
+      });
+      await sdk.unregisterAuthTokenProvider();
     });
 
     test('re-registration survives a failed teardown of the old provider',

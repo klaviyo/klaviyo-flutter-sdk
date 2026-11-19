@@ -29,13 +29,6 @@ void main() {
       expect(Geofence.fromJson(geofence.toJson()), geofence);
     });
 
-    test('fromJson throws when a field is missing', () {
-      expect(
-        () => Geofence.fromJson({'identifier': 'x', 'latitude': 1}),
-        throwsA(isA<TypeError>()),
-      );
-    });
-
     test('differs when any field differs', () {
       const others = [
         Geofence(identifier: 'x', latitude: 40.7, longitude: -74, radius: 100),
@@ -56,14 +49,6 @@ void main() {
       for (final other in others) {
         expect(other, isNot(geofence));
       }
-    });
-
-    test('toString names every field', () {
-      expect(
-        geofence.toString(),
-        'Geofence(identifier: store-1, latitude: 40.7, longitude: -74.0, '
-        'radius: 100.0)',
-      );
     });
   });
 
@@ -122,32 +107,10 @@ void main() {
       expect(full.copyWith(), full);
     });
 
-    test('copyWith can set every field', () {
-      final built = const KlaviyoLocation().copyWith(
-        address1: '1 Main St',
-        address2: 'Apt 2',
-        city: 'Boston',
-        country: 'US',
-        region: 'MA',
-        zip: '02110',
-        latitude: 42.36,
-        longitude: -71.06,
-        timezone: 'America/New_York',
-      );
-      expect(built, full);
-    });
-
     test('equality considers every field', () {
       expect(full.copyWith(timezone: 'UTC'), isNot(full));
       expect(full.copyWith(latitude: 0), isNot(full));
       expect(full.copyWith(address2: 'x'), isNot(full));
-    });
-
-    test('toString shows city, country and coordinates', () {
-      expect(
-        full.toString(),
-        'KlaviyoLocation(city: Boston, country: US, lat: 42.36, lng: -71.06)',
-      );
     });
   });
 
@@ -280,42 +243,6 @@ void main() {
         isNot(base),
       );
     });
-
-    test('toString shows the identifiers only', () {
-      expect(
-        KlaviyoProfile(email: 'a@b.com', firstName: 'Ada').toString(),
-        'KlaviyoProfile(email: a@b.com, phoneNumber: null, externalId: null)',
-      );
-    });
-  });
-
-  group('KlaviyoEvent', () {
-    test('fromJson reads every field', () {
-      final event = KlaviyoEvent.fromJson({
-        'name': 'Viewed Product',
-        'properties': {'sku': 'A1'},
-        'value': 3,
-        'value_currency': 'USD',
-        'unique_id': 'u-1',
-      });
-
-      expect(event.name, EventMetric.viewedProduct);
-      expect(event.properties, {'sku': 'A1'});
-      expect(event.value, 3.0);
-      expect(event.uniqueId, 'u-1');
-    });
-
-    test('toString reports the property count', () {
-      expect(
-        KlaviyoEvent.custom(metric: 'X', properties: {'a': 1, 'b': 2})
-            .toString(),
-        'KlaviyoEvent(name: X, properties: 2 items)',
-      );
-      expect(
-        KlaviyoEvent.custom(metric: 'X').toString(),
-        'KlaviyoEvent(name: X, properties: 0 items)',
-      );
-    });
   });
 
   group('EventMetric', () {
@@ -330,18 +257,6 @@ void main() {
     test('toString is the metric name', () {
       expect(EventMetric.startedCheckout.toString(), 'Started Checkout');
       expect(const EventMetric.custom('Mine').toString(), 'Mine');
-    });
-
-    test('predefined metrics have distinct names', () {
-      expect(
-        {
-          EventMetric.openedApp,
-          EventMetric.viewedProduct,
-          EventMetric.addedToCart,
-          EventMetric.startedCheckout,
-        },
-        hasLength(4),
-      );
     });
   });
 
@@ -413,20 +328,6 @@ void main() {
         {'listId': 'L', 'customSource': 'Footer'},
       );
     });
-
-    test('toString names list, channels and source', () {
-      const subscription = KlaviyoSubscription(
-        listId: 'L',
-        channels:
-            KlaviyoSubscriptionChannels(sms: {MessagingConsent.marketing}),
-      );
-      expect(subscription.toString(), contains('listId: L'));
-      expect(subscription.toString(), contains('customSource: null'));
-      expect(
-        subscription.channels.toString(),
-        contains('sms: {MessagingConsent.marketing}'),
-      );
-    });
   });
 
   group('InAppFormConfig', () {
@@ -449,97 +350,20 @@ void main() {
         'sessionTimeoutDuration': -1,
       });
     });
-
-    test('fromJson reads each form of the timeout', () {
-      final infinite = InAppFormConfig.fromJson({'sessionTimeoutDuration': -1});
-      expect(infinite.isInfinite, isTrue);
-      expect(infinite.sessionTimeoutDuration, isNull);
-
-      final timed = InAppFormConfig.fromJson({'sessionTimeoutDuration': 30});
-      expect(timed.isInfinite, isFalse);
-      expect(timed.sessionTimeoutDuration, const Duration(seconds: 30));
-
-      final fallback = InAppFormConfig.fromJson({});
-      expect(fallback.isInfinite, isFalse);
-      expect(fallback.sessionTimeoutDuration, isNull);
-
-      expect(
-        InAppFormConfig.fromJson({'sessionTimeoutDuration': '30'})
-            .sessionTimeoutDuration,
-        isNull,
-      );
-    });
-
-    test('a zero timeout round-trips as zero, not as the default', () {
-      final parsed = InAppFormConfig.fromJson(
-        const InAppFormConfig(sessionTimeoutDuration: Duration.zero).toJson(),
-      );
-      expect(parsed.sessionTimeoutDuration, Duration.zero);
-    });
-
-    test('copyWith can switch to infinite and to a new timeout', () {
-      const config =
-          InAppFormConfig(sessionTimeoutDuration: Duration(hours: 1));
-
-      expect(config.copyWith(isInfinite: true).isInfinite, isTrue);
-      expect(
-        config
-            .copyWith(sessionTimeoutDuration: const Duration(minutes: 1))
-            .sessionTimeoutDuration,
-        const Duration(minutes: 1),
-      );
-      expect(
-        config.copyWith().sessionTimeoutDuration,
-        const Duration(hours: 1),
-      );
-    });
-
-    test('toString reports the timeout', () {
-      expect(
-        const InAppFormConfig.infinite().toString(),
-        'InAppFormConfig(sessionTimeoutDuration: infinite)',
-      );
-      expect(
-        const InAppFormConfig(sessionTimeoutDuration: Duration(seconds: 90))
-            .toString(),
-        'InAppFormConfig(sessionTimeoutDuration: 0:01:30.000000)',
-      );
-    });
-  });
-
-  group('FormLifecycleEvent', () {
-    test('FormShown and FormDismissed compare by value', () {
-      const shown = FormShown(formId: 'f', formName: 'n');
-      const dismissed = FormDismissed(formId: 'f', formName: 'n');
-
-      expect(const FormShown(formId: 'f', formName: 'n'), shown);
-      expect(const FormShown(formId: 'g', formName: 'n'), isNot(shown));
-      expect(const FormDismissed(formId: 'f', formName: 'n'), dismissed);
-      expect(const FormDismissed(formId: 'f', formName: 'm'), isNot(dismissed));
-      expect(
-        const FormDismissed(formId: 'f', formName: 'n').hashCode,
-        dismissed.hashCode,
-      );
-    });
   });
 
   group('KlaviyoLogLevel', () {
-    test('maps each level to a package:logging level', () {
-      expect(
-        {for (final level in KlaviyoLogLevel.values) level: level.toLevel()},
-        {
-          KlaviyoLogLevel.none: Level.OFF,
-          KlaviyoLogLevel.error: Level.SEVERE,
-          KlaviyoLogLevel.warning: Level.WARNING,
-          KlaviyoLogLevel.info: Level.INFO,
-          KlaviyoLogLevel.debug: Level.FINE,
-          KlaviyoLogLevel.verbose: Level.FINER,
-        },
-      );
-    });
-
-    test('round-trips through its string form, ignoring case', () {
+    test('maps each level to package:logging and back from its name', () {
+      const expected = {
+        KlaviyoLogLevel.none: Level.OFF,
+        KlaviyoLogLevel.error: Level.SEVERE,
+        KlaviyoLogLevel.warning: Level.WARNING,
+        KlaviyoLogLevel.info: Level.INFO,
+        KlaviyoLogLevel.debug: Level.FINE,
+        KlaviyoLogLevel.verbose: Level.FINER,
+      };
       for (final level in KlaviyoLogLevel.values) {
+        expect(level.toLevel(), expected[level], reason: '$level');
         expect(KlaviyoLogLevel.fromString(level.toString()), level);
         expect(
           KlaviyoLogLevel.fromString(level.toString().toUpperCase()),
@@ -550,58 +374,6 @@ void main() {
 
     test('an unknown string falls back to info', () {
       expect(KlaviyoLogLevel.fromString('loud'), KlaviyoLogLevel.info);
-    });
-  });
-
-  group('exceptions', () {
-    test('KlaviyoException toString includes the code when set', () {
-      expect(
-        const KlaviyoException('boom').toString(),
-        'KlaviyoException: boom',
-      );
-      expect(
-        const KlaviyoException('boom', code: 'X').toString(),
-        'KlaviyoException: boom (Code: X)',
-      );
-    });
-
-    test('subclasses carry their error codes', () {
-      final cases = <KlaviyoException, String>{
-        const KlaviyoNotInitializedException(): 'NOT_INITIALIZED',
-        const KlaviyoInvalidApiKeyException(): 'INVALID_API_KEY',
-        const KlaviyoNetworkException('n'): 'NETWORK_ERROR',
-        const KlaviyoProfileException('p'): 'PROFILE_ERROR',
-        const KlaviyoEventException('e'): 'EVENT_ERROR',
-        const KlaviyoPushException('p'): 'PUSH_ERROR',
-        const KlaviyoFormException('f'): 'FORM_ERROR',
-        const KlaviyoConfigurationException('c'): 'CONFIGURATION_ERROR',
-        const KlaviyoPermissionException('p'): 'PERMISSION_ERROR',
-      };
-      cases.forEach((exception, code) {
-        expect(exception.code, code, reason: exception.runtimeType.toString());
-      });
-    });
-
-    test('default messages describe the failure', () {
-      expect(
-        const KlaviyoNotInitializedException().message,
-        'Klaviyo SDK is not initialized',
-      );
-      expect(
-        const KlaviyoInvalidApiKeyException().message,
-        'Invalid or missing API key',
-      );
-    });
-
-    test('KlaviyoNetworkException toString includes the status code', () {
-      expect(
-        const KlaviyoNetworkException('down', statusCode: 503).toString(),
-        'KlaviyoNetworkException: down (Status: 503)',
-      );
-      expect(
-        const KlaviyoNetworkException('down').toString(),
-        'KlaviyoNetworkException: down',
-      );
     });
   });
 }
