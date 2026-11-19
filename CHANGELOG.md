@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0 (Unreleased)
+
+### Breaking
+
+- **iOS: minimum deployment target raised from 13.0 to 15.0** — `Package.swift` and the podspec now declare iOS 15.0, matching the README. Apps must set their iOS deployment target to 15.0 or higher. iOS 15 runs on every device that runs iOS 13 (iPhone 6s and newer), so no devices are dropped. The plugin's iOS 13 code paths are gone; logging that used to be skipped below iOS 14 now always runs.
+
+### Platform Support
+
+- **iOS**: Minimum deployment target 15.0
+
 ## Unreleased
 
 ### What's New
