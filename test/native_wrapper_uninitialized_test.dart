@@ -60,10 +60,13 @@ void main() {
       });
     });
 
-    test('handleUniversalTrackingLink throws', () {
+    test('handleUniversalTrackingLink does not throw and forwards to native',
+        () async {
+      expect(sdk.handleUniversalTrackingLink('https://x.com/u/a'), isTrue);
+      await pumpEventQueue();
       expect(
-        () => sdk.handleUniversalTrackingLink('https://x.com/u/a'),
-        throwsA(isA<KlaviyoException>()),
+        log.where((c) => c.method == 'handleUniversalTrackingLink'),
+        hasLength(1),
       );
     });
 
