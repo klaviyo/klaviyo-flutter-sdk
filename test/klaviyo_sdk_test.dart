@@ -42,7 +42,7 @@ void main() {
   group('KlaviyoSDK logging toggle', () {
     test('setLoggingEnabled works before initialize', () async {
       expect(KlaviyoSDK().isInitialized, isFalse);
-      // Must not throw KlaviyoNotInitializedException
+      // Must not throw the not-initialized KlaviyoException
       await expectLater(KlaviyoSDK().setLoggingEnabled(false), completes);
       await KlaviyoSDK().setLoggingEnabled(true);
     });
@@ -56,6 +56,23 @@ void main() {
       expect(calls.length, 2);
       expect(calls[0].arguments['enabled'], isFalse);
       expect(calls[1].arguments['enabled'], isTrue);
+    });
+
+    test('setLoggingEnabled toggles Dart-side logging', () async {
+      final sdk = KlaviyoSDK();
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+
+      await sdk.setLoggingEnabled(false);
+      expect(Logger('KlaviyoSDK').level, Level.OFF);
+      Logger('KlaviyoSDK').info('while disabled');
+
+      await sdk.setLoggingEnabled(true);
+      expect(Logger('KlaviyoSDK').level, isNot(Level.OFF));
+      Logger('KlaviyoSDK').info('while enabled');
+
+      await sub.cancel();
+      expect(records.map((r) => r.message), ['while enabled']);
     });
 
     test('isLoggingEnabled returns native value', () async {
@@ -88,19 +105,10 @@ void main() {
   });
 
   group('KlaviyoSDK.initialize', () {
-    test('initializes and sets apiKey', () async {
+    test('initializes', () async {
       final sdk = KlaviyoSDK();
       await sdk.initialize(apiKey: 'KEY_1');
       expect(sdk.isInitialized, isTrue);
-      expect(sdk.apiKey, 'KEY_1');
-    });
-
-    test('re-initialization updates apiKey', () async {
-      final sdk = KlaviyoSDK();
-      await sdk.initialize(apiKey: 'KEY_1');
-      await sdk.initialize(apiKey: 'KEY_2');
-      expect(sdk.isInitialized, isTrue);
-      expect(sdk.apiKey, 'KEY_2');
     });
 
     test('re-initialization forwards new key to native layer', () async {
@@ -114,7 +122,7 @@ void main() {
       expect(initCalls[1].arguments['apiKey'], 'KEY_2');
     });
 
-    test('failed re-initialization preserves previous apiKey', () async {
+    test('failed re-initialization keeps the SDK initialized', () async {
       final sdk = KlaviyoSDK();
       await sdk.initialize(apiKey: 'KEY_1');
 
@@ -131,7 +139,7 @@ void main() {
         sdk.initialize(apiKey: 'KEY_BAD'),
         throwsA(isA<KlaviyoException>()),
       );
-      expect(sdk.apiKey, 'KEY_1');
+      expect(sdk.isInitialized, isTrue);
     });
   });
 

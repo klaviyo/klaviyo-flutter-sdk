@@ -5,18 +5,24 @@ This guide covers migrating from the community
 official [`klaviyo_flutter_sdk`](https://pub.dev/packages/klaviyo_flutter_sdk)
 published by Klaviyo.
 
-The official SDK includes a backwards-compatibility layer that lets you migrate
-incrementally. You can start with a **minimal migration** (swap the dependency,
-change one import, get running) and then work through deprecation warnings at
-your own pace — or you can do a **full migration** in one pass.
+Versions 0.x of the official SDK include a backwards-compatibility layer that
+lets you migrate incrementally. You can start with a **minimal migration** (swap
+the dependency, change one import, get running) and then work through
+deprecation warnings at your own pace — or you can do a **full migration** in
+one pass.
 
-> **Compatibility note:** All deprecated bridge APIs will be removed in version
-> 2.0 of `klaviyo_flutter_sdk`. We recommend completing the full migration
-> before upgrading to 2.0.
+> **Compatibility note:** The `Klaviyo` bridge class (`Klaviyo.instance`) was
+> removed in version 1.0 of `klaviyo_flutter_sdk`, so the minimal migration
+> only works on 0.x. On 1.0 or later, do the [full migration](#full-migration).
+> The deprecated `KlaviyoProfile` parameters (`id`, `address1`, `latitude` and
+> the other flat location fields) remain until 2.0.
 
 ---
 
 ## Minimal Migration
+
+> Requires `klaviyo_flutter_sdk` 0.x. The bridge this relies on was removed in
+> 1.0.
 
 The goal here is to get your app compiling against the official SDK with the
 fewest possible code changes. You will see deprecation warnings — that's
@@ -86,8 +92,9 @@ If you aren't using push notifications, no native changes are needed.
 
 If you were calling `Klaviyo.instance.handlePush(message.data)` from a
 `FirebaseMessaging.onBackgroundMessage` handler, this call is now a no-op. The
-official SDK handles push processing automatically in the native layer. The
-bridge method still exists so your code compiles, but you can safely remove it.
+official SDK handles push processing automatically in the native layer. On 0.x
+the bridge method still exists so your code compiles, but you can safely remove
+it. On 1.0 it no longer exists, so remove it.
 
 ---
 
@@ -95,7 +102,7 @@ bridge method still exists so your code compiles, but you can safely remove it.
 
 This section walks through every API change from the community SDK to the
 official SDK. After completing these steps, your code will have zero deprecation
-warnings and be fully ready for version 2.0.
+warnings, compiles against 1.0, and is ready for version 2.0.
 
 ### Entry point
 
@@ -174,11 +181,10 @@ The official SDK also provides an automatic approach that doesn't require
 await KlaviyoSDK().registerForPushNotifications();
 
 // Listen for token events
-KlaviyoSDK().onPushNotification.listen((event) {
-  if (event['type'] == 'push_token_received') {
-    print('Token: ${event['data']['token']}');
-  }
-});
+KlaviyoSDK().onPushToken.listen(
+  (token) => print('Push token received'),
+  onError: (Object error) => print('Push token error: $error'),
+);
 ```
 
 ### Push notification handling
@@ -203,8 +209,11 @@ Future<void> _handler(RemoteMessage message) async {
 // Before
 if (Klaviyo.instance.isKlaviyoPush(message.data)) { ... }
 
-// After — use the extension
-if (message.data.isKlaviyoNotification) { ... }
+// After — remove the check
+// Klaviyo push events arrive on KlaviyoSDK's own streams, such as
+// onPushOpened and onPushData, so there is no raw payload to inspect.
+// The isKlaviyoNotification extension was deprecated in 0.6.0 and removed in
+// 1.0.
 ```
 
 ### Profile management — `updateProfile`
@@ -399,16 +408,17 @@ After migrating, you gain access to features that were not available in the
 community SDK:
 
 - **In-App Forms:** `registerForInAppForms()`, `unregisterFromInAppForms()`,
-  and the `onFormEvent` stream.
+  and the `onFormLifecycleEvent` stream.
 - **Geofencing:** `registerGeofencing()`, `unregisterGeofencing()` (opt-in via
   build configuration).
 - **Deep Linking:** `handleUniversalTrackingLink()` with `go_router`
   integration support.
 - **Automatic push token registration:** `registerForPushNotifications()`
   without needing `firebase_messaging` as a dependency.
-- **Push event stream:** `onPushNotification` for token events, open events,
-  and errors.
-- **Log level control:** `setLogLevel(KlaviyoLogLevel)` with granular levels.
+- **Typed push streams:** `onPushToken` for tokens and token errors,
+  `onPushOpened` for taps, and `onPushData` for push data.
+- **Logging toggle:** `setLoggingEnabled(bool)` turns native and Dart-side
+  logging on or off.
 
 See the [README](https://pub.dev/packages/klaviyo_flutter_sdk) for full
 documentation on these features.
@@ -425,7 +435,7 @@ documentation on these features.
 | `.logEvent(name, meta)` | `.createEvent(KlaviyoEvent.custom(metric: name, properties: meta))` |
 | `.sendTokenToKlaviyo(token)` | `.setPushToken(token)` |
 | `.handlePush(data)` | Remove — handled automatically by native layer |
-| `.isKlaviyoPush(data)` | `data.isKlaviyoNotification` |
+| `.isKlaviyoPush(data)` | Remove — Klaviyo push events arrive on `KlaviyoSDK`'s streams |
 | `.updateProfile(profile)` | `.setProfile(profile)` |
 | `.setFirstName(name)` | `.setProfileAttribute('first_name', name)` |
 | `.setLastName(name)` | `.setProfileAttribute('last_name', name)` |

@@ -14,10 +14,15 @@ import UserNotifications
 // MARK: - Logger
 
 extension Logger {
-    static let klaviyoFlutterSDK = Logger(
+    private static let enabledKlaviyoFlutterSDK = Logger(
         subsystem: "com.klaviyo.flutter",
         category: "KlaviyoFlutterSDK"
     )
+
+    /// The plugin's logger, or a disabled logger while `KlaviyoSDK().isLoggingEnabled` is false.
+    static var klaviyoFlutterSDK: Logger {
+        KlaviyoSDK().isLoggingEnabled ? enabledKlaviyoFlutterSDK : Logger(OSLog.disabled)
+    }
 }
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
@@ -26,7 +31,20 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     /// Singleton instance to allow the Host App's AppDelegate to forward events manually.
     public static let shared = KlaviyoFlutterSdkPlugin()
 
-    private var eventSink: FlutterEventSink?
+    /// Event sinks of engines whose Dart side is listening, in listen order.
+    private var engineSinks: [EngineSink] = []
+
+    /// The primary engine receives every event: the first listening engine that
+    /// has a view controller, or the first listening engine if none has one.
+    private var primarySink: EngineSink? {
+        engineSinks.first { $0.hasViewController() } ?? engineSinks.first
+    }
+
+    private var eventSink: FlutterEventSink? {
+        primarySink?.sink
+    }
+
+    private static var didAddApplicationDelegate = false
 
     // Cache values to handle the race condition where the value arrives
     // before Flutter has finished initializing the EventChannel.
@@ -34,7 +52,14 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedError: [String: Any]?
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
-    private var cachedPushAction: [String: Any]?
+
+    // The `push_notification_opened` payload for the tap that launched the app,
+    // recorded from the first notification response delivered before the app first
+    // became active. Read by getInitialPushNotification; not cleared by onListen.
+    private var initialPushNotification: [String: Any]?
+    private var hasBecomeActive = false
+    private var launchResponseRecorded = false
+    private var activationObserver: NSObjectProtocol?
 
     // MARK: - Flutter Plugin Registration
 
@@ -47,13 +72,39 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: channel)
 
         // 2. Setup Event Channel (For Data Streams: tokens, opened notifications)
+        // Each engine gets its own stream handler; the shared instance routes events
+        // to the primary engine. Publishing it delivers the engine's detach callback.
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
-        eventChannel.setStreamHandler(instance)
+        let engineStream = EngineEventStream(registrar: registrar)
+        eventChannel.setStreamHandler(engineStream)
+        registrar.publish(engineStream)
 
-        // 3. Register as Application Delegate
+        // 3. Register as Application Delegate, once per process
         // This allows us to automatically intercept 'didRegisterForRemoteNotifications'
         // without requiring code in the Host App's AppDelegate.
-        registrar.addApplicationDelegate(instance)
+        if !didAddApplicationDelegate {
+            didAddApplicationDelegate = true
+            registrar.addApplicationDelegate(instance)
+        }
+
+        // 4. Track when the app first becomes active, to tell the launch tap apart from later taps.
+        instance.observeFirstActivation()
+    }
+
+    private func observeFirstActivation() {
+        guard activationObserver == nil, !hasBecomeActive else { return }
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.hasBecomeActive = true
+            if let observer = self.activationObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self.activationObserver = nil
+            }
+        }
     }
 }
 
@@ -221,11 +272,7 @@ extension KlaviyoFlutterSdkPlugin {
             result(nil)
 
         case "getPushToken":
-            let token = KlaviyoSDK().pushToken
-            if let token {
-                Logger.klaviyoFlutterSDK.info("Retrieved push token from SDK: \(token, privacy: .public)")
-            }
-            result(token)
+            result(KlaviyoSDK().pushToken)
 
         case "registerForInAppForms":
             #if canImport(KlaviyoForms)
@@ -403,8 +450,12 @@ extension KlaviyoFlutterSdkPlugin {
         case "respondToAuthTokenRequest":
             handleRespondToAuthTokenRequest(call: call, result: result)
 
+        case "getInitialPushNotification":
+            result(initialPushNotification)
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
+            initialPushNotification = nil
             result(nil)
 
         case "setBadgeCount":
@@ -454,8 +505,38 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         withArguments arguments: Any?,
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
-        eventSink = events
+        addListener(EngineSink(owner: ObjectIdentifier(self), sink: events) { false })
+        return nil
+    }
 
+    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        removeListener(ObjectIdentifier(self))
+        return nil
+    }
+
+    /// Adds an engine's sink and replays cached events if it becomes the primary.
+    fileprivate func addListener(_ engineSink: EngineSink) {
+        engineSinks.removeAll { $0.owner == engineSink.owner }
+        engineSinks.append(engineSink)
+        if primarySink?.owner == engineSink.owner {
+            replayCachedEvents(to: engineSink.sink)
+        }
+    }
+
+    /// Removes an engine's sink. If it was the primary, the next engine chosen by
+    /// `primarySink` takes over and the auth bridge is torn down.
+    fileprivate func removeListener(_ owner: ObjectIdentifier) {
+        let wasPrimary = primarySink?.owner == owner
+        engineSinks.removeAll { $0.owner == owner }
+        guard wasPrimary else { return }
+        // The Dart side keeps a permanent auth-event listener, so this fires at
+        // engine teardown. Give parity with Android's onDetachedFromEngine:
+        // unregister the auth-token provider and fail any in-flight requests
+        // immediately rather than leaving them suspended until the SDK timeout.
+        unregisterAuthTokenProvider(reason: "Flutter engine detached")
+    }
+
+    private func replayCachedEvents(to events: FlutterEventSink) {
         // If we have cached values from early app launch, send them now.
         // This solves the race condition where values arrive before Flutter is ready.
         if let cachedToken = cachedToken {
@@ -474,21 +555,46 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedSilentPush)
             self.cachedSilentPush = nil
         }
-        if let cachedPushAction {
-            events(cachedPushAction)
-            self.cachedPushAction = nil
-        }
+    }
+}
+
+/// A listening engine's event sink.
+private struct EngineSink {
+    let owner: ObjectIdentifier
+    let sink: FlutterEventSink
+    let hasViewController: () -> Bool
+}
+
+/// Per-engine `klaviyo_events` stream handler that registers the engine's sink
+/// with the shared plugin.
+private final class EngineEventStream: NSObject, FlutterStreamHandler {
+    private weak var registrar: FlutterPluginRegistrar?
+
+    init(registrar: FlutterPluginRegistrar) {
+        self.registrar = registrar
+    }
+
+    func onListen(
+        withArguments arguments: Any?,
+        eventSink events: @escaping FlutterEventSink
+    ) -> FlutterError? {
+        KlaviyoFlutterSdkPlugin.shared.addListener(
+            EngineSink(owner: ObjectIdentifier(self), sink: events) { [weak self] in
+                self?.registrar?.viewController != nil
+            }
+        )
         return nil
     }
 
-    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        eventSink = nil
-        // The Dart side keeps a permanent auth-event listener, so this fires at
-        // engine teardown. Give parity with Android's onDetachedFromEngine:
-        // unregister the auth-token provider and fail any in-flight requests
-        // immediately rather than leaving them suspended until the SDK timeout.
-        unregisterAuthTokenProvider(reason: "Flutter engine detached")
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
         return nil
+    }
+
+    /// Called by the Flutter engine on deallocation for published values.
+    @objc(detachFromEngineForRegistrar:)
+    func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+        KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
     }
 }
 
@@ -503,7 +609,7 @@ extension KlaviyoFlutterSdkPlugin {
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
-        Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString, privacy: .public)")
+        Logger.klaviyoFlutterSDK.info("APNs token received")
 
         // Respect `klaviyo_automatic_push_token_forwarding` in Info.plist when explicitly set:
         // unset -> no other path is active, this plugin forwards (today's default, unchanged).
@@ -560,11 +666,21 @@ extension KlaviyoFlutterSdkPlugin {
         let userInfo = response.notification.request.content.userInfo
         Logger.klaviyoFlutterSDK.info("Push notification opened")
 
-        // 1. Prepare Payload
-        let eventPayload: [String: Any] = [
+        let pushAction = pushActionPayload(for: response, userInfo: userInfo)
+
+        // 1. Prepare Payload, with the tapped button or web URL under `action`
+        var eventPayload: [String: Any] = [
             "type": "push_notification_opened",
             "data": userInfo
         ]
+        if let pushAction {
+            eventPayload["action"] = pushAction
+        }
+
+        if !hasBecomeActive && !launchResponseRecorded {
+            initialPushNotification = eventPayload
+            launchResponseRecorded = true
+        }
 
         // 2. Send to Flutter (or Cache if Flutter is asleep)
         if let eventSink = eventSink {
@@ -574,36 +690,25 @@ extension KlaviyoFlutterSdkPlugin {
             cachedOpenedNotification = eventPayload
         }
 
-        // 3. Surface the open_url action / action-button tap as a typed push action
-        // event, in parallel with the raw opened-notification event above.
-        forwardPushAction(for: response, userInfo: userInfo)
-
-        // 4. Pass to Native Klaviyo SDK
+        // 3. Pass to Native Klaviyo SDK
         // We pass a dummy completion handler because the Host App owns the real one.
         // No-op: We let the host app finish the system callback
         _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
     }
 
-    /// Mirrors an `open_url` body tap or an action-button tap to Flutter as a
-    /// typed push-action event. The native SDK still performs the actual
-    /// dispatch (opening the URL / launching the app); this only forwards the
-    /// event so Flutter apps can react.
+    /// Builds the push-action event for an `open_url` body tap or an
+    /// action-button tap, or nil for any other interaction. The native SDK still
+    /// performs the actual dispatch (opening the URL / launching the app); this
+    /// only describes the tap so Flutter apps can react.
     ///
     /// Scheme handling is deliberately left to the native SDK: whatever URL the
     /// payload carries is forwarded verbatim, including special schemes such as
     /// `mailto:`/`tel:`/`sms:`. The plugin does not re-implement the SDK's
     /// scheme allowlist.
-    private func forwardPushAction(
+    private func pushActionPayload(
         for response: UNNotificationResponse,
         userInfo: [AnyHashable: Any]
-    ) {
-        // Each notification interaction supersedes any push action still cached
-        // for a not-yet-ready Flutter listener. Clear it up front so that an
-        // earlier, superseded event can't be delivered on `onListen` when this
-        // interaction produces no push-action payload (e.g. a deep-link body tap
-        // or a notification dismiss, both of which return without caching below).
-        cachedPushAction = nil
-
+    ) -> [String: Any]? {
         let actionIdentifier = response.actionIdentifier
 
         var eventPayload: [String: Any]?
@@ -631,15 +736,15 @@ extension KlaviyoFlutterSdkPlugin {
                 Logger.klaviyoFlutterSDK.warning(
                     "No action button matches identifier '\(actionIdentifier)'; dropping tap."
                 )
-                return
+                return nil
             }
-            // Dart's KlaviyoPushAction.fromMap requires `action`, so drop
-            // incomplete taps here with a log rather than silently downstream.
+            // Dart's KlaviyoPushOpened.fromMap needs `action` to build the
+            // button, so drop incomplete taps here with a log.
             guard let action = button["action"] as? String else {
                 Logger.klaviyoFlutterSDK.warning(
                     "Action button '\(actionIdentifier)' has no action type; dropping tap."
                 )
-                return
+                return nil
             }
             var data: [String: Any] = ["id": actionIdentifier, "action": action]
             if let label = button["label"] as? String {
@@ -654,21 +759,19 @@ extension KlaviyoFlutterSdkPlugin {
             ]
         }
 
-        guard let eventPayload else { return }
-
-        if let eventSink {
-            eventSink(eventPayload)
-        } else {
-            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push action event.")
-            cachedPushAction = eventPayload
-        }
+        return eventPayload
     }
 
-    /// Manual Forwarding Helper - Silent Push
+    /// Manual Forwarding Helper - Push Data
     /// This should be called from the Host App's AppDelegate
-    /// in `didReceiveRemoteNotification:fetchCompletionHandler:`.
+    /// in `didReceiveRemoteNotification:fetchCompletionHandler:` for every push.
+    /// Only a silent push (no `aps.alert`) or a push with `key_value_pairs` reaches Dart;
+    /// any other push is ignored.
     /// Note: The host app is responsible for calling the completion handler after this method returns.
     public func handleSilentPush(userInfo: [AnyHashable: Any]) {
+        let isSilent = (userInfo["aps"] as? [String: Any])?["alert"] == nil
+        guard isSilent || userInfo["key_value_pairs"] != nil else { return }
+
         Logger.klaviyoFlutterSDK.info("Silent push received")
 
         // Prepare payload

@@ -6,6 +6,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../main.dart' show describeLaunchTap, describePushOpened, logPushTest;
 import '../widgets/test_id.dart';
 
 final _logger = Logger('KlaviyoExample');
@@ -23,7 +24,8 @@ class _PushTabState extends State<PushTab> {
   String _status = 'Push notification settings';
   String? _pushToken;
   bool _notificationsEnabled = false;
-  StreamSubscription<Map<String, dynamic>>? _pushNotificationSubscription;
+  StreamSubscription<String>? _pushTokenSubscription;
+  StreamSubscription<KlaviyoPushOpened>? _pushOpenedSubscription;
 
   //#region Lifecycle
 
@@ -42,37 +44,39 @@ class _PushTabState extends State<PushTab> {
   void _setupPushNotificationListener() {
     if (!_klaviyo.isInitialized) return;
 
-    // Listen for push notification events (token received, opened, errors)
-    _pushNotificationSubscription = _klaviyo.onPushNotification.listen((event) {
-      final eventType = event['type'] as String?;
+    _pushTokenSubscription = _klaviyo.onPushToken.listen(
+      (token) {
+        setState(() {
+          _pushToken = token;
+          _status = 'Push token received';
+        });
+      },
+      onError: (Object error) {
+        final message =
+            error is KlaviyoException ? error.message : error.toString();
+        setState(() {
+          _status = 'Push token error: $message';
+        });
+      },
+    );
 
-      switch (eventType) {
-        case 'push_token_received':
-          // Update token from stream (reactive approach)
-          final data = event['data'] as Map<String, dynamic>?;
-          final token = data?['token'] as String?;
-          setState(() {
-            _pushToken = token;
-            _status = 'Push token received';
-          });
-          break;
+    _pushOpenedSubscription = _klaviyo.onPushOpened.listen((opened) {
+      final summary = describePushOpened(opened);
+      logPushTest('onPushOpened source=push_tab $summary');
+      setState(() {
+        _status = 'Push notification opened: $summary';
+      });
+    });
+  }
 
-        case 'push_token_error':
-          final data = event['data'] as Map<String, dynamic>?;
-          final error = data?['error'] as String? ?? 'Unknown error';
-          setState(() {
-            _status = 'Push token error: $error';
-          });
-          break;
-
-        case 'push_notification_opened':
-          final data = event['data'] as Map<String, dynamic>?;
-          setState(() {
-            _status =
-                'Push notification opened: ${data?['title'] ?? 'Unknown'}';
-          });
-          break;
-      }
+  Future<void> _readLaunchTap() async {
+    final summary = describeLaunchTap(
+      await _klaviyo.getInitialPushNotification(),
+    );
+    logPushTest('getInitialPushNotification source=push_tab $summary');
+    if (!mounted) return;
+    setState(() {
+      _status = 'Launch tap: $summary';
     });
   }
 
@@ -119,7 +123,7 @@ class _PushTabState extends State<PushTab> {
       }
 
       // Register for push notifications after permission is granted
-      // The token will arrive via onPushNotification stream
+      // The token will arrive via the onPushToken stream
       await _klaviyo.registerForPushNotifications();
 
       // Update permission state
@@ -257,6 +261,15 @@ class _PushTabState extends State<PushTab> {
             ],
 
             TestId(
+              'push_read_launch_tap_button',
+              child: OutlinedButton(
+                onPressed: _readLaunchTap,
+                child: const Text('Read Launch Tap'),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            TestId(
               'push_request_permission_button',
               child: ElevatedButton(
                 onPressed: _notificationsEnabled
@@ -331,7 +344,8 @@ class _PushTabState extends State<PushTab> {
 
   @override
   void dispose() {
-    _pushNotificationSubscription?.cancel();
+    _pushTokenSubscription?.cancel();
+    _pushOpenedSubscription?.cancel();
     _badgeCountController.dispose();
     super.dispose();
   }
