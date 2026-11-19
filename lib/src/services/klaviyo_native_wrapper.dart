@@ -6,7 +6,8 @@ import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
 import '../exceptions/klaviyo_exception.dart';
 import '../utils/buffered_broadcast_stream_controller.dart';
-import '../utils/profile_key_normalizer.dart';
+import '../utils/channel_value_sanitizer.dart';
+import '../utils/profile_payload.dart';
 import 'package:logging/logging.dart';
 
 @Deprecated(
@@ -90,7 +91,9 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setProfile', {'profile': profile.toJson()});
+      await _channel.invokeMethod('setProfile', {
+        'profile': resolveProfilePayload(profile.toJson()),
+      });
     } catch (e) {
       throw KlaviyoException('Failed to set profile: $e');
     }
@@ -172,9 +175,28 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setProfileProperties', {
-        'properties': normalizeProfileProperties(properties),
-      });
+      final update = splitProfileProperties(properties);
+      final email = update.identifiers[ProfileIdentifierKey.email];
+      final phoneNumber = update.identifiers[ProfileIdentifierKey.phoneNumber];
+      final externalId = update.identifiers[ProfileIdentifierKey.externalId];
+      if (email != null) {
+        await _channel.invokeMethod('setEmail', {'email': email});
+      }
+      if (phoneNumber != null) {
+        await _channel.invokeMethod('setPhoneNumber', {
+          'phoneNumber': phoneNumber,
+        });
+      }
+      if (externalId != null) {
+        await _channel.invokeMethod('setExternalId', {
+          'externalId': externalId,
+        });
+      }
+      if (update.properties.isNotEmpty) {
+        await _channel.invokeMethod('setProfileProperties', {
+          'properties': update.properties,
+        });
+      }
     } catch (e) {
       throw KlaviyoException('Failed to set profile properties: $e');
     }
@@ -185,7 +207,13 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('trackEvent', {'event': event.toJson()});
+      final eventJson = event.toJson();
+      final properties = eventJson['properties'];
+      if (properties is Map<String, dynamic>) {
+        eventJson['properties'] =
+            sanitizeChannelProperties(properties, source: 'createEvent');
+      }
+      await _channel.invokeMethod('trackEvent', {'event': eventJson});
     } catch (e) {
       throw KlaviyoException('Failed to track event: $e');
     }
@@ -424,13 +452,14 @@ class KlaviyoNativeWrapper {
   }
 
   /// Set badge count on the app icon (iOS only)
-  /// This is a synchronous fire-and-forget operation
-  void setBadgeCount(int count) {
+  Future<void> setBadgeCount(int count) async {
     _ensureInitialized();
 
-    // Fire-and-forget - we don't await or handle errors
-    // since this is a synchronous operation from the caller's perspective
-    _channel.invokeMethod('setBadgeCount', {'count': count});
+    try {
+      await _channel.invokeMethod('setBadgeCount', {'count': count});
+    } catch (e) {
+      throw KlaviyoException('Failed to set badge count: $e');
+    }
   }
 
   /// Enable or disable native SDK logging.
@@ -460,9 +489,9 @@ class KlaviyoNativeWrapper {
 
   /// Handle a Klaviyo universal tracking link URL
   /// Returns true if the URL is a valid Klaviyo tracking link, false otherwise
+  ///
+  /// Callable before initialize().
   Future<bool> handleUniversalTrackingLink(String url) async {
-    _ensureInitialized();
-
     try {
       final result = await _channel.invokeMethod<bool>(
         'handleUniversalTrackingLink',

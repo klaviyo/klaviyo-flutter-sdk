@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
@@ -162,6 +163,17 @@ class KlaviyoSDK {
 
   /// Set profile properties
   /// Calls the native SDK directly - native SDK manages profile state
+  ///
+  /// Keys for standard attributes (see [ProfileProperty]) set the standard
+  /// field. The identifier keys `email`, `phone_number` and `external_id` set
+  /// the profile's identifiers, the same as [setEmail], [setPhoneNumber] and
+  /// [setExternalId]. Number and bool values for standard text fields are sent
+  /// as strings, and latitude and longitude accept numbers or numeric strings.
+  /// Null values are ignored and don't clear a property. [DateTime] values,
+  /// including nested ones, are sent as UTC ISO 8601 strings. Values the
+  /// platform channel can't encode, such as [Duration], [Uri] or custom
+  /// classes, are dropped with a warning and the other keys are still sent.
+  /// Any other key is stored as a custom property.
   Future<void> setProfileProperties(Map<String, dynamic> properties) async {
     _ensureInitialized();
 
@@ -186,7 +198,11 @@ class KlaviyoSDK {
   /// [propertyKey] can be a [ProfileProperty] constant or any string.
   /// camelCase and snake_case spellings of standard keys (for example
   /// `firstName` or `first_name`) set the standard field on both platforms.
-  /// Any other key is stored as a custom property.
+  /// `email`, `phone_number` and `external_id` set the identifier. Any other
+  /// key is stored as a custom property. A null [value] is ignored, a
+  /// [DateTime] is sent as a UTC ISO 8601 string, and a value the platform
+  /// channel can't encode is dropped with a warning. See
+  /// [setProfileProperties] for how values are converted.
   Future<void> setProfileAttribute(String propertyKey, dynamic value) async {
     await setProfileProperties({propertyKey: value});
   }
@@ -560,7 +576,7 @@ class KlaviyoSDK {
   ///   routes: [...],
   ///   redirect: (context, state) {
   ///     // Fire-and-forget - Klaviyo tracks in background
-  ///     Klaviyo.handleUniversalTrackingLink(state.uri.toString());
+  ///     KlaviyoSDK().handleUniversalTrackingLink(state.uri.toString());
   ///     return null; // Continue with normal navigation
   ///   },
   /// );
@@ -569,10 +585,10 @@ class KlaviyoSDK {
   /// This is a synchronous operation that validates the URL and returns immediately.
   /// The native SDK handles tracking and link resolution in the background (fire-and-forget).
   ///
+  /// Safe to call before [initialize]; this method never throws.
+  ///
   /// Returns `true` if the URL matches the Klaviyo tracking link pattern, `false` otherwise.
   bool handleUniversalTrackingLink(String url) {
-    _ensureInitialized();
-
     // Validate empty/null URL
     if (url.trim().isEmpty) {
       _logger.warning('[DeepLink SDK] Error: Empty tracking link provided');
@@ -621,10 +637,13 @@ class KlaviyoSDK {
   /// Reset the current profile (useful for logout)
   /// Profile state is managed by the native SDK
   void setBadgeCount(int count) {
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       _ensureInitialized();
-      _nativeWrapper.setBadgeCount(count);
-      _logger.info('Set the badge count to $count');
+      _nativeWrapper.setBadgeCount(count).then((_) {
+        _logger.info('Set the badge count to $count');
+      }).catchError((Object e) {
+        _logger.warning('Failed to set the badge count to $count: $e');
+      });
     } else {
       // Android does not support badge count
       _logger.warning(

@@ -1,3 +1,8 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
@@ -99,6 +104,64 @@ void main() {
       // Dart-side logging must stay untouched when the native call fails,
       // so Dart and native logging state can't disagree.
       expect(Logger('KlaviyoSDK').level, isNot(Level.OFF));
+    });
+  });
+
+  group('KlaviyoSDK.handleUniversalTrackingLink before initialize', () {
+    const trackingUrl = 'https://trk.example.com/u/abc123';
+
+    test('does not throw and forwards the link to native', () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+
+      expect(KlaviyoSDK().handleUniversalTrackingLink(trackingUrl), isTrue);
+      await pumpEventQueue();
+
+      final calls =
+          log.where((c) => c.method == 'handleUniversalTrackingLink').toList();
+      expect(calls.length, 1);
+      expect(calls.single.arguments['url'], trackingUrl);
+    });
+
+    test('returns false for a non-tracking link without calling native',
+        () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+
+      expect(
+        KlaviyoSDK().handleUniversalTrackingLink('https://example.com/a'),
+        isFalse,
+      );
+      await pumpEventQueue();
+
+      expect(
+        log.where((c) => c.method == 'handleUniversalTrackingLink'),
+        isEmpty,
+      );
+    });
+
+    test('does not throw when the native call fails', () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        throw PlatformException(code: 'ERROR', message: 'native failure');
+      });
+
+      expect(KlaviyoSDK().handleUniversalTrackingLink(trackingUrl), isTrue);
+      await pumpEventQueue();
+    });
+
+    test('native wrapper forwards the link without initialize', () async {
+      expect(KlaviyoNativeWrapper().isInitialized, isFalse);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        log.add(call);
+        return call.method == 'handleUniversalTrackingLink';
+      });
+
+      await expectLater(
+        KlaviyoNativeWrapper().handleUniversalTrackingLink(trackingUrl),
+        completion(isTrue),
+      );
+      expect(log.single.method, 'handleUniversalTrackingLink');
     });
   });
 
@@ -207,6 +270,265 @@ void main() {
     });
   });
 
+  group('KlaviyoSDK.setProfile', () {
+    test('sends custom properties nested under properties', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'test@example.com',
+          externalId: 'ext-123',
+          properties: {'plan': 'premium', 'age': 25},
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'email': 'test@example.com',
+          'external_id': 'ext-123',
+          'properties': {'plan': 'premium', 'age': 25},
+        },
+      });
+    });
+
+    test('omits properties when none are set', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(KlaviyoProfile(email: 'test@example.com'));
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {'email': 'test@example.com'},
+      });
+    });
+
+    test('promotes standard keys in properties to standard fields', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'test@example.com',
+          properties: {
+            'first_name': 'Ada',
+            'lastName': 'Lovelace',
+            'ORGANIZATION': 'Analytical Engines',
+            'plan': 'premium',
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'email': 'test@example.com',
+          'first_name': 'Ada',
+          'last_name': 'Lovelace',
+          'organization': 'Analytical Engines',
+          'properties': {'plan': 'premium'},
+        },
+      });
+    });
+
+    test('typed fields win over the same key in properties', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          firstName: 'A',
+          properties: {'first_name': 'B', 'firstName': 'C'},
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {'first_name': 'A'},
+      });
+    });
+
+    test('promotes location keys in properties into location', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          location: const KlaviyoLocation(city: 'Boston'),
+          properties: {
+            'city': 'Cambridge',
+            'zip': '02139',
+            'address_1': '1 Main St',
+            'latitude': 42,
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'location': {
+            'city': 'Boston',
+            'zip': '02139',
+            'address1': '1 Main St',
+            'latitude': 42.0,
+          },
+        },
+      });
+    });
+
+    test('promotes timezone spellings in properties into location', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      for (final key in ['timezone', 'timeZone', 'time_zone']) {
+        log.clear();
+        await sdk.setProfile(
+          KlaviyoProfile(properties: {key: 'America/New_York'}),
+        );
+
+        final call = log.singleWhere((c) => c.method == 'setProfile');
+        expect(
+          call.arguments,
+          {
+            'profile': {
+              'location': {'timezone': 'America/New_York'},
+            },
+          },
+          reason: key,
+        );
+      }
+    });
+
+    test('sends KlaviyoLocation.timezone under location', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          location: const KlaviyoLocation(timezone: 'America/New_York'),
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'location': {'timezone': 'America/New_York'},
+        },
+      });
+    });
+
+    test('promotes snake_case identifiers in properties', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'typed@example.com',
+          properties: {
+            'email': 'nested@example.com',
+            'phone_number': '+15555550100',
+            'external_id': 'ext-1',
+            'phoneNumber': '+15555550199',
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'email': 'typed@example.com',
+          'phone_number': '+15555550100',
+          'external_id': 'ext-1',
+          'properties': {'phoneNumber': '+15555550199'},
+        },
+      });
+    });
+
+    test('warns when a typed field wins over a properties key', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+      addTearDown(sub.cancel);
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          firstName: 'A',
+          location: const KlaviyoLocation(city: 'Boston'),
+          properties: {'first_name': 'B', 'city': 'Cambridge', 'zip': '02139'},
+        ),
+      );
+
+      final warnings = records
+          .where((r) => r.level == Level.WARNING)
+          .map((r) => r.message)
+          .toList();
+      expect(warnings, hasLength(2));
+      expect(
+        warnings.where((m) => m.contains("properties['first_name']")),
+        hasLength(1),
+      );
+      expect(
+        warnings.where((m) => m.contains("properties['city']")),
+        hasLength(1),
+      );
+    });
+
+    test('coerces standard values and drops nulls in properties', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          properties: {
+            'first_name': 5,
+            'longitude': '-71.1',
+            'plan': null,
+            'visits': 3,
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'first_name': '5',
+          'location': {'longitude': -71.1},
+          'properties': {'visits': 3},
+        },
+      });
+    });
+
+    test('passes custom keys through untouched', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          properties: {
+            'plan': 'premium',
+            'Favorite_Color': 'blue',
+            'prefs': {'push': true},
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'properties': {
+            'plan': 'premium',
+            'Favorite_Color': 'blue',
+            'prefs': {'push': true},
+          },
+        },
+      });
+    });
+  });
+
   group('KlaviyoSDK.setProfileProperties', () {
     test('normalizes standard keys to snake_case', () async {
       final sdk = KlaviyoSDK();
@@ -251,6 +573,546 @@ void main() {
 
       final call = log.singleWhere((c) => c.method == 'setProfileProperties');
       expect(call.arguments['properties'], {'first_name': 'Ada'});
+    });
+
+    test('setProfileAttribute sends every timezone spelling as timezone',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      for (final key in [
+        ProfileProperty.timezone,
+        'timeZone',
+        'time_zone',
+        'TimeZone',
+      ]) {
+        log.clear();
+        await sdk.setProfileAttribute(key, 'America/New_York');
+
+        final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+        expect(
+          call.arguments['properties'],
+          {'timezone': 'America/New_York'},
+          reason: key,
+        );
+      }
+    });
+
+    test('routes identifier keys to the identifier setters', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      log.clear();
+
+      await sdk.setProfileProperties({
+        'email': 'ada@example.com',
+        'phone_number': '+15555550100',
+        'external_id': 'ext-1',
+        'plan': 'premium',
+      });
+
+      expect(log.map((c) => c.method), [
+        'setEmail',
+        'setPhoneNumber',
+        'setExternalId',
+        'setProfileProperties',
+      ]);
+      expect(log[0].arguments, {'email': 'ada@example.com'});
+      expect(log[1].arguments, {'phoneNumber': '+15555550100'});
+      expect(log[2].arguments, {'externalId': 'ext-1'});
+      expect(log[3].arguments['properties'], {'plan': 'premium'});
+    });
+
+    test('setProfileAttribute with email only calls setEmail', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      log.clear();
+
+      await sdk.setProfileAttribute('email', 'ada@example.com');
+
+      expect(log.map((c) => c.method), ['setEmail']);
+      expect(log.single.arguments, {'email': 'ada@example.com'});
+    });
+
+    test('identifier keys match exactly', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      log.clear();
+
+      await sdk.setProfileProperties({
+        'phoneNumber': '+15555550100',
+        'Email': 'ada@example.com',
+      });
+
+      expect(log.map((c) => c.method), ['setProfileProperties']);
+      expect(log.single.arguments['properties'], {
+        'phoneNumber': '+15555550100',
+        'Email': 'ada@example.com',
+      });
+    });
+
+    test('coerces standard attribute values', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileProperties({
+        'first_name': 5,
+        'zip': 2139,
+        'latitude': 42,
+        'longitude': '-71.1',
+        'external_id': 12345,
+        'visits': 3,
+      });
+
+      final ids = log.singleWhere((c) => c.method == 'setExternalId');
+      expect(ids.arguments, {'externalId': '12345'});
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'first_name': '5',
+        'zip': '2139',
+        'latitude': 42.0,
+        'longitude': -71.1,
+        'visits': 3,
+      });
+    });
+
+    test('drops and warns on values that cannot be coerced', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+      addTearDown(sub.cancel);
+
+      await sdk.setProfileProperties({'latitude': 'north', 'plan': 'premium'});
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {'plan': 'premium'});
+      expect(
+        records.where(
+          (r) => r.level == Level.WARNING && r.message.contains("'latitude'"),
+        ),
+        hasLength(1),
+      );
+    });
+
+    test('drops null values', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      log.clear();
+
+      await sdk.setProfileProperties({
+        'plan': null,
+        'first_name': null,
+        'email': null,
+        'visits': 3,
+      });
+      await sdk.setProfileAttribute('plan', null);
+
+      expect(log.map((c) => c.method), ['setProfileProperties']);
+      expect(log.single.arguments['properties'], {'visits': 3});
+    });
+  });
+
+  group('DateTime and unsupported property values', () {
+    final date = DateTime.utc(2026, 11, 13, 9, 30);
+    final localDate = DateTime(2026, 11, 13, 9, 30);
+
+    List<LogRecord> captureWarnings() {
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+      addTearDown(sub.cancel);
+      return records;
+    }
+
+    test('setProfile sends DateTime as UTC ISO 8601, top level and nested',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'test@example.com',
+          properties: {
+            'signup': date,
+            'local': localDate,
+            'history': {
+              'visits': [date, 'x'],
+            },
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments['profile']['properties'], {
+        'signup': '2026-11-13T09:30:00.000Z',
+        'local': localDate.toUtc().toIso8601String(),
+        'history': {
+          'visits': ['2026-11-13T09:30:00.000Z', 'x'],
+        },
+      });
+    });
+
+    test('setProfile sends a DateTime under a standard key as an ISO string',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(KlaviyoProfile(properties: {'title': date}));
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {'title': '2026-11-13T09:30:00.000Z'},
+      });
+    });
+
+    test('setProfile drops unsupported values and keeps the rest', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = captureWarnings();
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          email: 'test@example.com',
+          properties: {
+            'plan': 'premium',
+            'wait': const Duration(seconds: 5),
+            'nested': {
+              'link': Uri.parse('https://example.com'),
+              'ok': 1,
+            },
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'email': 'test@example.com',
+          'properties': {
+            'plan': 'premium',
+            'nested': {'ok': 1},
+          },
+        },
+      });
+      final warnings = records
+          .where((r) => r.level == Level.WARNING)
+          .map((r) => r.message)
+          .toList();
+      expect(warnings.where((m) => m.contains("'wait'")), hasLength(1));
+      expect(warnings.where((m) => m.contains("'nested.link'")), hasLength(1));
+    });
+
+    test('setProfileProperties converts DateTime and drops unsupported values',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = captureWarnings();
+
+      await sdk.setProfileProperties({
+        'signup': date,
+        'dates': [date],
+        'wait': const Duration(seconds: 5),
+        'plan': 'premium',
+      });
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'signup': '2026-11-13T09:30:00.000Z',
+        'dates': ['2026-11-13T09:30:00.000Z'],
+        'plan': 'premium',
+      });
+      expect(
+        records.where(
+          (r) => r.level == Level.WARNING && r.message.contains("'wait'"),
+        ),
+        hasLength(1),
+      );
+    });
+
+    test('setProfileAttribute sends a DateTime as an ISO string', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileAttribute('signup', date);
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'signup': '2026-11-13T09:30:00.000Z',
+      });
+    });
+
+    test('createEvent converts DateTime and drops unsupported values',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final records = captureWarnings();
+
+      await sdk.createEvent(
+        KlaviyoEvent(
+          name: const EventMetric.custom('Purchase'),
+          value: 10,
+          properties: {
+            'at': date,
+            'items': [
+              {'shipped': date, 'sku': 'A1'},
+            ],
+            'link': Uri.parse('https://example.com'),
+            'bytes': Uint8List.fromList([1, 2]),
+            'map': {1: 'x', 'k': 'v'},
+          },
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'trackEvent');
+      expect(call.arguments['event']['name'], 'Purchase');
+      expect(call.arguments['event']['value'], 10.0);
+      expect(call.arguments['event']['properties'], {
+        'at': '2026-11-13T09:30:00.000Z',
+        'items': [
+          {'shipped': '2026-11-13T09:30:00.000Z', 'sku': 'A1'},
+        ],
+        'bytes': Uint8List.fromList([1, 2]),
+        'map': {'k': 'v'},
+      });
+      final warnings = records
+          .where((r) => r.level == Level.WARNING)
+          .map((r) => r.message)
+          .toList();
+      expect(warnings.where((m) => m.contains("'link'")), hasLength(1));
+      expect(warnings.where((m) => m.contains("'map[1]'")), hasLength(1));
+    });
+  });
+
+  group('Non-finite numbers and wrong-type standard values', () {
+    List<String> captureWarnings() {
+      final messages = <String>[];
+      final sub = Logger('KlaviyoSDK')
+          .onRecord
+          .where((r) => r.level == Level.WARNING)
+          .listen((r) => messages.add(r.message));
+      addTearDown(sub.cancel);
+      return messages;
+    }
+
+    void expectWarnedOnce(List<String> warnings, String path) {
+      expect(
+        warnings.where((m) => m.contains("'$path'")),
+        hasLength(1),
+        reason: 'expected one warning naming $path in $warnings',
+      );
+    }
+
+    test(
+      'setProfile drops NaN and Infinity custom values with a warning',
+      () async {
+        final sdk = KlaviyoSDK();
+        await sdk.initialize(apiKey: 'KEY_1');
+        final warnings = captureWarnings();
+
+        await sdk.setProfile(
+          KlaviyoProfile(
+            email: 'test@example.com',
+            properties: {
+              'ratio': 0 / 0,
+              'limit': double.infinity,
+              'plan': 'premium',
+              'stats': {
+                'avg': double.negativeInfinity,
+                'list': [1.5, 0 / 0, 2],
+                'ok': 1,
+              },
+            },
+          ),
+        );
+
+        final call = log.singleWhere((c) => c.method == 'setProfile');
+        expect(call.arguments, {
+          'profile': {
+            'email': 'test@example.com',
+            'properties': {
+              'plan': 'premium',
+              'stats': {
+                'list': [1.5, 2],
+                'ok': 1,
+              },
+            },
+          },
+        });
+        expectWarnedOnce(warnings, 'ratio');
+        expectWarnedOnce(warnings, 'limit');
+        expectWarnedOnce(warnings, 'stats.avg');
+        expectWarnedOnce(warnings, 'stats.list[1]');
+      },
+    );
+
+    test(
+      'setProfile drops a NaN latitude and a map under first_name',
+      () async {
+        final sdk = KlaviyoSDK();
+        await sdk.initialize(apiKey: 'KEY_1');
+        final warnings = captureWarnings();
+
+        await sdk.setProfile(
+          KlaviyoProfile(
+            email: 'test@example.com',
+            location: const KlaviyoLocation(city: 'Boston'),
+            properties: {
+              'latitude': 'NaN',
+              'longitude': double.nan,
+              'first_name': {'given': 'Ada'},
+              'plan': 'premium',
+            },
+          ),
+        );
+
+        final call = log.singleWhere((c) => c.method == 'setProfile');
+        expect(call.arguments, {
+          'profile': {
+            'email': 'test@example.com',
+            'location': {'city': 'Boston'},
+            'properties': {'plan': 'premium'},
+          },
+        });
+        expectWarnedOnce(warnings, 'latitude');
+        expectWarnedOnce(warnings, 'longitude');
+        expectWarnedOnce(warnings, 'first_name');
+      },
+    );
+
+    test(
+        'setProfileProperties drops NaN and Infinity custom values '
+        'with a warning', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final warnings = captureWarnings();
+
+      await sdk.setProfileProperties({
+        'ratio': 0 / 0,
+        'limit': double.infinity,
+        'plan': 'premium',
+        'stats': {
+          'avg': double.nan,
+          'list': [double.infinity, 3],
+          'ok': 1,
+        },
+      });
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'plan': 'premium',
+        'stats': {
+          'list': [3],
+          'ok': 1,
+        },
+      });
+      expectWarnedOnce(warnings, 'ratio');
+      expectWarnedOnce(warnings, 'limit');
+      expectWarnedOnce(warnings, 'stats.avg');
+      expectWarnedOnce(warnings, 'stats.list[0]');
+    });
+
+    test(
+        'setProfileProperties drops a NaN latitude and a map under '
+        'first_name', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final warnings = captureWarnings();
+
+      await sdk.setProfileProperties({
+        'latitude': 'NaN',
+        'longitude': double.nan,
+        'first_name': {'given': 'Ada'},
+        'last_name': ['Love', 'lace'],
+        'plan': 'premium',
+      });
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {'plan': 'premium'});
+      expectWarnedOnce(warnings, 'latitude');
+      expectWarnedOnce(warnings, 'longitude');
+      expectWarnedOnce(warnings, 'first_name');
+      expectWarnedOnce(warnings, 'last_name');
+    });
+
+    test('setProfileAttribute drops a NaN latitude with a warning', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      final warnings = captureWarnings();
+      log.clear();
+
+      await sdk.setProfileAttribute('latitude', 0 / 0);
+
+      expect(log, isEmpty);
+      expectWarnedOnce(warnings, 'latitude');
+    });
+
+    test('keeps finite doubles and typed lists', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfileProperties({
+        'latitude': '42.5',
+        'score': 1.25,
+        'samples': Float64List.fromList([1.0, 2.0]),
+      });
+
+      final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+      expect(call.arguments['properties'], {
+        'latitude': 42.5,
+        'score': 1.25,
+        'samples': Float64List.fromList([1.0, 2.0]),
+      });
+    });
+  });
+
+  group('KlaviyoSDK.setBadgeCount', () {
+    setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.iOS);
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('sends the count to the native layer on iOS', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      sdk.setBadgeCount(3);
+      await pumpEventQueue();
+
+      final call = log.singleWhere((c) => c.method == 'setBadgeCount');
+      expect(call.arguments, {'count': 3});
+    });
+
+    test('logs a channel error instead of letting it escape', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        throw PlatformException(code: 'BADGE_ERROR', message: 'native failure');
+      });
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+      addTearDown(sub.cancel);
+
+      final uncaught = <Object>[];
+      await runZonedGuarded(
+        () async {
+          sdk.setBadgeCount(7);
+          await pumpEventQueue();
+        },
+        (error, _) => uncaught.add(error),
+      );
+
+      expect(uncaught, isEmpty);
+      expect(
+        records.where(
+          (r) =>
+              r.level == Level.WARNING &&
+              r.message.contains('Failed to set the badge count to 7') &&
+              r.message.contains('native failure'),
+        ),
+        hasLength(1),
+      );
+      expect(
+        records.where((r) => r.message.contains('Set the badge count')),
+        isEmpty,
+      );
     });
   });
 }
