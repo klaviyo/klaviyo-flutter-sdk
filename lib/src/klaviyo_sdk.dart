@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
@@ -573,7 +574,7 @@ class KlaviyoSDK {
   ///   routes: [...],
   ///   redirect: (context, state) {
   ///     // Fire-and-forget - Klaviyo tracks in background
-  ///     Klaviyo.handleUniversalTrackingLink(state.uri.toString());
+  ///     KlaviyoSDK().handleUniversalTrackingLink(state.uri.toString());
   ///     return null; // Continue with normal navigation
   ///   },
   /// );
@@ -582,10 +583,10 @@ class KlaviyoSDK {
   /// This is a synchronous operation that validates the URL and returns immediately.
   /// The native SDK handles tracking and link resolution in the background (fire-and-forget).
   ///
+  /// Safe to call before [initialize]; this method never throws.
+  ///
   /// Returns `true` if the URL matches the Klaviyo tracking link pattern, `false` otherwise.
   bool handleUniversalTrackingLink(String url) {
-    _ensureInitialized();
-
     // Validate empty/null URL
     if (url.trim().isEmpty) {
       _logger.warning('[DeepLink SDK] Error: Empty tracking link provided');
@@ -634,10 +635,13 @@ class KlaviyoSDK {
   /// Reset the current profile (useful for logout)
   /// Profile state is managed by the native SDK
   void setBadgeCount(int count) {
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       _ensureInitialized();
-      _nativeWrapper.setBadgeCount(count);
-      _logger.info('Set the badge count to $count');
+      _nativeWrapper.setBadgeCount(count).then((_) {
+        _logger.info('Set the badge count to $count');
+      }).catchError((Object e) {
+        _logger.warning('Failed to set the badge count to $count: $e');
+      });
     } else {
       // Android does not support badge count
       _logger.warning(

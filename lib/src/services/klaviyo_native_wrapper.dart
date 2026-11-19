@@ -449,13 +449,14 @@ class KlaviyoNativeWrapper {
   }
 
   /// Set badge count on the app icon (iOS only)
-  /// This is a synchronous fire-and-forget operation
-  void setBadgeCount(int count) {
+  Future<void> setBadgeCount(int count) async {
     _ensureInitialized();
 
-    // Fire-and-forget - we don't await or handle errors
-    // since this is a synchronous operation from the caller's perspective
-    _channel.invokeMethod('setBadgeCount', {'count': count});
+    try {
+      await _channel.invokeMethod('setBadgeCount', {'count': count});
+    } catch (e) {
+      throw KlaviyoException('Failed to set badge count: $e');
+    }
   }
 
   /// Enable or disable native SDK logging.
@@ -485,9 +486,9 @@ class KlaviyoNativeWrapper {
 
   /// Handle a Klaviyo universal tracking link URL
   /// Returns true if the URL is a valid Klaviyo tracking link, false otherwise
+  ///
+  /// Callable before initialize().
   Future<bool> handleUniversalTrackingLink(String url) async {
-    _ensureInitialized();
-
     try {
       final result = await _channel.invokeMethod<bool>(
         'handleUniversalTrackingLink',
