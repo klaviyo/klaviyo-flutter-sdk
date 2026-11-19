@@ -10,6 +10,11 @@ class KlaviyoEvent {
   /// For example, the dollar amount of a purchase.
   final double? value;
 
+  /// ISO 4217 currency code for [value], e.g. `USD`.
+  ///
+  /// Klaviyo rejects an event whose code is not valid ISO 4217.
+  final String? valueCurrency;
+
   /// A unique identifier for an event.
   ///
   /// If the uniqueId is repeated for the same profile and metric, only the first
@@ -31,6 +36,11 @@ class KlaviyoEvent {
   /// - A single string cannot be larger than 100 KB
   /// - Each array must not exceed 4000 elements
   /// - The properties cannot contain more than 10 nested levels
+  ///
+  /// [DateTime] values, including nested ones, are sent as UTC ISO 8601
+  /// strings. Values the platform channel can't encode, such as [Duration],
+  /// [Uri] or custom classes, are dropped with a warning and the rest of the
+  /// event is still sent.
   final Map<String, dynamic>? properties;
 
   /// Creates a new event with an [EventMetric].
@@ -53,6 +63,7 @@ class KlaviyoEvent {
     required this.name,
     this.properties,
     this.value,
+    this.valueCurrency,
     this.uniqueId,
   });
 
@@ -72,11 +83,13 @@ class KlaviyoEvent {
     required String metric,
     Map<String, dynamic>? properties,
     double? value,
+    String? valueCurrency,
     String? uniqueId,
   }) : this(
           name: EventMetric.custom(metric),
           properties: properties,
           value: value,
+          valueCurrency: valueCurrency,
           uniqueId: uniqueId,
         );
 
@@ -85,12 +98,14 @@ class KlaviyoEvent {
     EventMetric? name,
     Map<String, dynamic>? properties,
     double? value,
+    String? valueCurrency,
     String? uniqueId,
   }) {
     return KlaviyoEvent(
       name: name ?? this.name,
       properties: properties ?? this.properties,
       value: value ?? this.value,
+      valueCurrency: valueCurrency ?? this.valueCurrency,
       uniqueId: uniqueId ?? this.uniqueId,
     );
   }
@@ -109,6 +124,10 @@ class KlaviyoEvent {
       data['value'] = value;
     }
 
+    if (valueCurrency != null) {
+      data['value_currency'] = valueCurrency;
+    }
+
     if (uniqueId != null) {
       data['unique_id'] = uniqueId;
     }
@@ -124,6 +143,7 @@ class KlaviyoEvent {
           ? Map<String, dynamic>.from(json['properties'] as Map)
           : null,
       value: (json['value'] as num?)?.toDouble(),
+      valueCurrency: json['value_currency'] as String?,
       uniqueId: json['unique_id'] as String?,
     );
   }
@@ -140,11 +160,12 @@ class KlaviyoEvent {
     return other is KlaviyoEvent &&
         other.name == name &&
         other.value == value &&
+        other.valueCurrency == valueCurrency &&
         other.uniqueId == uniqueId;
   }
 
   @override
   int get hashCode {
-    return Object.hash(name, value, uniqueId);
+    return Object.hash(name, value, valueCurrency, uniqueId);
   }
 }
