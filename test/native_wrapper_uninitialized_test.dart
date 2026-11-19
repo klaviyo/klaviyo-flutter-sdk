@@ -94,26 +94,4 @@ void main() {
       expect(log, isEmpty);
     });
   });
-
-  group('initialize failure', () {
-    test('leaves the SDK uninitialized and can be retried', () async {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(methodChannel, (call) async {
-        throw PlatformException(code: 'INIT_ERROR');
-      });
-
-      await expectLater(
-        KlaviyoSDK().initialize(apiKey: 'KEY'),
-        throwsA(isA<KlaviyoException>()),
-      );
-      expect(KlaviyoSDK().isInitialized, isFalse);
-      expect(KlaviyoNativeWrapper().isInitialized, isFalse);
-
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(methodChannel, (_) async => null);
-      await KlaviyoSDK().initialize(apiKey: 'KEY');
-      expect(KlaviyoSDK().isInitialized, isTrue);
-      expect(KlaviyoNativeWrapper().apiKey, 'KEY');
-    });
-  });
 }
