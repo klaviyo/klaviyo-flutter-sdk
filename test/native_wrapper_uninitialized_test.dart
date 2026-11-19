@@ -60,6 +60,16 @@ void main() {
       });
     });
 
+    test('handleUniversalTrackingLink does not throw and forwards to native',
+        () async {
+      expect(sdk.handleUniversalTrackingLink('https://x.com/u/a'), isTrue);
+      await pumpEventQueue();
+      expect(
+        log.where((c) => c.method == 'handleUniversalTrackingLink'),
+        hasLength(1),
+      );
+    });
+
     test('getters report the uninitialized state', () {
       expect(sdk.isInitialized, isFalse);
       expect(sdk.apiKey, isNull);
