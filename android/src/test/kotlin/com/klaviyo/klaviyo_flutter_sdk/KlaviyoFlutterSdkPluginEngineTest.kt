@@ -2,6 +2,7 @@ package com.klaviyo.klaviyo_flutter_sdk
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Bundle
 import android.os.Looper
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.model.Event
@@ -9,6 +10,7 @@ import com.klaviyo.analytics.model.EventKey
 import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.state.ProfileEventObserver
 import com.klaviyo.analytics.state.State
+import com.klaviyo.core.Constants
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
@@ -169,6 +171,7 @@ class KlaviyoFlutterSdkPluginEngineTest {
         attached.toList().forEach { detach(it) }
         KlaviyoFlutterSdkPlugin.resetEmittedOpens()
         KlaviyoFlutterSdkPlugin.resetCachedPushToken()
+        setAutomaticPushTokenForwarding(null)
         Registry.unregister<State>()
         unmockkAll()
     }
@@ -520,5 +523,27 @@ class KlaviyoFlutterSdkPluginEngineTest {
         assertEquals(listOf("rotated-3"), service.seen)
         assertEquals(listOf("rotated-3"), engine.pushTokens())
         verify(exactly = 1) { Registry.get<State>().pushToken = "rotated-3" }
+    }
+
+    private fun setAutomaticPushTokenForwarding(enabled: Boolean?) {
+        val app = RuntimeEnvironment.getApplication()
+        val appInfo = shadowOf(app.packageManager).getInternalMutablePackageInfo(app.packageName).applicationInfo!!
+        appInfo.metaData =
+            Bundle().apply {
+                enabled?.let { putBoolean(Constants.AUTOMATIC_PUSH_TOKEN_FORWARDING, it) }
+            }
+    }
+
+    @Test
+    fun `token rotation reaches Dart but not Klaviyo when automatic forwarding is disabled`() {
+        setAutomaticPushTokenForwarding(false)
+        registerState()
+        val engine = attach()
+        engine.listen()
+
+        rotateToken("rotated-4")
+
+        assertEquals(listOf("rotated-4"), engine.pushTokens())
+        verify(exactly = 0) { Registry.get<State>().pushToken = any() }
     }
 }

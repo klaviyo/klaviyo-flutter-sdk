@@ -705,10 +705,14 @@ class KlaviyoSDK {
   Stream<Map<String, dynamic>> get onPushNotification =>
       _nativeWrapper.onPushNotification;
 
-  /// Push tokens the native SDK registers with Klaviyo.
+  /// Push tokens the platform delivers to the app.
   ///
   /// Emits the APNs token on iOS and the FCM token on Android each time the
-  /// platform delivers one. A failure to register for push arrives as a stream
+  /// platform delivers one, including when FCM rotates the token. This stream
+  /// only bridges the token to Dart: it emits whether or not the native SDK
+  /// forwards the token to Klaviyo, so it still emits when
+  /// `automatic_push_token_forwarding` is `false`, and you can pass the token
+  /// to [setPushToken] yourself. A failure to register for push arrives as a stream
   /// error carrying a [KlaviyoException] with code `PUSH_TOKEN_ERROR`; handle
   /// it with `onError`. A token or error that arrives before anyone listens
   /// goes to the first listener.

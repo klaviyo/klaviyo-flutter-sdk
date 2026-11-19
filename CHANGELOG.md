@@ -8,7 +8,7 @@
 
 ### Bug Fixes
 
-- **Android: FCM token rotation reaches `onPushToken`.** `KlaviyoFlutterPushService.onNewToken` now emits the new token on `onPushToken`, as iOS does for every APNs registration. Before, Android only emitted the token returned by `registerForPushNotifications()`. A token that arrives before Dart listens is held (newest wins) and delivered once, to the first `onPushToken` listener. Subclasses that override `onNewToken` must call `super.onNewToken(token)`.
+- **Android: FCM token rotation reaches `onPushToken`.** `KlaviyoFlutterPushService.onNewToken` now emits the new token on `onPushToken`, as iOS does for every APNs registration. Before, Android only emitted the token returned by `registerForPushNotifications()`. A token that arrives before Dart listens is held (newest wins) and delivered once, to the first `onPushToken` listener. `onPushToken` emits whatever `com.klaviyo.push.automatic_push_token_forwarding` says; that flag still only controls whether the native SDK sends the token to Klaviyo. Subclasses that override `onNewToken` must call `super.onNewToken(token)`.
 
 ### Deprecated
 

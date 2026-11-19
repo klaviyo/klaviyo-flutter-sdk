@@ -262,7 +262,7 @@ implementation("com.google.firebase:firebase-messaging")
 
 See the [Android SDK's Advanced Setup](https://github.com/klaviyo/klaviyo-android-sdk#advanced-setup) for subclassing and custom handling.
 
-`firebase_messaging`'s `onMessage` and `onBackgroundMessage` keep firing, because it receives messages through its own broadcast receiver. `onTokenRefresh` stops firing on Android. Klaviyo still gets rotated tokens unless `com.klaviyo.push.automatic_push_token_forwarding` is `false`, and `KlaviyoSDK().onPushToken` emits each one. To handle rotation yourself, override `onNewToken` in a subclass and call `super.onNewToken(token)`; without the `super` call, neither Klaviyo nor `onPushToken` sees the new token.
+`firebase_messaging`'s `onMessage` and `onBackgroundMessage` keep firing, because it receives messages through its own broadcast receiver. `onTokenRefresh` stops firing on Android. Klaviyo still gets rotated tokens unless `com.klaviyo.push.automatic_push_token_forwarding` is `false`. `KlaviyoSDK().onPushToken` emits each rotated token whatever that flag says, because it only bridges the token to Dart. To handle rotation yourself, override `onNewToken` in a subclass and call `super.onNewToken(token)`; without the `super` call, neither Klaviyo nor `onPushToken` sees the new token.
 
 ## Profile Management
 
@@ -488,6 +488,8 @@ either one.
   | **not set** (default) | `KlaviyoFlutterPushService` forwards a token whenever FCM delivers one — this plugin's existing automatic behavior, unaffected. This plugin initializes Klaviyo from Dart after `Application.onCreate`, so a token FCM delivers before that call is silently dropped. |
   | **`true`** | Additionally fetches and registers the current token at `Klaviyo.initialize()` and on each foreground. |
   | **`false`** | Disables forwarding entirely — set this only if you register the token yourself, since Klaviyo otherwise keeps whatever token it last stored, which goes stale once FCM rotates it. |
+
+  The flag only controls whether the native SDK sends the token to Klaviyo. `onPushToken` emits each token FCM delivers in every state, so with `false` you can listen to it and call `setPushToken` when you're ready.
 
 For the underlying native behavior, see the native
 [Android](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) and
