@@ -715,12 +715,13 @@ class KlaviyoSDK {
 
   /// Push tokens delivered by the platform.
   ///
-  /// Emits the APNs token on iOS and the FCM token on Android each time the
-  /// platform delivers one, as a [KlaviyoPushToken] whose [KlaviyoPushToken.type]
-  /// is [KlaviyoPushTokenType.apns] or [KlaviyoPushTokenType.fcm]. A failure to
-  /// register for push arrives as a stream error carrying a [KlaviyoException]
-  /// with code `PUSH_TOKEN_ERROR`; handle it with `onError`. A token or error
-  /// that arrives before anyone listens goes to the first listener.
+  /// Emits a [KlaviyoPushToken] with [KlaviyoPushTokenType.apns] on iOS or
+  /// [KlaviyoPushTokenType.fcm] on Android, including when FCM rotates the token.
+  /// The stream emits independently of native token forwarding. If you disable
+  /// forwarding, pass the event's [KlaviyoPushToken.token] to [setPushToken].
+  /// A registration failure arrives as a [KlaviyoException] stream error with
+  /// code `PUSH_TOKEN_ERROR`; handle it with `onError`. Tokens and errors that
+  /// reach Dart before anyone listens go to the first listener.
   Stream<KlaviyoPushToken> get onPushToken =>
       _nativeWrapper.onPushTokenEvent.transform(
         StreamTransformer.fromHandlers(
