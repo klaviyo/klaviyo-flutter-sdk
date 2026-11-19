@@ -1,19 +1,3 @@
-group = "com.klaviyo.klaviyo_flutter_sdk"
-version = "1.0"
-
-buildscript {
-    val kotlinVersion = "1.9.25"
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath("com.android.tools.build:gradle:8.11.0")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-    }
-}
-
 rootProject.allprojects {
     repositories {
         google()
@@ -51,12 +35,6 @@ extensions.configure<com.android.build.api.dsl.LibraryExtension> {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    sourceSets {
-        getByName("main") {
-            java.srcDirs("src/main/kotlin")
-        }
     }
 
     defaultConfig {
@@ -120,5 +98,5 @@ dependencies {
     "implementation"("com.google.firebase:firebase-messaging:24.1.0")
 
     "testImplementation"("junit:junit:4.13.2")
-    "testImplementation"("io.mockk:mockk:1.13.17")
+    "testImplementation"("io.mockk:mockk:1.14.12")
 }
