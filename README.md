@@ -262,7 +262,7 @@ implementation("com.google.firebase:firebase-messaging")
 
 See the [Android SDK's Advanced Setup](https://github.com/klaviyo/klaviyo-android-sdk#advanced-setup) for subclassing and custom handling.
 
-`firebase_messaging`'s `onMessage` and `onBackgroundMessage` keep firing, because it receives messages through its own broadcast receiver. `onTokenRefresh` stops firing on Android. Klaviyo still gets rotated tokens unless `com.klaviyo.push.automatic_push_token_forwarding` is `false`; to handle rotation yourself, override `onNewToken` in a subclass and call `super`.
+`firebase_messaging`'s `onMessage` and `onBackgroundMessage` keep firing, because it receives messages through its own broadcast receiver. `onTokenRefresh` stops firing on Android. Klaviyo still gets rotated tokens unless `com.klaviyo.push.automatic_push_token_forwarding` is `false`. `KlaviyoSDK().onPushToken` emits each rotated token whatever that flag says, because it only bridges the token to Dart. To handle rotation yourself, override `onNewToken` in a subclass and call `super.onNewToken(token)`; without the `super` call, neither Klaviyo nor `onPushToken` sees the new token.
 
 ## Profile Management
 
@@ -489,6 +489,8 @@ either one.
   | **`true`** | Additionally fetches and registers the current token at `Klaviyo.initialize()` and on each foreground. |
   | **`false`** | Disables forwarding entirely — set this only if you register the token yourself, since Klaviyo otherwise keeps whatever token it last stored, which goes stale once FCM rotates it. |
 
+  The flag only controls whether the native SDK sends the token to Klaviyo. `onPushToken` emits each token FCM delivers in every state, so with `false` you can listen to it and call `setPushToken` when you're ready.
+
 For the underlying native behavior, see the native
 [Android](https://github.com/klaviyo/klaviyo-android-sdk#push-notifications) and
 [iOS](https://github.com/klaviyo/klaviyo-swift-sdk#push-notifications) push documentation.
@@ -536,7 +538,7 @@ if (Platform.isAndroid) {
 }
 ```
 
-On Android, `onTokenRefresh` doesn't fire once you [declare `KlaviyoFlutterPushService` in your app manifest](#using-with-firebase_messaging-or-another-fcm-library); Klaviyo still gets rotated tokens by default.
+On Android, `onTokenRefresh` doesn't fire once you [declare `KlaviyoFlutterPushService` in your app manifest](#using-with-firebase_messaging-or-another-fcm-library); Klaviyo still gets rotated tokens by default, and `onPushToken` emits each rotated token.
 
 #### Option B: Built-in Registration
 
