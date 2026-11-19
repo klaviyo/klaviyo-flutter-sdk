@@ -65,6 +65,8 @@ class _ProfileTabState extends State<ProfileTab> {
         if (!_klaviyo.isInitialized) {
           await _initializeSDK();
         } else {
+          await _syncCurrentProfile();
+          if (!mounted) return;
           setState(() {
             _isInitialized = true;
             _status = 'SDK already initialized';
@@ -208,6 +210,7 @@ class _ProfileTabState extends State<ProfileTab> {
           lastName: _lastNameController.text.isNotEmpty
               ? _lastNameController.text
               : null,
+          properties: {'example_app_source': 'flutter_profile_tab'},
         ),
       );
       await _syncCurrentProfile();
@@ -452,6 +455,11 @@ class _ProfileTabState extends State<ProfileTab> {
                       ],
                     ),
                     const Divider(),
+                    _buildProfileValueRow(
+                      'profile_current_company_id_text',
+                      'Company ID',
+                      _klaviyo.apiKey,
+                    ),
                     _buildProfileValueRow(
                       'profile_current_email_text',
                       'Email',

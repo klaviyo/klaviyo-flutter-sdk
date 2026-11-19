@@ -16,6 +16,15 @@ in-app messaging (forms), and geofencing.
 Builds go through the example app — there is no standalone build for the plugin itself.
 Use `--no-codesign` for iOS: `cd example && flutter build ios --no-codesign`
 
+The `Makefile` mirrors the CI gates; `make help` lists targets.
+
+- `make setup` installs Flutter, JDK 17, the Android SDK, ktlint and SwiftLint into `~/.cache/klaviyo-flutter-sdk-tools` (Linux x86_64, no root). The Makefile puts them on `PATH`.
+- `make check` runs every Linux CI gate except the example APK build (`make build-android`): Dart format, `flutter analyze`, ktlint, SwiftLint, Dart unit tests and Kotlin unit tests.
+- `make test-android` runs the plugin's Kotlin JVM unit tests (`android/src/test/kotlin`) through the example app's Gradle project.
+- `make build-android` builds the example debug APK; it needs `example/android/app/google-services.json` (CI writes a dummy one).
+
+iOS builds and device tests can't run on Linux. Push the branch and read the `build-ios` workflow result with `gh run list --branch <branch>` and `gh run view <run-id> --log-failed`.
+
 ### Branching
 
 Branch format: `<initials>/<ticket-id>/<short-description>` (e.g. `ab/MAGE-123/fix-push-token`).
@@ -43,7 +52,7 @@ Push/form events flow back via `EventChannel` streams.
 
 Native SDK versions are pinned in two places — keep them in sync when bumping:
 - **iOS**: `ios/klaviyo_flutter_sdk.podspec` — `KlaviyoSwift ~> X.Y.Z`
-- **Android**: `android/build.gradle` — `klaviyoSdkVersion = "X.Y.Z"`
+- **Android**: `android/build.gradle.kts` — `klaviyoSdkVersion = "X.Y.Z"`
 
 Optional features controlled by host app build properties:
 - **Forms** (`klaviyoIncludeForms`): defaults to **true**
@@ -61,13 +70,13 @@ Key lint rules (`analysis_options.yaml`):
 ### Native SDK Development
 
 To test against a local native SDK build:
-- **iOS**: In `ios/klaviyo_flutter_sdk.podspec`, replace the `KlaviyoSwift ~> X.Y.Z` dependency with a local path: `s.dependency 'KlaviyoSwift', :path => '../path/to/KlaviyoSwift'`
-- **Android**: In `android/build.gradle`, replace the version string with a local Maven path or use `includeBuild()` in `example/android/settings.gradle`
+- **iOS**: Run `scripts/configure-sdk.sh --ios-local ../klaviyo-swift-sdk` (or `--ios-branch` / `--ios-commit`). It points `ios/klaviyo_flutter_sdk/Package.swift` and the example's Xcode project at that source; `--ios-version X.Y.Z` puts the release pin back.
+- **Android**: Run `scripts/configure-sdk.sh --android-local ../klaviyo-android-sdk` (or `--android-branch` / `--android-commit`). A local path appends an `includeBuild()` block to `example/android/settings.gradle.kts`; a branch or commit rewrites `klaviyoSdkVersion` in `android/build.gradle.kts` to a JitPack ref. `--android-version X.Y.Z` puts the release pin back and removes the `includeBuild()` block.
 
 ### Gotchas
 
 - **Version sync**: changing `pubspec.yaml` version triggers `scripts/sync_version.sh` via pre-commit hook, which updates the iOS plist, the example app's `pubspec.yaml`, and `MARKETING_VERSION` in the example app's Xcode project. Use `scripts/bump_version.sh` to update all version references at once.
-- **Example Podfile.lock is committed**: it pins the native iOS SDK the published example app ships with. Native SDK bumps and `scripts/configure-sdk.sh` overrides change it — regenerate with `pod install` in `example/ios` and commit the result. Never commit a lock pointing at a feature branch or local checkout.
+- **Example iOS app uses Swift Package Manager, not CocoaPods**: `klaviyo-swift-sdk` is a package dependency of `example/ios/Runner.xcodeproj` (the `XCRemoteSwiftPackageReference "klaviyo-swift-sdk"` in `project.pbxproj`, whose requirement must match `ios/klaviyo_flutter_sdk/Package.swift`; `.github/scripts/check-native-pins.sh` checks this). Its lockfile, `example/ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved`, is committed and pins the iOS SDK the published example app ships with. `scripts/configure-sdk.sh` rewrites both manifests and drops the `klaviyo-swift-sdk` pin from `Package.resolved`; the next `flutter build ios` re-resolves it. Commit the regenerated lockfile for a released version only, never one pointing at a branch, commit or local checkout.
 - `BufferedBroadcastStreamController` (`lib/src/utils/buffered_broadcast_stream_controller.dart`) exists because native events (push tokens, notifications) can fire before Dart listeners are attached. Don't replace it with a plain `StreamController.broadcast`.
 
 ## Example app deployment

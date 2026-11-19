@@ -40,6 +40,8 @@ extension Profile.ProfileKey {
             return .latitude
         case "longitude":
             return .longitude
+        case "timezone", "time_zone":
+            return .timezone
         default:
             return .custom(customKey: stringKey)
         }
