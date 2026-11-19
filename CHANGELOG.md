@@ -6,10 +6,6 @@
 
 - **Typed push streams.** `onPushToken` (`Stream<KlaviyoPushToken>`) emits each push token as a `KlaviyoPushToken` with the `token` string and its `type` (`KlaviyoPushTokenType.apns` on iOS, `KlaviyoPushTokenType.fcm` on Android); a registration failure arrives as a stream error carrying a `KlaviyoException` with code `PUSH_TOKEN_ERROR`. `onPushOpened` (`Stream<KlaviyoPushOpened>`) emits exactly one event for every tap on a Klaviyo push, whether on the body, an action button or a web URL push, with the tapped `button` or `webUrl` on the event. On Android, web-link taps reach `onPushOpened` and `onPushAction`. If the app is not yet subscribed, the plugin holds the tap in memory until it subscribes or the process dies. `onPushData` (`Stream<KlaviyoPushData>`) emits push data received in the foreground or background while a Flutter engine is alive and the OS delivers the push. `KlaviyoPushOpened` and `KlaviyoPushData` expose the push's key/value pairs as `keyValuePairs`. An open that arrives before anyone subscribes is held and delivered once, to the first `onPushOpened` subscriber; read the launch tap at any time with `getInitialPushNotification()`. See [Typed Push Streams](README.md#typed-push-streams).
 
-### Bug Fixes
-
-- **Android: FCM token rotation reaches `onPushToken`.** `KlaviyoFlutterPushService.onNewToken` now emits the new token on `onPushToken`, as iOS does for every APNs registration. Before, Android only emitted the token returned by `registerForPushNotifications()`. A token that arrives before Dart listens is held (newest wins) and delivered once, to the first `onPushToken` listener. Subclasses that override `onNewToken` must call `super.onNewToken(token)`.
-
 ### Deprecated
 
 - The old push streams are deprecated in favor of the typed streams and will be removed in 1.0. They keep working unchanged until then.
@@ -30,6 +26,7 @@
 
 ### Bug Fixes
 
+- **Android: FCM token rotation reaches `onPushToken`.** `KlaviyoFlutterPushService.onNewToken` delivers a `KlaviyoPushToken` with type `KlaviyoPushTokenType.fcm`. If Flutter cannot receive the token, the native plugin holds the newest rotation and delivers it once when Flutter listens. Dart still receives rotations when `com.klaviyo.push.automatic_push_token_forwarding` is `false`. Subclasses that override `onNewToken` must call `super.onNewToken(token)`.
 - **Android: push opens and action-button taps that launch the app now reach Dart.** On a cold start the tap was handled before your Dart listener subscribed, so the `push_notification_opened` event and `onPushAction`'s `ActionButtonTapped` were dropped. The plugin now holds the most recent open and the most recent action until Dart subscribes. Reopening the app from Recents doesn't re-deliver the original tap.
 - **Android: web-link push taps now reach Dart through `onPushAction`.** A body tap that opens a web URL (`web_url`) emits `OpenWebUrl`. An `open_url` action button emits `ActionButtonTapped` with `action: 'open_url'`. If Flutter isn't listening yet, the plugin holds the tap in memory until your app returns and subscribes. If Android kills the process before delivery, Dart gets no event. The native SDK still tracks Opened Push. Requires Klaviyo Android SDK 4.7.0.
 - **Android: the plugin builds on Kotlin Gradle Plugin 1.8** — The plugin imported `kotlin.concurrent.Volatile`, which only exists from Kotlin 1.9, so host apps on KGP 1.8 (such as the Flutter 3.27 template, which ships 1.8.22) failed in `:klaviyo_flutter_sdk:compileDebugKotlin`. It now uses `kotlin.jvm.Volatile`, and the README's minimum KGP is 1.8.0.
