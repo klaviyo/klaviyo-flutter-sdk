@@ -1,10 +1,12 @@
 package com.klaviyo.klaviyo_flutter_sdk
 
 import android.app.Activity
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
@@ -64,11 +66,13 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var eventChannel: EventChannel
     private var eventSink: EventChannel.EventSink? = null
 
-    // The `push_notification_opened` payload for the tap that launched the activity this
-    // plugin first attached to; read by getInitialPushNotification. Not cleared by onListen.
+    // The `push_notification_opened` payload for the tap that launched or relaunched the
+    // app from a killed state; read by getInitialPushNotification. Not cleared by onListen.
     internal var initialPushNotification: Map<String, Any?>? = null
         private set
     private var launchIntentHandled = false
+    private var firstResumeOccurred = false
+    private var lifecycleCallbacks: Application.ActivityLifecycleCallbacks? = null
 
     private lateinit var applicationContext: android.content.Context
     private var activity: Activity? = null
@@ -307,6 +311,49 @@ class KlaviyoFlutterSdkPlugin :
                 }
             },
         )
+
+        observeFirstResume()
+    }
+
+    private fun applicationOrNull(): Application? = applicationContext as? Application
+
+    private fun unregisterFirstResumeObserver() {
+        val callbacks = lifecycleCallbacks ?: return
+        lifecycleCallbacks = null
+        applicationOrNull()?.unregisterActivityLifecycleCallbacks(callbacks)
+    }
+
+    private fun observeFirstResume() {
+        if (lifecycleCallbacks != null || firstResumeOccurred) return
+        val application = applicationOrNull() ?: return
+        val callbacks =
+            object : Application.ActivityLifecycleCallbacks {
+                override fun onActivityResumed(activity: Activity) {
+                    firstResumeOccurred = true
+                    application.unregisterActivityLifecycleCallbacks(this)
+                    lifecycleCallbacks = null
+                }
+
+                override fun onActivityCreated(
+                    activity: Activity,
+                    savedInstanceState: Bundle?,
+                ) = Unit
+
+                override fun onActivityStarted(activity: Activity) = Unit
+
+                override fun onActivityPaused(activity: Activity) = Unit
+
+                override fun onActivityStopped(activity: Activity) = Unit
+
+                override fun onActivitySaveInstanceState(
+                    activity: Activity,
+                    outState: Bundle,
+                ) = Unit
+
+                override fun onActivityDestroyed(activity: Activity) = Unit
+            }
+        lifecycleCallbacks = callbacks
+        application.registerActivityLifecycleCallbacks(callbacks)
     }
 
     internal fun attachEventSink(events: EventChannel.EventSink?) {
@@ -1034,6 +1081,7 @@ class KlaviyoFlutterSdkPlugin :
         activePlugins.remove(this)
         eventSink = null
         selectInstance()
+        unregisterFirstResumeObserver()
         // Unregister the auth token provider so the Klaviyo singleton stops
         // retaining (and invoking) this now-detached plugin instance's bridge
         // lambda after the engine is gone, and drain pending callbacks.
@@ -1092,7 +1140,7 @@ class KlaviyoFlutterSdkPlugin :
 
         // Listen for new intents (warm start)
         binding.addOnNewIntentListener { intent ->
-            handleIntent(intent)
+            handleIntent(intent, isLaunchTap(intent))
             false // Return false to allow other listeners
         }
     }
@@ -1111,7 +1159,7 @@ class KlaviyoFlutterSdkPlugin :
         Registry.lifecycleMonitor.assignCurrentActivity(binding.activity)
 
         binding.addOnNewIntentListener { intent ->
-            handleIntent(intent)
+            handleIntent(intent, isLaunchTap(intent))
             false
         }
     }
@@ -1155,6 +1203,15 @@ class KlaviyoFlutterSdkPlugin :
         key: String,
         valueOf: (String) -> T,
     ): Set<T>? = (json[key] as? List<*>)?.map { valueOf((it as String).uppercase()) }?.toSet()
+
+    /**
+     * Whether a tap arriving through `onNewIntent` should be recorded as the launch tap.
+     *
+     * The process can be killed while its task stays in Recents. The reused Activity keeps its
+     * original launcher intent, so the tap arrives before the activity's first resume.
+     */
+    private fun isLaunchTap(intent: Intent): Boolean =
+        !firstResumeOccurred && initialPushNotification == null && intent.isKlaviyoNotificationIntent
 
     internal fun handleIntent(
         intent: Intent,
