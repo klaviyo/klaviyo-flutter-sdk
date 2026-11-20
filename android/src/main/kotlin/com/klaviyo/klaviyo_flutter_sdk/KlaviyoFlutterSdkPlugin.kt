@@ -20,8 +20,6 @@ import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.analytics.model.Subscription
-import com.klaviyo.analytics.state.ProfileEventObserver
-import com.klaviyo.analytics.state.State
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
@@ -29,7 +27,6 @@ import com.klaviyo.core.config.Config
 import com.klaviyo.core.config.Log
 import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
-import com.klaviyo.core.utils.hasAllowedOpenUrlScheme
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.endFormsPreview
@@ -50,6 +47,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import org.json.JSONObject
 import java.net.SocketException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -171,56 +169,86 @@ class KlaviyoFlutterSdkPlugin :
             return true
         }
 
-        private const val OPENED_PUSH_METRIC = "\$opened_push"
+        private const val PENDING_WEB_LINK_TAP_PREFS = "com.klaviyo.klaviyo_flutter_sdk"
+        private const val PENDING_WEB_LINK_TAP_KEY = "pending_web_link_tap"
+        internal const val PENDING_WEB_LINK_TAP_TTL_MS = 24 * 60 * 60 * 1000L
 
-        private val webLinkTapObserver: ProfileEventObserver = { event ->
-            webLinkTapPayload(event)?.let { payload ->
-                Handler(Looper.getMainLooper()).post {
-                    instance?.emitOrCachePushAction(payload) ?: run { cachedPushAction = payload }
-                }
-            }
-        }
-
-        /** Registers [webLinkTapObserver] once, if the native SDK is initialized. */
-        internal fun observeWebLinkTaps() {
-            Registry.getOrNull<State>()?.run {
-                offProfileEvent(webLinkTapObserver)
-                onProfileEvent(webLinkTapObserver)
-            }
+        /**
+         * Delivers a web-link tap from the native trampoline to the primary engine, or saves it
+         * for the next engine attach when no engine is attached. Main thread only.
+         */
+        internal fun onWebLinkTap(
+            context: Context,
+            intent: Intent,
+            url: String,
+        ) {
+            val payload = webLinkTapPayload(intent, url)
+            instance?.emitOrCachePushAction(payload) ?: savePendingWebLinkTap(context, payload)
         }
 
         /**
-         * Maps an "Opened Push" event for a web-link tap (an `open_url` button, or a body
-         * tap with an allowed `web_url` and no deep-link `url`) to the iOS push-action
-         * payload. Returns null for every other event.
+         * Maps a web-link tap to the iOS push-action payload: `push_action_button_tapped` for an
+         * `open_url` button, else `push_open_web_url`.
          */
-        internal fun webLinkTapPayload(event: Event): Map<String, Any?>? {
-            if (event.metric.name != OPENED_PUSH_METRIC) return null
-            val props = event.toMap()
-
-            val buttonId = props["Button ID"] as? String
-            if (buttonId != null) {
-                if (props["Button Action"] != "Open URL") return null
-                val url = props[Constants.BUTTON_LINK_PARAMETER] as? String ?: return null
-                val data = mutableMapOf<String, Any?>("id" to buttonId, "action" to "open_url", "url" to url)
-                (props["Button Label"] as? String)?.let { data["label"] = it }
-                return mapOf("type" to "push_action_button_tapped", "data" to data)
-            }
-
-            if (props.containsKey(Constants.URL_PARAMETER)) return null
-            val webUrl = (props["web_url"] as? String)?.takeIf { it.isNotBlank() } ?: return null
-            if (!Uri.parse(webUrl).hasAllowedOpenUrlScheme()) return null
-            return mapOf("type" to "push_open_web_url", "data" to mapOf("url" to webUrl))
+        internal fun webLinkTapPayload(
+            intent: Intent,
+            url: String,
+        ): Map<String, Any?> {
+            val buttonId =
+                intent.getStringExtra(Constants.PACKAGE_PREFIX + "Button ID")
+                    ?: return mapOf("type" to "push_open_web_url", "data" to mapOf("url" to url))
+            val data = mutableMapOf<String, Any?>("id" to buttonId, "action" to "open_url", "url" to url)
+            intent.getStringExtra(Constants.PACKAGE_PREFIX + "Button Label")?.let { data["label"] = it }
+            return mapOf("type" to "push_action_button_tapped", "data" to data)
         }
+
+        private fun pendingWebLinkTapPrefs(context: Context) =
+            context.getSharedPreferences(PENDING_WEB_LINK_TAP_PREFS, Context.MODE_PRIVATE)
+
+        private fun savePendingWebLinkTap(
+            context: Context,
+            payload: Map<String, Any?>,
+        ) {
+            Registry.log.verbose("No Flutter engine attached. Saving web-link tap.")
+            val saved = JSONObject().put("time", System.currentTimeMillis()).put("payload", JSONObject(payload))
+            pendingWebLinkTapPrefs(context).edit().putString(PENDING_WEB_LINK_TAP_KEY, saved.toString()).apply()
+        }
+
+        internal fun clearPendingWebLinkTap(context: Context) {
+            pendingWebLinkTapPrefs(context).edit().remove(PENDING_WEB_LINK_TAP_KEY).apply()
+        }
+
+        /** Moves a saved web-link tap, if any and not expired, into the held push-action slot. */
+        internal fun restorePendingWebLinkTap(context: Context) {
+            val prefs = pendingWebLinkTapPrefs(context)
+            val saved = prefs.getString(PENDING_WEB_LINK_TAP_KEY, null) ?: return
+            clearPendingWebLinkTap(context)
+            try {
+                val json = JSONObject(saved)
+                if (System.currentTimeMillis() - json.getLong("time") > PENDING_WEB_LINK_TAP_TTL_MS) return
+                cachedPushAction = json.getJSONObject("payload").toMap()
+            } catch (e: Exception) {
+                Registry.log.warning("Discarding unreadable saved web-link tap", e)
+            }
+        }
+
+        private fun JSONObject.toMap(): Map<String, Any?> =
+            keys().asSequence().associateWith { key ->
+                when (val value = get(key)) {
+                    is JSONObject -> value.toMap()
+                    JSONObject.NULL -> null
+                    else -> value
+                }
+            }
     }
 
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
+        applicationContext = flutterPluginBinding.applicationContext
+        restorePendingWebLinkTap(applicationContext)
         activePlugins.add(this)
         selectInstance()
-        observeWebLinkTaps()
-        applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
 
@@ -306,7 +334,6 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     // Initialize Klaviyo SDK
                     Klaviyo.initialize(apiKey!!, applicationContext)
-                    observeWebLinkTaps()
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("INIT_ERROR", "Failed to initialize Klaviyo", e.message)
@@ -901,6 +928,7 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.resetProfile()
                     initialPushNotification = null
+                    clearPendingWebLinkTap(applicationContext)
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("RESET_ERROR", "Failed to reset profile", e.message)
