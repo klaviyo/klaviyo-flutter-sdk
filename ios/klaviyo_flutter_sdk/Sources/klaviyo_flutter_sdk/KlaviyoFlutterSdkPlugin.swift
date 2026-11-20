@@ -29,6 +29,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
     /// Event sinks of engines whose Dart side is listening, in listen order.
     private var engineSinks: [EngineSink] = []
+    private let registeredEngines = NSHashTable<EngineEventStream>.weakObjects()
 
     /// The primary engine receives every event: the first listening engine that
     /// has a view controller, or the first listening engine if none has one.
@@ -38,6 +39,10 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
 
     private var eventSink: FlutterEventSink? {
         primarySink?.sink
+    }
+
+    private var waitingForUI: Bool {
+        primarySink?.hasViewController() != true && registeredEngines.allObjects.contains { $0.waitingForUI }
     }
 
     private static var didAddApplicationDelegate = false
@@ -73,6 +78,7 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         // to the primary engine. Publishing it delivers the engine's detach callback.
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
         let engineStream = EngineEventStream(registrar: registrar)
+        instance.registeredEngines.add(engineStream)
         eventChannel.setStreamHandler(engineStream)
         registrar.publish(engineStream)
 
@@ -552,6 +558,21 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedError)
             self.cachedError = nil
         }
+        replayCachedPushEvents(to: events)
+    }
+
+    fileprivate func releaseCachedPushEvents() {
+        guard let eventSink else { return }
+        replayCachedPushEvents(to: eventSink)
+    }
+
+    fileprivate func removeRegisteredEngine(_ engine: EngineEventStream) {
+        registeredEngines.remove(engine)
+        releaseCachedPushEvents()
+    }
+
+    private func replayCachedPushEvents(to events: FlutterEventSink) {
+        guard !waitingForUI else { return }
         if let cachedOpenedNotification = cachedOpenedNotification {
             events(cachedOpenedNotification)
             self.cachedOpenedNotification = nil
@@ -578,6 +599,11 @@ private struct EngineSink {
 /// with the shared plugin.
 private final class EngineEventStream: NSObject, FlutterStreamHandler {
     private weak var registrar: FlutterPluginRegistrar?
+    private var hasListened = false
+
+    var waitingForUI: Bool {
+        !hasListened && registrar?.viewController != nil
+    }
 
     init(registrar: FlutterPluginRegistrar) {
         self.registrar = registrar
@@ -587,6 +613,7 @@ private final class EngineEventStream: NSObject, FlutterStreamHandler {
         withArguments arguments: Any?,
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
+        hasListened = true
         KlaviyoFlutterSdkPlugin.shared.addListener(
             EngineSink(owner: ObjectIdentifier(self), sink: events) { [weak self] in
                 self?.registrar?.viewController != nil
@@ -597,6 +624,7 @@ private final class EngineEventStream: NSObject, FlutterStreamHandler {
 
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
         KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
+        KlaviyoFlutterSdkPlugin.shared.releaseCachedPushEvents()
         return nil
     }
 
@@ -604,6 +632,7 @@ private final class EngineEventStream: NSObject, FlutterStreamHandler {
     @objc(detachFromEngineForRegistrar:)
     func detachFromEngine(for registrar: FlutterPluginRegistrar) {
         KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
+        KlaviyoFlutterSdkPlugin.shared.removeRegisteredEngine(self)
     }
 }
 
@@ -697,7 +726,7 @@ extension KlaviyoFlutterSdkPlugin {
         }
 
         // 2. Send to Flutter (or Cache if Flutter is asleep)
-        if let eventSink = eventSink {
+        if let eventSink = eventSink, !waitingForUI {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
@@ -792,7 +821,7 @@ extension KlaviyoFlutterSdkPlugin {
 
         guard let eventPayload else { return }
 
-        if let eventSink {
+        if let eventSink, !waitingForUI {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
@@ -818,7 +847,7 @@ extension KlaviyoFlutterSdkPlugin {
         ]
 
         // Send to Flutter (or cache if Flutter is not ready)
-        if let eventSink = eventSink {
+        if let eventSink = eventSink, !waitingForUI {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
