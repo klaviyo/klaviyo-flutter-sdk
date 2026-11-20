@@ -1,5 +1,6 @@
 package com.klaviyo.klaviyo_flutter_sdk
 
+import android.content.Context
 import com.klaviyo.analytics.Klaviyo
 import com.klaviyo.analytics.model.Event
 import com.klaviyo.analytics.model.EventKey
@@ -9,6 +10,7 @@ import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.analytics.model.Subscription
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
+import com.klaviyo.core.config.Config
 import com.klaviyo.core.config.Log
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.registerForInAppForms
@@ -27,6 +29,7 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.verify
+import io.mockk.verifyOrder
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -378,11 +381,36 @@ class KlaviyoFlutterSdkPluginMethodCallTest {
 
     @Test
     fun `handleUniversalTrackingLink returns the native verdict`() {
+        Registry.register<Config>(mockk<Config>(relaxed = true))
+        every { Klaviyo.handleUniversalTrackingLink(any<String>()) } returns true
+
+        try {
+            call("handleUniversalTrackingLink", mapOf("url" to "https://trk.example.com/u/abc"))
+        } finally {
+            Registry.unregister<Config>()
+        }
+
+        verify(exactly = 0) { Klaviyo.registerForLifecycleCallbacks(any()) }
+        verify { Klaviyo.handleUniversalTrackingLink("https://trk.example.com/u/abc") }
+        verify { result.success(true) }
+    }
+
+    @Test
+    fun `handleUniversalTrackingLink before initialize registers lifecycle callbacks first`() {
+        val context = mockk<Context>(relaxed = true)
+        KlaviyoFlutterSdkPlugin::class.java.getDeclaredField("applicationContext").apply {
+            isAccessible = true
+            set(plugin, context)
+        }
+        every { Klaviyo.registerForLifecycleCallbacks(any()) } returns Klaviyo
         every { Klaviyo.handleUniversalTrackingLink(any<String>()) } returns true
 
         call("handleUniversalTrackingLink", mapOf("url" to "https://trk.example.com/u/abc"))
 
-        verify { Klaviyo.handleUniversalTrackingLink("https://trk.example.com/u/abc") }
+        verifyOrder {
+            Klaviyo.registerForLifecycleCallbacks(context)
+            Klaviyo.handleUniversalTrackingLink("https://trk.example.com/u/abc")
+        }
         verify { result.success(true) }
     }
 
