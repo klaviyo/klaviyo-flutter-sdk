@@ -279,18 +279,65 @@ class KlaviyoFlutterSdkPluginEngineTest {
     }
 
     @Test
-    fun `held push open replays to the primary chosen after the open arrives`() {
+    fun `held push events wait for an attached ui engine to listen`() {
         val headless = attach()
         val ui = attach()
-        ui.attachActivity(pushOpenIntent())
+        ui.attachActivity(pushOpenIntent(buttonId = "btn-1"))
+        ui.plugin.handleSilentPush(mapOf("key" to "value"))
+        shadowOf(Looper.getMainLooper()).idle()
 
         headless.listen()
         assertSame(headless.plugin, KlaviyoFlutterSdkPlugin.instance)
-        assertEquals(1, headless.pushOpens().size)
+        assertEquals(0, headless.messenger.sent.size)
 
         ui.listen()
         assertSame(ui.plugin, KlaviyoFlutterSdkPlugin.instance)
-        assertEquals(0, ui.pushOpens().size)
+        assertEquals(1, ui.pushOpens().size)
+        assertEquals(1, ui.pushActions().size)
+        assertEquals(1, ui.messenger.sent.count { it["type"] == "silent_push_received" })
+    }
+
+    @Test
+    fun `a launch tap waits for an attached ui engine when headless already listens`() {
+        val headless = attach()
+        headless.listen()
+        val ui = attach()
+        ui.attachActivity(pushOpenIntent())
+
+        assertEquals(0, headless.pushOpens().size)
+        ui.listen()
+        assertEquals(1, ui.pushOpens().size)
+    }
+
+    @Test
+    fun `held push events replay to a listening headless engine when no ui is attached`() {
+        val headless = attach()
+        headless.plugin.handleIntent(pushOpenIntent(buttonId = "btn-1"))
+        headless.plugin.handleSilentPush(mapOf("key" to "value"))
+        shadowOf(Looper.getMainLooper()).idle()
+
+        headless.listen()
+
+        assertEquals(1, headless.pushOpens().size)
+        assertEquals(1, headless.pushActions().size)
+        assertEquals(1, headless.messenger.sent.count { it["type"] == "silent_push_received" })
+    }
+
+    @Test
+    fun `form events registered by a secondary engine reach the primary`() {
+        val primary = attach()
+        primary.listen()
+        val secondary = attach()
+        secondary.listen()
+        secondary.registerForms()
+
+        emitFormShown()
+        assertEquals(1, primary.formEvents().size)
+        assertEquals(0, secondary.formEvents().size)
+
+        detach(secondary)
+        emitFormShown()
+        assertEquals(2, primary.formEvents().size)
     }
 
     @Test

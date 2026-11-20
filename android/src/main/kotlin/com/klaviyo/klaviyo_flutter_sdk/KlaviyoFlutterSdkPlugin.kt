@@ -148,8 +148,10 @@ class KlaviyoFlutterSdkPlugin :
             instance = activePlugins.firstOrNull { it.eventSink != null && it.attachedToActivity }
                 ?: activePlugins.firstOrNull { it.eventSink != null }
                 ?: activePlugins.firstOrNull()
-            instance?.eventSink?.let { replayCachedEvents(it) }
+            if (!waitingForUi()) instance?.eventSink?.let { replayCachedEvents(it) }
         }
+
+        private fun waitingForUi(): Boolean = instance?.attachedToActivity != true && activePlugins.any { it.attachedToActivity }
 
         private fun replayCachedEvents(sink: EventChannel.EventSink) {
             cachedSilentPush?.let { sink.success(it) }
@@ -160,8 +162,9 @@ class KlaviyoFlutterSdkPlugin :
             cachedPushAction = null
         }
 
-        // Sends to the primary engine, or returns false if no engine is listening.
+        // Sends to the primary engine, or returns false if delivery must wait.
         private fun emitToPrimary(payload: Map<String, Any?>): Boolean {
+            if (waitingForUi()) return false
             val sink = instance?.eventSink ?: return false
             sink.success(payload)
             return true
@@ -701,8 +704,7 @@ class KlaviyoFlutterSdkPlugin :
                         }
 
                         Handler(Looper.getMainLooper()).post {
-                            // Falls back to the current delivery owner once this engine has detached.
-                            (eventSink ?: instance?.eventSink)?.success(
+                            instance?.eventSink?.success(
                                 mapOf(
                                     "type" to "form_lifecycle_event",
                                     "data" to data,
