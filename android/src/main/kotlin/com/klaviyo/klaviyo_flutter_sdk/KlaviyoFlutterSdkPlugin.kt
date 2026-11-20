@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
-import androidx.annotation.VisibleForTesting
 import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.AuthTokenProvider
 import com.klaviyo.analytics.Klaviyo
@@ -21,8 +20,6 @@ import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.model.Profile
 import com.klaviyo.analytics.model.ProfileKey
 import com.klaviyo.analytics.model.Subscription
-import com.klaviyo.analytics.state.ProfileEventObserver
-import com.klaviyo.analytics.state.State
 import com.klaviyo.core.Constants
 import com.klaviyo.core.MissingKlaviyoModule
 import com.klaviyo.core.Registry
@@ -30,7 +27,6 @@ import com.klaviyo.core.config.Config
 import com.klaviyo.core.config.Log
 import com.klaviyo.core.config.hasManifestKey
 import com.klaviyo.core.utils.AdvancedAPI
-import com.klaviyo.core.utils.hasAllowedOpenUrlScheme
 import com.klaviyo.forms.FormLifecycleEvent
 import com.klaviyo.forms.InAppFormsConfig
 import com.klaviyo.forms.endFormsPreview
@@ -171,120 +167,6 @@ class KlaviyoFlutterSdkPlugin :
             sink.success(payload)
             return true
         }
-
-        private const val OPENED_PUSH_METRIC = "\$opened_push"
-
-        private val OPENED_PUSH_METADATA_KEYS =
-            setOf(
-                "\$event_id",
-                "push_token",
-                "_time",
-                "Device ID",
-                "Device Manufacturer",
-                "Device Model",
-                "OS Name",
-                "OS Version",
-                "SDK Name",
-                "SDK Version",
-                "App Name",
-                "App ID",
-                "App Version",
-                "App Build",
-                "Push Token",
-            )
-
-        private var lastEmittedOpenKey: String? = null
-
-        private val webLinkTapObserver: ProfileEventObserver = { event ->
-            webLinkOpenedPayload(event)?.let { payload ->
-                Handler(Looper.getMainLooper()).post { emitWebLinkOpen(payload) }
-            }
-        }
-
-        /**
-         * Returns false if an open for the same push delivery (its `_k` tracking payload) was
-         * already emitted, so a tap seen by both the activity and the "Opened Push" observer
-         * reaches Dart once. Opens without `_k` are never deduplicated. Main thread only.
-         */
-        internal fun markOpenEmitted(notificationData: Map<String, Any?>): Boolean {
-            val key = notificationData[Constants.TRACKING_PARAMETER]?.toString() ?: return true
-            if (key == lastEmittedOpenKey) return false
-            lastEmittedOpenKey = key
-            return true
-        }
-
-        @VisibleForTesting
-        internal fun resetEmittedOpens() {
-            lastEmittedOpenKey = null
-        }
-
-        /**
-         * Builds the `push_notification_opened` event for a web-link tap from its "Opened Push"
-         * event, with the push-action payload from [webLinkTapPayload] under `action` and the
-         * device metadata the native SDK adds removed from `data`. Returns null for every other
-         * event.
-         */
-        internal fun webLinkOpenedPayload(event: Event): Map<String, Any?>? {
-            val action = webLinkTapPayload(event) ?: return null
-            return mapOf(
-                "type" to "push_notification_opened",
-                "data" to event.toMap().filterKeys { it !in OPENED_PUSH_METADATA_KEYS },
-                "action" to action,
-            )
-        }
-
-        /**
-         * Emits a web-link tap built by [webLinkOpenedPayload] to the primary engine: the open
-         * for `onPushOpened`, then its action for `onPushAction`. Each is cached until an
-         * engine listens. Main thread only.
-         */
-        @Suppress("UNCHECKED_CAST")
-        internal fun emitWebLinkOpen(payload: Map<String, Any?>) {
-            val data = payload["data"] as? Map<String, Any?> ?: return
-            if (!markOpenEmitted(data)) return
-            cachedPushAction = null
-            if (!emitToPrimary(payload)) {
-                Registry.log.verbose("Flutter not ready. Caching notification open event.")
-                cachedOpenedNotification = payload
-            }
-            val action = payload["action"] as? Map<String, Any?> ?: return
-            if (!emitToPrimary(action)) {
-                Registry.log.verbose("Flutter not ready. Caching push action event.")
-                cachedPushAction = action
-            }
-        }
-
-        /** Registers [webLinkTapObserver] once, if the native SDK is initialized. */
-        internal fun observeWebLinkTaps() {
-            Registry.getOrNull<State>()?.run {
-                offProfileEvent(webLinkTapObserver)
-                onProfileEvent(webLinkTapObserver)
-            }
-        }
-
-        /**
-         * Maps an "Opened Push" event for a web-link tap (an `open_url` button, or a body
-         * tap with an allowed `web_url` and no deep-link `url`) to the iOS push-action
-         * payload. Returns null for every other event.
-         */
-        internal fun webLinkTapPayload(event: Event): Map<String, Any?>? {
-            if (event.metric.name != OPENED_PUSH_METRIC) return null
-            val props = event.toMap()
-
-            val buttonId = props["Button ID"] as? String
-            if (buttonId != null) {
-                if (props["Button Action"] != "Open URL") return null
-                val url = props[Constants.BUTTON_LINK_PARAMETER] as? String ?: return null
-                val data = mutableMapOf<String, Any?>("id" to buttonId, "action" to "open_url", "url" to url)
-                (props["Button Label"] as? String)?.let { data["label"] = it }
-                return mapOf("type" to "push_action_button_tapped", "data" to data)
-            }
-
-            if (props.containsKey(Constants.URL_PARAMETER)) return null
-            val webUrl = (props["web_url"] as? String)?.takeIf { it.isNotBlank() } ?: return null
-            if (!Uri.parse(webUrl).hasAllowedOpenUrlScheme()) return null
-            return mapOf("type" to "push_open_web_url", "data" to mapOf("url" to webUrl))
-        }
     }
 
     override fun onAttachedToEngine(
@@ -292,7 +174,6 @@ class KlaviyoFlutterSdkPlugin :
     ) {
         activePlugins.add(this)
         selectInstance()
-        observeWebLinkTaps()
         applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
@@ -379,7 +260,6 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     // Initialize Klaviyo SDK
                     Klaviyo.initialize(apiKey!!, applicationContext)
-                    observeWebLinkTaps()
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("INIT_ERROR", "Failed to initialize Klaviyo", e.message)
@@ -1268,11 +1148,6 @@ class KlaviyoFlutterSdkPlugin :
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
-                if (!markOpenEmitted(notificationData)) {
-                    Registry.log.verbose("Push open already emitted for this delivery")
-                    return
-                }
-
                 cachedPushAction = null
                 val pushAction = actionButtonTapPayload(notificationData)
 
@@ -1341,7 +1216,7 @@ class KlaviyoFlutterSdkPlugin :
         }
     }
 
-    internal fun emitOrCachePushAction(payload: Map<String, Any?>) {
+    private fun emitOrCachePushAction(payload: Map<String, Any?>) {
         if (!emitToPrimary(payload)) {
             Registry.log.verbose("Flutter not ready. Caching push action event.")
             cachedPushAction = payload

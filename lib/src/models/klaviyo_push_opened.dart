@@ -111,8 +111,9 @@ class KlaviyoPushButton {
 
 /// A Klaviyo push the user tapped, emitted on [KlaviyoSDK.onPushOpened].
 ///
-/// Emitted once for every tap: on the notification body, on an action button,
-/// or on a push that opens a web URL. [tap] says which, and [button] or
+/// Emitted once for each supported notification or action-button tap. On iOS,
+/// web URL taps are also emitted. On Android, web URL taps open an external
+/// handler and do not reach this stream. [tap] says which, and [button] or
 /// [webUrl] carries what was tapped.
 @immutable
 class KlaviyoPushOpened {
