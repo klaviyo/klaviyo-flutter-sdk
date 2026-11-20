@@ -262,6 +262,8 @@ class KlaviyoFlutterSdkPluginEngineTest {
         primary.cancel()
 
         assertSame(headless.plugin, KlaviyoFlutterSdkPlugin.instance)
+        primary.deliverNewIntent(pushOpenIntent())
+        assertEquals(1, headless.pushOpens().size)
     }
 
     @Test
