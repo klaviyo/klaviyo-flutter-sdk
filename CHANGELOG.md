@@ -47,7 +47,7 @@
 
 ### New Features
 
-- **`KlaviyoSDK().getInitialPushNotification()`** returns the push tap that launched the app from a killed state as a `KlaviyoPushOpened`, the same type `onPushOpened` emits, or `null`. It returns the same value on every call for the life of the process, even after a stream listener received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
+- **`KlaviyoSDK().getInitialPushNotification()`** returns the push tap that launched or relaunched the app from a killed state as a `KlaviyoPushOpened`, the same type `onPushOpened` emits, or `null`. It returns the same value on every call for the life of the process, even after a stream listener received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
 
 ### Changes
 

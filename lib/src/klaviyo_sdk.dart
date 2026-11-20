@@ -774,8 +774,8 @@ class KlaviyoSDK {
         );
       });
 
-  /// The push notification tap that launched the app from a killed state, or
-  /// `null` if the app wasn't launched by a push tap.
+  /// The push notification tap that launched or relaunched the app from a
+  /// killed state, or `null` if the app wasn't launched by a push tap.
   ///
   /// Returns the same [KlaviyoPushOpened] that [onPushOpened] emits for that
   /// tap, with [KlaviyoPushOpened.tap], [KlaviyoPushOpened.button] and
