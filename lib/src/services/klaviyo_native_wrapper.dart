@@ -298,8 +298,8 @@ class KlaviyoNativeWrapper {
     }
   }
 
-  /// The push notification tap that launched the app from a killed state, or
-  /// `null` if the app wasn't launched by a push tap.
+  /// The push notification tap that launched or relaunched the app from a
+  /// killed state, or `null` if the app wasn't launched by a push tap.
   ///
   /// The map has the same shape as the `push_notification_opened` event on
   /// [onPushNotification]. The same value is returned on every call for the
