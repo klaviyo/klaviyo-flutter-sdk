@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Documentation
+
+- **Silent push is experimental.** The `silent_push_received` event on `onPushNotification` and the iOS `handleSilentPush` method may change before or after 1.0. The README now lists the platform limits: iOS needs `AppDelegate` forwarding and doesn't deliver after the user swipes the app away, and Android doesn't deliver while the app is killed. No behavior change.
+
 ### What's New
 
 - **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
