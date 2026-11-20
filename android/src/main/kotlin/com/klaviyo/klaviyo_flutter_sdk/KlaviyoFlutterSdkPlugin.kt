@@ -61,6 +61,7 @@ class KlaviyoFlutterSdkPlugin :
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
     private var eventSink: EventChannel.EventSink? = null
+    private var eventStreamCancelled = false
 
     // The `push_notification_opened` payload for the tap that launched or relaunched the
     // app from a killed state; read by getInitialPushNotification. Not cleared by onListen.
@@ -147,7 +148,8 @@ class KlaviyoFlutterSdkPlugin :
             if (!waitingForUi()) instance?.eventSink?.let { replayCachedEvents(it) }
         }
 
-        private fun waitingForUi(): Boolean = instance?.attachedToActivity != true && activePlugins.any { it.attachedToActivity }
+        private fun waitingForUi(): Boolean =
+            instance?.attachedToActivity != true && activePlugins.any { it.attachedToActivity && !it.eventStreamCancelled }
 
         private fun replayCachedEvents(sink: EventChannel.EventSink) {
             cachedSilentPush?.let { sink.success(it) }
@@ -186,6 +188,7 @@ class KlaviyoFlutterSdkPlugin :
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
+                    eventStreamCancelled = true
                     selectInstance()
                     // The Dart side keeps a permanent auth-event listener, so this
                     // fires at engine teardown. Tear the auth bridge down here too
@@ -242,6 +245,7 @@ class KlaviyoFlutterSdkPlugin :
 
     internal fun attachEventSink(events: EventChannel.EventSink?) {
         eventSink = events
+        eventStreamCancelled = false
         selectInstance()
     }
 
