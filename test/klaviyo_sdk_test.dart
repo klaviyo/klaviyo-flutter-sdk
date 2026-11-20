@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
@@ -84,6 +87,64 @@ void main() {
       // Dart-side logging must stay untouched when the native call fails,
       // so Dart and native logging state can't disagree.
       expect(Logger('KlaviyoSDK').level, isNot(Level.OFF));
+    });
+  });
+
+  group('KlaviyoSDK.handleUniversalTrackingLink before initialize', () {
+    const trackingUrl = 'https://trk.example.com/u/abc123';
+
+    test('does not throw and forwards the link to native', () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+
+      expect(KlaviyoSDK().handleUniversalTrackingLink(trackingUrl), isTrue);
+      await pumpEventQueue();
+
+      final calls =
+          log.where((c) => c.method == 'handleUniversalTrackingLink').toList();
+      expect(calls.length, 1);
+      expect(calls.single.arguments['url'], trackingUrl);
+    });
+
+    test('returns false for a non-tracking link without calling native',
+        () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+
+      expect(
+        KlaviyoSDK().handleUniversalTrackingLink('https://example.com/a'),
+        isFalse,
+      );
+      await pumpEventQueue();
+
+      expect(
+        log.where((c) => c.method == 'handleUniversalTrackingLink'),
+        isEmpty,
+      );
+    });
+
+    test('does not throw when the native call fails', () async {
+      expect(KlaviyoSDK().isInitialized, isFalse);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        throw PlatformException(code: 'ERROR', message: 'native failure');
+      });
+
+      expect(KlaviyoSDK().handleUniversalTrackingLink(trackingUrl), isTrue);
+      await pumpEventQueue();
+    });
+
+    test('native wrapper forwards the link without initialize', () async {
+      expect(KlaviyoNativeWrapper().isInitialized, isFalse);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        log.add(call);
+        return call.method == 'handleUniversalTrackingLink';
+      });
+
+      await expectLater(
+        KlaviyoNativeWrapper().handleUniversalTrackingLink(trackingUrl),
+        completion(isTrue),
+      );
+      expect(log.single.method, 'handleUniversalTrackingLink');
     });
   });
 
@@ -393,6 +454,47 @@ void main() {
       });
     });
 
+    test('promotes timezone spellings in properties into location', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      for (final key in ['timezone', 'timeZone', 'time_zone']) {
+        log.clear();
+        await sdk.setProfile(
+          KlaviyoProfile(properties: {key: 'America/New_York'}),
+        );
+
+        final call = log.singleWhere((c) => c.method == 'setProfile');
+        expect(
+          call.arguments,
+          {
+            'profile': {
+              'location': {'timezone': 'America/New_York'},
+            },
+          },
+          reason: key,
+        );
+      }
+    });
+
+    test('sends KlaviyoLocation.timezone under location', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      await sdk.setProfile(
+        KlaviyoProfile(
+          location: const KlaviyoLocation(timezone: 'America/New_York'),
+        ),
+      );
+
+      final call = log.singleWhere((c) => c.method == 'setProfile');
+      expect(call.arguments, {
+        'profile': {
+          'location': {'timezone': 'America/New_York'},
+        },
+      });
+    });
+
     test('promotes snake_case identifiers in properties', () async {
       final sdk = KlaviyoSDK();
       await sdk.initialize(apiKey: 'KEY_1');
@@ -546,6 +648,29 @@ void main() {
 
       final call = log.singleWhere((c) => c.method == 'setProfileProperties');
       expect(call.arguments['properties'], {'first_name': 'Ada'});
+    });
+
+    test('setProfileAttribute sends every timezone spelling as timezone',
+        () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      for (final key in [
+        ProfileProperty.timezone,
+        'timeZone',
+        'time_zone',
+        'TimeZone',
+      ]) {
+        log.clear();
+        await sdk.setProfileAttribute(key, 'America/New_York');
+
+        final call = log.singleWhere((c) => c.method == 'setProfileProperties');
+        expect(
+          call.arguments['properties'],
+          {'timezone': 'America/New_York'},
+          reason: key,
+        );
+      }
     });
 
     test('routes identifier keys to the identifier setters', () async {
@@ -1011,6 +1136,58 @@ void main() {
         'score': 1.25,
         'samples': Float64List.fromList([1.0, 2.0]),
       });
+    });
+  });
+
+  group('KlaviyoSDK.setBadgeCount', () {
+    setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.iOS);
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('sends the count to the native layer on iOS', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+
+      sdk.setBadgeCount(3);
+      await pumpEventQueue();
+
+      final call = log.singleWhere((c) => c.method == 'setBadgeCount');
+      expect(call.arguments, {'count': 3});
+    });
+
+    test('logs a channel error instead of letting it escape', () async {
+      final sdk = KlaviyoSDK();
+      await sdk.initialize(apiKey: 'KEY_1');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+        throw PlatformException(code: 'BADGE_ERROR', message: 'native failure');
+      });
+      final records = <LogRecord>[];
+      final sub = Logger('KlaviyoSDK').onRecord.listen(records.add);
+      addTearDown(sub.cancel);
+
+      final uncaught = <Object>[];
+      await runZonedGuarded(
+        () async {
+          sdk.setBadgeCount(7);
+          await pumpEventQueue();
+        },
+        (error, _) => uncaught.add(error),
+      );
+
+      expect(uncaught, isEmpty);
+      expect(
+        records.where(
+          (r) =>
+              r.level == Level.WARNING &&
+              r.message.contains('Failed to set the badge count to 7') &&
+              r.message.contains('native failure'),
+        ),
+        hasLength(1),
+      );
+      expect(
+        records.where((r) => r.message.contains('Set the badge count')),
+        isEmpty,
+      );
     });
   });
 }
