@@ -928,6 +928,7 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.resetProfile()
                     initialPushNotification = null
+                    cachedPushAction = null
                     clearPendingWebLinkTap(applicationContext)
                     result.success(null)
                 } catch (e: Exception) {
