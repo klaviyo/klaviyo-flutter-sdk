@@ -5,9 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Looper
 import com.klaviyo.analytics.Klaviyo
-import com.klaviyo.analytics.model.Event
-import com.klaviyo.analytics.model.EventKey
-import com.klaviyo.analytics.model.EventMetric
 import com.klaviyo.analytics.state.ProfileEventObserver
 import com.klaviyo.analytics.state.State
 import com.klaviyo.core.Constants
@@ -169,12 +166,17 @@ class KlaviyoFlutterSdkPluginEngineTest {
     @After
     fun tearDown() {
         attached.toList().forEach { detach(it) }
-        KlaviyoFlutterSdkPlugin.resetEmittedOpens()
         KlaviyoFlutterSdkPlugin.resetCachedPushToken()
         setAutomaticPushTokenForwarding(null)
         Registry.unregister<State>()
+        KlaviyoFlutterSdkPlugin.clearPendingWebLinkTap(RuntimeEnvironment.getApplication())
         unmockkAll()
     }
+
+    private fun webLinkTap(
+        url: String = "https://example.com",
+        intent: Intent = Intent().putExtra("${Constants.PACKAGE_PREFIX}web_url", url),
+    ) = KlaviyoFlutterSdkPlugin.onWebLinkTap(RuntimeEnvironment.getApplication(), intent, url)
 
     private fun registerState(): MutableList<ProfileEventObserver> {
         val observers = mutableListOf<ProfileEventObserver>()
@@ -385,6 +387,18 @@ class KlaviyoFlutterSdkPluginEngineTest {
     }
 
     @Test
+    fun `repeated taps for the same push are delivered each time`() {
+        val ui = attach()
+        ui.attachActivity()
+        ui.listen()
+
+        ui.deliverNewIntent(pushOpenIntent())
+        ui.deliverNewIntent(pushOpenIntent())
+
+        assertEquals(2, ui.pushOpens().size)
+    }
+
+    @Test
     fun `configuration change keeps the ui engine primary`() {
         val headless = attach()
         headless.listen()
@@ -447,54 +461,45 @@ class KlaviyoFlutterSdkPluginEngineTest {
     }
 
     @Test
-    fun `web-link tap with two engines attached emits once to the primary`() {
-        val observers = registerState()
+    fun `web-link tap with two engines attached emits one open and one action to the primary`() {
         val primary = attach()
         primary.attachActivity()
         primary.listen()
         val secondary = attach()
         secondary.listen()
 
-        assertEquals(1, observers.size)
-
-        val openedPush =
-            Event(EventMetric.CUSTOM("\$opened_push")).apply {
-                this[EventKey.CUSTOM("web_url")] = "https://example.com"
-            }
-        observers.forEach { it(openedPush) }
-        shadowOf(Looper.getMainLooper()).idle()
+        webLinkTap()
 
         assertEquals(1, primary.webUrlOpens().size)
         assertEquals(mapOf("url" to "https://example.com"), primary.webUrlOpens().single()["data"])
-        assertEquals(0, secondary.webUrlOpens().size)
         assertEquals(1, primary.pushOpens().size)
         assertEquals(primary.webUrlOpens().single(), primary.pushOpens().single()["action"])
-        assertEquals(0, secondary.pushOpens().size)
+        assertEquals(mapOf("web_url" to "https://example.com"), primary.pushOpens().single()["data"])
+        assertEquals(0, secondary.messenger.sent.size)
     }
 
     @Test
-    fun `web-link tap before any engine listens is held and delivered once to the primary`() {
-        val observers = registerState()
+    fun `web-link button tap with no engine attached replays once to the first engine that listens`() {
+        val intent =
+            Intent()
+                .putExtra("${Constants.PACKAGE_PREFIX}Button ID", "b1")
+                .putExtra("${Constants.PACKAGE_PREFIX}Button Label", "Shop")
+        webLinkTap("https://example.com/shop", intent)
+
         val engine = attach()
-        engine.attachActivity()
-
-        val openedPush =
-            Event(EventMetric.CUSTOM("\$opened_push")).apply {
-                this[EventKey.CUSTOM("Button ID")] = "b1"
-                this[EventKey.CUSTOM("Button Action")] = "Open URL"
-                this[EventKey.CUSTOM("Button Link")] = "https://example.com/shop"
-                this[EventKey.CUSTOM("_k")] = "{\"tm\":\"replay-1\"}"
-            }
-        observers.forEach { it(openedPush) }
-        observers.forEach { it(openedPush) }
-        shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(0, engine.pushOpens().size)
-
         engine.listen()
+        val later = attach()
+        later.listen()
 
         assertEquals(1, engine.pushOpens().size)
         assertEquals(1, engine.pushActions().size)
-        assertEquals("open_url", (engine.pushActions().single()["data"] as Map<*, *>)["action"])
+        val action = engine.pushActions().single()
+        assertEquals(action, engine.pushOpens().single()["action"])
+        assertEquals(
+            mapOf("id" to "b1", "action" to "open_url", "url" to "https://example.com/shop", "label" to "Shop"),
+            action["data"],
+        )
+        assertEquals(0, later.messenger.sent.size)
     }
 
     class SubclassedPushService : KlaviyoFlutterPushService() {

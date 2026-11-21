@@ -255,4 +255,21 @@ class PushLaunchTapTest {
 
         assertNull(getInitialPushNotification())
     }
+
+    @Test
+    fun `resetProfile clears a held push action`() {
+        KlaviyoFlutterSdkPlugin::class.java.getDeclaredField("cachedPushAction").apply {
+            isAccessible = true
+            set(null, mapOf("type" to "push_open_web_url", "data" to mapOf("url" to "https://example.com")))
+        }
+
+        plugin.onMethodCall(MethodCall("resetProfile", null), mockk(relaxed = true))
+
+        val held =
+            KlaviyoFlutterSdkPlugin::class.java.getDeclaredField("cachedPushAction").run {
+                isAccessible = true
+                get(null)
+            }
+        assertNull(held)
+    }
 }
