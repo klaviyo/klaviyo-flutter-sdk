@@ -50,8 +50,10 @@ class KlaviyoFlutterInitProviderTest {
         receiver.onPushTap(Intent(), PushTapDestination.External("https://example.com"))
 
         val saved = JSONObject(pendingTap() ?: "{}").optJSONObject("payload")
-        assertEquals("push_open_web_url", saved?.optString("type"))
-        assertEquals("https://example.com", saved?.optJSONObject("data")?.optString("url"))
+        assertEquals("push_notification_opened", saved?.optString("type"))
+        val action = saved?.optJSONObject("action")
+        assertEquals("push_open_web_url", action?.optString("type"))
+        assertEquals("https://example.com", action?.optJSONObject("data")?.optString("url"))
     }
 
     @Test
