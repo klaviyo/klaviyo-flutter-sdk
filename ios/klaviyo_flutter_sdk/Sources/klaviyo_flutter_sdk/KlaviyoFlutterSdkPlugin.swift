@@ -41,8 +41,13 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     var backgroundChannel: FlutterMethodChannel?
     var isBackgroundHandlerRegistered = false
     var pendingBackgroundPushData: BackgroundPushDataDelivery?
+    var recentPushDataKeys: [(key: String, date: Date)] = []
+    static let recentPushDataWindow: TimeInterval = 30
+    static let recentPushDataLimit = 10
 
-    var hasStreamListener: Bool { eventSink != nil }
+    var hasStreamListener: Bool {
+        eventSink != nil
+    }
 
     // MARK: - Flutter Plugin Registration
 

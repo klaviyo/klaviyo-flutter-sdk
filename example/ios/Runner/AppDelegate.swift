@@ -20,6 +20,8 @@ class AppDelegate: FlutterAppDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        KlaviyoFlutterSdkPlugin.shared.handleWillPresent(notification)
+
         // Show banner, sound, badge even in foreground
         completionHandler([.banner, .sound, .badge])
     }

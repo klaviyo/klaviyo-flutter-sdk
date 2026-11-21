@@ -154,6 +154,10 @@ import klaviyo_flutter_sdk
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // If your willPresent override doesn't call super, add this line.
+        // The plugin receives willPresent automatically when it does.
+        KlaviyoFlutterSdkPlugin.shared.handleWillPresent(notification)
+
         // Show banner, sound, and badge even when the app is open
         completionHandler([.banner, .sound, .badge])
 
@@ -657,7 +661,12 @@ The same pushes still arrive on `onPushNotification` as `silent_push_received` e
 
 #### iOS
 
-iOS delivers these pushes through `didReceiveRemoteNotification:fetchCompletionHandler:` in your `AppDelegate.swift`. Klaviyo sends key/value pairs together with `content-available`, which is what makes iOS call it for visible pushes too. The setup in [iOS Setup](#ios-setup) forwards every push to `KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo:fetchCompletionHandler:)`; the plugin picks out silent pushes and pushes with key/value pairs, and calls the completion handler for every push. This forwarding step is required: `FlutterAppDelegate` doesn't pass this callback to plugins ([flutter/flutter#155479](https://github.com/flutter/flutter/issues/155479)).
+iOS delivers these pushes through `didReceiveRemoteNotification:fetchCompletionHandler:` in your `AppDelegate.swift`. Klaviyo only sends `content-available` with a visible push that carries key/value pairs when Background Processing is on for the message; with it off, iOS never calls that method for the push. The setup in [iOS Setup](#ios-setup) forwards every push to `KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo:fetchCompletionHandler:)`; the plugin picks out silent pushes and pushes with key/value pairs, and calls the completion handler for every push. This forwarding step is required: Flutter does forward `didReceiveRemoteNotification` to plugins, but the first plugin that returns `YES` (for example `firebase_messaging`) wins and the rest never see it, so forward it explicitly ([flutter/flutter#155479](https://github.com/flutter/flutter/issues/155479)).
+
+Where key/value pairs reach Dart for a visible push:
+
+- **In the foreground**, they reach `onPushData` either way. The plugin also observes `userNotificationCenter(_:willPresent:withCompletionHandler:)`, which iOS calls for every push shown in the foreground, so Background Processing doesn't matter. If your `willPresent` override doesn't call `super`, call `KlaviyoFlutterSdkPlugin.shared.handleWillPresent(notification)` in it, as in the iOS setup. A push seen by both callbacks reaches `onPushData` once.
+- **In the background**, they reach Dart only when Background Processing is on (through `onBackgroundPushData`), or when the user taps the push (`onPushOpened`).
 
 Delivery on arrival is best effort on iOS. The system decides whether to wake your app for a `content-available` push, and it throttles or skips these wakes based on battery, Low Power Mode, how often you send them, and whether the user swiped the app away. Don't rely on push data for anything that must happen; for a visible push, the opened event still fires when the user taps it.
 

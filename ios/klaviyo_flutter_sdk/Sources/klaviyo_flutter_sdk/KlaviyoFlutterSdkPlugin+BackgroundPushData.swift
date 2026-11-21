@@ -1,6 +1,7 @@
 import Flutter
 import os
 import UIKit
+import UserNotifications
 
 /// A background push waiting for the Dart handler, with the system completion handler
 /// that must be called exactly once.
@@ -19,7 +20,9 @@ final class BackgroundPushDataDelivery {
         self.completionHandler = completionHandler
     }
 
-    var isFinished: Bool { completionHandler == nil }
+    var isFinished: Bool {
+        completionHandler == nil
+    }
 
     /// Starts a background task and schedules `finish(.failed)` after `timeout` seconds.
     func start() {
@@ -84,7 +87,7 @@ extension KlaviyoFlutterSdkPlugin {
         }
 
         if UIApplication.shared.applicationState != .background {
-            emitPushDataToStream(userInfo: userInfo)
+            emitForegroundPushData(userInfo: userInfo)
             completionHandler(.newData)
             return
         }
@@ -114,6 +117,72 @@ extension KlaviyoFlutterSdkPlugin {
             pendingBackgroundPushData?.finish(.noData)
             pendingBackgroundPushData = delivery
         }
+    }
+
+    /// Delivers the key/value pairs of a visible push that arrives while the app is not in the
+    /// background, from `userNotificationCenter(_:willPresent:withCompletionHandler:)`. It only
+    /// observes: it never calls the completion handler and never changes how the notification is
+    /// presented. Hosts whose `willPresent` override doesn't call `super` call this themselves.
+    ///
+    /// A push that also reaches `handleSilentPush(userInfo:fetchCompletionHandler:)` reaches Dart once.
+    public func handleWillPresent(_ notification: UNNotification) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { self.handleWillPresent(notification) }
+            return
+        }
+
+        let userInfo = notification.request.content.userInfo
+        guard userInfo["key_value_pairs"] != nil,
+              UIApplication.shared.applicationState != .background
+        else { return }
+
+        emitForegroundPushData(userInfo: userInfo, requestIdentifier: notification.request.identifier)
+    }
+
+    /// Receives `willPresent` automatically through `addApplicationDelegate`. It does not call the
+    /// completion handler; the host's own `UNUserNotificationCenterDelegate` owns it.
+    @objc
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        handleWillPresent(notification)
+    }
+
+    /// Emits push data to the stream unless the same push was already emitted in the last
+    /// `recentPushDataWindow` seconds. Main thread only.
+    func emitForegroundPushData(userInfo: [AnyHashable: Any], requestIdentifier: String? = nil) {
+        if let dedupeKey = Self.pushDataDedupeKey(userInfo: userInfo, requestIdentifier: requestIdentifier) {
+            let current = Date()
+            recentPushDataKeys.removeAll { current.timeIntervalSince($0.date) > Self.recentPushDataWindow }
+            if recentPushDataKeys.contains(where: { $0.key == dedupeKey }) {
+                return
+            }
+            recentPushDataKeys.append((key: dedupeKey, date: current))
+            if recentPushDataKeys.count > Self.recentPushDataLimit {
+                recentPushDataKeys.removeFirst(recentPushDataKeys.count - Self.recentPushDataLimit)
+            }
+        }
+        emitPushDataToStream(userInfo: userInfo)
+    }
+
+    /// The Klaviyo tracking id (`_k`) identifies a push across `willPresent` and
+    /// `didReceiveRemoteNotification`. Without one, the notification request identifier is used when
+    /// the caller has it. Returns nil when neither exists, which means no dedupe.
+    static func pushDataDedupeKey(userInfo: [AnyHashable: Any], requestIdentifier: String?) -> String? {
+        if let tracking = userInfo["_k"] {
+            if JSONSerialization.isValidJSONObject(tracking),
+               let data = try? JSONSerialization.data(withJSONObject: tracking, options: [.sortedKeys]),
+               let text = String(data: data, encoding: .utf8) {
+                return "k:\(text)"
+            }
+            return "k:\(tracking)"
+        }
+        if let requestIdentifier {
+            return "id:\(requestIdentifier)"
+        }
+        return nil
     }
 
     /// True for a push with no `aps.alert`, or any push carrying `key_value_pairs`.
