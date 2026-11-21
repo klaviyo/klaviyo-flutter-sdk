@@ -167,11 +167,11 @@ extension KlaviyoFlutterSdkPlugin {
         emitPushDataToStream(userInfo: userInfo)
     }
 
-    /// The Klaviyo tracking id (`_k`) identifies a push across `willPresent` and
-    /// `didReceiveRemoteNotification`. Without one, the notification request identifier is used when
-    /// the caller has it. Returns nil when neither exists, which means no dedupe.
+    /// The Klaviyo tracking dictionary (`_k`, top level or under `body`) identifies a push across
+    /// `willPresent` and `didReceiveRemoteNotification`. Without one, the notification request
+    /// identifier is used when the caller has it. Returns nil when neither exists: no dedupe.
     static func pushDataDedupeKey(userInfo: [AnyHashable: Any], requestIdentifier: String?) -> String? {
-        if let tracking = userInfo["_k"] {
+        if let tracking = userInfo["_k"] ?? (userInfo["body"] as? [String: Any])?["_k"] {
             if JSONSerialization.isValidJSONObject(tracking),
                let data = try? JSONSerialization.data(withJSONObject: tracking, options: [.sortedKeys]),
                let text = String(data: data, encoding: .utf8) {
