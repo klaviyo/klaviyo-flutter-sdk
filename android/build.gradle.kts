@@ -58,7 +58,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEa
     compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
 }
 
-val klaviyoSdkVersion = "ecm~mage-1576~trampoline-web-link-listener-SNAPSHOT"
+val klaviyoSdkVersion = "cf9fec8"
 
 // Matches Groovy's String.toBoolean(): "true", "y" or "1", trimmed and case-insensitive.
 fun booleanProperty(
