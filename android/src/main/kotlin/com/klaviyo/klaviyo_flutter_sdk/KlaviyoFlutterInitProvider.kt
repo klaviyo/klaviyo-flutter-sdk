@@ -4,20 +4,26 @@ import android.content.ContentProvider
 import android.content.ContentValues
 import android.database.Cursor
 import android.net.Uri
-import com.klaviyo.core.ExternalPushTapReceiver
+import com.klaviyo.core.PushTapDestination
+import com.klaviyo.core.PushTapReceiver
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
 
 /**
- * Registers the plugin's [ExternalPushTapReceiver] at process start, so web-link push taps the
- * native trampoline opens in the browser reach the plugin even when no Flutter engine is running.
+ * Registers the plugin's [PushTapReceiver] at process start, so web-link push taps the native
+ * trampoline opens in the browser reach the plugin even when no Flutter engine is running. Other
+ * taps launch the host activity, where [KlaviyoFlutterSdkPlugin] reads them from the intent.
  */
 internal class KlaviyoFlutterInitProvider : ContentProvider() {
     @OptIn(AdvancedAPI::class)
     override fun onCreate(): Boolean {
         val appContext = context?.applicationContext ?: return true
-        Registry.register<ExternalPushTapReceiver>(
-            ExternalPushTapReceiver { intent, url -> KlaviyoFlutterSdkPlugin.onWebLinkTap(appContext, intent, url) },
+        Registry.register<PushTapReceiver>(
+            PushTapReceiver { intent, destination ->
+                if (destination is PushTapDestination.External) {
+                    KlaviyoFlutterSdkPlugin.onWebLinkTap(appContext, intent, destination.url)
+                }
+            },
         )
         return true
     }
