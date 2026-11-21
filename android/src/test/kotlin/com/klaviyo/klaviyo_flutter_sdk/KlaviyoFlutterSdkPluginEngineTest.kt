@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Looper
 import com.klaviyo.analytics.Klaviyo
+import com.klaviyo.core.Constants
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
@@ -118,6 +119,8 @@ class KlaviyoFlutterSdkPluginEngineTest {
 
         fun pushActions() = messenger.sent.filter { it["type"] == "push_action_button_tapped" }
 
+        fun webUrlOpens() = messenger.sent.filter { it["type"] == "push_open_web_url" }
+
         fun registerForms() =
             plugin.onMethodCall(
                 MethodCall("registerForInAppForms", mapOf("configuration" to mapOf("sessionTimeoutDuration" to 60))),
@@ -153,8 +156,14 @@ class KlaviyoFlutterSdkPluginEngineTest {
     @After
     fun tearDown() {
         attached.toList().forEach { detach(it) }
+        KlaviyoFlutterSdkPlugin.clearPendingWebLinkTap(RuntimeEnvironment.getApplication())
         unmockkAll()
     }
+
+    private fun webLinkTap(
+        url: String = "https://example.com",
+        intent: Intent = Intent().putExtra("${Constants.PACKAGE_PREFIX}web_url", url),
+    ) = KlaviyoFlutterSdkPlugin.onWebLinkTap(RuntimeEnvironment.getApplication(), intent, url)
 
     private fun attach() =
         Engine().also {
@@ -425,5 +434,47 @@ class KlaviyoFlutterSdkPluginEngineTest {
 
     private companion object {
         const val EVENTS = "klaviyo_events"
+    }
+
+    @Test
+    fun `web-link tap with two engines attached emits one open and one action to the primary`() {
+        val primary = attach()
+        primary.attachActivity()
+        primary.listen()
+        val secondary = attach()
+        secondary.listen()
+
+        webLinkTap()
+
+        assertEquals(1, primary.webUrlOpens().size)
+        assertEquals(mapOf("url" to "https://example.com"), primary.webUrlOpens().single()["data"])
+        assertEquals(1, primary.pushOpens().size)
+        assertEquals(primary.webUrlOpens().single(), primary.pushOpens().single()["action"])
+        assertEquals(mapOf("web_url" to "https://example.com"), primary.pushOpens().single()["data"])
+        assertEquals(0, secondary.messenger.sent.size)
+    }
+
+    @Test
+    fun `web-link button tap with no engine attached replays once to the first engine that listens`() {
+        val intent =
+            Intent()
+                .putExtra("${Constants.PACKAGE_PREFIX}Button ID", "b1")
+                .putExtra("${Constants.PACKAGE_PREFIX}Button Label", "Shop")
+        webLinkTap("https://example.com/shop", intent)
+
+        val engine = attach()
+        engine.listen()
+        val later = attach()
+        later.listen()
+
+        assertEquals(1, engine.pushOpens().size)
+        assertEquals(1, engine.pushActions().size)
+        val action = engine.pushActions().single()
+        assertEquals(action, engine.pushOpens().single()["action"])
+        assertEquals(
+            mapOf("id" to "b1", "action" to "open_url", "url" to "https://example.com/shop", "label" to "Shop"),
+            action["data"],
+        )
+        assertEquals(0, later.messenger.sent.size)
     }
 }

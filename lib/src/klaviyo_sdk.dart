@@ -742,10 +742,9 @@ class KlaviyoSDK {
 
   /// Klaviyo pushes the user tapped.
   ///
-  /// Emits one [KlaviyoPushOpened] per supported notification or action-button
-  /// tap. On iOS, this includes web URL taps. On Android, web URL taps open an
-  /// external handler and do not reach this stream. [KlaviyoPushOpened.tap]
-  /// says which kind of tap occurred.
+  /// Emits exactly one [KlaviyoPushOpened] per tap, whether the user tapped
+  /// the notification body, an action button, or a push that opens a web URL.
+  /// [KlaviyoPushOpened.tap] says which.
   ///
   /// An open that arrives before anyone subscribes (for example, the tap that
   /// launched the app) is held; only the most recent one is kept. The first

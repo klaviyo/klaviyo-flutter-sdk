@@ -47,6 +47,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import org.json.JSONObject
 import java.net.SocketException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -167,14 +168,138 @@ class KlaviyoFlutterSdkPlugin :
             sink.success(payload)
             return true
         }
+
+        private const val PENDING_WEB_LINK_TAP_PREFS = "com.klaviyo.klaviyo_flutter_sdk"
+        private const val PENDING_WEB_LINK_TAP_KEY = "pending_web_link_tap"
+        internal const val PENDING_WEB_LINK_TAP_TTL_MS = 24 * 60 * 60 * 1000L
+
+        /**
+         * Delivers a web-link tap from the native trampoline to the primary engine, or saves it
+         * for the next engine attach when no engine is attached. Main thread only.
+         */
+        internal fun onWebLinkTap(
+            context: Context,
+            intent: Intent,
+            url: String,
+        ) {
+            val payload = webLinkOpenedPayload(intent, url)
+            if (instance == null) savePendingWebLinkTap(context, payload) else emitWebLinkOpen(payload)
+        }
+
+        /**
+         * Builds the `push_notification_opened` event for a web-link tap, with the push payload
+         * under `data` and its push-action payload from [webLinkTapPayload] under `action`.
+         */
+        internal fun webLinkOpenedPayload(
+            intent: Intent,
+            url: String,
+        ): Map<String, Any?> =
+            mapOf(
+                "type" to "push_notification_opened",
+                "data" to klaviyoExtras(intent),
+                "action" to webLinkTapPayload(intent, url),
+            )
+
+        /**
+         * Emits a web-link open built by [webLinkOpenedPayload] to the primary engine: the open
+         * for `onPushOpened`, then its action for `onPushAction`. Each is held until an engine
+         * listens. Main thread only.
+         */
+        @Suppress("UNCHECKED_CAST")
+        private fun emitWebLinkOpen(payload: Map<String, Any?>) {
+            cachedPushAction = null
+            if (!emitToPrimary(payload)) {
+                Registry.log.verbose("Flutter not ready. Caching notification open event.")
+                cachedOpenedNotification = payload
+            }
+            val action = payload["action"] as? Map<String, Any?> ?: return
+            if (!emitToPrimary(action)) {
+                Registry.log.verbose("Flutter not ready. Caching push action event.")
+                cachedPushAction = action
+            }
+        }
+
+        /**
+         * The Klaviyo push payload carried by [intent]'s extras, without the `com.klaviyo.`
+         * prefix, so the Dart payload matches the iOS `userInfo` shape.
+         */
+        internal fun klaviyoExtras(intent: Intent): Map<String, Any?> {
+            val extras = intent.extras ?: return emptyMap()
+            return extras
+                .keySet()
+                .filter { it.startsWith(Constants.PACKAGE_PREFIX) }
+                .associate { key ->
+                    key.removePrefix(Constants.PACKAGE_PREFIX) to
+                        when (val value = extras.get(key)) {
+                            is String, is Int, is Long, is Double, is Boolean -> value
+                            else -> value?.toString()
+                        }
+                }
+        }
+
+        /**
+         * Maps a web-link tap to the iOS push-action payload: `push_action_button_tapped` for an
+         * `open_url` button, else `push_open_web_url`.
+         */
+        internal fun webLinkTapPayload(
+            intent: Intent,
+            url: String,
+        ): Map<String, Any?> {
+            val buttonId =
+                intent.getStringExtra(Constants.PACKAGE_PREFIX + "Button ID")
+                    ?: return mapOf("type" to "push_open_web_url", "data" to mapOf("url" to url))
+            val data = mutableMapOf<String, Any?>("id" to buttonId, "action" to "open_url", "url" to url)
+            intent.getStringExtra(Constants.PACKAGE_PREFIX + "Button Label")?.let { data["label"] = it }
+            return mapOf("type" to "push_action_button_tapped", "data" to data)
+        }
+
+        private fun pendingWebLinkTapPrefs(context: Context) =
+            context.getSharedPreferences(PENDING_WEB_LINK_TAP_PREFS, Context.MODE_PRIVATE)
+
+        private fun savePendingWebLinkTap(
+            context: Context,
+            payload: Map<String, Any?>,
+        ) {
+            Registry.log.verbose("No Flutter engine attached. Saving web-link tap.")
+            val saved = JSONObject().put("time", System.currentTimeMillis()).put("payload", JSONObject(payload))
+            pendingWebLinkTapPrefs(context).edit().putString(PENDING_WEB_LINK_TAP_KEY, saved.toString()).apply()
+        }
+
+        internal fun clearPendingWebLinkTap(context: Context) {
+            pendingWebLinkTapPrefs(context).edit().remove(PENDING_WEB_LINK_TAP_KEY).apply()
+        }
+
+        /** Emits or holds a saved web-link tap, if any and not expired. */
+        internal fun restorePendingWebLinkTap(context: Context) {
+            val prefs = pendingWebLinkTapPrefs(context)
+            val saved = prefs.getString(PENDING_WEB_LINK_TAP_KEY, null) ?: return
+            clearPendingWebLinkTap(context)
+            try {
+                val json = JSONObject(saved)
+                if (System.currentTimeMillis() - json.getLong("time") > PENDING_WEB_LINK_TAP_TTL_MS) return
+                emitWebLinkOpen(json.getJSONObject("payload").toMap())
+            } catch (e: Exception) {
+                Registry.log.warning("Discarding unreadable saved web-link tap", e)
+            }
+        }
+
+        private fun JSONObject.toMap(): Map<String, Any?> =
+            keys().asSequence().associateWith { key ->
+                when (val value = get(key)) {
+                    is JSONObject -> value.toMap()
+                    JSONObject.NULL -> null
+                    else -> value
+                }
+            }
     }
 
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
+        applicationContext = flutterPluginBinding.applicationContext
+        restorePendingWebLinkTap(applicationContext)
         activePlugins.add(this)
         selectInstance()
-        applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
 
@@ -854,6 +979,7 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.resetProfile()
                     initialPushNotification = null
+                    clearPendingWebLinkTap(applicationContext)
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("RESET_ERROR", "Failed to reset profile", e.message)
@@ -1126,25 +1252,8 @@ class KlaviyoFlutterSdkPlugin :
                 return
             }
 
-            val extras = intent.extras
-            if (extras != null && intent.isKlaviyoNotificationIntent) {
-                // Klaviyo namespaces all push extras with Constants.PACKAGE_PREFIX when building
-                // the tap PendingIntent. Strip it so the Dart payload matches the iOS userInfo shape.
-                val notificationData = mutableMapOf<String, Any?>()
-                for (key in extras.keySet()) {
-                    if (!key.startsWith(Constants.PACKAGE_PREFIX)) continue
-                    val unprefixedKey = key.removePrefix(Constants.PACKAGE_PREFIX)
-                    val value = extras.get(key)
-                    notificationData[unprefixedKey] =
-                        when (value) {
-                            is String -> value
-                            is Int -> value
-                            is Long -> value
-                            is Double -> value
-                            is Boolean -> value
-                            else -> value?.toString()
-                        }
-                }
+            if (intent.extras != null && intent.isKlaviyoNotificationIntent) {
+                val notificationData = klaviyoExtras(intent)
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 

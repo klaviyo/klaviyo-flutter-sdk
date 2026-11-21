@@ -561,7 +561,7 @@ Push events arrive on one typed stream per concern, the same split `firebase_mes
 | Stream | Type | Emits |
 |---|---|---|
 | `onPushToken` | `Stream<String>` | Each push token the platform delivers. Registration errors arrive through `onError`. |
-| `onPushOpened` | `Stream<KlaviyoPushOpened>` | Once for each supported notification or action-button tap. Web-link taps are supported on iOS. |
+| `onPushOpened` | `Stream<KlaviyoPushOpened>` | Once for every tap on a Klaviyo push: the body, an action button, or a push that opens a web URL. |
 | `onPushData` | `Stream<KlaviyoPushData>` (experimental) | Push data received while the app is in the foreground. See [Silent Push](#silent-push). |
 
 `KlaviyoPushOpened` and `KlaviyoPushData` both expose the full push `payload` and the push's Klaviyo key/value pairs as `keyValuePairs` (null when there are none).
@@ -585,9 +585,9 @@ KlaviyoSDK().onPushOpened.listen((opened) {
 });
 ```
 
-Each supported tap emits one event. Before 0.6.0, an iOS action-button or web URL tap emitted both `push_notification_opened` and an `onPushAction` event. On iOS, `webUrl` is set for a web URL push and for an `open_url` action button. `KlaviyoPushTap` and `KlaviyoPushButtonAction` are not enums, because later releases may add new kinds, so keep a `default` case when you switch on them.
+One tap emits one event. Before 0.6.0, an iOS action-button or web URL tap emitted both `push_notification_opened` and an `onPushAction` event. `webUrl` is set for a web URL push and for an `open_url` action button. `KlaviyoPushTap` and `KlaviyoPushButtonAction` are not enums, because later releases may add new kinds, so keep a `default` case when you switch on them.
 
-> **Android web-link taps:** a web URL push or an `open_url` button opens an external handler and does not reach `onPushOpened` or `onPushAction`.
+> **Android web-link taps:** a web URL push or an `open_url` button opens the browser without launching your app's activity, so the native SDK hands the tap to the plugin directly. If your app is running, the open reaches `onPushOpened` right away. If the app was fully killed, the plugin saves the tap and delivers it the next time your app starts and subscribes, within 24 hours. The same applies to `onPushAction`. Requires Klaviyo Android SDK 4.7.0.
 
 > **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
 
@@ -816,7 +816,7 @@ subscription.cancel();
 
 ## Push Action Events
 
-> **Deprecated:** `onPushAction` will be removed in 1.0. Use [`onPushOpened`](#handling-push-notification-opens), which emits one event per supported tap and carries the tapped button (`button`) or web URL (`webUrl`).
+> **Deprecated:** `onPushAction` will be removed in 1.0. Use [`onPushOpened`](#handling-push-notification-opens), which emits one event per tap and carries the tapped button (`button`) or web URL (`webUrl`).
 
 Subscribe to `onPushAction` to observe taps on Klaviyo pushes that carry an **Open External URL** (`open_url`) action or **action buttons**. Events are typed via the sealed `KlaviyoPushAction` class, so Dart pattern matching is exhaustive.
 
@@ -856,7 +856,7 @@ subscription.cancel();
 | `action` | `String` | `ActionButtonTapped` | One of `open_app`, `deep_link`, `open_url` |
 | `url` | `String?` | `ActionButtonTapped` | URL for `deep_link` / `open_url` buttons; `null` for `open_app` |
 
-> **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. On **iOS**, both body `open_url` taps and action-button taps surface. On **Android**, `open_url` is dispatched to an external handler by the native SDK and does **not** reach the app, so only `deep_link` / `open_app` action-button taps surface on Android.
+> **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. Body `open_url` taps (`OpenWebUrl`) and every kind of action-button tap surface on both platforms. On **Android**, a web-link tap opens the browser without launching your app's activity, so the native SDK hands the tap to the plugin directly. If your app is running, the event reaches Dart right away. If the app was fully killed, the plugin saves the tap and delivers it the next time your app starts and subscribes, as long as that's within 24 hours. A newer push open replaces a saved tap.
 
 > **Cold starts:** a push action that arrives before you subscribe is buffered and delivered once, to the first listener that subscribes. See the note under [Handling Push Notification Opens](#handling-push-notification-opens).
 
