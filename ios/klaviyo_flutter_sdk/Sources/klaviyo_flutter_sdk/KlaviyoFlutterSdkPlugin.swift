@@ -69,6 +69,9 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     }
 
     private func observeFirstActivation() {
+        if Thread.isMainThread, UIApplication.shared.applicationState == .active {
+            hasBecomeActive = true
+        }
         guard activationObserver == nil, !hasBecomeActive else { return }
         activationObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
@@ -612,7 +615,8 @@ extension KlaviyoFlutterSdkPlugin {
             "data": userInfo
         ]
 
-        if !hasBecomeActive && !launchResponseRecorded {
+        if !hasBecomeActive, !launchResponseRecorded,
+           response.actionIdentifier != UNNotificationDismissActionIdentifier {
             initialPushNotification = eventPayload
             launchResponseRecorded = true
         }
