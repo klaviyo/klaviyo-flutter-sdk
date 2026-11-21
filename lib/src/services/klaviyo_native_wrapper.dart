@@ -10,6 +10,8 @@ import '../utils/channel_value_sanitizer.dart';
 import '../utils/profile_payload.dart';
 import 'package:logging/logging.dart';
 
+const _maxBufferedPushEvents = 50;
+
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
   static const EventChannel _eventChannel = EventChannel('klaviyo_events');
@@ -44,13 +46,17 @@ class KlaviyoNativeWrapper {
     holdKey: (_) => 'push_action',
   );
   final _pushTokenController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    maxBuffered: _maxBufferedPushEvents,
+  );
   final _pushOpenedController =
       BufferedBroadcastStreamController<Map<String, dynamic>>(
     holdKey: (_) => 'push_notification_opened',
   );
   final _pushDataController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    maxBuffered: _maxBufferedPushEvents,
+  );
 
   // Getters for streams
 
