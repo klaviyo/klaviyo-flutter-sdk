@@ -4,9 +4,16 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.klaviyo.core.PushTapDestination
-import com.klaviyo.core.PushTapReceiver
 import com.klaviyo.core.Registry
+import com.klaviyo.core.config.Log
 import com.klaviyo.core.utils.AdvancedAPI
+import com.klaviyo.pushFcm.PushTapDispatcher
+import com.klaviyo.pushFcm.PushTapObserver
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
+import io.mockk.verify
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -22,23 +29,32 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class KlaviyoFlutterInitProviderTest {
     private val context: Context = RuntimeEnvironment.getApplication()
-    private lateinit var receiver: PushTapReceiver
+    private val observers = mutableListOf<PushTapObserver>()
+    private val dispatcher =
+        mockk<PushTapDispatcher>(relaxed = true) {
+            every { onPushTap(any()) } answers { observers += firstArg<PushTapObserver>() }
+        }
     private var previousInstance: KlaviyoFlutterSdkPlugin? = null
 
     @Before
     fun setUp() {
         previousInstance = KlaviyoFlutterSdkPlugin.instance
         KlaviyoFlutterSdkPlugin.instance = null
-        Robolectric.setupContentProvider(KlaviyoFlutterInitProvider::class.java)
-        receiver = Registry.get<PushTapReceiver>()
     }
 
     @After
     fun tearDown() {
-        Registry.unregister<PushTapReceiver>()
+        Registry.unregister<PushTapDispatcher>()
         KlaviyoFlutterSdkPlugin.clearPendingWebLinkTap(context)
         KlaviyoFlutterSdkPlugin.instance = previousInstance
     }
+
+    private fun createProvider() {
+        Registry.register<PushTapDispatcher>(dispatcher)
+        Robolectric.setupContentProvider(KlaviyoFlutterInitProvider::class.java)
+    }
+
+    private fun tap(destination: PushTapDestination) = observers.forEach { it.onPushTap(Intent(), destination) }
 
     private fun pendingTap(): String? =
         context
@@ -46,8 +62,17 @@ class KlaviyoFlutterInitProviderTest {
             .getString("pending_web_link_tap", null)
 
     @Test
+    fun `onCreate subscribes one observer to the push tap dispatcher`() {
+        createProvider()
+
+        assertEquals(1, observers.size)
+    }
+
+    @Test
     fun `an external tap with no engine attached is saved for the next attach`() {
-        receiver.onPushTap(Intent(), PushTapDestination.External("https://example.com"))
+        createProvider()
+
+        tap(PushTapDestination.External("https://example.com"))
 
         val saved = JSONObject(pendingTap() ?: "{}").optJSONObject("payload")
         assertEquals("push_open_web_url", saved?.optString("type"))
@@ -56,9 +81,25 @@ class KlaviyoFlutterInitProviderTest {
 
     @Test
     fun `deep link and open app taps are left to the activity intent`() {
-        receiver.onPushTap(Intent(), PushTapDestination.DeepLink(Uri.parse("myapp://home")))
-        receiver.onPushTap(Intent(), PushTapDestination.OpenApp)
+        createProvider()
+
+        tap(PushTapDestination.DeepLink(Uri.parse("myapp://home")))
+        tap(PushTapDestination.OpenApp)
 
         assertNull(pendingTap())
+    }
+
+    @Test
+    fun `onCreate logs a warning when the push tap dispatcher is unavailable`() {
+        val log = mockk<Log>(relaxed = true)
+        mockkObject(Registry)
+        every { Registry.log } returns log
+        try {
+            Robolectric.setupContentProvider(KlaviyoFlutterInitProvider::class.java)
+
+            verify { log.warning(match { it.contains("dispatcher unavailable") }, any()) }
+        } finally {
+            unmockkObject(Registry)
+        }
     }
 }
