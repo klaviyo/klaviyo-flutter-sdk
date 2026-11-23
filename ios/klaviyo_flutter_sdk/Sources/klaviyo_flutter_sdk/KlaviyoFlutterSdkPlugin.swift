@@ -605,6 +605,17 @@ extension KlaviyoFlutterSdkPlugin {
 
     public func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
+        defer {
+            _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
+        }
+        if response.actionIdentifier == UNNotificationDismissActionIdentifier {
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.info("Push notification dismissed")
+            }
+            cachedOpenedNotification = nil
+            cachedPushAction = nil
+            return
+        }
         if #available(iOS 14.0, *) {
             Logger.klaviyoFlutterSDK.info("Push notification opened")
         }
@@ -615,8 +626,7 @@ extension KlaviyoFlutterSdkPlugin {
             "data": userInfo
         ]
 
-        if !hasBecomeActive, !launchResponseRecorded,
-           response.actionIdentifier != UNNotificationDismissActionIdentifier {
+        if !hasBecomeActive, !launchResponseRecorded {
             initialPushNotification = eventPayload
             launchResponseRecorded = true
         }
@@ -634,11 +644,6 @@ extension KlaviyoFlutterSdkPlugin {
         // 3. Surface the open_url action / action-button tap as a typed push action
         // event, in parallel with the raw opened-notification event above.
         forwardPushAction(for: response, userInfo: userInfo)
-
-        // 4. Pass to Native Klaviyo SDK
-        // We pass a dummy completion handler because the Host App owns the real one.
-        // No-op: We let the host app finish the system callback
-        _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
     }
 
     /// Mirrors an `open_url` body tap or an action-button tap to Flutter as a
