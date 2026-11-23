@@ -596,7 +596,7 @@ Future<String> initialRoute() async {
 }
 ```
 
-It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. On Android, the value belongs to the Flutter engine that captured the launch tap; if your app runs more than one engine, the others return `null`. `resetProfile()` does not flush opens or actions still queued on the native side.
+It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. On Android, the value belongs to the Flutter engine that captured the launch tap; if your app runs more than one engine, the others return `null`. Reset does not clear notification opens still queued on the native side. It clears pending push actions on Android but leaves them queued on iOS.
 
 #### Identifying Klaviyo Notifications
 
