@@ -1211,13 +1211,6 @@ extension KlaviyoFlutterSdkPlugin {
             // Dart model exposes, preferring the configured value and falling
             // back to aps.badge.
             "badge": message.badge.map { $0.value ?? $0.apsBadge } ?? nil,
-            // The native SDK stores read/archived/expiry timestamps but does
-            // not expose them on its public InboxMessage yet, so they are
-            // omitted here and read as null in Dart.
-            //
-            // Follow-up (MAGE-1722/MAGE-1723): add readUpdatedAt,
-            // archivedUpdatedAt, updatedAt and expiredAt here (epoch millis via
-            // `epochMillis`) once the native message carries them.
             "isRead": message.isRead,
             "isArchived": message.isArchived,
             "source": message.source.rawValue

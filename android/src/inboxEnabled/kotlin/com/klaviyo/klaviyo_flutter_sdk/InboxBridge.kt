@@ -204,15 +204,6 @@ internal object InboxBridge {
             "receivedAt" to receivedAt,
             "collapseId" to collapseId,
             "badge" to badge,
-            // The native module stores read/archived/expiry timestamps on its
-            // entity but does not expose them on the public InboxMessage, so
-            // they are omitted here and read as null in Dart. Android also has
-            // no catch-all updated-at in its storage.
-            //
-            // TODO(MAGE-1722/MAGE-1723): add readUpdatedAt, archivedUpdatedAt,
-            // updatedAt and expiredAt here once the public InboxMessage carries
-            // them. Note Android spells the expiry instant `expiresAt`; the Dart
-            // field is `expiredAt`.
             "isRead" to isRead,
             "isArchived" to isArchived,
             "source" to source.rawValue,
