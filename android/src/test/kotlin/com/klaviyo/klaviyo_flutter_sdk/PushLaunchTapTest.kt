@@ -32,6 +32,7 @@ import org.junit.Test
 
 class PushLaunchTapTest {
     private lateinit var plugin: KlaviyoFlutterSdkPlugin
+    private lateinit var engineBinding: FlutterPlugin.FlutterPluginBinding
     private lateinit var attachedActivity: Activity
     private val newIntentListeners = mutableListOf<PluginRegistry.NewIntentListener>()
     private val lifecycleCallbacks = mutableListOf<Application.ActivityLifecycleCallbacks>()
@@ -41,8 +42,18 @@ class PushLaunchTapTest {
             every { it.success(any()) } answers { sent.add(firstArg()) }
         }
 
+    private fun clearStaticEventCaches() {
+        listOf("cachedSilentPush", "cachedOpenedNotification", "cachedPushAction").forEach { name ->
+            KlaviyoFlutterSdkPlugin::class.java.getDeclaredField(name).apply {
+                isAccessible = true
+                set(null, null)
+            }
+        }
+    }
+
     @Before
     fun setUp() {
+        clearStaticEventCaches()
         mockkObject(Registry)
         every { Registry.log } returns mockk(relaxed = true)
         every { Registry.lifecycleMonitor } returns mockk(relaxed = true)
@@ -59,7 +70,7 @@ class PushLaunchTapTest {
         every { application.unregisterActivityLifecycleCallbacks(any()) } just Runs
 
         plugin = KlaviyoFlutterSdkPlugin()
-        val engineBinding =
+        engineBinding =
             mockk<FlutterPlugin.FlutterPluginBinding>(relaxed = true) {
                 every { applicationContext } returns application
             }
@@ -68,7 +79,9 @@ class PushLaunchTapTest {
 
     @After
     fun tearDown() {
+        plugin.onDetachedFromEngine(engineBinding)
         KlaviyoFlutterSdkPlugin.instance = null
+        clearStaticEventCaches()
         unmockkAll()
     }
 

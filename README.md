@@ -596,7 +596,7 @@ Future<String> initialRoute() async {
 }
 ```
 
-It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`.
+It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. On Android, the value belongs to the Flutter engine that captured the launch tap; if your app runs more than one engine, the others return `null`. `resetProfile()` does not flush opens or actions still queued on the native side.
 
 #### Identifying Klaviyo Notifications
 
@@ -626,7 +626,7 @@ The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM se
 
 #### Delivery Guarantees
 
-Your listener fires for every Klaviyo silent push, with the full payload and its JSON object values decoded to maps on both platforms. Delivery needs a live Flutter engine: foreground **and backgrounded** apps both receive events, a terminated one does not. Silent pushes that arrive before your listener subscribes are held in memory and delivered when it does (before `initialize()`, only the most recent one). Nothing survives the process dying.
+Silent-push events carry the full payload. On iOS, the SDK forwards the notification payload as received. On Android, the SDK decodes `_k` and `key_value_pairs` into maps when it can. Other Android data fields stay strings, even if they contain JSON. Delivery needs a live Flutter engine: foreground **and backgrounded** apps both receive events, a terminated one does not. Until it can forward one to Dart, the native SDK keeps only the most recent silent push. Once forwarded, events that arrive before the first subscriber are held in a Dart-side buffer and delivered to that first subscriber. Nothing survives the process dying.
 
 > **Known limitation (Android)**: when your app isn't running, there's no Flutter engine, so silent pushes are missed. To handle them anyway, use a `KlaviyoFlutterPushService` subclass or [`firebase_messaging`](https://pub.dev/packages/firebase_messaging)'s `onBackgroundMessage` (which needs the [manifest declaration above](#using-with-firebase_messaging-or-another-fcm-library)), and guard against handling a push twice. A force-stopped app receives nothing until the user opens it. On iOS, a force-quit app gets no silent pushes until the user reopens it or restarts the device.
 
