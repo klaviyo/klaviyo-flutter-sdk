@@ -16,6 +16,7 @@ import 'tabs/forms_tab.dart';
 import 'tabs/push_tab.dart';
 import 'tabs/geofencing_tab.dart';
 import 'tabs/auth_tab.dart';
+import 'tabs/inbox_tab.dart';
 import 'screens/configure_auth_response.dart';
 import 'widgets/test_id.dart';
 
@@ -255,6 +256,12 @@ final GoRouter _router = GoRouter(
           ),
         ),
         GoRoute(
+          path: '/inbox',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: InboxTab(),
+          ),
+        ),
+        GoRoute(
           path: '/geofencing',
           pageBuilder: (context, state) => const NoTransitionPage(
             child: GeofencingTab(),
@@ -425,6 +432,14 @@ class ScaffoldWithNavBar extends StatelessWidget {
           ),
           BottomNavigationBarItem(
             icon: TestId(
+              'nav_inbox_tab',
+              merge: false,
+              child: const Icon(Icons.inbox),
+            ),
+            label: 'Inbox',
+          ),
+          BottomNavigationBarItem(
+            icon: TestId(
               'nav_auth_tab',
               merge: false,
               child: const Icon(Icons.vpn_key),
@@ -453,8 +468,11 @@ class ScaffoldWithNavBar extends StatelessWidget {
     if (location.startsWith('/geofencing')) {
       return 4;
     }
-    if (location.startsWith('/auth')) {
+    if (location.startsWith('/inbox')) {
       return 5;
+    }
+    if (location.startsWith('/auth')) {
+      return 6;
     }
     return 0;
   }
@@ -477,6 +495,9 @@ class ScaffoldWithNavBar extends StatelessWidget {
         context.go('/geofencing');
         break;
       case 5:
+        context.go('/inbox');
+        break;
+      case 6:
         context.go('/auth');
         break;
     }

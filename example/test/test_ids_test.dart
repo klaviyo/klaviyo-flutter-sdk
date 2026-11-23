@@ -28,6 +28,7 @@ void main() {
       'nav_forms_tab',
       'nav_push_tab',
       'nav_geofencing_tab',
+      'nav_inbox_tab',
       'nav_auth_tab',
       'build_info_button',
       'profile_status_text',
