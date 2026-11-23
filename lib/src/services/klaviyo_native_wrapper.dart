@@ -28,16 +28,31 @@ class KlaviyoNativeWrapper {
 
   // Stream controllers for native events – buffer events that arrive
   // before any listener subscribes, then flush on first subscription.
+  // The pending push open and the pending push action take one slot each.
   final _pushNotificationController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (event) => event['type'] == 'push_notification_opened'
+        ? 'push_notification_opened'
+        : null,
+  );
   final _formEventController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _authTokenRequestController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _pushActionController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (_) => 'push_action',
+  );
 
   // Getters for streams
+
+  /// Push token, token error, silent push and push opened events.
+  ///
+  /// A `push_notification_opened` event that arrives while no listener is
+  /// subscribed is buffered; only the most recent one is kept. The first
+  /// subscriber receives it once, then the buffer is cleared, so later
+  /// subscribers don't receive it. Use [getInitialPushNotification] to read
+  /// the tap that launched the app at any time.
   Stream<Map<String, dynamic>> get onPushNotification =>
       _pushNotificationController.stream;
 
@@ -55,13 +70,16 @@ class KlaviyoNativeWrapper {
   /// `push_action_button_tapped`). Kept on a dedicated stream so they do not
   /// surface on [onPushNotification]; see [KlaviyoSDK.onPushAction] for the
   /// typed view.
+  ///
+  /// A push action that arrives while no listener is subscribed is buffered;
+  /// only the most recent one is kept, and each new push open clears it. The
+  /// first subscriber receives it once, then the buffer is cleared, so later
+  /// subscribers don't receive it.
   Stream<Map<String, dynamic>> get onPushActionEvent =>
       _pushActionController.stream;
 
   /// Initialize the native SDK wrapper
-  Future<void> initialize({
-    required String apiKey,
-  }) async {
+  Future<void> initialize({required String apiKey}) async {
     try {
       // Set up event listener only once — re-subscribing would cause duplicate
       // events or orphaned subscriptions. Use a dedicated flag rather than
@@ -72,9 +90,7 @@ class KlaviyoNativeWrapper {
       }
 
       // Always forward to native — allows re-initialization with a new API key
-      await _channel.invokeMethod('initialize', {
-        'apiKey': apiKey,
-      });
+      await _channel.invokeMethod('initialize', {'apiKey': apiKey});
 
       _apiKey = apiKey;
       _isInitialized = true;
@@ -263,9 +279,7 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setPushToken', {
-        'token': token,
-      });
+      await _channel.invokeMethod('setPushToken', {'token': token});
     } catch (e) {
       throw KlaviyoException('Failed to set push token: $e');
     }
@@ -281,6 +295,27 @@ class KlaviyoNativeWrapper {
       return result;
     } catch (e) {
       throw KlaviyoException('Failed to get push token: $e');
+    }
+  }
+
+  /// The push notification tap that launched or relaunched the app from a
+  /// killed state, or `null` if the app wasn't launched by a push tap.
+  ///
+  /// The map has the same shape as the `push_notification_opened` event on
+  /// [onPushNotification]. The same value is returned on every call for the
+  /// life of the process, whether or not a stream subscriber already received
+  /// that event. Taps while the app is running never set it, and
+  /// [resetProfile] clears it.
+  ///
+  /// Callable before initialize().
+  Future<Map<String, dynamic>?> getInitialPushNotification() async {
+    try {
+      final result = await _channel.invokeMethod<Object?>(
+        'getInitialPushNotification',
+      );
+      return result == null ? null : _deepConvertMap(result);
+    } catch (e) {
+      throw KlaviyoException('Failed to get initial push notification: $e');
     }
   }
 
@@ -443,6 +478,8 @@ class KlaviyoNativeWrapper {
 
     try {
       await _channel.invokeMethod('resetProfile');
+      _pushNotificationController.clearHeld();
+      _pushActionController.clearHeld();
     } catch (e) {
       throw KlaviyoException('Failed to reset profile: $e');
     }
@@ -513,6 +550,9 @@ class KlaviyoNativeWrapper {
         case 'push_token_received':
         case 'push_token_error':
           _logger.info('Native push notification event: $eventData');
+          if (eventType == 'push_notification_opened') {
+            _pushActionController.clearHeld();
+          }
           _pushNotificationController.add(eventData);
           break;
         case 'form_event':
