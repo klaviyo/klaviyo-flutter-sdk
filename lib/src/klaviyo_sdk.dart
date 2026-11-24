@@ -722,7 +722,6 @@ class KlaviyoSDK {
   ///
   /// Throws an [ArgumentError] if [handler] is not a top-level or static
   /// function, and a [KlaviyoException] if the native registration fails.
-  @experimental
   static Future<void> onBackgroundPushData(
     KlaviyoBackgroundPushDataHandler handler,
   ) async {

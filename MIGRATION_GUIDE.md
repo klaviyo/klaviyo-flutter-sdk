@@ -16,8 +16,8 @@ This guide outlines how developers can migrate from older versions of the
 ### Silent push is now push data, split into `onPushData` and `onBackgroundPushData`
 
 Push data covers every silent push and every visible push that carries key/value pairs. Each
-push reaches Dart in exactly one place, chosen by app state when it arrives: the experimental
-`onPushData` stream in the foreground, or a handler you register with the experimental
+push reaches Dart in exactly one place, chosen by app state when it arrives: the
+`onPushData` stream in the foreground, or a handler you register with
 `KlaviyoSDK.onBackgroundPushData` in the background or while the app isn't running. Without a
 handler, background push data is dropped.
 

@@ -1,5 +1,3 @@
-// ignore_for_file: experimental_member_use
-
 import 'package:flutter/foundation.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 

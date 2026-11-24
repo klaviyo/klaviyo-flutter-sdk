@@ -568,7 +568,7 @@ Push events arrive on one typed stream per concern, the same split `firebase_mes
 |---|---|---|
 | `onPushToken` | `Stream<KlaviyoPushToken>` | Each push token the platform delivers, typed as APNs or FCM. Registration errors arrive through `onError`. |
 | `onPushOpened` | `Stream<KlaviyoPushOpened>` | Once for every tap on a Klaviyo push: the body, an action button, or a push that opens a web URL. |
-| `onPushData` | `Stream<KlaviyoPushData>` | Push data received while the app is in the foreground. See [Silent Push](#silent-push). |
+| `onPushData` | `Stream<KlaviyoPushData>` | Push data received while the app is in the foreground. See [Push Data](#push-data). |
 
 `KlaviyoPushOpened` and `KlaviyoPushData` both expose the full push `payload` and the push's Klaviyo key/value pairs as `keyValuePairs` (null when there are none).
 
@@ -645,8 +645,6 @@ void handlePushPayload(Map<String, dynamic> payload) {
 ```
 
 ### Push Data
-
-> **Experimental**: the push data API may change in a minor release.
 
 Push data lets your Dart code run when a Klaviyo push arrives, before anyone taps it. It is delivered for:
 

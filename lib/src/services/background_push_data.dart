@@ -9,7 +9,6 @@ import '../klaviyo_sdk.dart';
 import '../models/klaviyo_push_data.dart';
 
 /// Signature for [KlaviyoSDK.onBackgroundPushData] handlers.
-@experimental
 typedef KlaviyoBackgroundPushDataHandler = Future<void> Function(
   KlaviyoPushData data,
 );
