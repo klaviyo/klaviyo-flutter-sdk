@@ -564,7 +564,7 @@ Push events arrive on one typed stream per concern, the same split `firebase_mes
 |---|---|---|
 | `onPushToken` | `Stream<KlaviyoPushToken>` | Each push token the platform delivers, typed as APNs or FCM. Registration errors arrive through `onError`. |
 | `onPushOpened` | `Stream<KlaviyoPushOpened>` | Once for every tap on a Klaviyo push: the body, an action button, or a push that opens a web URL. |
-| `onPushData` | `Stream<KlaviyoPushData>` | Push data received while the app is in the foreground. See [Silent Push](#silent-push). |
+| `onPushData` | `Stream<KlaviyoPushData>` | Push data received in the foreground or background while a Flutter engine is alive and the OS delivers the push. See [Silent Push](#silent-push). |
 
 `KlaviyoPushOpened` and `KlaviyoPushData` both expose the full push `payload` and the push's Klaviyo key/value pairs as `keyValuePairs` (null when there are none).
 
@@ -1215,7 +1215,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `apiKey` | `String?` | Current API key |
 | `onPushToken` | `Stream<KlaviyoPushToken>` | Each push token the platform delivers, typed as APNs or FCM |
 | `onPushOpened` | `Stream<KlaviyoPushOpened>` | One event per tap on a Klaviyo push |
-| `onPushData` | `Stream<KlaviyoPushData>` | Push data received in the foreground |
+| `onPushData` | `Stream<KlaviyoPushData>` | Push data received in the foreground or background while a Flutter engine is alive and the OS delivers the push |
 | `onPushNotification` | `Stream<Map<String, dynamic>>` | Push notification events (deprecated) |
 | `onFormLifecycleEvent` | `Stream<FormLifecycleEvent>` | Typed in-app form lifecycle events |
 | `onPushAction` | `Stream<KlaviyoPushAction>` | Typed `open_url` / action-button push tap events (deprecated) |
