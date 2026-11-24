@@ -19,6 +19,7 @@ export 'src/models/inbox_destination.dart';
 export 'src/models/inbox_page.dart';
 export 'src/models/inbox_message_state.dart';
 export 'src/models/inbox_filters.dart';
+export 'src/models/inbox_filter.dart';
 export 'src/enums/klaviyo_log_level.dart';
 export 'src/services/klaviyo_native_wrapper.dart';
 export 'src/exceptions/klaviyo_exception.dart';

@@ -6,6 +6,7 @@ import com.klaviyo.inbox.InboxChangeListener
 import com.klaviyo.inbox.InboxCursor
 import com.klaviyo.inbox.InboxDestination
 import com.klaviyo.inbox.InboxException
+import com.klaviyo.inbox.InboxFilter
 import com.klaviyo.inbox.InboxMessage
 import com.klaviyo.inbox.InboxPage
 import com.klaviyo.inbox.InboxQuery
@@ -83,6 +84,38 @@ internal object InboxBridge {
             KlaviyoInbox.updateMessageState(messageId, change, done)
         }
     }
+
+    /**
+     * @see KlaviyoInbox.updateMessageState
+     *
+     * The bulk form: puts every message matching the filter into the state and
+     * resolves how many changed. A message already in that state is not matched
+     * or counted.
+     */
+    fun updateMessageStates(
+        state: String,
+        filter: Map<*, *>?,
+        onResult: (InboxBridgeResult<Int>) -> Unit,
+    ) {
+        val change: InboxStateChange
+        val inboxFilter: InboxFilter
+        try {
+            change = state.toStateChange()
+            inboxFilter = filter.toInboxFilter()
+        } catch (e: IllegalArgumentException) {
+            onResult(InboxBridgeResult.Failure(InboxErrorCodes.STORAGE_FAILURE, e.message))
+            return
+        }
+        deliver(onResult, { it }) { done ->
+            KlaviyoInbox.updateMessageState(change, inboxFilter, done)
+        }
+    }
+
+    /** @see KlaviyoInbox.clearAll */
+    fun clearAll(onResult: (InboxBridgeResult<Int>) -> Unit) =
+        deliver(onResult, { it }) { done ->
+            KlaviyoInbox.clearAll(done)
+        }
 
     /**
      * Collects the native inbox change signal while Dart is subscribed.
@@ -235,4 +268,21 @@ internal object InboxBridge {
             "unarchived" -> InboxStateChange.UNARCHIVE
             else -> throw IllegalArgumentException("Unknown inbox message state: $this")
         }
+
+    /**
+     * Maps the Dart filter map onto the native filter.
+     *
+     * Both fields are required: a bulk change with a missing filter would have
+     * to guess which messages were meant, and the wrong guess changes or hides
+     * data, so it is rejected instead.
+     */
+    private fun Map<*, *>?.toInboxFilter(): InboxFilter {
+        if (this == null) {
+            throw IllegalArgumentException("An inbox filter is required")
+        }
+        return InboxFilter.where(
+            (this["readFilter"] as? String).toReadFilter(),
+            (this["archiveFilter"] as? String).toArchiveFilter(),
+        )
+    }
 }

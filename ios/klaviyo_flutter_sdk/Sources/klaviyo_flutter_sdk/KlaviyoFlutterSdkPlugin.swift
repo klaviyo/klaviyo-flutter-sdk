@@ -587,6 +587,66 @@ extension KlaviyoFlutterSdkPlugin {
             result(Self.inboxUnavailableError())
             #endif
 
+        case "updateInboxMessageStates":
+            #if canImport(KlaviyoInbox)
+            guard let args = call.arguments as? [String: Any],
+                  let state = args["state"] as? String,
+                  let filter = args["filter"] as? [String: Any]
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "An inbox state and filter are required",
+                    details: nil
+                ))
+                return
+            }
+            guard let messageState = Self.inboxMessageState(from: state) else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Unknown inbox message state: \(state)",
+                    details: nil
+                ))
+                return
+            }
+            guard let readFilter = Self.inboxReadFilter(from: filter["readFilter"] as? String),
+                  let archiveFilter = Self.inboxArchiveFilter(from: filter["archiveFilter"] as? String)
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Unknown inbox filter",
+                    details: nil
+                ))
+                return
+            }
+            Task {
+                do {
+                    // A message already in this state is not matched, so a repeat returns 0.
+                    let changed = try await KlaviyoSDK().mobileInbox.setMessageState(
+                        messageState,
+                        matching: InboxFilter.where(read: readFilter, archive: archiveFilter)
+                    )
+                    result(changed)
+                } catch {
+                    result(Self.inboxError(error))
+                }
+            }
+            #else
+            result(Self.inboxUnavailableError())
+            #endif
+
+        case "clearInbox":
+            #if canImport(KlaviyoInbox)
+            Task {
+                do {
+                    result(try await KlaviyoSDK().mobileInbox.clearAll())
+                } catch {
+                    result(Self.inboxError(error))
+                }
+            }
+            #else
+            result(Self.inboxUnavailableError())
+            #endif
+
         case "handleUniversalTrackingLink":
             guard let args = call.arguments as? [String: Any],
                   let urlString = args["url"] as? String,
