@@ -526,6 +526,10 @@ class KlaviyoFlutterSdkPluginEngineTest {
         }
     }
 
+    private fun registerState() {
+        Registry.register<State>(mockk<State>(relaxed = true))
+    }
+
     private fun rotateToken(
         token: String,
         service: KlaviyoFlutterPushService =
