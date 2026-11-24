@@ -718,7 +718,7 @@ The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM se
 
 If you also use `firebase_messaging`, its `FlutterFirebaseMessagingService` also registers for `MESSAGING_EVENT`, and Android delivers that intent to only one service. Firebase's `onBackgroundMessage` doesn't depend on it (it runs from a broadcast receiver), but Klaviyo push data does. Check your merged manifest (`app/build/intermediates/merged_manifests/`) to see which service wins:
 
-- If `KlaviyoFlutterPushService` wins, both handlers run for the same Klaviyo push, each in its own engine, in no set order. You can skip Klaviyo pushes that deliver push data in your Firebase handler (they carry `_k` and either have no `title`/`body` or carry `key_value_pairs`) to avoid handling them twice.
+- If `KlaviyoFlutterPushService` wins, both handlers run for the same Klaviyo push, each in its own engine, in no set order. You can skip Klaviyo pushes that deliver push data in your Firebase handler to avoid handling them twice: `message.data.isKlaviyoNotification` is true for every Klaviyo push, and those that deliver push data either have no `title`/`body` or carry `key_value_pairs`.
 - If you can't confirm that, keep handling those pushes in your Firebase handler and make the work idempotent, because Klaviyo's handler may not run at all.
 
 ### Action Buttons

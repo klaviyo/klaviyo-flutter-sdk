@@ -18,7 +18,6 @@
 - **`KlaviyoNativeWrapper`**: use `KlaviyoSDK`. The class becomes internal in 1.0.
 - **`KlaviyoSDK.dispose()` and `KlaviyoNativeWrapper.dispose()`**: no longer needed. If you called `dispose()` to turn off personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()` instead. Otherwise, remove the calls.
 - **`KlaviyoSDK.setLogLevel` and the `KlaviyoLogLevel` enum**: use `setLoggingEnabled(bool)`.
-- **The `isKlaviyoNotification` extension on `Map<String, dynamic>`**: no longer needed. Use `onPushOpened` for taps or `onPushData` for push data received in the foreground.
 
 ### Breaking Changes
 

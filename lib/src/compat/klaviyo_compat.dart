@@ -118,10 +118,10 @@ class Klaviyo {
 
   /// Check if a push notification payload originated from Klaviyo.
   ///
-  /// Migrate by removing the check: Klaviyo push events arrive on
-  /// [KlaviyoSDK]'s streams, such as [KlaviyoSDK.onPushNotification].
+  /// Migrate to `message.isKlaviyoNotification`, or remove the check if you
+  /// only used it to call [handlePush].
   @Deprecated(
-    "No longer needed; Klaviyo push events arrive on KlaviyoSDK's streams. "
+    'Use the isKlaviyoNotification extension on Map<String, dynamic>. '
     'Will be removed in 1.0.',
   )
   bool isKlaviyoPush(Map<String, dynamic> message) =>

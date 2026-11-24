@@ -203,12 +203,18 @@ Future<void> _handler(RemoteMessage message) async {
 // Before
 if (Klaviyo.instance.isKlaviyoPush(message.data)) { ... }
 
-// After — remove the check
-// Listen to KlaviyoSDK().onPushOpened for taps or
-// KlaviyoSDK().onPushData for push data received in the foreground.
-// The isKlaviyoNotification extension still exists but is deprecated and
-// will be removed in 1.0.
+// After — if you only checked so you could call handlePush, remove the check.
+// Push processing is automatic in the native layer.
+
+// After — if your app handles raw messages from another library, such as
+// firebase_messaging, use the extension:
+if (message.data.isKlaviyoNotification) { ... }
 ```
+
+To receive Klaviyo push data directly, prefer the typed APIs:
+`KlaviyoSDK().onPushOpened` for taps, `KlaviyoSDK().onPushData` for push data
+in the foreground, and `KlaviyoSDK.onBackgroundPushData` for push data in the
+background or when the app isn't running.
 
 ### Profile management — `updateProfile`
 
@@ -429,7 +435,7 @@ documentation on these features.
 | `.logEvent(name, meta)` | `.createEvent(KlaviyoEvent.custom(metric: name, properties: meta))` |
 | `.sendTokenToKlaviyo(token)` | `.setPushToken(token)` |
 | `.handlePush(data)` | Remove — handled automatically by native layer |
-| `.isKlaviyoPush(data)` | Remove — Klaviyo push events arrive on `KlaviyoSDK`'s streams |
+| `.isKlaviyoPush(data)` | `data.isKlaviyoNotification`, or remove if only used before `handlePush` |
 | `.updateProfile(profile)` | `.setProfile(profile)` |
 | `.setFirstName(name)` | `.setProfileAttribute('first_name', name)` |
 | `.setLastName(name)` | `.setProfileAttribute('last_name', name)` |
