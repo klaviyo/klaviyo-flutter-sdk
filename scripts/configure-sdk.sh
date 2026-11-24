@@ -184,10 +184,13 @@ update_podspec_versions() {
         sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1, '$version'|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1, '$version'|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1, '$version'|" "$PODSPEC"
+        sedi -E "s|(s\.dependency 'KlaviyoInbox').*|\1, '$version'|" "$PODSPEC"
     else
         sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1|" "$PODSPEC"
         sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1|" "$PODSPEC"
+        # Leave the inbox line alone: it is opt-in and conditional, so a branch
+        # switch must not rewrite it into an unconditional dependency.
     fi
 }
 
@@ -404,6 +407,8 @@ includeBuild("$path") {
         substitute(module("com.github.klaviyo.klaviyo-android-sdk:location-core")).using(project(":sdk:location-core"))
         substitute(module("com.github.klaviyo.klaviyo-android-sdk:forms")).using(project(":sdk:forms"))
         substitute(module("com.github.klaviyo.klaviyo-android-sdk:forms-core")).using(project(":sdk:forms-core"))
+        substitute(module("com.github.klaviyo.klaviyo-android-sdk:inbox")).using(project(":sdk:inbox"))
+        substitute(module("com.github.klaviyo.klaviyo-android-sdk:inbox-core")).using(project(":sdk:inbox-core"))
     }
 }
 $ANDROID_MARKER_END_LITERAL
@@ -560,6 +565,15 @@ Android Options:
   --android-commit HASH     Use Android SDK from a git commit
   --android-local [PATH]    Use a local Android SDK checkout (default: $DEFAULT_ANDROID_LOCAL_PATH)
 
+Mobile Inbox:
+  --inbox                    Opt in to the unreleased Mobile Inbox module
+  --no-inbox                 Opt back out (the default)
+
+  The native inbox artifacts are unpublished, so --inbox only makes sense
+  together with a branch, commit or local path for both SDKs. It sets
+  klaviyoIncludeInbox in the example app's gradle.properties and exports
+  KLAVIYO_INCLUDE_INBOX for the pod update, which the podspec reads.
+
 General:
   --reset                    Reset both SDKs to latest published versions
   --status                   Show current native SDK configuration
@@ -570,8 +584,51 @@ Examples:
   $(basename "$0") --ios-version 5.2.1 --android-version 4.3.0     # Published versions
   $(basename "$0") --ios-local ../klaviyo-swift-sdk --android-branch main
   $(basename "$0") --ios-branch feature/new-api --android-commit abc1234
+  $(basename "$0") --ios-branch feat/mobile-inbox --android-branch feat/mobile-inbox --inbox
   $(basename "$0") --reset
 EOF
+}
+
+# ─── Mobile Inbox ─────────────────────────────────────────────────────
+
+# Mobile Inbox is opt-in while its native modules are unreleased. Unlike forms
+# and location, a default build must not reference them: the inbox artifacts are
+# only on JitPack branch builds.
+#
+# Enabling writes klaviyoIncludeInbox into the example app's gradle.properties,
+# which the plugin's build.gradle.kts reads, and exports KLAVIYO_INCLUDE_INBOX
+# for this script's pod update: the podspec reads it at `pod install` time, so it
+# has to be in the environment of the resolving command. A host app integrating
+# this SDK sets both itself.
+#
+# The setting is persisted so a later plain `flutter run` keeps it, mirroring how
+# the native version pin is stored. --no-inbox removes it again.
+configure_inbox() {
+    local enabled="$1"
+    local property_file="$ROOT_DIR/example/android/gradle.properties"
+    local inbox_marker="# Mobile Inbox (opt-in; native artifacts are unpublished)"
+
+    if [[ -f "$property_file" ]]; then
+        # Drop the previous marker and value so re-running is idempotent.
+        sedi "/^${inbox_marker}$/d" "$property_file"
+        sedi "/^klaviyoIncludeInbox=/d" "$property_file"
+        if [[ "$enabled" == "true" ]]; then
+            printf '\n%s\nklaviyoIncludeInbox=true\n' "$inbox_marker" >> "$property_file"
+        else
+            # Drop the blank separator line the marker block was appended after,
+            # so opting out restores the file byte for byte.
+            sedi -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$property_file"
+        fi
+    fi
+
+    if [[ "$enabled" == "true" ]]; then
+        export KLAVIYO_INCLUDE_INBOX=true
+        success "Mobile Inbox enabled (klaviyoIncludeInbox=true, KLAVIYO_INCLUDE_INBOX=true)"
+        info "KlaviyoFoundation and KlaviyoInboxCore are not added to the example Podfile;"
+        info "add them by hand if pod install cannot resolve KlaviyoInbox."
+    else
+        success "Mobile Inbox disabled (default)"
+    fi
 }
 
 parse_args() {
@@ -579,6 +636,8 @@ parse_args() {
     local android_action="" android_value=""
     local reset=false
     local status=false
+    local include_inbox=false
+    local inbox_explicitly_disabled=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -602,6 +661,10 @@ parse_args() {
                 android_action="local"
                 if [[ -n "${2:-}" && ! "$2" == --* ]]; then android_value="$2"; shift 2;
                 else android_value="$DEFAULT_ANDROID_LOCAL_PATH"; shift; fi ;;
+            --inbox)
+                include_inbox=true; shift ;;
+            --no-inbox)
+                include_inbox=false; inbox_explicitly_disabled=true; shift ;;
             --reset)
                 reset=true; shift ;;
             --status)
@@ -639,7 +702,17 @@ parse_args() {
         return
     fi
 
+    # --inbox on its own still has work to do: it flips the build property the
+    # already-pinned native SDKs are read with.
     if [[ -z "$ios_action" && -z "$android_action" ]]; then
+        if $include_inbox || $inbox_explicitly_disabled; then
+            if $include_inbox; then
+                configure_inbox "true"
+            else
+                configure_inbox "false"
+            fi
+            return
+        fi
         error "No configuration specified. Use --help for usage or run without arguments for interactive mode."
         exit 1
     fi
@@ -650,6 +723,16 @@ parse_args() {
 
     if [[ -n "$android_action" ]]; then
         "configure_android_${android_action}" "$android_value"
+    fi
+
+    # Applies to the build the platform flags just configured, so it runs after
+    # them: the podspec reads the exported variable during this script's pod step.
+    if $include_inbox || $inbox_explicitly_disabled; then
+        if $include_inbox; then
+            configure_inbox "true"
+        else
+            configure_inbox "false"
+        fi
     fi
 
     echo ""
