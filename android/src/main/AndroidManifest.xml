@@ -27,5 +27,12 @@
         <service
             android:name="com.klaviyo.pushFcm.KlaviyoPushService"
             tools:node="remove" />
+
+        <!-- Registers the receiver for web-link push taps at process start, before a
+             cold-start tap is handled. -->
+        <provider
+            android:name="com.klaviyo.klaviyo_flutter_sdk.KlaviyoFlutterInitProvider"
+            android:authorities="${applicationId}.klaviyo.flutter.init"
+            android:exported="false" />
     </application>
 </manifest>

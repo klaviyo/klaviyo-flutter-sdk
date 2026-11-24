@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:meta/meta.dart';
 
 import 'models/klaviyo_profile.dart';
@@ -62,9 +63,7 @@ class KlaviyoSDK {
   ///
   /// Can be called multiple times to re-initialize with a different API key,
   /// matching native Android and iOS SDK behavior.
-  Future<KlaviyoSDK> initialize({
-    required String apiKey,
-  }) async {
+  Future<KlaviyoSDK> initialize({required String apiKey}) async {
     try {
       await _nativeWrapper.initialize(apiKey: apiKey);
 
@@ -165,6 +164,17 @@ class KlaviyoSDK {
 
   /// Set profile properties
   /// Calls the native SDK directly - native SDK manages profile state
+  ///
+  /// Keys for standard attributes (see [ProfileProperty]) set the standard
+  /// field. The identifier keys `email`, `phone_number` and `external_id` set
+  /// the profile's identifiers, the same as [setEmail], [setPhoneNumber] and
+  /// [setExternalId]. Number and bool values for standard text fields are sent
+  /// as strings, and latitude and longitude accept numbers or numeric strings.
+  /// Null values are ignored and don't clear a property. [DateTime] values,
+  /// including nested ones, are sent as UTC ISO 8601 strings. Values the
+  /// platform channel can't encode, such as [Duration], [Uri] or custom
+  /// classes, are dropped with a warning and the other keys are still sent.
+  /// Any other key is stored as a custom property.
   Future<void> setProfileProperties(Map<String, dynamic> properties) async {
     _ensureInitialized();
 
@@ -189,7 +199,11 @@ class KlaviyoSDK {
   /// [propertyKey] can be a [ProfileProperty] constant or any string.
   /// camelCase and snake_case spellings of standard keys (for example
   /// `firstName` or `first_name`) set the standard field on both platforms.
-  /// Any other key is stored as a custom property.
+  /// `email`, `phone_number` and `external_id` set the identifier. Any other
+  /// key is stored as a custom property. A null [value] is ignored, a
+  /// [DateTime] is sent as a UTC ISO 8601 string, and a value the platform
+  /// channel can't encode is dropped with a warning. See
+  /// [setProfileProperties] for how values are converted.
   Future<void> setProfileAttribute(String propertyKey, dynamic value) async {
     await setProfileProperties({propertyKey: value});
   }
@@ -397,8 +411,9 @@ class KlaviyoSDK {
     _ensureInitialized();
 
     // Attach the single permanent listener once (see [_authTokenSubscription]).
-    _authTokenSubscription ??=
-        _nativeWrapper.onAuthTokenRequested.listen(_handleAuthTokenRequest);
+    _authTokenSubscription ??= _nativeWrapper.onAuthTokenRequested.listen(
+      _handleAuthTokenRequest,
+    );
 
     // Re-register: tear down the native provider first so it drains any pending
     // requests before the replacement takes over. The Dart listener stays put;
@@ -558,7 +573,7 @@ class KlaviyoSDK {
   ///   routes: [...],
   ///   redirect: (context, state) {
   ///     // Fire-and-forget - Klaviyo tracks in background
-  ///     Klaviyo.handleUniversalTrackingLink(state.uri.toString());
+  ///     KlaviyoSDK().handleUniversalTrackingLink(state.uri.toString());
   ///     return null; // Continue with normal navigation
   ///   },
   /// );
@@ -567,10 +582,10 @@ class KlaviyoSDK {
   /// This is a synchronous operation that validates the URL and returns immediately.
   /// The native SDK handles tracking and link resolution in the background (fire-and-forget).
   ///
+  /// Safe to call before [initialize]; this method never throws.
+  ///
   /// Returns `true` if the URL matches the Klaviyo tracking link pattern, `false` otherwise.
   bool handleUniversalTrackingLink(String url) {
-    _ensureInitialized();
-
     // Validate empty/null URL
     if (url.trim().isEmpty) {
       _logger.warning('[DeepLink SDK] Error: Empty tracking link provided');
@@ -619,10 +634,13 @@ class KlaviyoSDK {
   /// Reset the current profile (useful for logout)
   /// Profile state is managed by the native SDK
   void setBadgeCount(int count) {
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       _ensureInitialized();
-      _nativeWrapper.setBadgeCount(count);
-      _logger.info('Set the badge count to $count');
+      _nativeWrapper.setBadgeCount(count).then((_) {
+        _logger.info('Set the badge count to $count');
+      }).catchError((Object e) {
+        _logger.warning('Failed to set the badge count to $count: $e');
+      });
     } else {
       // Android does not support badge count
       _logger.warning(
@@ -678,8 +696,33 @@ class KlaviyoSDK {
   }
 
   /// Get push notification events stream
+  ///
+  /// A `push_notification_opened` event that arrives before anyone subscribes
+  /// (for example, the tap that launched the app) is buffered; only the most
+  /// recent one is kept. The first subscriber receives it once, then the
+  /// buffer is cleared, so later subscribers don't receive it. Use
+  /// [getInitialPushNotification] to read the launch tap whenever you need it.
   Stream<Map<String, dynamic>> get onPushNotification =>
       _nativeWrapper.onPushNotification;
+
+  /// The push notification tap that launched or relaunched the app from a
+  /// killed state, or `null` if the app wasn't launched by a push tap.
+  ///
+  /// The map has the same shape as the `push_notification_opened` event on
+  /// [onPushNotification]. Every call returns the same value for the life of
+  /// the process, including after the first [onPushNotification] subscriber
+  /// has received that event, so it can be read whenever it's needed (for
+  /// example, by a router at startup). Taps while the app is running never set
+  /// it, and [resetProfile] clears it.
+  ///
+  /// Safe to call before [initialize].
+  Future<Map<String, dynamic>?> getInitialPushNotification() async {
+    try {
+      return await _nativeWrapper.getInitialPushNotification();
+    } catch (e) {
+      throw KlaviyoException('Failed to get initial push notification: $e');
+    }
+  }
 
   /// Get form events stream
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
@@ -708,6 +751,12 @@ class KlaviyoSDK {
   /// ([ActionButtonTapped]). Filters for the `push_open_web_url` and
   /// `push_action_button_tapped` event types and parses the native map.
   /// Malformed events are logged and dropped rather than crashing the stream.
+  ///
+  /// A push action that arrives before anyone subscribes is buffered; only the
+  /// most recent one is kept, and each new push open clears it. The first
+  /// subscriber receives it once, then the buffer is cleared, so later
+  /// subscribers don't receive it. Use [getInitialPushNotification] to read
+  /// the launch tap whenever you need it.
   Stream<KlaviyoPushAction> get onPushAction => _nativeWrapper.onPushActionEvent
           .where(
         (event) =>
@@ -746,8 +795,9 @@ class KlaviyoSDK {
       _authTokenProvider = null;
       // dispose() is synchronous; fire-and-forget the native unregister.
       _nativeWrapper.unregisterAuthTokenProvider().catchError((Object e) {
-        _logger
-            .warning('Failed to unregister auth token provider on dispose: $e');
+        _logger.warning(
+          'Failed to unregister auth token provider on dispose: $e',
+        );
       });
     }
     _nativeWrapper.dispose();

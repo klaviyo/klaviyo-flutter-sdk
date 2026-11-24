@@ -27,7 +27,25 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     /// Singleton instance to allow the Host App's AppDelegate to forward events manually.
     public static let shared = KlaviyoFlutterSdkPlugin()
 
-    private var eventSink: FlutterEventSink?
+    /// Event sinks of engines whose Dart side is listening, in listen order.
+    private var engineSinks: [EngineSink] = []
+    private let registeredEngines = NSHashTable<EngineEventStream>.weakObjects()
+
+    /// The primary engine receives every event: the first listening engine that
+    /// has a view controller, or the first listening engine if none has one.
+    private var primarySink: EngineSink? {
+        engineSinks.first { $0.hasViewController() } ?? engineSinks.first
+    }
+
+    private var eventSink: FlutterEventSink? {
+        primarySink?.sink
+    }
+
+    private var waitingForUI: Bool {
+        primarySink?.hasViewController() != true && registeredEngines.allObjects.contains { $0.waitingForUI }
+    }
+
+    private static var didAddApplicationDelegate = false
 
     // Cache values to handle the race condition where the value arrives
     // before Flutter has finished initializing the EventChannel.
@@ -36,6 +54,14 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
     private var cachedPushAction: [String: Any]?
+
+    // The `push_notification_opened` payload for the tap that launched the app,
+    // recorded from the first notification response delivered before the app first
+    // became active. Read by getInitialPushNotification; not cleared by onListen.
+    private var initialPushNotification: [String: Any]?
+    private var hasBecomeActive = false
+    private var launchResponseRecorded = false
+    private var activationObserver: NSObjectProtocol?
 
     // MARK: - Flutter Plugin Registration
 
@@ -48,13 +74,43 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: channel)
 
         // 2. Setup Event Channel (For Data Streams: tokens, opened notifications)
+        // Each engine gets its own stream handler; the shared instance routes events
+        // to the primary engine. Publishing it delivers the engine's detach callback.
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
-        eventChannel.setStreamHandler(instance)
+        let engineStream = EngineEventStream(registrar: registrar)
+        instance.registeredEngines.add(engineStream)
+        eventChannel.setStreamHandler(engineStream)
+        registrar.publish(engineStream)
 
-        // 3. Register as Application Delegate
+        // 3. Register as Application Delegate, once per process
         // This allows us to automatically intercept 'didRegisterForRemoteNotifications'
         // without requiring code in the Host App's AppDelegate.
-        registrar.addApplicationDelegate(instance)
+        if !didAddApplicationDelegate {
+            didAddApplicationDelegate = true
+            registrar.addApplicationDelegate(instance)
+        }
+
+        // 4. Track when the app first becomes active, to tell the launch tap apart from later taps.
+        instance.observeFirstActivation()
+    }
+
+    private func observeFirstActivation() {
+        if Thread.isMainThread, UIApplication.shared.applicationState == .active {
+            hasBecomeActive = true
+        }
+        guard activationObserver == nil, !hasBecomeActive else { return }
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.hasBecomeActive = true
+            if let observer = self.activationObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self.activationObserver = nil
+            }
+        }
     }
 }
 
@@ -408,8 +464,12 @@ extension KlaviyoFlutterSdkPlugin {
         case "respondToAuthTokenRequest":
             handleRespondToAuthTokenRequest(call: call, result: result)
 
+        case "getInitialPushNotification":
+            result(initialPushNotification)
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
+            initialPushNotification = nil
             result(nil)
 
         case "setBadgeCount":
@@ -459,8 +519,38 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         withArguments arguments: Any?,
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
-        eventSink = events
+        addListener(EngineSink(owner: ObjectIdentifier(self), sink: events) { false })
+        return nil
+    }
 
+    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        removeListener(ObjectIdentifier(self))
+        return nil
+    }
+
+    /// Adds an engine's sink and replays cached events if it becomes the primary.
+    fileprivate func addListener(_ engineSink: EngineSink) {
+        engineSinks.removeAll { $0.owner == engineSink.owner }
+        engineSinks.append(engineSink)
+        if primarySink?.owner == engineSink.owner {
+            replayCachedEvents(to: engineSink.sink)
+        }
+    }
+
+    /// Removes an engine's sink. If it was the primary, the next engine chosen by
+    /// `primarySink` takes over and the auth bridge is torn down.
+    fileprivate func removeListener(_ owner: ObjectIdentifier) {
+        let wasPrimary = primarySink?.owner == owner
+        engineSinks.removeAll { $0.owner == owner }
+        guard wasPrimary else { return }
+        // The Dart side keeps a permanent auth-event listener, so this fires at
+        // engine teardown. Give parity with Android's onDetachedFromEngine:
+        // unregister the auth-token provider and fail any in-flight requests
+        // immediately rather than leaving them suspended until the SDK timeout.
+        unregisterAuthTokenProvider(reason: "Flutter engine detached")
+    }
+
+    private func replayCachedEvents(to events: FlutterEventSink) {
         // If we have cached values from early app launch, send them now.
         // This solves the race condition where values arrive before Flutter is ready.
         if let cachedToken = cachedToken {
@@ -471,6 +561,21 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedError)
             self.cachedError = nil
         }
+        replayCachedPushEvents(to: events)
+    }
+
+    fileprivate func releaseCachedPushEvents() {
+        guard let eventSink else { return }
+        replayCachedPushEvents(to: eventSink)
+    }
+
+    fileprivate func removeRegisteredEngine(_ engine: EngineEventStream) {
+        registeredEngines.remove(engine)
+        releaseCachedPushEvents()
+    }
+
+    private func replayCachedPushEvents(to events: FlutterEventSink) {
+        guard !waitingForUI else { return }
         if let cachedOpenedNotification = cachedOpenedNotification {
             events(cachedOpenedNotification)
             self.cachedOpenedNotification = nil
@@ -483,17 +588,54 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedPushAction)
             self.cachedPushAction = nil
         }
+    }
+}
+
+/// A listening engine's event sink.
+private struct EngineSink {
+    let owner: ObjectIdentifier
+    let sink: FlutterEventSink
+    let hasViewController: () -> Bool
+}
+
+/// Per-engine `klaviyo_events` stream handler that registers the engine's sink
+/// with the shared plugin.
+private final class EngineEventStream: NSObject, FlutterStreamHandler {
+    private weak var registrar: FlutterPluginRegistrar?
+    private var hasListened = false
+
+    var waitingForUI: Bool {
+        !hasListened && registrar?.viewController != nil
+    }
+
+    init(registrar: FlutterPluginRegistrar) {
+        self.registrar = registrar
+    }
+
+    func onListen(
+        withArguments arguments: Any?,
+        eventSink events: @escaping FlutterEventSink
+    ) -> FlutterError? {
+        hasListened = true
+        KlaviyoFlutterSdkPlugin.shared.addListener(
+            EngineSink(owner: ObjectIdentifier(self), sink: events) { [weak self] in
+                self?.registrar?.viewController != nil
+            }
+        )
         return nil
     }
 
-    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        eventSink = nil
-        // The Dart side keeps a permanent auth-event listener, so this fires at
-        // engine teardown. Give parity with Android's onDetachedFromEngine:
-        // unregister the auth-token provider and fail any in-flight requests
-        // immediately rather than leaving them suspended until the SDK timeout.
-        unregisterAuthTokenProvider(reason: "Flutter engine detached")
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
+        KlaviyoFlutterSdkPlugin.shared.releaseCachedPushEvents()
         return nil
+    }
+
+    /// Called by the Flutter engine on deallocation for published values.
+    @objc(detachFromEngineForRegistrar:)
+    func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+        KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
+        KlaviyoFlutterSdkPlugin.shared.removeRegisteredEngine(self)
     }
 }
 
@@ -571,6 +713,17 @@ extension KlaviyoFlutterSdkPlugin {
 
     public func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
+        defer {
+            _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
+        }
+        if response.actionIdentifier == UNNotificationDismissActionIdentifier {
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.info("Push notification dismissed")
+            }
+            cachedOpenedNotification = nil
+            cachedPushAction = nil
+            return
+        }
         if #available(iOS 14.0, *) {
             Logger.klaviyoFlutterSDK.info("Push notification opened")
         }
@@ -581,8 +734,13 @@ extension KlaviyoFlutterSdkPlugin {
             "data": userInfo
         ]
 
+        if !hasBecomeActive, !launchResponseRecorded {
+            initialPushNotification = eventPayload
+            launchResponseRecorded = true
+        }
+
         // 2. Send to Flutter (or Cache if Flutter is asleep)
-        if let eventSink = eventSink {
+        if let eventSink = eventSink, !waitingForUI {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
@@ -594,11 +752,6 @@ extension KlaviyoFlutterSdkPlugin {
         // 3. Surface the open_url action / action-button tap as a typed push action
         // event, in parallel with the raw opened-notification event above.
         forwardPushAction(for: response, userInfo: userInfo)
-
-        // 4. Pass to Native Klaviyo SDK
-        // We pass a dummy completion handler because the Host App owns the real one.
-        // No-op: We let the host app finish the system callback
-        _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
     }
 
     /// Mirrors an `open_url` body tap or an action-button tap to Flutter as a
@@ -677,7 +830,7 @@ extension KlaviyoFlutterSdkPlugin {
 
         guard let eventPayload else { return }
 
-        if let eventSink {
+        if let eventSink, !waitingForUI {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
@@ -703,7 +856,7 @@ extension KlaviyoFlutterSdkPlugin {
         ]
 
         // Send to Flutter (or cache if Flutter is not ready)
-        if let eventSink = eventSink {
+        if let eventSink = eventSink, !waitingForUI {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {

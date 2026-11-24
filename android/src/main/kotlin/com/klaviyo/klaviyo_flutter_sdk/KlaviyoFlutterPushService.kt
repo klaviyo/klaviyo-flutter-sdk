@@ -17,9 +17,12 @@ import org.json.JSONObject
  * `handleSilentPush` path.
  *
  * Auto-registered for `com.google.firebase.MESSAGING_EVENT` via the plugin's
- * `AndroidManifest.xml`; host apps require no manifest changes.
+ * `AndroidManifest.xml`. Apps can subclass it for custom FCM handling; a subclass
+ * that overrides [onMessageReceived] must call `super.onMessageReceived` to keep
+ * Klaviyo display and silent push forwarding, and must be declared in the app's
+ * manifest in place of this class.
  */
-class KlaviyoFlutterPushService : KlaviyoPushService() {
+open class KlaviyoFlutterPushService : KlaviyoPushService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
