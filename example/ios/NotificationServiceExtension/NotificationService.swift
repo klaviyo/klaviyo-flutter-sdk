@@ -7,6 +7,9 @@
 
 import KlaviyoSwiftExtension
 import UserNotifications
+#if canImport(KlaviyoInboxExtension)
+import KlaviyoInboxExtension
+#endif
 
 class NotificationService: UNNotificationServiceExtension {
     var request: UNNotificationRequest!
@@ -25,15 +28,23 @@ class NotificationService: UNNotificationServiceExtension {
         bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
         
         if let bestAttemptContent {
-            // Let Klaviyo handle the notification content modification
-            // This handles:
-            // - Rich media (images) attached to push notifications
-            // - Badge count management (increment/set based on payload)
-            KlaviyoExtensionSDK.handleNotificationServiceDidReceivedRequest(
-                request: self.request,
-                bestAttemptContent: bestAttemptContent,
-                contentHandler: contentHandler
-            )
+            // Optional Mobile Inbox: capture the push first, then continue with rich push handling.
+            // Capture waits at most one second and never throws, so it cannot block the notification.
+            let userInfo = request.content.userInfo
+            Task {
+                #if canImport(KlaviyoInboxExtension)
+                await KlaviyoInboxExtensionSDK.capture(userInfo: userInfo)
+                #endif
+                // Let Klaviyo handle the notification content modification
+                // This handles:
+                // - Rich media (images) attached to push notifications
+                // - Badge count management (increment/set based on payload)
+                KlaviyoExtensionSDK.handleNotificationServiceDidReceivedRequest(
+                    request: request,
+                    bestAttemptContent: bestAttemptContent,
+                    contentHandler: contentHandler
+                )
+            }
         } else {
             // If we can't create mutable content, deliver the original notification immediately
             contentHandler(request.content)
