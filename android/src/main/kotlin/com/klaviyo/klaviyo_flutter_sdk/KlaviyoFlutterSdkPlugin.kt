@@ -79,6 +79,22 @@ class KlaviyoFlutterSdkPlugin :
     private var attachedToActivity = false
 
     /**
+     * True when this instance belongs to the headless engine started by
+     * [BackgroundPushDataExecutor]. A headless instance never claims [instance]
+     * and never consumes [cachedSilentPush].
+     */
+    private var isHeadless = false
+    private var backgroundChannel: MethodChannel? = null
+
+    /** Set once Dart calls `registerBackgroundPushDataHandler` on this engine. */
+    @Volatile
+    private var isBackgroundHandlerAttached = false
+
+    /** True when Dart on this engine has registered a background push data handler. */
+    internal val hasBackgroundHandler: Boolean
+        get() = isBackgroundHandlerAttached
+
+    /**
      * Pending auth token requests keyed by correlation ID. The native SDK
      * invokes the provider on a background dispatcher and hands us an
      * [AuthTokenProvider.Callback] to complete once the Dart side responds via
@@ -283,9 +299,15 @@ class KlaviyoFlutterSdkPlugin :
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
+        isHeadless = BackgroundPushDataExecutor.isCreatingEngine
+        if (!isHeadless) {
+            activePlugins.add(this)
+            selectInstance()
+        }
         applicationContext = flutterPluginBinding.applicationContext
-        activePlugins.add(this)
-        selectInstance()
+        if (!isHeadless) {
+            backgroundChannel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk_background")
+        }
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
 
@@ -295,7 +317,13 @@ class KlaviyoFlutterSdkPlugin :
                 override fun onListen(
                     arguments: Any?,
                     events: EventChannel.EventSink?,
-                ) = attachEventSink(events)
+                ) {
+                    if (isHeadless) {
+                        eventSink = events
+                        return
+                    }
+                    attachEventSink(events)
+                }
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
@@ -371,6 +399,7 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     // Initialize Klaviyo SDK
                     Klaviyo.initialize(apiKey!!, applicationContext)
+                    BackgroundPushDataStore.saveApiKey(applicationContext, apiKey)
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("INIT_ERROR", "Failed to initialize Klaviyo", e.message)
@@ -979,6 +1008,18 @@ class KlaviyoFlutterSdkPlugin :
                 result.success(null)
             }
 
+            "registerBackgroundPushDataHandler" -> {
+                val dispatcherHandle = call.argument<Number>("dispatcherHandle")?.toLong()
+                val handlerHandle = call.argument<Number>("handlerHandle")?.toLong()
+                if (dispatcherHandle == null || handlerHandle == null) {
+                    result.error("INVALID_ARGUMENTS", "Missing background push data callback handles", null)
+                    return
+                }
+                BackgroundPushDataStore.saveHandles(applicationContext, dispatcherHandle, handlerHandle)
+                isBackgroundHandlerAttached = !isHeadless
+                result.success(null)
+            }
+
             "handleUniversalTrackingLink" -> {
                 val url = call.argument<String>("url")
 
@@ -1079,6 +1120,8 @@ class KlaviyoFlutterSdkPlugin :
         channel.setMethodCallHandler(null)
         activePlugins.remove(this)
         eventSink = null
+        backgroundChannel = null
+        isBackgroundHandlerAttached = false
         selectInstance()
         unregisterFirstResumeObserver()
         // Unregister the auth token provider so the Klaviyo singleton stops
@@ -1097,7 +1140,7 @@ class KlaviyoFlutterSdkPlugin :
     }
 
     /**
-     * Forwards a Klaviyo silent push to the Flutter event stream as
+     * Forwards Klaviyo push data to the Flutter event stream as
      * `{type: 'silent_push_received', data: <RemoteMessage.data>}`.
      *
      * Called from [KlaviyoFlutterPushService] (or a host's subclass of it) on the
@@ -1115,9 +1158,32 @@ class KlaviyoFlutterSdkPlugin :
 
         Handler(Looper.getMainLooper()).post {
             if (!emitToPrimary(payload)) {
-                Registry.log.verbose("Flutter not ready. Caching silent push event.")
+                Registry.log.verbose("Flutter not ready. Caching push data event.")
                 cachedSilentPush = payload
             }
+        }
+    }
+
+    /**
+     * Sends background push data to the Dart handler on this plugin's engine.
+     * [onComplete] runs on the main thread when the handler finishes or fails,
+     * or right away if the engine detached in the meantime.
+     */
+    internal fun dispatchBackgroundPushData(
+        data: Map<String, Any?>,
+        onComplete: () -> Unit,
+    ) {
+        Handler(Looper.getMainLooper()).post {
+            val activeChannel = backgroundChannel
+            if (activeChannel == null || !isBackgroundHandlerAttached) {
+                onComplete()
+                return@post
+            }
+            activeChannel.invokeMethod(
+                "handleBackgroundPushData",
+                mapOf("data" to data),
+                CompletionResult(onComplete),
+            )
         }
     }
 

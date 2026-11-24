@@ -2,7 +2,8 @@ import 'dart:convert';
 
 import 'package:meta/meta.dart';
 
-/// The data a Klaviyo push delivers to Dart through [KlaviyoSDK.onPushData].
+/// The data a Klaviyo push delivers to Dart through [KlaviyoSDK.onPushData] or
+/// a handler registered with [KlaviyoSDK.onBackgroundPushData].
 ///
 /// Delivered for every silent push, and for every visible push that carries
 /// key/value pairs.

@@ -20,6 +20,8 @@ class AppDelegate: FlutterAppDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        KlaviyoFlutterSdkPlugin.shared.handleWillPresent(notification)
+
         // Show banner, sound, badge even in foreground
         completionHandler([.banner, .sound, .badge])
     }
@@ -41,9 +43,10 @@ class AppDelegate: FlutterAppDelegate {
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        // Forward every push; the plugin keeps only silent pushes and pushes with key/value pairs.
-        KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo: userInfo)
-
-        completionHandler(.newData)
+        // The plugin decides which pushes reach Dart and calls completionHandler.
+        KlaviyoFlutterSdkPlugin.shared.handleSilentPush(
+            userInfo: userInfo,
+            fetchCompletionHandler: completionHandler
+        )
     }
 }
