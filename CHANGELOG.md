@@ -33,9 +33,11 @@
 ### Changes
 
 - **Cold-start push opens and actions go to the first subscriber once.** A push open or push action that arrives before anyone subscribes is buffered, one of each, newest wins, and a new open clears a buffered action. The first `onPushNotification` / `onPushAction` subscriber receives it once, then the buffer is cleared. Later subscribers don't receive it; use `getInitialPushNotification()` to read the launch tap whenever you need it. `resetProfile()` drops a buffered open and action.
+- **iOS: clearer `FORMS_NOT_AVAILABLE` and `GEOFENCING_NOT_AVAILABLE` error messages** — They now say that `KLAVIYO_INCLUDE_FORMS` and `KLAVIYO_INCLUDE_LOCATION` apply to CocoaPods only, and that Swift Package Manager builds always include forms and the location module.
 
 ### Documentation
 
+- **Swift Package Manager setup on iOS** — The README now covers installing with Swift Package Manager (Flutter 3.41+), including adding `KlaviyoSwiftExtension` to a notification service extension, and notes that the `KLAVIYO_INCLUDE_FORMS` and `KLAVIYO_INCLUDE_LOCATION` flags apply to CocoaPods only.
 - **iOS silent push after a force quit** — The README no longer says iOS is unaffected: a force-quit app gets no silent pushes until the user reopens it or restarts the device.
 - **Using the SDK alongside `firebase_messaging` on Android** — New README section: declare `KlaviyoFlutterPushService` in your app manifest, or `firebase_messaging`'s service wins and Klaviyo pushes never display; the example app does this.
 

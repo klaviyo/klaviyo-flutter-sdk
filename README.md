@@ -21,6 +21,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
   - [Handling Push Opens](#handling-push-notification-opens)
   - [Action Buttons](#action-buttons)
   - [Rich Push](#rich-push)
+    - [Notification Service Extension (iOS)](#notification-service-extension-ios)
   - [Badge Count (iOS)](#badge-count-ios-only)
 - [In-App Forms](#in-app-forms)
   - [Personalized Forms Authentication](#personalized-forms-authentication)
@@ -68,6 +69,16 @@ dependencies:
   klaviyo_flutter_sdk: ^0.6.0
 ```
 
+On iOS, the plugin installs through Swift Package Manager (SwiftPM), which needs Flutter 3.41 or later. Flutter 3.44 and later use SwiftPM by default. On Flutter 3.41–3.43, turn it on once:
+
+```bash
+flutter config --enable-swift-package-manager
+```
+
+Apps on Flutter 3.27–3.40, or with SwiftPM turned off, install through CocoaPods (see [iOS Setup](#ios-setup)).
+
+> **Coming in 1.0 (December):** Swift Package Manager becomes the primary iOS install path and the CocoaPods podspec is frozen, so new native iOS fixes ship only through SwiftPM. To switch now, see Flutter's [Swift Package Manager guide for app developers](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers).
+
 A complete working example is available in the [`example/`](example/) directory.
 
 ## Initialization
@@ -94,7 +105,13 @@ The sections below cover required native configuration for push notification han
 
 ### iOS Setup
 
-**1. Install Pods**
+**1. Build with Swift Package Manager**
+
+With SwiftPM on (see [Installation](#installation)), `flutter build ios` or `flutter run` resolves the plugin and the native Klaviyo SDK. You don't need `pod install`.
+
+Under SwiftPM the plugin always links `KlaviyoSwift`, `KlaviyoForms` and `KlaviyoLocation`. In-app forms and geofencing are always available, and the `KLAVIYO_INCLUDE_FORMS` / `KLAVIYO_INCLUDE_LOCATION` Podfile flags have no effect. Geofencing still needs the `Info.plist` entries in [Enabling Geofencing](#enabling-geofencing) before you call `registerGeofencing()`.
+
+**CocoaPods:** with SwiftPM off, install the pods instead:
 
 ```bash
 cd ios && pod install
@@ -656,11 +673,36 @@ If a button is configured with a deep link, your existing [Deep Linking](#deep-l
 [Rich Push](https://help.klaviyo.com/hc/en-us/articles/16917302437275) lets you add images and videos (iOS only) to push notifications.
 
 - **Android**: No additional setup needed. Refer to the [Android SDK documentation](https://github.com/klaviyo/klaviyo-android-sdk#Rich-Push) for more details.
-- **iOS**: Requires a notification service extension. Follow the CocoaPods setup steps in the [iOS SDK installation guide](https://github.com/klaviyo/klaviyo-swift-sdk/blob/master/README.md#installation), then see the [Rich Push documentation](https://github.com/klaviyo/klaviyo-swift-sdk#rich-push-images--videos).
+- **iOS**: Requires a notification service extension. See [Notification Service Extension (iOS)](#notification-service-extension-ios), then the [Rich Push documentation](https://github.com/klaviyo/klaviyo-swift-sdk#rich-push-images--videos).
+
+#### Notification Service Extension (iOS)
+
+Rich push and [badge counts](#badge-count-ios-only) on iOS need a notification service extension that uses the native `KlaviyoSwiftExtension` library. The extension is an Xcode target in your app, so you add the library to it yourself; the Flutter plugin doesn't.
+
+**Swift Package Manager**
+
+1. In Xcode, open `ios/Runner.xcworkspace` and choose **File → New → Target… → Notification Service Extension**. Set its minimum deployment target to the same iOS version as the Runner target.
+2. Choose **File → Add Package Dependencies…**, enter `https://github.com/klaviyo/klaviyo-swift-sdk`, and set the dependency rule to **Up to Next Minor Version** from the same version as the plugin's native iOS SDK (see the plugin's [`Package.swift`](ios/klaviyo_flutter_sdk/Package.swift)). Xcode resolves one version of `klaviyo-swift-sdk` for the whole app, so the rule must allow the version the plugin needs.
+3. When Xcode asks which products to add, add **`KlaviyoSwiftExtension`** to the notification service extension target only. Don't add it to Runner.
+4. Replace the generated `NotificationService.swift` with the Klaviyo implementation from the [iOS SDK Rich Push guide](https://github.com/klaviyo/klaviyo-swift-sdk#rich-push-images--videos). It imports `KlaviyoSwiftExtension` and calls `KlaviyoExtensionSDK.handleNotificationServiceDidReceivedRequest`. The example app's [`NotificationService.swift`](example/ios/NotificationServiceExtension/NotificationService.swift) is a working copy.
+5. For badge counts, add the same App Group to Runner and the extension, as described in the [badge count documentation](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#badge-count).
+
+**CocoaPods**
+
+Add the extension target in Xcode as in step 1, then add the pod to `ios/Podfile` and run `pod install`:
+
+```ruby
+target 'NotificationServiceExtension' do
+  use_frameworks!
+  pod 'KlaviyoSwiftExtension'
+end
+```
+
+Steps 4 and 5 are the same.
 
 ### Badge Count (iOS Only)
 
-Klaviyo supports setting or incrementing the badge count on iOS push notifications. This requires a notification service extension and app group — see the [Swift SDK installation instructions](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#installation) and [badge count documentation](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#badge-count).
+Klaviyo supports setting or incrementing the badge count on iOS push notifications. This requires a notification service extension and app group — see [Notification Service Extension (iOS)](#notification-service-extension-ios) and the [badge count documentation](https://github.com/klaviyo/klaviyo-swift-sdk?tab=readme-ov-file#badge-count).
 
 Android handles badge counts automatically.
 
@@ -1019,7 +1061,7 @@ This includes the full `location` module with Google Play Services and adds the 
 - `android.permission.ACCESS_COARSE_LOCATION`
 - `android.permission.ACCESS_BACKGROUND_LOCATION`
 
-**iOS (Swift Package Manager)** — no flag is needed. The plugin's Swift package always links `KlaviyoLocation`. Swift Package Manager is the default for Flutter 3.44+ apps that have no `ios/Podfile`.
+**iOS (Swift Package Manager)** — no flag is needed. The plugin's Swift package always links `KlaviyoLocation`, and the `KLAVIYO_INCLUDE_LOCATION` flag has no effect.
 
 **iOS (CocoaPods)** — add to `ios/Podfile` before `flutter_install_all_ios_pods`:
 
@@ -1056,7 +1098,9 @@ In-app forms are **enabled by default**. To opt out (for a smaller SDK footprint
 klaviyoIncludeForms=false
 ```
 
-**iOS** — add to `ios/Podfile` before `flutter_install_all_ios_pods`:
+**iOS (Swift Package Manager)** — forms can't be turned off. The plugin's Swift package always links `KlaviyoForms`, and the `KLAVIYO_INCLUDE_FORMS` flag has no effect.
+
+**iOS (CocoaPods)** — add to `ios/Podfile` before `flutter_install_all_ios_pods`:
 
 ```ruby
 ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'
