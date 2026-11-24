@@ -13,6 +13,7 @@ import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
 import 'models/klaviyo_push_action.dart';
 import 'models/profile_property.dart';
+import 'models/inbox_filter.dart';
 import 'models/inbox_filters.dart';
 import 'models/inbox_message_state.dart';
 import 'models/inbox_page.dart';
@@ -880,6 +881,64 @@ class KlaviyoSDK {
   /// subscribing. Treat this stream as a hint that shortens the wait, never as
   /// the source of truth.
   Stream<void> get inboxChanged => _nativeWrapper.onInboxChanged;
+
+  /// Puts every message that matches [filter] into [state], returning how many
+  /// changed.
+  ///
+  /// The bulk form of [updateInboxMessageState], applied to the current
+  /// company's messages in one change, so [inboxChanged] listeners fire once.
+  ///
+  /// A message already in [state] is never matched, so it is not counted and
+  /// not changed, and repeating the call returns 0. That means a filter that
+  /// allows only such messages changes nothing: `read` with
+  /// `InboxFilter.where(InboxReadFilter.read, ...)`, `unread` with the `unread`
+  /// filter, `archived` with the `archived` archive filter, or `unarchived`
+  /// with `active`. To unarchive, ask for archived messages.
+  ///
+  /// ```dart
+  /// // Archive everything.
+  /// await klaviyo.updateInboxMessageStates(
+  ///   InboxMessageState.archived,
+  ///   InboxFilter.allMessages,
+  /// );
+  ///
+  /// // Mark everything visible in the inbox as read.
+  /// await klaviyo.updateInboxMessageStates(
+  ///   InboxMessageState.read,
+  ///   InboxFilter.where(InboxReadFilter.unread, InboxArchiveFilter.active),
+  /// );
+  /// ```
+  ///
+  /// [filter] is required: there is no default, so a bulk change never has to
+  /// guess which messages were meant. The state is local to this device, like
+  /// [updateInboxMessageState]. Throws [KlaviyoInboxException] when the native
+  /// store fails.
+  Future<int> updateInboxMessageStates(
+    InboxMessageState state,
+    InboxFilter filter,
+  ) async {
+    _ensureInitialized();
+    return _nativeWrapper.updateInboxMessageStates(state, filter);
+  }
+
+  /// Remove every message this device has for the current company, returning
+  /// how many were removed.
+  ///
+  /// This is a local delete, not a server-side unsubscribe or a suppression:
+  /// the messages are gone from this device's store only, and messages for
+  /// other companies on the device are left alone.
+  ///
+  /// It does not replace the clear on a profile reset on iOS: [resetProfile]
+  /// already clears the inbox in full there, for every company, so one
+  /// profile's messages are never shown to the next. Android's reset-clear is
+  /// still open (klaviyo-android-sdk#679).
+  ///
+  /// [inboxChanged] listeners fire once, and not at all when there was nothing
+  /// to remove. Throws [KlaviyoInboxException] when the native store fails.
+  Future<int> clearInbox() async {
+    _ensureInitialized();
+    return _nativeWrapper.clearInbox();
+  }
 
   /// Private methods
   void _ensureInitialized() {

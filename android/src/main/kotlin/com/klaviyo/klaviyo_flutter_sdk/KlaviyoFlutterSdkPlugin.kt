@@ -945,6 +945,27 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "updateInboxMessageStates" -> {
+                val state = call.argument<String>("state")
+                val filter = call.argument<Map<*, *>>("filter")
+                if (state == null || filter == null) {
+                    result.error(
+                        "INVALID_ARGUMENTS",
+                        "An inbox state and filter are required",
+                        null,
+                    )
+                    return
+                }
+                deliverInboxResult(result) { done ->
+                    InboxBridge.updateMessageStates(state, filter, done)
+                }
+            }
+
+            "clearInbox" ->
+                deliverInboxResult(result) { done ->
+                    InboxBridge.clearAll(done)
+                }
+
             "handleUniversalTrackingLink" -> {
                 val url = call.argument<String>("url")
 

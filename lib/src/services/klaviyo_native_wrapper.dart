@@ -4,6 +4,7 @@ import '../models/klaviyo_profile.dart';
 import '../models/klaviyo_event.dart';
 import '../models/klaviyo_subscription.dart';
 import '../models/geofence.dart';
+import '../models/inbox_filter.dart';
 import '../models/inbox_filters.dart';
 import '../models/inbox_message_state.dart';
 import '../models/inbox_page.dart';
@@ -561,6 +562,39 @@ class KlaviyoNativeWrapper {
         {'messageId': messageId, 'state': state.wireValue},
       );
       return result ?? false;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
+  /// Put every message that matches [filter] into [state], returning how many
+  /// changed.
+  ///
+  /// The bulk form of [updateInboxMessageState]. Native applies it to the
+  /// current company's messages in one change.
+  Future<int> updateInboxMessageStates(
+    InboxMessageState state,
+    InboxFilter filter,
+  ) async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<int>(
+        'updateInboxMessageStates',
+        {'state': state.wireValue, 'filter': filter.toMap()},
+      );
+      return result ?? 0;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
+  /// Remove every message this device has for the current company, returning
+  /// how many were removed.
+  Future<int> clearInbox() async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<int>('clearInbox');
+      return result ?? 0;
     } on PlatformException catch (e, stackTrace) {
       throw _inboxException(e, stackTrace);
     }
