@@ -35,6 +35,7 @@ class KlaviyoFlutterPushServiceTest {
     fun `non Klaviyo message is never push data`() {
         assertFalse(isPushData(isKlaviyoMessage = false, isKlaviyoNotification = false, hasKeyValuePairs = false))
         assertFalse(isPushData(isKlaviyoMessage = false, isKlaviyoNotification = false, hasKeyValuePairs = true))
+        assertFalse(isPushData(isKlaviyoMessage = false, isKlaviyoNotification = true, hasKeyValuePairs = false))
         assertFalse(isPushData(isKlaviyoMessage = false, isKlaviyoNotification = true, hasKeyValuePairs = true))
     }
 }
