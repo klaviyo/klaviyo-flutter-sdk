@@ -27,7 +27,6 @@ iOS 15 supports the same devices as iOS 13 (iPhone 6s and newer), so this doesn'
 | `KlaviyoSDK().handlePushNotificationOpened(...)` | Delete the call. Push opens are tracked automatically and arrive on `onPushOpened`. |
 | The `Klaviyo` class (`Klaviyo.instance`) | `KlaviyoSDK()`. [MIGRATION.md](./MIGRATION.md#quick-reference) maps every method. |
 | `KlaviyoSDK().onFormEvent` | `KlaviyoSDK().onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s instead of raw maps. |
-| `map.isKlaviyoNotification` | Delete the check. Klaviyo push events arrive on `KlaviyoSDK`'s streams, such as `onPushOpened`, `onPushToken` and `onPushData`. |
 | `KlaviyoSDK().dispose()` | Delete the call. If you used it to stop supplying tokens for personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()`. To cancel your own listeners, cancel their `StreamSubscription`s. |
 | `KlaviyoNativeWrapper` (including its `dispose()` and `track()`) | `KlaviyoSDK()`. The class is internal and no longer exported. Use `createEvent(KlaviyoEvent.custom(...))` in place of `track()`. |
 | `KlaviyoSDK().setLogLevel(...)` and the `KlaviyoLogLevel` enum | `KlaviyoSDK().setLoggingEnabled(bool)` turns native and Dart logging on or off. For native verbosity on Android, set the `com.klaviyo.core.log_level` manifest meta-data (see the README's Android troubleshooting). |
@@ -40,7 +39,7 @@ iOS 15 supports the same devices as iOS 13 (iPhone 6s and newer), so this doesn'
 | `ActionButtonTapped` (`buttonId`, `label`, `action`, `url`) | `KlaviyoPushOpened.button`. If present, read `id`, `label`, `action` (a `KlaviyoPushButtonAction`) and `url`. The button may also be set for a web URL tap. |
 | `KlaviyoNotInitializedException`, `KlaviyoInvalidApiKeyException`, `KlaviyoNetworkException`, `KlaviyoProfileException`, `KlaviyoEventException`, `KlaviyoPushException`, `KlaviyoFormException`, `KlaviyoConfigurationException`, `KlaviyoPermissionException` | `KlaviyoException`. Catch `KlaviyoException` and check `code` for errors that provide one. |
 | `KlaviyoException.originalError` typed `dynamic` | Same field, now typed `Object?`. Code that called members on it without a check or cast stops compiling. |
-| `ClassifiedProviderError`, `classifyAuthTokenProviderError` and `parseAuthTokenRequestedEventId` | None. These were internal helpers for the auth token bridge. `auth_token.dart` now exports only `AuthTokenProvider`. |
+| `ClassifiedProviderError`, `classifyAuthTokenProviderError` and `parseAuthTokenRequestedEventId` | None. These were internal helpers for the auth token bridge. The public package now exports only `AuthTokenProvider` from `auth_token.dart`. |
 | `InAppFormConfig.copyWith(isInfinite: ...)` | Use `InAppFormConfig.infinite()` for an infinite config. Pass `sessionTimeoutDuration` to `copyWith` for a finite one. A `copyWith()` with no arguments keeps an infinite config infinite. |
 | `KlaviyoSDK().apiKey` | None. Keep the key in your own code if you need it after `initialize()`. The native SDKs own that state. |
 

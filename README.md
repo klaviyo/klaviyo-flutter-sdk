@@ -628,7 +628,21 @@ Future<String> initialRoute() async {
 }
 ```
 
-It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. On Android, the value belongs to the Flutter engine that captured the launch tap; if your app runs more than one engine, the others return `null`. Reset does not clear notification opens still queued on the native side. It clears pending push actions on Android but leaves them queued on iOS.
+It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. On Android, the value belongs to the Flutter engine that captured the launch tap; if your app runs more than one engine, the others return `null`. `resetProfile()` also clears the pending native open on Android.
+
+#### Identifying Klaviyo Notifications
+
+Use the `isKlaviyoNotification` extension to pick out Klaviyo pushes in messages your app receives from another library, such as `firebase_messaging`:
+
+```dart
+FirebaseMessaging.onMessage.listen((message) {
+  if (message.data.isKlaviyoNotification) {
+    // This is a Klaviyo notification
+  }
+});
+```
+
+Use `onPushOpened` for taps, `onPushData` for foreground push data, and `onBackgroundPushData` for background push data.
 
 ### Push Data
 
@@ -1356,6 +1370,14 @@ Custom metrics:
 Applies to the SMS and WhatsApp channels.
 
 `marketing` | `transactional`
+
+### Extensions
+
+#### KlaviyoNotificationMap (on `Map<String, dynamic>`)
+
+| Property | Description |
+|----------|-------------|
+| `isKlaviyoNotification` | `bool` — whether the map is a Klaviyo push notification payload |
 
 ### Exceptions
 

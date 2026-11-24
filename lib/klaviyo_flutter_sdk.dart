@@ -18,3 +18,4 @@ export 'src/models/klaviyo_push_token.dart';
 export 'src/services/background_push_data.dart'
     show KlaviyoBackgroundPushDataHandler;
 export 'src/exceptions/klaviyo_exception.dart';
+export 'src/extensions/map_extensions.dart';
