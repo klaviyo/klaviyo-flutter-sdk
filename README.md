@@ -720,6 +720,8 @@ Where key/value pairs reach Dart for a visible push:
 - **In the foreground**, they reach `onPushData` either way. The plugin also observes `userNotificationCenter(_:willPresent:withCompletionHandler:)`, which iOS calls for every push shown in the foreground, so Background Processing doesn't matter. If your `willPresent` override doesn't call `super`, call `KlaviyoFlutterSdkPlugin.shared.handleWillPresent(notification)` in it, as in the iOS setup. A push seen by both callbacks reaches `onPushData` once.
 - **In the background**, they reach Dart only when Background Processing is on (through `onBackgroundPushData`), or when the user taps the push (`onPushOpened`).
 
+In apps with multiple Flutter engines, only the first engine that calls `onBackgroundPushData` owns the iOS background handler; a second engine's call succeeds but its handler is not used. If the owning engine is destroyed, call `onBackgroundPushData` again from the engine that remains.
+
 Delivery on arrival is best effort on iOS. The system decides whether to wake your app for a `content-available` push, and it throttles or skips these wakes based on battery, Low Power Mode, how often you send them, and whether the user swiped the app away. Don't rely on push data for anything that must happen; for a visible push, the opened event still fires when the user taps it.
 
 #### Android
