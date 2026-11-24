@@ -81,11 +81,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         // Use the SHARED instance to ensure the AppDelegate accesses the same object
         let instance = KlaviyoFlutterSdkPlugin.shared
 
-        // 1. Setup Method Channel (For Commands: initialize, setProfile, etc.)
-        let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: registrar.messenger())
-        registrar.addMethodCallDelegate(instance, channel: channel)
-
-        // 2. Setup Event Channel (For Data Streams: tokens, opened notifications)
         // Each engine gets its own stream handler; the shared instance routes events
         // to the primary engine. Publishing it delivers the engine's detach callback.
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
@@ -94,13 +89,19 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
         eventChannel.setStreamHandler(engineStream)
         registrar.publish(engineStream)
 
-        // 3. Setup Background Channel (For running the Dart background push data handler)
-        instance.backgroundChannel = FlutterMethodChannel(
-            name: "klaviyo_sdk_background",
-            binaryMessenger: registrar.messenger()
-        )
+        let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: registrar.messenger())
+        channel.setMethodCallHandler { [weak engineStream] call, result in
+            if call.method == "registerBackgroundPushDataHandler" {
+                if let engineStream {
+                    instance.registerBackgroundPushDataHandler(for: engineStream)
+                }
+                result(nil)
+            } else {
+                instance.handle(call, result: result)
+            }
+        }
 
-        // 4. Register as Application Delegate, once per process
+        // Register as Application Delegate, once per process
         // This allows us to automatically intercept 'didRegisterForRemoteNotifications'
         // without requiring code in the Host App's AppDelegate.
         if !didAddApplicationDelegate {
@@ -108,8 +109,14 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
             registrar.addApplicationDelegate(instance)
         }
 
-        // 4. Track when the app first becomes active, to tell the launch tap apart from later taps.
+        // Track when the app first becomes active, to tell the launch tap apart from later taps.
         instance.observeFirstActivation()
+    }
+
+    private func registerBackgroundPushDataHandler(for engine: EngineEventStream) {
+        guard backgroundChannel == nil, registeredEngines.contains(engine) else { return }
+        backgroundChannel = engine.backgroundChannel
+        registerBackgroundPushDataHandler()
     }
 
     private func observeFirstActivation() {
@@ -506,10 +513,6 @@ extension KlaviyoFlutterSdkPlugin {
             KlaviyoSDK().setBadgeCount(count)
             result(nil)
 
-        case "registerBackgroundPushDataHandler":
-            registerBackgroundPushDataHandler()
-            result(nil)
-
         case "handleUniversalTrackingLink":
             guard let args = call.arguments as? [String: Any],
                   let urlString = args["url"] as? String,
@@ -593,6 +596,10 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
 
     fileprivate func removeRegisteredEngine(_ engine: EngineEventStream) {
         registeredEngines.remove(engine)
+        if backgroundChannel === engine.backgroundChannel {
+            backgroundChannel = nil
+            isBackgroundHandlerRegistered = false
+        }
         releaseCachedPushEvents()
     }
 
@@ -623,6 +630,7 @@ private struct EngineSink {
 /// Per-engine `klaviyo_events` stream handler that registers the engine's sink
 /// with the shared plugin.
 private final class EngineEventStream: NSObject, FlutterStreamHandler {
+    let backgroundChannel: FlutterMethodChannel
     private weak var registrar: FlutterPluginRegistrar?
     private var hasListened = false
 
@@ -632,6 +640,10 @@ private final class EngineEventStream: NSObject, FlutterStreamHandler {
 
     init(registrar: FlutterPluginRegistrar) {
         self.registrar = registrar
+        backgroundChannel = FlutterMethodChannel(
+            name: "klaviyo_sdk_background",
+            binaryMessenger: registrar.messenger()
+        )
     }
 
     func onListen(
