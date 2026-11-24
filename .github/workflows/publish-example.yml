@@ -587,7 +587,7 @@ jobs:
         || github.event_name == 'release'
         || (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
         || (github.event_name == 'pull_request' && (github.event.label.name == 'deploy-example-app' || github.event.label.name == 'deploy-example-app:ios')))
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 45
     environment:
       name: testflight
@@ -599,8 +599,6 @@ jobs:
     defaults:
       run:
         working-directory: klaviyo_flutter_sdk
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     outputs:
       build_number: ${{ steps.result.outputs.build_number }}
       marketing_version: ${{ steps.result.outputs.marketing_version }}
@@ -626,6 +624,13 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: klaviyo_flutter_sdk
+
+      - name: Verify iOS SDK
+        run: |
+          xcodebuild -version
+          sdk_version=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iOS SDK: $sdk_version"
+          [[ "$sdk_version" == 27.* ]]
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
