@@ -767,7 +767,9 @@ class KlaviyoSDK {
   Stream<KlaviyoPushOpened> get onPushOpened =>
       _nativeWrapper.onPushOpenedEvent.map(KlaviyoPushOpened.fromMap);
 
-  /// Klaviyo push data received while the app is in the foreground.
+  /// Klaviyo push data received in the foreground or background.
+  ///
+  /// Delivery requires a live Flutter engine and OS delivery of the push.
   ///
   /// Emits for every silent push, and for every visible push that carries
   /// key/value pairs. A visible push with key/value pairs therefore also
