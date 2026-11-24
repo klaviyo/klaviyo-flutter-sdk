@@ -2,7 +2,6 @@ package com.klaviyo.klaviyo_flutter_sdk
 
 import android.app.Activity
 import android.app.Application
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
@@ -167,14 +166,43 @@ class KlaviyoFlutterSdkPlugin :
             sink.success(payload)
             return true
         }
+
+        private fun emitOrCachePushAction(payload: Map<String, Any?>) {
+            if (!emitToPrimary(payload)) {
+                Registry.log.verbose("Flutter not ready. Caching push action event.")
+                cachedPushAction = payload
+            }
+        }
+
+        /** Delivers or holds a web-link tap from the native trampoline. Main thread only. */
+        internal fun onWebLinkTap(
+            intent: Intent,
+            url: String,
+        ) = emitOrCachePushAction(webLinkTapPayload(intent, url))
+
+        /**
+         * Maps a web-link tap to the iOS push-action payload: `push_action_button_tapped` for an
+         * `open_url` button, else `push_open_web_url`.
+         */
+        internal fun webLinkTapPayload(
+            intent: Intent,
+            url: String,
+        ): Map<String, Any?> {
+            val buttonId =
+                intent.getStringExtra(Constants.PACKAGE_PREFIX + "Button ID")
+                    ?: return mapOf("type" to "push_open_web_url", "data" to mapOf("url" to url))
+            val data = mutableMapOf<String, Any?>("id" to buttonId, "action" to "open_url", "url" to url)
+            intent.getStringExtra(Constants.PACKAGE_PREFIX + "Button Label")?.let { data["label"] = it }
+            return mapOf("type" to "push_action_button_tapped", "data" to data)
+        }
     }
 
     override fun onAttachedToEngine(
         @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding,
     ) {
+        applicationContext = flutterPluginBinding.applicationContext
         activePlugins.add(this)
         selectInstance()
-        applicationContext = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "klaviyo_sdk")
         channel.setMethodCallHandler(this)
 
@@ -854,6 +882,7 @@ class KlaviyoFlutterSdkPlugin :
                 try {
                     Klaviyo.resetProfile()
                     initialPushNotification = null
+                    cachedPushAction = null
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("RESET_ERROR", "Failed to reset profile", e.message)
@@ -1210,13 +1239,6 @@ class KlaviyoFlutterSdkPlugin :
         if (!emitToPrimary(payload)) {
             Registry.log.verbose("Flutter not ready. Caching notification open event.")
             cachedOpenedNotification = payload
-        }
-    }
-
-    private fun emitOrCachePushAction(payload: Map<String, Any?>) {
-        if (!emitToPrimary(payload)) {
-            Registry.log.verbose("Flutter not ready. Caching push action event.")
-            cachedPushAction = payload
         }
     }
 }
