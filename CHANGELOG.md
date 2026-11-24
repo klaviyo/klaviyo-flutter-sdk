@@ -39,6 +39,10 @@
 - **iOS silent push after a force quit** — The README no longer says iOS is unaffected: a force-quit app gets no silent pushes until the user reopens it or restarts the device.
 - **Using the SDK alongside `firebase_messaging` on Android** — New README section: declare `KlaviyoFlutterPushService` in your app manifest, or `firebase_messaging`'s service wins and Klaviyo pushes never display; the example app does this.
 
+### Coming in 1.0
+
+- **iOS: Swift Package Manager becomes the primary install path in 1.0 (December).** CocoaPods trunk stops taking new releases on Dec 2, 2026. Starting with 1.0, the podspec is frozen at the last KlaviyoSwift version on trunk, so new native iOS fixes ship only through Swift Package Manager. SPM needs Flutter 3.41+. Apps on older Flutter versions can still install through CocoaPods, but they won't get native iOS updates. To switch now, see Flutter's [Swift Package Manager guide for app developers](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers).
+
 ## 0.5.0
 
 ### Changes
