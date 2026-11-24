@@ -606,7 +606,7 @@ KlaviyoSDK().onPushOpened.listen((opened) {
 
 One tap emits one event. Before 0.6.0, an iOS action-button or web URL tap emitted both `push_notification_opened` and an `onPushAction` event. `webUrl` is set for a web URL push and for an `open_url` action button. `KlaviyoPushTap` and `KlaviyoPushButtonAction` are not enums, because later releases may add new kinds, so keep a `default` case when you switch on them.
 
-> **Android web-link taps:** a web URL push or an `open_url` button opens the browser without launching your app's activity, so the native SDK hands the tap to the plugin directly. If your app is running, the open reaches `onPushOpened` right away. If the app was fully killed, the plugin saves the tap and delivers it the next time your app starts and subscribes, within 24 hours. The same applies to `onPushAction`. Requires Klaviyo Android SDK 4.7.0.
+> **Android web-link taps:** a web URL push or an `open_url` button opens the browser without launching your app's activity. The native SDK hands the tap to the plugin directly. If your app is running and subscribed, `onPushOpened` receives the open right away. If Flutter is not ready to receive it, the plugin holds the tap in memory and delivers it once the app subscribes. If the process dies before delivery, Dart gets no event, but the native SDK still tracks the open. The same delivery rules apply to `onPushAction`. Requires Klaviyo Android SDK 4.7.0.
 
 > **Why this stream exists alongside native tracking:** The native SDK's own open-tracking (via the manual `AppDelegate` wiring on iOS, or the opt-outable automatic handling on Android) reports the "Opened Push" event to Klaviyo's backend for analytics and flow triggers — it has no effect on your Flutter app's runtime behavior. This Dart stream is the separate, app-facing signal: it's how your Flutter code learns a notification was tapped, with the payload, so it can react (navigate, update state, log to your own analytics). Native tracking and this stream serve different consumers — Klaviyo's backend vs. your app — so both exist independently, and this stream fires regardless of the Android opt-out.
 
@@ -1213,7 +1213,7 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 | `apiKey` | `String?` | Current API key |
 | `onPushToken` | `Stream<KlaviyoPushToken>` | Each push token the platform delivers, typed as APNs or FCM |
 | `onPushOpened` | `Stream<KlaviyoPushOpened>` | One event per tap on a Klaviyo push |
-| `onPushData` | `Stream<KlaviyoPushData>` (experimental) | Push data received in the foreground |
+| `onPushData` | `Stream<KlaviyoPushData>` | Push data received in the foreground |
 | `onPushNotification` | `Stream<Map<String, dynamic>>` | Push notification events (deprecated) |
 | `onFormLifecycleEvent` | `Stream<FormLifecycleEvent>` | Typed in-app form lifecycle events |
 | `onPushAction` | `Stream<KlaviyoPushAction>` | Typed `open_url` / action-button push tap events (deprecated) |
