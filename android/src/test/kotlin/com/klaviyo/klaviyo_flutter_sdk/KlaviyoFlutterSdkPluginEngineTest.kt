@@ -1,9 +1,12 @@
 package com.klaviyo.klaviyo_flutter_sdk
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Looper
 import com.klaviyo.analytics.Klaviyo
+import com.klaviyo.core.PushTapDestination
 import com.klaviyo.core.Registry
 import com.klaviyo.core.utils.AdvancedAPI
 import com.klaviyo.forms.FormLifecycleEvent
@@ -155,12 +158,12 @@ class KlaviyoFlutterSdkPluginEngineTest {
     @After
     fun tearDown() {
         attached.toList().forEach { detach(it) }
-        KlaviyoFlutterSdkPlugin.clearPendingWebLinkTap(RuntimeEnvironment.getApplication())
         unmockkAll()
     }
 
+    @OptIn(AdvancedAPI::class)
     private fun webLinkTap(url: String = "https://example.com") =
-        KlaviyoFlutterSdkPlugin.onWebLinkTap(RuntimeEnvironment.getApplication(), Intent(), url)
+        KlaviyoFlutterInitProvider.webLinkTapObserver().onPushTap(Intent(), PushTapDestination.External(url))
 
     private fun attach() =
         Engine().also {
@@ -436,9 +439,37 @@ class KlaviyoFlutterSdkPluginEngineTest {
         assertEquals(0, secondary.webUrlOpens().size)
     }
 
+    @OptIn(AdvancedAPI::class)
+    @Test
+    fun `provider leaves deep-link and open-app taps to the activity intent`() {
+        val engine = attach()
+        engine.listen()
+        val observer = KlaviyoFlutterInitProvider.webLinkTapObserver()
+
+        observer.onPushTap(Intent(), PushTapDestination.DeepLink(Uri.parse("myapp://home")))
+        observer.onPushTap(Intent(), PushTapDestination.OpenApp)
+
+        assertEquals(emptyList<Map<*, *>>(), engine.messenger.sent)
+    }
+
+    @Test
+    fun `a newer push open clears a held web-link tap`() {
+        webLinkTap()
+        val engine = attach()
+        engine.attachActivity(pushOpenIntent())
+
+        engine.listen()
+
+        assertEquals(1, engine.pushOpens().size)
+        assertEquals(0, engine.webUrlOpens().size)
+    }
+
     @Test
     fun `web-link tap with no engine attached replays once to the first engine that listens`() {
         webLinkTap()
+
+        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("com.klaviyo.klaviyo_flutter_sdk", Context.MODE_PRIVATE)
+        assertNull(prefs.getString("pending_web_link_tap", null))
 
         val engine = attach()
         engine.listen()
@@ -446,6 +477,7 @@ class KlaviyoFlutterSdkPluginEngineTest {
         later.listen()
 
         assertEquals(1, engine.webUrlOpens().size)
+        assertEquals(mapOf("url" to "https://example.com"), engine.webUrlOpens().single()["data"])
         assertEquals(0, later.webUrlOpens().size)
     }
 }

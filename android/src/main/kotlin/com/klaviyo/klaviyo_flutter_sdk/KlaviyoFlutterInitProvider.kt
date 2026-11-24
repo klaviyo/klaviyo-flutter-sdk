@@ -2,7 +2,6 @@ package com.klaviyo.klaviyo_flutter_sdk
 
 import android.content.ContentProvider
 import android.content.ContentValues
-import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import com.klaviyo.core.PushTapDestination
@@ -20,17 +19,9 @@ import com.klaviyo.pushFcm.PushTapObserver
 internal class KlaviyoFlutterInitProvider : ContentProvider() {
     @OptIn(AdvancedAPI::class)
     override fun onCreate(): Boolean {
-        val appContext =
-            context?.applicationContext ?: run {
-                Registry.log.error(
-                    "No application context; Android web-link taps won't reach Dart",
-                    IllegalStateException("KlaviyoFlutterInitProvider has no application context"),
-                )
-                return true
-            }
         Registry
             .getOrNull<PushTapDispatcher>()
-            ?.onPushTap(webLinkTapObserver(appContext))
+            ?.onPushTap(webLinkTapObserver())
             ?: Registry.log.warning("Push tap dispatcher unavailable; Android web-link taps won't reach Dart")
         return true
     }
@@ -65,10 +56,10 @@ internal class KlaviyoFlutterInitProvider : ContentProvider() {
 
     internal companion object {
         @OptIn(AdvancedAPI::class)
-        internal fun webLinkTapObserver(context: Context) =
+        internal fun webLinkTapObserver() =
             PushTapObserver { intent, destination ->
                 if (destination is PushTapDestination.External) {
-                    KlaviyoFlutterSdkPlugin.onWebLinkTap(context, intent, destination.url)
+                    KlaviyoFlutterSdkPlugin.onWebLinkTap(intent, destination.url)
                 }
             }
     }

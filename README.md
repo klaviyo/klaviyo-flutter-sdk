@@ -845,7 +845,7 @@ subscription.cancel();
 | `action` | `String` | `ActionButtonTapped` | One of `open_app`, `deep_link`, `open_url` |
 | `url` | `String?` | `ActionButtonTapped` | URL for `deep_link` / `open_url` buttons; `null` for `open_app` |
 
-> **Platform behavior:** The native SDK still performs the actual navigation (opening the URL or launching the app); these events let your app react in parallel. Body `open_url` taps (`OpenWebUrl`) and every kind of action-button tap surface on both platforms. On **Android**, a web-link tap opens the browser without launching your app's activity, so the native SDK hands the tap to the plugin directly. If your app is running, the event reaches Dart right away. If the app was fully killed, the plugin saves the tap and delivers it the next time your app starts and subscribes, as long as that's within 24 hours. A newer push open replaces a saved tap.
+> **Platform behavior:** The native SDK handles navigation. These events let your app respond to taps on both platforms. On **Android**, a web-link tap opens the browser without launching your app's activity. If Flutter isn't listening yet, the plugin holds the tap in memory until your app returns and subscribes. A newer push open clears the held tap. If Android kills the process before delivery, Dart gets no event. The native SDK still tracks Opened Push.
 
 > **Cold starts:** a push action that arrives before you subscribe is buffered and delivered once, to the first listener that subscribes. See the note under [Handling Push Notification Opens](#handling-push-notification-opens).
 
