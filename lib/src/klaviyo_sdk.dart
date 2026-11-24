@@ -13,6 +13,9 @@ import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
 import 'models/klaviyo_push_action.dart';
 import 'models/profile_property.dart';
+import 'models/inbox_filters.dart';
+import 'models/inbox_message_state.dart';
+import 'models/inbox_page.dart';
 import 'enums/klaviyo_log_level.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
@@ -620,6 +623,11 @@ class KlaviyoSDK {
 
   /// Reset the current profile (useful for logout)
   /// Profile state is managed by the native SDK
+  ///
+  /// **iOS also clears the entire Mobile Inbox natively**, for every company,
+  /// so one profile's messages are never shown to the next. Android does not
+  /// do this yet: its reset-clear is still open (klaviyo-android-sdk#679), so
+  /// a host that needs it there should call `clearAll()`.
   Future<void> resetProfile() async {
     _ensureInitialized();
 
@@ -771,6 +779,110 @@ class KlaviyoSDK {
           return [];
         }
       });
+
+  // ============================================================================
+  // Mobile Inbox
+  // ============================================================================
+
+  /// One page of the Mobile Inbox, newest first.
+  ///
+  /// Pages are per-company: reads cover the company this session was
+  /// initialized with, and a page is empty before [initialize].
+  ///
+  /// [pageSize] is clamped by the native SDKs to 1 through 100; the default is
+  /// 20. Pass a previous page's [InboxPage.nextCursor] as [cursor] to continue.
+  /// The cursor is opaque — pass it back, never parse or build one.
+  ///
+  /// [readFilter] and [archiveFilter] choose which messages the page holds.
+  /// They are independent: each narrows the page on its own axis, so
+  /// `readFilter: InboxReadFilter.unread` alone means "unread and not
+  /// archived". **Archived messages are hidden by default** — [archiveFilter]
+  /// defaults to [InboxArchiveFilter.active], so an archive view must ask for
+  /// [InboxArchiveFilter.archived] or [InboxArchiveFilter.all].
+  ///
+  /// A cursor is only valid with the filters it was issued under. Reusing one
+  /// with different filters surfaces as [KlaviyoInboxErrorReason.invalidCursor];
+  /// restart paging from the first page when that happens.
+  ///
+  /// Throws [KlaviyoInboxException] when the native inbox fails. When
+  /// [KlaviyoInboxErrorReason.invalidCursor] is reported, the cursor did not
+  /// come from this inbox (or these filters): restart paging from the first
+  /// page.
+  ///
+  /// Example:
+  /// ```dart
+  /// // Unread messages that are not archived (the default archive filter).
+  /// var page = await klaviyo.fetchInboxPage(
+  ///   readFilter: InboxReadFilter.unread,
+  /// );
+  /// while (page.nextCursor != null) {
+  ///   page = await klaviyo.fetchInboxPage(
+  ///     readFilter: InboxReadFilter.unread,
+  ///     cursor: page.nextCursor,
+  ///   );
+  /// }
+  ///
+  /// // The archive: archived messages only, read or unread.
+  /// final archived = await klaviyo.fetchInboxPage(
+  ///   archiveFilter: InboxArchiveFilter.archived,
+  /// );
+  /// ```
+  Future<InboxPage> fetchInboxPage({
+    int pageSize = 20,
+    String? cursor,
+    InboxReadFilter readFilter = InboxReadFilter.all,
+    InboxArchiveFilter archiveFilter = InboxArchiveFilter.active,
+  }) async {
+    _ensureInitialized();
+    return _nativeWrapper.fetchInboxPage(
+      pageSize: pageSize,
+      cursor: cursor,
+      readFilter: readFilter,
+      archiveFilter: archiveFilter,
+    );
+  }
+
+  /// The number of the current company's messages that are unread and not
+  /// archived.
+  ///
+  /// Zero when nothing has been captured yet. This is the inbox's own count,
+  /// which is independent of the app-icon badge an individual push carried.
+  Future<int> fetchInboxUnreadCount() async {
+    _ensureInitialized();
+    return _nativeWrapper.fetchInboxUnreadCount();
+  }
+
+  /// Puts a message into [state].
+  ///
+  /// Read and archived are independent, so archiving leaves a message read or
+  /// unread. Applying a state a message already reflects does nothing.
+  ///
+  /// Returns whether this device has [messageId], whether or not the change
+  /// altered it — false when it does not, for example because retention removed
+  /// it. Throws [KlaviyoInboxException] when the native store fails.
+  Future<bool> updateInboxMessageState(
+    String messageId,
+    InboxMessageState state,
+  ) async {
+    _ensureInitialized();
+    return _nativeWrapper.updateInboxMessageState(messageId, state);
+  }
+
+  /// Fires when the inbox may have changed: a push was captured, a message's
+  /// state changed, or messages were cleared.
+  ///
+  /// The event carries no payload — re-fetch whatever you are showing.
+  ///
+  /// **This is a best-effort invalidation, not durable delivery.** A change that
+  /// happened while the app was suspended, or before this listener attached, is
+  /// never replayed. A consumer must therefore *also* fetch on startup, on
+  /// resume (e.g. `AppLifecycleState.resumed`), and immediately after
+  /// subscribing. Treat this stream as a hint that shortens the wait, never as
+  /// the source of truth.
+  ///
+  /// Android has no native invalidation signal yet, so this stream stays silent
+  /// there; the startup/resume fetches are what keep Android correct.
+  Stream<void> get inboxChanged => _nativeWrapper.onInboxChanged;
 
   /// Private methods
   void _ensureInitialized() {
