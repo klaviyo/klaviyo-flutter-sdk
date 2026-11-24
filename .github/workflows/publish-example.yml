@@ -87,7 +87,6 @@ env:
   TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || inputs.triggered_by || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   SLACK_USERNAME: Flutter Example App
   SLACK_ICON_EMOJI: ':merlin-orb-flutter:'
-  FLUTTER_VERSION: 3.47.9
   GRADLE_OPTS: -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000
 
 jobs:
@@ -449,7 +448,7 @@ jobs:
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Write Firebase config and signing keystore
@@ -629,7 +628,7 @@ jobs:
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version-file: klaviyo_flutter_sdk/.fvmrc
           cache: true
 
       # Stamps every event field (source label, event, commit, refs) into
