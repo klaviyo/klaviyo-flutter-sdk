@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### New Features
+
+- **Typed push streams.** `onPushToken` (`Stream<KlaviyoPushToken>`) emits each push token as a `KlaviyoPushToken` with the `token` string and its `type` (`KlaviyoPushTokenType.apns` on iOS, `KlaviyoPushTokenType.fcm` on Android); a registration failure arrives as a stream error carrying a `KlaviyoException` with code `PUSH_TOKEN_ERROR`. `onPushOpened` (`Stream<KlaviyoPushOpened>`) emits exactly one event for every tap on a Klaviyo push, whether on the body, an action button or a web URL push, with the tapped `button` or `webUrl` on the event. On Android, web-link taps (a web URL push or an `open_url` button) reach `onPushOpened` the same way they reach `onPushAction`, including after a tap on a fully killed app. `onPushData` (`Stream<KlaviyoPushData>`) emits push data received in the foreground. `KlaviyoPushOpened` and `KlaviyoPushData` expose the push's key/value pairs as `keyValuePairs`. An open that arrives before anyone subscribes is held and delivered once, to the first `onPushOpened` subscriber; read the launch tap at any time with `getInitialPushNotification()`. See [Typed Push Streams](README.md#typed-push-streams).
+
+### Deprecated
+
+- The old push streams are deprecated in favor of the typed streams and will be removed in 1.0. They keep working unchanged until then.
+  - `KlaviyoSDK.onPushNotification`: use `onPushToken` for tokens and token errors, `onPushOpened` for opens, and `onPushData` for silent pushes.
+  - `KlaviyoSDK.onPushAction`: use `onPushOpened`, which carries the tapped button or web URL.
+  - `KlaviyoPushAction`, `OpenWebUrl` and `ActionButtonTapped`: use `KlaviyoPushOpened`, with `tap` set to `KlaviyoPushTap.webUrl` (read `webUrl`) or `KlaviyoPushTap.actionButton` (read `button`).
+
+### Behavior Changes
+
+- **Push data now includes visible pushes with key/value pairs.** `onPushData` and `silent_push_received` on `onPushNotification` fire for every silent push and for every visible push that carries key/value pairs, so such a push fires twice by design: push data on arrival, then an open on tap. On iOS the "visible content" check moved from the host `AppDelegate` into `handleSilentPush(userInfo:)`, so forward every push to it. **Apps still using the old README snippet keep dropping visible pushes with key/value pairs until they update it.**
+
 ### What's New
 
 - **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
@@ -28,7 +43,7 @@
 
 ### New Features
 
-- **`KlaviyoSDK().getInitialPushNotification()`** returns the push tap that launched or relaunched the app from a killed state, or `null`. The map has the same shape as the `push_notification_opened` event. It returns the same value on every call for the life of the process, even after a stream listener received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
+- **`KlaviyoSDK().getInitialPushNotification()`** returns the push tap that launched or relaunched the app from a killed state as a `KlaviyoPushOpened`, the same type `onPushOpened` emits, or `null`. It returns the same value on every call for the life of the process, even after a stream listener received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
 
 ### Changes
 

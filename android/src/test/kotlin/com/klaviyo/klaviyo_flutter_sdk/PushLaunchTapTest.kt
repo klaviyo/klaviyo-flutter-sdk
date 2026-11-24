@@ -162,6 +162,16 @@ class PushLaunchTapTest {
     }
 
     @Test
+    fun `launch tap from an action button carries the button action`() {
+        launchActivityWith(tapIntent("launch", buttonId = "btn1"))
+
+        val action = (getInitialPushNotification() as Map<*, *>)["action"] as Map<*, *>
+
+        assertEquals("push_action_button_tapped", action["type"])
+        assertEquals("btn1", (action["data"] as Map<*, *>)["id"])
+    }
+
+    @Test
     fun `relaunch from history is tracked natively but not emitted or recorded`() {
         val intent = tapIntent("stale", flags = Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)
         launchActivityWith(intent)

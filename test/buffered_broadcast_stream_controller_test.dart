@@ -105,4 +105,21 @@ void main() {
   test('stream is a broadcast stream', () {
     expect(controller.stream.isBroadcast, isTrue);
   });
+
+  group('maxBuffered', () {
+    test('keeps only the newest events', () async {
+      final capped = BufferedBroadcastStreamController<int>(maxBuffered: 3);
+      for (var i = 1; i <= 5; i++) {
+        capped.add(i);
+      }
+
+      final events = <int>[];
+      final sub = capped.stream.listen(events.add);
+      await pumpEventQueue();
+      await sub.cancel();
+      capped.close();
+
+      expect(events, [3, 4, 5]);
+    });
+  });
 }

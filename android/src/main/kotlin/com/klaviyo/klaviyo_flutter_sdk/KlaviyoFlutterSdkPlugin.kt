@@ -178,7 +178,58 @@ class KlaviyoFlutterSdkPlugin :
         internal fun onWebLinkTap(
             intent: Intent,
             url: String,
-        ) = emitOrCachePushAction(webLinkTapPayload(intent, url))
+        ) = emitWebLinkOpen(webLinkOpenedPayload(intent, url))
+
+        /**
+         * Builds the `push_notification_opened` event for a web-link tap, with the push payload
+         * under `data` and its push-action payload from [webLinkTapPayload] under `action`.
+         */
+        internal fun webLinkOpenedPayload(
+            intent: Intent,
+            url: String,
+        ): Map<String, Any?> =
+            mapOf(
+                "type" to "push_notification_opened",
+                "data" to klaviyoExtras(intent),
+                "action" to webLinkTapPayload(intent, url),
+            )
+
+        /**
+         * Emits a web-link open built by [webLinkOpenedPayload] to the primary engine: the open
+         * for `onPushOpened`, then its action for `onPushAction`. Each is held until an engine
+         * listens. Main thread only.
+         */
+        @Suppress("UNCHECKED_CAST")
+        private fun emitWebLinkOpen(payload: Map<String, Any?>) {
+            cachedPushAction = null
+            if (!emitToPrimary(payload)) {
+                Registry.log.verbose("Flutter not ready. Caching notification open event.")
+                cachedOpenedNotification = payload
+            }
+            val action = payload["action"] as? Map<String, Any?> ?: return
+            if (!emitToPrimary(action)) {
+                Registry.log.verbose("Flutter not ready. Caching push action event.")
+                cachedPushAction = action
+            }
+        }
+
+        /**
+         * The Klaviyo push payload carried by [intent]'s extras, without the `com.klaviyo.`
+         * prefix, so the Dart payload matches the iOS `userInfo` shape.
+         */
+        internal fun klaviyoExtras(intent: Intent): Map<String, Any?> {
+            val extras = intent.extras ?: return emptyMap()
+            return extras
+                .keySet()
+                .filter { it.startsWith(Constants.PACKAGE_PREFIX) }
+                .associate { key ->
+                    key.removePrefix(Constants.PACKAGE_PREFIX) to
+                        when (val value = extras.get(key)) {
+                            is String, is Int, is Long, is Double, is Boolean -> value
+                            else -> value?.toString()
+                        }
+                }
+        }
 
         /**
          * Maps a web-link tap to the iOS push-action payload: `push_action_button_tapped` for an
@@ -883,6 +934,7 @@ class KlaviyoFlutterSdkPlugin :
                     Klaviyo.resetProfile()
                     initialPushNotification = null
                     cachedPushAction = null
+                    cachedOpenedNotification = null
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("RESET_ERROR", "Failed to reset profile", e.message)
@@ -1155,40 +1207,26 @@ class KlaviyoFlutterSdkPlugin :
                 return
             }
 
-            val extras = intent.extras
-            if (extras != null && intent.isKlaviyoNotificationIntent) {
-                // Klaviyo namespaces all push extras with Constants.PACKAGE_PREFIX when building
-                // the tap PendingIntent. Strip it so the Dart payload matches the iOS userInfo shape.
-                val notificationData = mutableMapOf<String, Any?>()
-                for (key in extras.keySet()) {
-                    if (!key.startsWith(Constants.PACKAGE_PREFIX)) continue
-                    val unprefixedKey = key.removePrefix(Constants.PACKAGE_PREFIX)
-                    val value = extras.get(key)
-                    notificationData[unprefixedKey] =
-                        when (value) {
-                            is String -> value
-                            is Int -> value
-                            is Long -> value
-                            is Double -> value
-                            is Boolean -> value
-                            else -> value?.toString()
-                        }
-                }
+            if (intent.extras != null && intent.isKlaviyoNotificationIntent) {
+                val notificationData = klaviyoExtras(intent)
 
                 Registry.log.verbose("Push notification opened: $notificationData")
 
+                cachedPushAction = null
+                val pushAction = actionButtonTapPayload(notificationData)
+
                 val openedPayload =
-                    mapOf(
-                        "type" to "push_notification_opened",
-                        "data" to notificationData,
-                    )
+                    buildMap<String, Any?> {
+                        put("type", "push_notification_opened")
+                        put("data", notificationData)
+                        pushAction?.let { put("action", it) }
+                    }
                 if (isLaunch) {
                     initialPushNotification = openedPayload
                 }
                 emitOrCacheOpenedNotification(openedPayload)
 
-                cachedPushAction = null
-                forwardActionButtonTap(notificationData)
+                pushAction?.let { emitOrCachePushAction(it) }
             }
         } catch (e: Exception) {
             Registry.log.error("Error handling push: ${e.message}", e)
@@ -1196,8 +1234,10 @@ class KlaviyoFlutterSdkPlugin :
     }
 
     /**
-     * Surfaces an action-button tap as a typed `push_action_button_tapped`
-     * event, in parallel with the `push_notification_opened` event.
+     * Builds the `push_action_button_tapped` event for an action-button tap, or
+     * null if the open was not a button tap. It is sent on its own for
+     * `onPushAction` and embedded as `action` in the `push_notification_opened`
+     * event for `onPushOpened`.
      *
      * The native SDK only launches the host app (carrying these `Button *`
      * extras) for `deep_link` / `open_app` buttons; `open_url` buttons are
@@ -1205,8 +1245,8 @@ class KlaviyoFlutterSdkPlugin :
      * they are not bridged here. The button's URL (when present) is forwarded
      * verbatim regardless of scheme — scheme handling stays in the native SDK.
      */
-    private fun forwardActionButtonTap(notificationData: Map<String, Any?>) {
-        val buttonId = notificationData["Button ID"] as? String ?: return
+    private fun actionButtonTapPayload(notificationData: Map<String, Any?>): Map<String, Any?>? {
+        val buttonId = notificationData["Button ID"] as? String ?: return null
 
         // The native SDK serializes the action as a display name; map it back to
         // the raw token shared with iOS and the Dart layer. "Open URL" is
@@ -1216,7 +1256,7 @@ class KlaviyoFlutterSdkPlugin :
             when (notificationData["Button Action"] as? String) {
                 "Open App" -> "open_app"
                 "Deep Link" -> "deep_link"
-                else -> return
+                else -> return null
             }
 
         val data =
@@ -1227,11 +1267,9 @@ class KlaviyoFlutterSdkPlugin :
         (notificationData["Button Label"] as? String)?.let { data["label"] = it }
         (notificationData["Button Link"] as? String)?.let { data["url"] = it }
 
-        emitOrCachePushAction(
-            mapOf(
-                "type" to "push_action_button_tapped",
-                "data" to data,
-            ),
+        return mapOf(
+            "type" to "push_action_button_tapped",
+            "data" to data,
         )
     }
 
