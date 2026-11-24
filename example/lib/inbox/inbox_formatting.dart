@@ -13,10 +13,12 @@ class InboxFormatting {
     return value.toLocal().toString().split('.').first;
   }
 
-  /// When the inbox orders by: the send time, or the receive time when the
-  /// send time is unknown.
+  /// When the inbox orders by.
+  ///
+  /// Both timestamps are required, and the native page is already newest first,
+  /// so this only renders the send time the message was ordered by.
   static String sortTime(InboxMessage message) =>
-      dateTime(message.sentAt) ?? dateTime(message.receivedAt) ?? 'no time';
+      dateTime(message.sentAt) ?? 'no time';
 
   /// The destination as `type` or `type url`, for a message or an action.
   static String destination(InboxDestination destination) {
