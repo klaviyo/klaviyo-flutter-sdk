@@ -567,6 +567,45 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Report a click on the message [messageId], or on its button [actionId].
+  ///
+  /// Returns whether the click was queued, which it is not when this device has
+  /// no such message or button. A click never changes the message's state.
+  Future<bool> trackInboxMessageClick(
+    String messageId, {
+    String? actionId,
+    Map<String, Object>? properties,
+  }) async {
+    if (messageId.trim().isEmpty) {
+      throw ArgumentError.value(
+        messageId,
+        'messageId',
+        'must be a non-empty string',
+      );
+    }
+    if (actionId != null && actionId.trim().isEmpty) {
+      throw ArgumentError.value(
+        actionId,
+        'actionId',
+        'must be a non-empty string when provided',
+      );
+    }
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'trackInboxMessageClick',
+        {
+          'messageId': messageId,
+          if (actionId != null) 'actionId': actionId,
+          if (properties != null) 'properties': properties,
+        },
+      );
+      return result ?? false;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
   /// Put every message that matches [filter] into [state], returning how many
   /// changed.
   ///
