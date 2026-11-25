@@ -176,7 +176,7 @@ await KlaviyoSDK().registerForPushNotifications();
 // Listen for token events
 KlaviyoSDK().onPushNotification.listen((event) {
   if (event['type'] == 'push_token_received') {
-    print('Token: ${event['data']['token']}');
+    print('Push token received');
   }
 });
 ```
@@ -203,9 +203,18 @@ Future<void> _handler(RemoteMessage message) async {
 // Before
 if (Klaviyo.instance.isKlaviyoPush(message.data)) { ... }
 
-// After — use the extension
+// After — if you only checked so you could call handlePush, remove the check.
+// Push processing is automatic in the native layer.
+
+// After — if your app handles raw messages from another library, such as
+// firebase_messaging, use the extension:
 if (message.data.isKlaviyoNotification) { ... }
 ```
+
+To receive Klaviyo push data directly, prefer the typed APIs:
+`KlaviyoSDK().onPushOpened` for taps, `KlaviyoSDK().onPushData` for push data
+in the foreground, and `KlaviyoSDK.onBackgroundPushData` for push data in the
+background or when the app isn't running.
 
 ### Profile management — `updateProfile`
 
@@ -399,7 +408,7 @@ After migrating, you gain access to features that were not available in the
 community SDK:
 
 - **In-App Forms:** `registerForInAppForms()`, `unregisterFromInAppForms()`,
-  and the `onFormEvent` stream.
+  and the `onFormLifecycleEvent` stream.
 - **Geofencing:** `registerGeofencing()`, `unregisterGeofencing()` (opt-in via
   build configuration).
 - **Deep Linking:** `handleUniversalTrackingLink()` with `go_router`
@@ -408,7 +417,8 @@ community SDK:
   without needing `firebase_messaging` as a dependency.
 - **Push event stream:** `onPushNotification` for token events, open events,
   and errors.
-- **Log level control:** `setLogLevel(KlaviyoLogLevel)` with granular levels.
+- **Logging toggle:** `setLoggingEnabled(bool)` turns native and Dart-side
+  logging on or off.
 
 See the [README](https://pub.dev/packages/klaviyo_flutter_sdk) for full
 documentation on these features.
@@ -425,7 +435,7 @@ documentation on these features.
 | `.logEvent(name, meta)` | `.createEvent(KlaviyoEvent.custom(metric: name, properties: meta))` |
 | `.sendTokenToKlaviyo(token)` | `.setPushToken(token)` |
 | `.handlePush(data)` | Remove — handled automatically by native layer |
-| `.isKlaviyoPush(data)` | `data.isKlaviyoNotification` |
+| `.isKlaviyoPush(data)` | `data.isKlaviyoNotification`, or remove if only used before `handlePush` |
 | `.updateProfile(profile)` | `.setProfile(profile)` |
 | `.setFirstName(name)` | `.setProfileAttribute('first_name', name)` |
 | `.setLastName(name)` | `.setProfileAttribute('last_name', name)` |

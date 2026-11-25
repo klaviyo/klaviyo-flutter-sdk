@@ -552,10 +552,10 @@ The simplest approach — the SDK automatically fetches the push token without r
 await KlaviyoSDK().registerForPushNotifications();
 ```
 
-To see the token, listen to `onPushToken`. It emits a `KlaviyoPushToken` whose `type` is `KlaviyoPushTokenType.apns` on iOS or `KlaviyoPushTokenType.fcm` on Android. A registration failure arrives as a stream error (a `KlaviyoException` with code `PUSH_TOKEN_ERROR`), so handle it with `onError`:
+To receive the token, listen to `onPushToken`. It emits a `KlaviyoPushToken` whose `type` is `KlaviyoPushTokenType.apns` on iOS or `KlaviyoPushTokenType.fcm` on Android. A registration failure arrives as a stream error (a `KlaviyoException` with code `PUSH_TOKEN_ERROR`), so handle it with `onError`:
 ```dart
 KlaviyoSDK().onPushToken.listen(
-  (event) => _logger.info('${event.type.name} token received: ${event.token}'),
+  (event) => _logger.info('${event.type.name} token received'),
   onError: (Object error) => _logger.warning('Token error: $error'),
 );
 ```
@@ -578,11 +578,11 @@ Push events arrive on one typed stream per concern, the same split `firebase_mes
 KlaviyoSDK().onPushToken.listen((event) {
   switch (event.type) {
     case KlaviyoPushTokenType.apns:
-      _logger.info('APNs token: ${event.token}');
+      _logger.info('APNs token received');
     case KlaviyoPushTokenType.fcm:
-      _logger.info('FCM token: ${event.token}');
+      _logger.info('FCM token received');
     default:
-      _logger.info('${event.type.name} token: ${event.token}');
+      _logger.info('${event.type.name} token received');
   }
 });
 ```
@@ -631,18 +631,6 @@ Future<String> initialRoute() async {
 ```
 
 It returns the same value on every call for the life of the process, including after a stream listener has received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. On Android, the value belongs to the Flutter engine that captured the launch tap; if your app runs more than one engine, the others return `null`. Reset does not clear notification opens still queued on the native side. It clears pending push actions on Android but leaves them queued on iOS.
-
-#### Identifying Klaviyo Notifications
-
-Use the `isKlaviyoNotification` extension to check whether a push notification payload originated from Klaviyo:
-
-```dart
-void handlePushPayload(Map<String, dynamic> payload) {
-  if (payload.isKlaviyoNotification) {
-    // This is a Klaviyo notification
-  }
-}
-```
 
 ### Push Data
 
@@ -730,7 +718,7 @@ The plugin's manifest already contributes `KlaviyoFlutterPushService`, an FCM se
 
 If you also use `firebase_messaging`, its `FlutterFirebaseMessagingService` also registers for `MESSAGING_EVENT`, and Android delivers that intent to only one service. Firebase's `onBackgroundMessage` doesn't depend on it (it runs from a broadcast receiver), but Klaviyo push data does. Check your merged manifest (`app/build/intermediates/merged_manifests/`) to see which service wins:
 
-- If `KlaviyoFlutterPushService` wins, both handlers run for the same Klaviyo push, each in its own engine, in no set order. You can skip Klaviyo pushes that deliver push data in your Firebase handler (they carry `_k` and either have no `title`/`body` or carry `key_value_pairs`) to avoid handling them twice.
+- If `KlaviyoFlutterPushService` wins, both handlers run for the same Klaviyo push, each in its own engine, in no set order. You can skip Klaviyo pushes that deliver push data in your Firebase handler to avoid handling them twice: `message.data.isKlaviyoNotification` is true for every Klaviyo push, and those that deliver push data either have no `title`/`body` or carry `key_value_pairs`.
 - If you can't confirm that, keep handling those pushes in your Firebase handler and make the work idempotent, because Klaviyo's handler may not run at all.
 
 ### Action Buttons
@@ -1177,14 +1165,6 @@ Platform notes:
 - **iOS**: The toggle does not affect `KlaviyoSwiftExtension` (used for rich push), which runs in a separate app-extension process.
 - **Android**: The native SDK uses log levels rather than a boolean toggle. Disabling sets the level to `None`; re-enabling restores the level that was in effect before it was disabled (or the SDK default if it was never enabled at runtime). For finer-grained control of native log verbosity, use the [`com.klaviyo.core.log_level` manifest tag](#android).
 
-To adjust the verbosity of the plugin's Dart-side logs (native logs are unaffected):
-
-```dart
-KlaviyoSDK().setLogLevel(KlaviyoLogLevel.debug);
-```
-
-While logging is disabled via `setLoggingEnabled(false)`, the level passed to `setLogLevel` is stored and takes effect once logging is re-enabled.
-
 ## API Reference
 
 ### KlaviyoSDK
@@ -1262,8 +1242,6 @@ The main SDK class. All methods are accessed via `KlaviyoSDK()`.
 |--------|-------------|
 | `setLoggingEnabled(bool enabled)` | Enable/disable SDK logging (native + Dart), callable before `initialize()`; does not affect iOS `KlaviyoSwiftExtension` — see [SDK Logging](#sdk-logging) |
 | `isLoggingEnabled()` | Whether native SDK logging is enabled, returns `Future<bool>` |
-| `setLogLevel(KlaviyoLogLevel logLevel)` | Set logging level (Flutter-side only) |
-| `dispose()` | Clean up resources |
 
 #### Properties
 
@@ -1407,10 +1385,6 @@ class FormCtaClicked extends FormLifecycleEvent {
 
 ### Enums
 
-#### KlaviyoLogLevel
-
-`none` | `error` | `warning` | `info` | `debug` | `verbose`
-
 #### EventMetric
 
 Predefined metrics:
@@ -1431,14 +1405,6 @@ Custom metrics:
 Applies to the SMS and WhatsApp channels.
 
 `marketing` | `transactional`
-
-### Extensions
-
-#### KlaviyoNotificationMap (on `Map<String, dynamic>`)
-
-| Property | Description |
-|----------|-------------|
-| `isKlaviyoNotification` | `bool` — whether the map is a Klaviyo push notification payload |
 
 ### Exceptions
 

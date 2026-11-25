@@ -39,6 +39,7 @@ class KlaviyoSDK {
   }
 
   // Native wrapper service — singleton, safe to construct eagerly
+  // ignore: deprecated_member_use_from_same_package
   final KlaviyoNativeWrapper _nativeWrapper = KlaviyoNativeWrapper();
   final Logger _logger = Logger('KlaviyoSDK');
 
@@ -88,7 +89,6 @@ class KlaviyoSDK {
 
     try {
       await _nativeWrapper.setProfile(profile);
-      _logger.info('Profile updated: ${profile.email}');
     } catch (e) {
       throw KlaviyoException('Failed to set profile: $e');
     }
@@ -101,7 +101,6 @@ class KlaviyoSDK {
 
     try {
       await _nativeWrapper.setEmail(email);
-      _logger.info('Email set: $email');
     } catch (e) {
       throw KlaviyoException('Failed to set email: $e');
     }
@@ -114,7 +113,6 @@ class KlaviyoSDK {
 
     try {
       await _nativeWrapper.setPhoneNumber(phoneNumber);
-      _logger.info('Phone number set: $phoneNumber');
     } catch (e) {
       throw KlaviyoException('Failed to set phone number: $e');
     }
@@ -127,7 +125,6 @@ class KlaviyoSDK {
 
     try {
       await _nativeWrapper.setExternalId(externalId);
-      _logger.info('External ID set: $externalId');
     } catch (e) {
       throw KlaviyoException('Failed to set external ID: $e');
     }
@@ -271,7 +268,7 @@ class KlaviyoSDK {
   /// After calling this method, you can listen for the token via [onPushToken]:
   /// ```dart
   /// klaviyo.onPushToken.listen(
-  ///   (token) => log('${token.type.name} token received: ${token.token}'),
+  ///   (token) => log('${token.type.name} token received'),
   ///   onError: (Object error) => log('Token error: $error'),
   /// );
   /// ```
@@ -300,6 +297,9 @@ class KlaviyoSDK {
   }
 
   /// Handle push notification received
+  @Deprecated(
+    'No longer needed; push tracking is automatic. Will be removed in 1.0.',
+  )
   Future<void> handlePushNotificationReceived(
     Map<String, dynamic> userInfo,
   ) async {
@@ -309,6 +309,9 @@ class KlaviyoSDK {
   }
 
   /// Handle push notification opened
+  @Deprecated(
+    'No longer needed; push tracking is automatic. Will be removed in 1.0.',
+  )
   Future<void> handlePushNotificationOpened(
     Map<String, dynamic> userInfo,
   ) async {
@@ -658,6 +661,7 @@ class KlaviyoSDK {
   /// Note: This only affects Flutter console logs, not native SDK logs.
   /// While logging is disabled via [setLoggingEnabled], the new level is
   /// stored and takes effect once logging is re-enabled.
+  @Deprecated('Use setLoggingEnabled instead. Will be removed in 1.0.')
   void setLogLevel(KlaviyoLogLevel logLevel) {
     _dartLogLevel = logLevel.toLevel();
     if (_loggingEnabled) {
@@ -667,7 +671,8 @@ class KlaviyoSDK {
 
   /// Enable or disable all Klaviyo SDK logging.
   ///
-  /// Controls both the native SDK loggers and this plugin's Dart-side logs.
+  /// This one toggle controls both the native SDK loggers and this plugin's
+  /// Dart-side logs (the `KlaviyoSDK` logger from `package:logging`).
   /// Logging is enabled by default. Safe to call before [initialize] —
   /// useful for silencing logs emitted during SDK startup.
   ///
@@ -843,6 +848,7 @@ class KlaviyoSDK {
   }
 
   /// Get form events stream
+  @Deprecated('Use onFormLifecycleEvent instead. Will be removed in 1.0.')
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
 
   /// Get typed form lifecycle events stream.
@@ -903,17 +909,12 @@ class KlaviyoSDK {
     }
   }
 
-  /// Dispose resources
+  /// Unregisters the auth token provider, if one is registered.
+  ///
+  /// Event streams stay open, so the SDK keeps working after this call.
+  @Deprecated('No longer needed. Will be removed in 1.0.')
   void dispose() {
-    // Tear down the auth bridge before the wrapper closes its event
-    // controllers. Otherwise a still-registered native provider keeps emitting
-    // `auth_token_requested` events into a closed stream — the add() throws and
-    // is swallowed, so the native request is never answered and stalls until the
-    // SDK timeout. Only act if a provider is registered (which implies the SDK
-    // was initialized, so the native call is safe).
     if (_authTokenProvider != null) {
-      _authTokenSubscription?.cancel();
-      _authTokenSubscription = null;
       _authTokenProvider = null;
       // dispose() is synchronous; fire-and-forget the native unregister.
       _nativeWrapper.unregisterAuthTokenProvider().catchError((Object e) {
@@ -922,6 +923,5 @@ class KlaviyoSDK {
         );
       });
     }
-    _nativeWrapper.dispose();
   }
 }
