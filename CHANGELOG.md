@@ -2,74 +2,68 @@
 
 ## Unreleased
 
-### New Features
+### Added
 
-- **Typed push streams.** `onPushToken` (`Stream<KlaviyoPushToken>`) emits each push token as a `KlaviyoPushToken` with the `token` string and its `type` (`KlaviyoPushTokenType.apns` on iOS, `KlaviyoPushTokenType.fcm` on Android); a registration failure arrives as a stream error carrying a `KlaviyoException` with code `PUSH_TOKEN_ERROR`. `onPushOpened` (`Stream<KlaviyoPushOpened>`) emits exactly one event for every tap on a Klaviyo push, whether on the body, an action button or a web URL push, with the tapped `button` or `webUrl` on the event. On Android, web-link taps reach `onPushOpened` and `onPushAction`. If the app is not yet subscribed, the plugin holds the tap in memory until it subscribes or the process dies. `onPushData` (`Stream<KlaviyoPushData>`) emits push data received in the foreground. `KlaviyoPushOpened` and `KlaviyoPushData` expose the push's key/value pairs as `keyValuePairs`. An open that arrives before anyone subscribes is held and delivered once, to the first `onPushOpened` subscriber; read the launch tap at any time with `getInitialPushNotification()`. See [Typed Push Streams](README.md#typed-push-streams).
-
-### Deprecated
-
-- The old push streams are deprecated in favor of the typed streams and will be removed in 1.0. They keep working unchanged until then.
-  - `KlaviyoSDK.onPushNotification`: use `onPushToken` for tokens and token errors, `onPushOpened` for opens, and `onPushData` for silent pushes.
-  - `KlaviyoSDK.onPushAction`: use `onPushOpened`, which carries the tapped button or web URL.
-  - `KlaviyoPushAction`, `OpenWebUrl` and `ActionButtonTapped`: use `KlaviyoPushOpened`, with `tap` set to `KlaviyoPushTap.webUrl` (read `webUrl`) or `KlaviyoPushTap.actionButton` (read `button`).
-
-- **`KlaviyoSDK.onFormEvent`**: use `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s.
-- **`KlaviyoSDK.handlePushNotificationReceived` and `KlaviyoSDK.handlePushNotificationOpened`**: these only logged a message. Remove the calls; push tracking is automatic.
-- **`KlaviyoNativeWrapper`**: use `KlaviyoSDK`. The class becomes internal in 1.0.
-- **`KlaviyoSDK.dispose()` and `KlaviyoNativeWrapper.dispose()`**: no longer needed. If you called `dispose()` to turn off personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()` instead. Otherwise, remove the calls.
-- **`KlaviyoSDK.setLogLevel` and the `KlaviyoLogLevel` enum**: use `setLoggingEnabled(bool)`.
-
-### Breaking Changes
-
-- **Silent push is now push data, routed by app state**: Klaviyo push data reaches Dart in exactly one place: the new `onPushData` stream (`Stream<KlaviyoPushData>`) while the app is in the foreground, or the handler registered with the new `KlaviyoSDK.onBackgroundPushData` while it is in the background or not running. On Android a killed app now runs the handler in a headless engine instead of dropping the push. Without a handler, background push data is dropped; `silent_push_received` on `onPushNotification` still fires in the foreground. See [Push Data](README.md#push-data) and the [migration guide](MIGRATION_GUIDE.md#migrating-to-v060).
-- **Push data now includes visible pushes with key/value pairs**: on both platforms, push data fires for every Klaviyo silent push and for every visible Klaviyo push that carries key/value pairs, so such a push fires twice by design (push data on arrival, `push_notification_opened` on tap). On iOS, both paths require `_k` at the top level or under `body`. On iOS the "visible content" check moved from the host `AppDelegate` into `handleSilentPush(userInfo:fetchCompletionHandler:)`, and hosts should forward every push. **Apps still using the old README snippet keep dropping visible pushes with key/value pairs until they update it.**
-- **iOS: push data for visible pushes now also comes from `willPresent`** — iOS only calls `didReceiveRemoteNotification` for a visible push with key/value pairs when Background Processing is on for the message, so with it off the pairs never reached `onPushData`. The plugin now observes `userNotificationCenter(_:willPresent:withCompletionHandler:)` and emits to `onPushData` when the app isn't in the background, never calling the completion handler. A push seen by both callbacks reaches Dart once. **Upgrade step:** if your `willPresent` override doesn't call `super`, add `KlaviyoFlutterSdkPlugin.shared.handleWillPresent(notification)` to it.
-
-### What's New
-
-- **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
-- **Event value currency** — `KlaviyoEvent` takes an optional `valueCurrency`, an ISO 4217 code (e.g. `EUR`) for the event's `value`. It is passed to the native `Event.setValueCurrency` on Android and `Event(valueCurrency:)` on iOS. Events without it are sent as before.
-- **iOS: `timezone` sets the standard profile field** — `setProfileAttribute` and `setProfileProperties` with `timezone`, `timeZone` or `time_zone` now set the profile's standard timezone on iOS, as they already did on Android. It used to be stored as a custom property.
-- **`KlaviyoFlutterPushService` can be subclassed (Android)** — The class is now `open`; a subclass is declared in your app manifest, calls `super.onMessageReceived`, and needs `firebase-messaging` as an app dependency.
-
-### Bug Fixes
-
-- **Android: FCM token rotation reaches `onPushToken`.** `KlaviyoFlutterPushService.onNewToken` delivers a `KlaviyoPushToken` with type `KlaviyoPushTokenType.fcm`. If Flutter cannot receive the token, the native plugin holds the newest rotation and delivers it once when Flutter listens. The held Dart event is in memory only; if Android kills the process before delivery, Dart gets no event. This does not change native token registration. Dart still receives rotations when `com.klaviyo.push.automatic_push_token_forwarding` is `false`. Subclasses that override `onNewToken` must call `super.onNewToken(token)`.
-- **Android: push opens and action-button taps that launch the app now reach Dart.** On a cold start the tap was handled before your Dart listener subscribed, so the `push_notification_opened` event and `onPushAction`'s `ActionButtonTapped` were dropped. The plugin now holds the most recent open and the most recent action until Dart subscribes. Reopening the app from Recents doesn't re-deliver the original tap.
-- **Android: web-link push taps now reach Dart through `onPushAction`.** A body tap that opens a web URL (`web_url`) emits `OpenWebUrl`. An `open_url` action button emits `ActionButtonTapped` with `action: 'open_url'`. If Flutter isn't listening yet, the plugin holds the tap in memory until your app returns and subscribes. If Android kills the process before delivery, Dart gets no event. The native SDK still tracks Opened Push. Requires Klaviyo Android SDK 4.7.0.
-- **Android: the plugin builds on Kotlin Gradle Plugin 1.8** — The plugin imported `kotlin.concurrent.Volatile`, which only exists from Kotlin 1.9, so host apps on KGP 1.8 (such as the Flutter 3.27 template, which ships 1.8.22) failed in `:klaviyo_flutter_sdk:compileDebugKotlin`. It now uses `kotlin.jvm.Volatile`, and the README's minimum KGP is 1.8.0.
-- **Android: camelCase profile keys now land in standard fields** — `setProfileAttribute` and `setProfileProperties` now normalize keys for standard attributes in Dart, case-insensitively and in camelCase or snake_case, before calling the native SDKs. On Android, keys such as `firstName` or `address_1` used to be saved as custom properties; they now set the standard field, matching iOS. Other keys stay custom. The README lists the supported keys.
-- **`handleUniversalTrackingLink()` threw if called before `initialize()`** — It now works before `initialize()` on iOS and Android and never throws, so universal links that open the app from a cold start are tracked and resolved even if `initialize()` hasn't run yet. On Android, the plugin registers the native SDK's lifecycle callbacks first when the SDK isn't initialized yet.
-- **`setProfile` dropped custom properties on iOS and Android** — `KlaviyoProfile.toJson` merged `properties` into the top level of the profile map, but both native plugins read them from a nested `properties` key, so custom properties passed to `setProfile` never reached Klaviyo. They are now sent under `properties`. `KlaviyoProfile.fromJson` reads them from the same nested key and still accepts JSON saved in the old top-level shape. Standard keys inside `properties`, such as `first_name`, `firstName`, `email` or `city`, set the standard field on both platforms, and the matching typed field wins if both are set. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
-- **iOS: identifier keys in `setProfileAttribute` and `setProfileProperties` now set the identifier** — `email`, `phone_number` and `external_id` are now routed to `setEmail`, `setPhoneNumber` and `setExternalId` on both platforms. On iOS they used to be stored as custom properties. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
-- **iOS: standard profile values with the wrong type were dropped** — `setProfile`, `setProfileAttribute` and `setProfileProperties` now convert number and bool values for standard text fields to strings, and number or numeric-string values for latitude and longitude to doubles, before calling the native SDKs. iOS used to drop them silently, for example `setProfileAttribute('first_name', 5)` or an integer latitude. A value that still can't be converted is dropped with a warning on both platforms. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
-- **Null profile property values are ignored on both platforms** — `setProfile`, `setProfileAttribute` and `setProfileProperties` now drop null values in Dart. Android skipped them, while iOS forwarded them as JSON null, so the platforms disagreed. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
-- **`setProfile` logs conflicts between typed fields and `properties`** — when a typed field such as `firstName` and the same key inside `properties` are both set, the typed value is kept and a warning names the ignored key. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
-- **DateTime values in profile and event properties no longer make the call fail; they are sent as ISO 8601 strings.** `setProfile`, `setProfileAttribute`, `setProfileProperties` and `createEvent` convert a `DateTime`, including nested ones, to a UTC ISO 8601 string. Values the platform channel can't encode, such as `Duration`, `Uri` or custom classes, are dropped with a warning naming the key, and the rest of the call goes through. ([#178](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
-- **`InAppFormConfig.copyWith` dropped the infinite timeout** — copying an `InAppFormConfig.infinite()` with no arguments returned a config with the default one-hour timeout. The copy now stays infinite unless you pass a `sessionTimeoutDuration` or `isInfinite: false`.
-- **`InAppFormConfig` sent negative and sub-second timeouts wrong** — a negative `sessionTimeoutDuration` such as `Duration(seconds: -1)` was sent as `-1`, which both native plugins read as "no timeout". It is now sent as 0, which is what the native SDKs use for a negative timeout. A duration under one second was truncated to 0, meaning "time out as soon as the app backgrounds"; durations now round up to the next whole second, so they are never shorter than requested.
-- **iOS: `setBadgeCount` failures no longer escape as uncaught errors** — a native error from `setBadgeCount` used to reach the app's zone as an uncaught async error. It is now logged as a warning.
-
-### New Features
-
-- **`KlaviyoSDK().getInitialPushNotification()`** returns the push tap that launched or relaunched the app from a killed state as a `KlaviyoPushOpened`, the same type `onPushOpened` emits, or `null`. It returns the same value on every call for the life of the process, even after a stream listener received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
-
-### Changes
-
-- **Cold-start push opens and actions go to the first subscriber once.** A push open or push action that arrives before anyone subscribes is buffered, one of each, newest wins, and a new open clears a buffered action. The first `onPushNotification` / `onPushAction` subscriber receives it once, then the buffer is cleared. Later subscribers don't receive it; use `getInitialPushNotification()` to read the launch tap whenever you need it. `resetProfile()` drops a buffered open and action.
-- **iOS: clearer `FORMS_NOT_AVAILABLE` and `GEOFENCING_NOT_AVAILABLE` error messages** — They now say that `KLAVIYO_INCLUDE_FORMS` and `KLAVIYO_INCLUDE_LOCATION` apply to CocoaPods only, and that Swift Package Manager builds always include forms and the location module.
-
-### Documentation
-
-- **Swift Package Manager setup on iOS** — The README now covers installing with Swift Package Manager (Flutter 3.41+), including adding `KlaviyoSwiftExtension` to a notification service extension, and notes that the `KLAVIYO_INCLUDE_FORMS` and `KLAVIYO_INCLUDE_LOCATION` flags apply to CocoaPods only.
-- **iOS silent push after a force quit** — The README no longer says iOS is unaffected: a force-quit app gets no silent pushes until the user reopens it or restarts the device.
-- **Using the SDK alongside `firebase_messaging` on Android** — New README section: declare `KlaviyoFlutterPushService` in your app manifest, or `firebase_messaging`'s service wins and Klaviyo pushes never display; the example app does this.
+- Typed `onPushToken`, `onPushOpened` and `onPushData` streams expose token types, tapped actions and push key/value pairs. Token registration failures arrive through `onError`.
+- `getInitialPushNotification()` returns the typed launch tap repeatedly until `resetProfile()` clears it, including before initialization. ([Launch tap getter (klaviyo-flutter-sdk#86)](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
+- `onBackgroundPushData` runs a registered handler for background push data, including a headless Flutter engine on Android when the process was killed.
+- Preview draft forms on a device with `startFormsPreview` or a link handled by `handleFormsPreviewLink`. End the preview with `endFormsPreview`. ([Device forms preview (klaviyo-flutter-sdk#200)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/200))
+- `ProfileProperty` provides constants for standard profile attribute keys.
+- Events accept an optional ISO 4217 `valueCurrency`.
+- Android supports AGP 9 built-in Kotlin while retaining the `kotlin-android` path for older hosts. ([AGP 9 support (klaviyo-flutter-sdk#190)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/190))
+- Android apps can subclass `KlaviyoFlutterPushService`. Overrides must call `super.onMessageReceived` and `super.onNewToken` to retain SDK handling.
 
 ### Changed
 
-- **`dispose()` no longer closes the SDK's event streams.** Calling it used to leave the SDK broken until the app restarted: push, form, and auth-token streams were closed for good and `initialize()` didn't reopen them. It now only unregisters the auth token provider, if one is registered.
-- **`setLoggingEnabled(bool)` is now the single documented switch for Dart and native logging.** It already turned Dart-side logs on and off; with `setLogLevel` and `KlaviyoLogLevel` deprecated, it is the only logging control. The iOS plugin's own log messages now follow it as well.
-- **The plugin logs less.** Push token values, full push and form event payloads, and per-call profile identifiers (email, phone number, external ID) are no longer logged. The iOS and Android token-received messages remain without the token. A few duplicate bridge messages were dropped.
+- Push data now routes to `onPushData` in the foreground or `onBackgroundPushData` in the background. Without a handler, background data is dropped. See the [migration guide](MIGRATION_GUIDE.md#migrating-to-v060).
+- Legacy `onPushNotification` still emits `silent_push_received` for qualifying foreground pushes, now including visible pushes with key/value pairs. It no longer emits background push data.
+- Qualifying push data includes Klaviyo silent pushes and visible pushes with key/value pairs. Arrival and a later tap are separate data/open events.
+- On iOS, forward every remote notification with its fetch completion handler. Foreground visible-push data also uses `willPresent`, with manual forwarding required when an override does not call `super`.
+- Buffered opens and actions reach the first subscriber of each stream once. A new open clears an older held action, and `resetProfile()` clears both holds.
+- `dispose()` leaves streams open and only unregisters an auth token provider if one is registered. `KlaviyoNativeWrapper.dispose()` is a no-op.
+- `setLoggingEnabled(bool)` is the single documented logging switch. The iOS plugin's bridge logs now follow it too.
+- SDK logs no longer include push tokens, full push/form payloads or per-call profile identifiers.
+- iOS setup now documents SwiftPM, notification service extensions and CocoaPods-only module flags. Unavailable-module messages explain that SwiftPM includes forms and location.
+- The Android setup guide documents FCM service routing when using `firebase_messaging`.
+- iOS guidance clarifies silent-push delivery after a force quit.
+
+### Deprecated
+
+These APIs are scheduled for removal in 1.0. Use the [migration table](MIGRATION_GUIDE.md#deprecated-apis) for replacements.
+
+- `onPushNotification`: use `onPushToken`, `onPushOpened` and foreground `onPushData`, plus `onBackgroundPushData` for background work.
+- `onPushAction`, `KlaviyoPushAction`, `OpenWebUrl` and `ActionButtonTapped`: use `onPushOpened` and `KlaviyoPushOpened`.
+- `onFormEvent`: use typed `onFormLifecycleEvent` events.
+- `handlePushNotificationReceived` and `handlePushNotificationOpened`: remove these Dart calls. Retain the required native push forwarding.
+- `KlaviyoNativeWrapper`: use the public `KlaviyoSDK` API. The wrapper becomes internal in 1.0.
+- `KlaviyoSDK.dispose()` and `KlaviyoNativeWrapper.dispose()`: remove calls, or explicitly await `unregisterAuthTokenProvider()` when turning off personalized forms.
+- `setLogLevel` and `KlaviyoLogLevel`: use `setLoggingEnabled(bool)` for logging on/off.
+
+### Fixed
+
+- Android FCM rotations reach `onPushToken` independently of automatic native forwarding. The newest undelivered Dart token event is held in memory only until delivery or process death.
+- Android push opens and action-button taps that launch the app now reach Dart. Reopening from Recents does not replay the original tap.
+- Android web-link taps reach typed `onPushOpened` and legacy `onPushAction`. Undelivered events are held in memory only until delivery or process death.
+- Push and form events stay with the primary UI engine when secondary Flutter engines attach, cancel or detach. ([Primary engine delivery (klaviyo-flutter-sdk#189)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/189))
+- iOS notification dismissals no longer emit push-open events. ([Dismiss handling (klaviyo-flutter-sdk#184)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/184))
+- iOS push-data forwarding rejects non-Klaviyo payloads: both entry paths require `_k` at the top level or under `body`, and duplicate foreground callbacks emit once.
+- Android host apps using Kotlin Gradle Plugin 1.8 can compile the plugin.
+- Standard profile keys accept camelCase and snake_case on both platforms.
+- iOS timezone attributes now set the standard field instead of custom properties.
+- Tracking links no longer throw before initialization. Android queues a failed pre-init click for retry, while iOS drops it unless native pre-init disk capture is enabled.
+- `setProfile` sends custom attributes under `properties`. `fromJson` also accepts the old flat shape, and typed fields win over conflicting standard keys. ([Nested profile properties (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- iOS identifier keys in `setProfileAttribute` and `setProfileProperties` now update email, phone number and external ID instead of custom properties. ([Profile identifiers (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- Standard profile text fields accept numbers and booleans as strings, and coordinates accept numbers or numeric strings. Invalid values are dropped with a warning. ([Profile value conversion (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- Null profile properties are ignored on both platforms rather than sent as JSON null on iOS. ([Null profile properties (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- Conflicts between typed profile fields and `properties` are logged, with the typed field retained. ([Profile property conflicts (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- Nested `DateTime` profile/event values serialize as ISO 8601 strings. Unsupported values are dropped with a warning instead of failing the call. ([Custom value serialization (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- `InAppFormConfig.infinite().copyWith()` preserves its infinite timeout unless explicitly changed.
+- Form session timeouts clamp negative durations to zero and round positive sub-second durations up to whole seconds.
+- iOS `setBadgeCount` failures are caught and logged instead of escaping as uncaught asynchronous errors.
+
+### Known limitations
+
+- `KlaviyoProfile` and `KlaviyoEvent` equality and hash codes ignore custom properties, as in 0.5.0 and earlier. Compare those properties separately when needed.
 
 ### Coming in 1.0
 
