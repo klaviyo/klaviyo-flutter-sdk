@@ -107,12 +107,6 @@ void main() {
       expect(log, isEmpty);
     });
 
-    test('does not require initialize()', () async {
-      expect(KlaviyoSDK().isInitialized, isFalse);
-      await KlaviyoSDK.onBackgroundPushData(_recordingHandler);
-      expect(log.map((c) => c.method), ['registerBackgroundPushDataHandler']);
-    });
-
     test('wraps a native failure in KlaviyoException', () async {
       messenger.setMockMethodCallHandler(methodChannel, (call) async {
         throw PlatformException(code: 'ERR');

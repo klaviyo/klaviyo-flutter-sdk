@@ -10,7 +10,6 @@ import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.FlutterCallbackInformation
-import kotlin.concurrent.Volatile
 
 /**
  * Runs the Dart background push data handler in a headless [FlutterEngine] when the process has
