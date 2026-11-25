@@ -14,6 +14,7 @@ import com.klaviyo.inbox.InboxReadFilter
 import com.klaviyo.inbox.InboxResult
 import com.klaviyo.inbox.InboxStateChange
 import com.klaviyo.inbox.KlaviyoInbox
+import java.io.Serializable
 
 /**
  * Opt-in Mobile Inbox bridge onto the native `com.klaviyo:inbox` module.
@@ -82,6 +83,32 @@ internal object InboxBridge {
             }
         deliver(onResult, { it }) { done ->
             KlaviyoInbox.updateMessageState(messageId, change, done)
+        }
+    }
+
+    /**
+     * @see KlaviyoInbox.trackMessageClick
+     *
+     * Resolves whether the click was queued, which it is not when the message
+     * or button is not found. A value in [properties] that is not Serializable
+     * cannot be recorded on the event, so it is left out.
+     */
+    fun trackMessageClick(
+        messageId: String,
+        actionId: String?,
+        properties: Map<*, *>?,
+        onResult: (InboxBridgeResult<Boolean>) -> Unit,
+    ) {
+        val clickProperties: Map<String, Serializable?> =
+            properties
+                ?.mapNotNull { (key, value) ->
+                    val name = key as? String
+                    val serializable = value as? Serializable
+                    if (name != null && serializable != null) name to serializable else null
+                }?.toMap()
+                ?: emptyMap()
+        deliver(onResult, { it }) { done ->
+            KlaviyoInbox.trackMessageClick(messageId, actionId, clickProperties, done)
         }
     }
 

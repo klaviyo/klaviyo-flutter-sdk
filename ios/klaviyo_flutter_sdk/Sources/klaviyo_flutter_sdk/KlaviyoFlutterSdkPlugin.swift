@@ -587,6 +587,36 @@ extension KlaviyoFlutterSdkPlugin {
             result(Self.inboxUnavailableError())
             #endif
 
+        case "trackInboxMessageClick":
+            #if canImport(KlaviyoInbox)
+            guard let args = call.arguments as? [String: Any],
+                  let messageId = args["messageId"] as? String,
+                  !messageId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "An inbox message id is required",
+                    details: nil
+                ))
+                return
+            }
+            let actionId = args["actionId"] as? String
+            let properties = args["properties"] as? [String: Any] ?? [:]
+            Task {
+                do {
+                    result(try await KlaviyoSDK().mobileInbox.trackMessageClick(
+                        messageID: messageId,
+                        actionID: actionId,
+                        properties: properties
+                    ))
+                } catch {
+                    result(Self.inboxError(error))
+                }
+            }
+            #else
+            result(Self.inboxUnavailableError())
+            #endif
+
         case "updateInboxMessageStates":
             #if canImport(KlaviyoInbox)
             guard let args = call.arguments as? [String: Any],

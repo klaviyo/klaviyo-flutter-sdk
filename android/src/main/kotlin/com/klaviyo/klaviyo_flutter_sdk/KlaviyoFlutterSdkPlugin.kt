@@ -945,6 +945,23 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "trackInboxMessageClick" -> {
+                val messageId = call.argument<String>("messageId")
+                if (messageId.isNullOrBlank()) {
+                    result.error(
+                        "INVALID_ARGUMENTS",
+                        "An inbox message id is required",
+                        null,
+                    )
+                    return
+                }
+                val actionId = call.argument<String>("actionId")
+                val properties = call.argument<Map<*, *>>("properties")
+                deliverInboxResult(result) { done ->
+                    InboxBridge.trackMessageClick(messageId, actionId, properties, done)
+                }
+            }
+
             "updateInboxMessageStates" -> {
                 val state = call.argument<String>("state")
                 val filter = call.argument<Map<*, *>>("filter")

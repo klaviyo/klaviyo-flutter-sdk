@@ -139,6 +139,33 @@ class KlaviyoFlutterSdkPluginInboxTest {
     }
 
     @Test
+    fun `trackInboxMessageClick reports INBOX_UNAVAILABLE without the module`() {
+        plugin.onMethodCall(
+            MethodCall(
+                "trackInboxMessageClick",
+                mapOf("messageId" to "msg-1", "actionId" to "a1", "properties" to mapOf("screen" to "inbox")),
+            ),
+            result,
+        )
+
+        verify(exactly = 1) { result.error(InboxErrorCodes.UNAVAILABLE, any(), null) }
+        confirmVerified(result)
+    }
+
+    @Test
+    fun `trackInboxMessageClick requires a message id`() {
+        plugin.onMethodCall(
+            MethodCall("trackInboxMessageClick", mapOf("actionId" to "a1")),
+            result,
+        )
+
+        verify(exactly = 1) {
+            result.error("INVALID_ARGUMENTS", "An inbox message id is required", null)
+        }
+        confirmVerified(result)
+    }
+
+    @Test
     fun `updateInboxMessageState reports INBOX_UNAVAILABLE without the module`() {
         plugin.onMethodCall(
             MethodCall(

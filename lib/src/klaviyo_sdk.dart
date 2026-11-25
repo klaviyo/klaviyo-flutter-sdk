@@ -869,6 +869,41 @@ class KlaviyoSDK {
     return _nativeWrapper.updateInboxMessageState(messageId, state);
   }
 
+  /// Reports that the user tapped an inbox message, or one of its buttons, as
+  /// a `Clicked App Inbox Message` event for the current profile.
+  ///
+  /// Call this when the user taps, separately from [updateInboxMessageState]: a
+  /// click never marks a message read or archived, and a state change never
+  /// records a click. The SDK does not open the destination, so navigation
+  /// stays with your app.
+  ///
+  /// The click is queued and sent with the rest of the SDK's analytics, so it is
+  /// kept while offline and retried. It is recorded from the message stored on
+  /// this device, so nothing is recorded once the message is gone.
+  ///
+  /// [actionId] is the tapped button's `InboxAction.id`; omit it for a tap on
+  /// the message itself. [properties] are extra values recorded on the event,
+  /// such as which UI element the user tapped. They are added last, so a key
+  /// that matches one of the SDK's own properties, such as `Action Type`, is
+  /// ignored in favor of the SDK's value.
+  ///
+  /// Returns true when the click was queued, and false when this device has no
+  /// message with [messageId], the message has no button [actionId], or the SDK
+  /// is not initialized yet. Throws [KlaviyoInboxException] when the native
+  /// store fails, and [ArgumentError] when [messageId] or [actionId] is empty.
+  Future<bool> trackInboxMessageClick(
+    String messageId, {
+    String? actionId,
+    Map<String, Object>? properties,
+  }) async {
+    _ensureInitialized();
+    return _nativeWrapper.trackInboxMessageClick(
+      messageId,
+      actionId: actionId,
+      properties: properties,
+    );
+  }
+
   /// Fires when the inbox may have changed: a push was captured, a message's
   /// state changed, or messages were cleared.
   ///

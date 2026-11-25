@@ -238,6 +238,85 @@ void main() {
     });
   });
 
+  group('trackInboxMessageClick', () {
+    test('sends only the message id for a body click', () async {
+      replies['trackInboxMessageClick'] = () => true;
+
+      final queued = await KlaviyoSDK().trackInboxMessageClick('msg-1');
+
+      final call = calls.lastWhere((c) => c.method == 'trackInboxMessageClick');
+      expect(call.arguments, {'messageId': 'msg-1'});
+      expect(queued, isTrue);
+    });
+
+    test('sends the tapped button and the extra properties', () async {
+      replies['trackInboxMessageClick'] = () => true;
+
+      await KlaviyoSDK().trackInboxMessageClick(
+        'msg-1',
+        actionId: 'a1',
+        properties: {'screen': 'inbox', 'position': 3},
+      );
+
+      final call = calls.lastWhere((c) => c.method == 'trackInboxMessageClick');
+      expect(call.arguments['messageId'], 'msg-1');
+      expect(call.arguments['actionId'], 'a1');
+      expect(call.arguments['properties'], {'screen': 'inbox', 'position': 3});
+    });
+
+    test('returns false when no click was queued', () async {
+      replies['trackInboxMessageClick'] = () => false;
+
+      expect(await KlaviyoSDK().trackInboxMessageClick('gone'), isFalse);
+    });
+
+    test('does not change message state', () async {
+      replies['trackInboxMessageClick'] = () => true;
+
+      await KlaviyoSDK().trackInboxMessageClick('msg-1');
+
+      expect(
+        calls.where(
+          (c) =>
+              c.method == 'updateInboxMessageState' ||
+              c.method == 'updateInboxMessageStates',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('rejects an empty message id without calling native', () async {
+      await expectLater(
+        KlaviyoSDK().trackInboxMessageClick(''),
+        throwsArgumentError,
+      );
+      await expectLater(
+        KlaviyoSDK().trackInboxMessageClick('   '),
+        throwsArgumentError,
+      );
+      expect(calls.where((c) => c.method == 'trackInboxMessageClick'), isEmpty);
+    });
+
+    test('rejects an empty action id without calling native', () async {
+      await expectLater(
+        KlaviyoSDK().trackInboxMessageClick('msg-1', actionId: ''),
+        throwsArgumentError,
+      );
+      expect(calls.where((c) => c.method == 'trackInboxMessageClick'), isEmpty);
+    });
+
+    test('wraps a native failure in a typed inbox exception', () async {
+      replies['trackInboxMessageClick'] = () => throw PlatformException(
+            code: 'INBOX_STORAGE_FAILURE',
+          );
+
+      await expectLater(
+        KlaviyoSDK().trackInboxMessageClick('msg-1'),
+        throwsA(isA<KlaviyoInboxException>()),
+      );
+    });
+  });
+
   group('updateInboxMessageState', () {
     test('sends the message id and state wire value', () async {
       replies['updateInboxMessageState'] = () => true;

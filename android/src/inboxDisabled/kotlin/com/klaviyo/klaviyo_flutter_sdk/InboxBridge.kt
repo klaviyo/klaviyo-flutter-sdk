@@ -42,6 +42,14 @@ internal object InboxBridge {
     ) = onResult(unavailable)
 
     /** @see updateMessageState, which reports the same unavailable result */
+    fun trackMessageClick(
+        @Suppress("UNUSED_PARAMETER") messageId: String,
+        @Suppress("UNUSED_PARAMETER") actionId: String?,
+        @Suppress("UNUSED_PARAMETER") properties: Map<*, *>?,
+        onResult: (InboxBridgeResult<Boolean>) -> Unit,
+    ) = onResult(unavailable)
+
+    /** @see updateMessageState, which reports the same unavailable result */
     fun updateMessageStates(
         @Suppress("UNUSED_PARAMETER") state: String,
         @Suppress("UNUSED_PARAMETER") filter: Map<*, *>?,
