@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
+import androidx.annotation.VisibleForTesting
 import com.google.firebase.messaging.FirebaseMessaging
 import com.klaviyo.analytics.AuthTokenProvider
 import com.klaviyo.analytics.Klaviyo
@@ -121,9 +122,12 @@ class KlaviyoFlutterSdkPlugin :
         @Volatile
         internal var instance: KlaviyoFlutterSdkPlugin? = null
 
-        // Most recent silent push, push open and push action that arrived while no
-        // engine was listening; replayed to the primary engine once it listens. One
-        // slot each, matching iOS.
+        // Most recent push token, silent push, push open and push action that arrived
+        // while no engine was listening; replayed to the primary engine once it listens.
+        // One slot each, matching iOS.
+        @Volatile
+        private var cachedPushToken: Map<String, Any?>? = null
+
         @Volatile
         private var cachedSilentPush: Map<String, Any?>? = null
 
@@ -151,6 +155,8 @@ class KlaviyoFlutterSdkPlugin :
             instance?.attachedToActivity != true && activePlugins.any { it.attachedToActivity && !it.eventStreamCancelled }
 
         private fun replayCachedEvents(sink: EventChannel.EventSink) {
+            cachedPushToken?.let { sink.success(it) }
+            cachedPushToken = null
             cachedSilentPush?.let { sink.success(it) }
             cachedSilentPush = null
             cachedOpenedNotification?.let { sink.success(it) }
@@ -172,6 +178,32 @@ class KlaviyoFlutterSdkPlugin :
                 Registry.log.verbose("Flutter not ready. Caching push action event.")
                 cachedPushAction = payload
             }
+        }
+
+        /**
+         * Emits a `push_token_received` event for a token FCM delivered to
+         * [KlaviyoFlutterPushService.onNewToken]. Callable from any thread; posts to the
+         * main thread. If no engine is listening, the token is held (newest wins) and
+         * replayed to the primary engine once it listens.
+         */
+        internal fun handleNewToken(token: String) {
+            val payload =
+                mapOf(
+                    "type" to "push_token_received",
+                    "data" to mapOf("token" to token),
+                )
+
+            Handler(Looper.getMainLooper()).post {
+                if (!emitToPrimary(payload)) {
+                    Registry.log.verbose("Flutter not ready. Caching push token event.")
+                    cachedPushToken = payload
+                }
+            }
+        }
+
+        @VisibleForTesting
+        internal fun resetCachedPushToken() {
+            cachedPushToken = null
         }
 
         /** Delivers or holds a web-link tap from the native trampoline. Main thread only. */
