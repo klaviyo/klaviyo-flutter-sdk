@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### New Features
+
+- **Typed push streams.** `onPushToken` (`Stream<KlaviyoPushToken>`) emits each push token as a `KlaviyoPushToken` with the `token` string and its `type` (`KlaviyoPushTokenType.apns` on iOS, `KlaviyoPushTokenType.fcm` on Android); a registration failure arrives as a stream error carrying a `KlaviyoException` with code `PUSH_TOKEN_ERROR`. `onPushOpened` (`Stream<KlaviyoPushOpened>`) emits exactly one event for every tap on a Klaviyo push, whether on the body, an action button or a web URL push, with the tapped `button` or `webUrl` on the event. On Android, web-link taps reach `onPushOpened` and `onPushAction`. If the app is not yet subscribed, the plugin holds the tap in memory until it subscribes or the process dies. `onPushData` (`Stream<KlaviyoPushData>`) emits push data received in the foreground. `KlaviyoPushOpened` and `KlaviyoPushData` expose the push's key/value pairs as `keyValuePairs`. An open that arrives before anyone subscribes is held and delivered once, to the first `onPushOpened` subscriber; read the launch tap at any time with `getInitialPushNotification()`. See [Typed Push Streams](README.md#typed-push-streams).
+
+### Deprecated
+
+- The old push streams are deprecated in favor of the typed streams and will be removed in 1.0. They keep working unchanged until then.
+  - `KlaviyoSDK.onPushNotification`: use `onPushToken` for tokens and token errors, `onPushOpened` for opens, and `onPushData` for silent pushes.
+  - `KlaviyoSDK.onPushAction`: use `onPushOpened`, which carries the tapped button or web URL.
+  - `KlaviyoPushAction`, `OpenWebUrl` and `ActionButtonTapped`: use `KlaviyoPushOpened`, with `tap` set to `KlaviyoPushTap.webUrl` (read `webUrl`) or `KlaviyoPushTap.actionButton` (read `button`).
+
+- **`KlaviyoSDK.onFormEvent`**: use `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s.
+- **`KlaviyoSDK.handlePushNotificationReceived` and `KlaviyoSDK.handlePushNotificationOpened`**: these only logged a message. Remove the calls; push tracking is automatic.
+- **`KlaviyoNativeWrapper`**: use `KlaviyoSDK`. The class becomes internal in 1.0.
+- **`KlaviyoSDK.dispose()` and `KlaviyoNativeWrapper.dispose()`**: no longer needed. If you called `dispose()` to turn off personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()` instead. Otherwise, remove the calls.
+- **`KlaviyoSDK.setLogLevel` and the `KlaviyoLogLevel` enum**: use `setLoggingEnabled(bool)`.
+
+### Breaking Changes
+
+- **Silent push is now push data, routed by app state**: Klaviyo push data reaches Dart in exactly one place: the new `onPushData` stream (`Stream<KlaviyoPushData>`) while the app is in the foreground, or the handler registered with the new `KlaviyoSDK.onBackgroundPushData` while it is in the background or not running. On Android a killed app now runs the handler in a headless engine instead of dropping the push. Without a handler, background push data is dropped; `silent_push_received` on `onPushNotification` still fires in the foreground. See [Push Data](README.md#push-data) and the [migration guide](MIGRATION_GUIDE.md#migrating-to-v060).
+- **Push data now includes visible pushes with key/value pairs**: on both platforms, push data fires for every Klaviyo silent push and for every visible Klaviyo push that carries key/value pairs, so such a push fires twice by design (push data on arrival, `push_notification_opened` on tap). On iOS, both paths require `_k` at the top level or under `body`. On iOS the "visible content" check moved from the host `AppDelegate` into `handleSilentPush(userInfo:fetchCompletionHandler:)`, and hosts should forward every push. **Apps still using the old README snippet keep dropping visible pushes with key/value pairs until they update it.**
+- **iOS: push data for visible pushes now also comes from `willPresent`** — iOS only calls `didReceiveRemoteNotification` for a visible push with key/value pairs when Background Processing is on for the message, so with it off the pairs never reached `onPushData`. The plugin now observes `userNotificationCenter(_:willPresent:withCompletionHandler:)` and emits to `onPushData` when the app isn't in the background, never calling the completion handler. A push seen by both callbacks reaches Dart once. **Upgrade step:** if your `willPresent` override doesn't call `super`, add `KlaviyoFlutterSdkPlugin.shared.handleWillPresent(notification)` to it.
+
 ### What's New
 
 - **`ProfileProperty` constants for standard profile keys** — `ProfileProperty.firstName`, `lastName`, `organization`, `title`, `image`, `address1`, `address2`, `city`, `country`, `region`, `zip`, `latitude`, `longitude` and `timezone` hold the wire keys for Klaviyo's standard profile attributes, matching the React Native SDK's `ProfileProperty`. Pass them to `setProfileAttribute` or `setProfileProperties`. Plain string keys still work. `KlaviyoProfile` and `KlaviyoLocation` use the same constants, and no wire keys changed.
@@ -11,6 +34,7 @@
 
 ### Bug Fixes
 
+- **Android: FCM token rotation reaches `onPushToken`.** `KlaviyoFlutterPushService.onNewToken` delivers a `KlaviyoPushToken` with type `KlaviyoPushTokenType.fcm`. If Flutter cannot receive the token, the native plugin holds the newest rotation and delivers it once when Flutter listens. The held Dart event is in memory only; if Android kills the process before delivery, Dart gets no event. This does not change native token registration. Dart still receives rotations when `com.klaviyo.push.automatic_push_token_forwarding` is `false`. Subclasses that override `onNewToken` must call `super.onNewToken(token)`.
 - **Android: push opens and action-button taps that launch the app now reach Dart.** On a cold start the tap was handled before your Dart listener subscribed, so the `push_notification_opened` event and `onPushAction`'s `ActionButtonTapped` were dropped. The plugin now holds the most recent open and the most recent action until Dart subscribes. Reopening the app from Recents doesn't re-deliver the original tap.
 - **Android: web-link push taps now reach Dart through `onPushAction`.** A body tap that opens a web URL (`web_url`) emits `OpenWebUrl`. An `open_url` action button emits `ActionButtonTapped` with `action: 'open_url'`. If Flutter isn't listening yet, the plugin holds the tap in memory until your app returns and subscribes. If Android kills the process before delivery, Dart gets no event. The native SDK still tracks Opened Push. Requires Klaviyo Android SDK 4.7.0.
 - **Android: the plugin builds on Kotlin Gradle Plugin 1.8** — The plugin imported `kotlin.concurrent.Volatile`, which only exists from Kotlin 1.9, so host apps on KGP 1.8 (such as the Flutter 3.27 template, which ships 1.8.22) failed in `:klaviyo_flutter_sdk:compileDebugKotlin`. It now uses `kotlin.jvm.Volatile`, and the README's minimum KGP is 1.8.0.
@@ -28,7 +52,7 @@
 
 ### New Features
 
-- **`KlaviyoSDK().getInitialPushNotification()`** returns the push tap that launched or relaunched the app from a killed state, or `null`. The map has the same shape as the `push_notification_opened` event. It returns the same value on every call for the life of the process, even after a stream listener received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
+- **`KlaviyoSDK().getInitialPushNotification()`** returns the push tap that launched or relaunched the app from a killed state as a `KlaviyoPushOpened`, the same type `onPushOpened` emits, or `null`. It returns the same value on every call for the life of the process, even after a stream listener received the event. Taps while the app is running never set it, and `resetProfile()` clears it. It's safe to call before `initialize()`. ([#86](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
 
 ### Changes
 
@@ -40,6 +64,12 @@
 - **Swift Package Manager setup on iOS** — The README now covers installing with Swift Package Manager (Flutter 3.41+), including adding `KlaviyoSwiftExtension` to a notification service extension, and notes that the `KLAVIYO_INCLUDE_FORMS` and `KLAVIYO_INCLUDE_LOCATION` flags apply to CocoaPods only.
 - **iOS silent push after a force quit** — The README no longer says iOS is unaffected: a force-quit app gets no silent pushes until the user reopens it or restarts the device.
 - **Using the SDK alongside `firebase_messaging` on Android** — New README section: declare `KlaviyoFlutterPushService` in your app manifest, or `firebase_messaging`'s service wins and Klaviyo pushes never display; the example app does this.
+
+### Changed
+
+- **`dispose()` no longer closes the SDK's event streams.** Calling it used to leave the SDK broken until the app restarted: push, form, and auth-token streams were closed for good and `initialize()` didn't reopen them. It now only unregisters the auth token provider, if one is registered.
+- **`setLoggingEnabled(bool)` is now the single documented switch for Dart and native logging.** It already turned Dart-side logs on and off; with `setLogLevel` and `KlaviyoLogLevel` deprecated, it is the only logging control. The iOS plugin's own log messages now follow it as well.
+- **The plugin logs less.** Push token values, full push and form event payloads, and per-call profile identifiers (email, phone number, external ID) are no longer logged. The iOS and Android token-received messages remain without the token. A few duplicate bridge messages were dropped.
 
 ### Coming in 1.0
 

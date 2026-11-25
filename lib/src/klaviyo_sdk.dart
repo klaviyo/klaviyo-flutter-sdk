@@ -12,8 +12,12 @@ import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
 import 'models/klaviyo_push_action.dart';
+import 'models/klaviyo_push_data.dart';
+import 'models/klaviyo_push_opened.dart';
+import 'models/klaviyo_push_token.dart';
 import 'models/profile_property.dart';
 import 'enums/klaviyo_log_level.dart';
+import 'services/background_push_data.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
 
@@ -35,6 +39,7 @@ class KlaviyoSDK {
   }
 
   // Native wrapper service — singleton, safe to construct eagerly
+  // ignore: deprecated_member_use_from_same_package
   final KlaviyoNativeWrapper _nativeWrapper = KlaviyoNativeWrapper();
   final Logger _logger = Logger('KlaviyoSDK');
 
@@ -84,7 +89,6 @@ class KlaviyoSDK {
 
     try {
       await _nativeWrapper.setProfile(profile);
-      _logger.info('Profile updated: ${profile.email}');
     } catch (e) {
       throw KlaviyoException('Failed to set profile: $e');
     }
@@ -97,7 +101,6 @@ class KlaviyoSDK {
 
     try {
       await _nativeWrapper.setEmail(email);
-      _logger.info('Email set: $email');
     } catch (e) {
       throw KlaviyoException('Failed to set email: $e');
     }
@@ -110,7 +113,6 @@ class KlaviyoSDK {
 
     try {
       await _nativeWrapper.setPhoneNumber(phoneNumber);
-      _logger.info('Phone number set: $phoneNumber');
     } catch (e) {
       throw KlaviyoException('Failed to set phone number: $e');
     }
@@ -123,7 +125,6 @@ class KlaviyoSDK {
 
     try {
       await _nativeWrapper.setExternalId(externalId);
-      _logger.info('External ID set: $externalId');
     } catch (e) {
       throw KlaviyoException('Failed to set external ID: $e');
     }
@@ -264,14 +265,12 @@ class KlaviyoSDK {
   ///   and forwarded to the Klaviyo SDK.
   /// - **Android**: Fetches the FCM token and registers it with the Klaviyo SDK.
   ///
-  /// After calling this method, you can listen for the token via [onPushNotification]:
+  /// After calling this method, you can listen for the token via [onPushToken]:
   /// ```dart
-  /// klaviyo.onPushNotification.listen((event) {
-  ///   if (event['type'] == 'push_token_received') {
-  ///     final token = event['data']['token'];
-  ///     log('Token received: $token');
-  ///   }
-  /// });
+  /// klaviyo.onPushToken.listen(
+  ///   (token) => log('${token.type.name} token received'),
+  ///   onError: (Object error) => log('Token error: $error'),
+  /// );
   /// ```
   Future<void> registerForPushNotifications() async {
     _ensureInitialized();
@@ -279,6 +278,9 @@ class KlaviyoSDK {
   }
 
   /// Set push token
+  ///
+  /// Takes the token string itself. For a token received on [onPushToken], pass
+  /// [KlaviyoPushToken.token].
   Future<void> setPushToken(String token) async {
     _ensureInitialized();
     await _nativeWrapper.setPushToken(token);
@@ -288,13 +290,16 @@ class KlaviyoSDK {
   ///
   /// Note: On iOS, the token may not be immediately available after calling
   /// [registerForPushNotifications]. For immediate access to the token,
-  /// listen to [onPushNotification] for `push_token_received` events instead.
+  /// listen to [onPushToken] instead.
   Future<String?> getPushToken() async {
     _ensureInitialized();
     return await _nativeWrapper.getPushToken();
   }
 
   /// Handle push notification received
+  @Deprecated(
+    'No longer needed; push tracking is automatic. Will be removed in 1.0.',
+  )
   Future<void> handlePushNotificationReceived(
     Map<String, dynamic> userInfo,
   ) async {
@@ -304,6 +309,9 @@ class KlaviyoSDK {
   }
 
   /// Handle push notification opened
+  @Deprecated(
+    'No longer needed; push tracking is automatic. Will be removed in 1.0.',
+  )
   Future<void> handlePushNotificationOpened(
     Map<String, dynamic> userInfo,
   ) async {
@@ -653,6 +661,7 @@ class KlaviyoSDK {
   /// Note: This only affects Flutter console logs, not native SDK logs.
   /// While logging is disabled via [setLoggingEnabled], the new level is
   /// stored and takes effect once logging is re-enabled.
+  @Deprecated('Use setLoggingEnabled instead. Will be removed in 1.0.')
   void setLogLevel(KlaviyoLogLevel logLevel) {
     _dartLogLevel = logLevel.toLevel();
     if (_loggingEnabled) {
@@ -662,7 +671,8 @@ class KlaviyoSDK {
 
   /// Enable or disable all Klaviyo SDK logging.
   ///
-  /// Controls both the native SDK loggers and this plugin's Dart-side logs.
+  /// This one toggle controls both the native SDK loggers and this plugin's
+  /// Dart-side logs (the `KlaviyoSDK` logger from `package:logging`).
   /// Logging is enabled by default. Safe to call before [initialize] —
   /// useful for silencing logs emitted during SDK startup.
   ///
@@ -695,36 +705,150 @@ class KlaviyoSDK {
     }
   }
 
+  /// Registers [handler] to receive Klaviyo push data that arrives while the
+  /// app is in the background or not running.
+  ///
+  /// Push data is delivered for every silent push, and for every visible push
+  /// that carries key/value pairs. Each push goes to exactly one place, chosen
+  /// natively from the app state when it arrives: while the app is in the
+  /// foreground it is emitted on [onPushData]; otherwise it is passed to
+  /// [handler]. With no handler registered, background push data is dropped.
+  ///
+  /// [handler] must be a top-level or static function annotated with
+  /// `@pragma('vm:entry-point')`. On Android it can run in a separate isolate
+  /// with no UI, so it must not touch widgets or in-memory app state. It should
+  /// complete within about 20 seconds on Android and 25 seconds on iOS; the
+  /// platform may suspend or kill the app after that.
+  ///
+  /// Call it in `main()` before `runApp`, on every launch. It can be called
+  /// before [initialize]. On Android, if the handler runs in a process with no
+  /// Flutter engine, the SDK is initialized with the last API key passed to
+  /// [initialize] before [handler] runs.
+  ///
+  /// Throws an [ArgumentError] if [handler] is not a top-level or static
+  /// function, and a [KlaviyoException] if the native registration fails.
+  static Future<void> onBackgroundPushData(
+    KlaviyoBackgroundPushDataHandler handler,
+  ) async {
+    final handles = attachBackgroundPushDataHandler(handler);
+    await KlaviyoNativeWrapper().registerBackgroundPushDataHandler(
+      dispatcherHandle: handles['dispatcherHandle']!,
+      handlerHandle: handles['handlerHandle']!,
+    );
+  }
+
   /// Get push notification events stream
+  ///
+  /// `silent_push_received` events carry the same pushes as [onPushData] and
+  /// fire only while the app is in the foreground.
   ///
   /// A `push_notification_opened` event that arrives before anyone subscribes
   /// (for example, the tap that launched the app) is buffered; only the most
   /// recent one is kept. The first subscriber receives it once, then the
   /// buffer is cleared, so later subscribers don't receive it. Use
   /// [getInitialPushNotification] to read the launch tap whenever you need it.
+  @Deprecated(
+    'Use onPushToken for tokens and token errors, onPushOpened for opens, '
+    'and onPushData for silent pushes. Will be removed in 1.0.',
+  )
   Stream<Map<String, dynamic>> get onPushNotification =>
       _nativeWrapper.onPushNotification;
+
+  /// Push tokens delivered by the platform.
+  ///
+  /// Emits a [KlaviyoPushToken] with [KlaviyoPushTokenType.apns] on iOS or
+  /// [KlaviyoPushTokenType.fcm] on Android, including when FCM rotates the token.
+  /// The stream emits independently of native token forwarding. If you disable
+  /// forwarding, pass the event's [KlaviyoPushToken.token] to [setPushToken].
+  /// A registration failure arrives as a [KlaviyoException] stream error with
+  /// code `PUSH_TOKEN_ERROR`; handle it with `onError`. Tokens and errors that
+  /// reach Dart before anyone listens go to the first listener.
+  Stream<KlaviyoPushToken> get onPushToken =>
+      _nativeWrapper.onPushTokenEvent.transform(
+        StreamTransformer.fromHandlers(
+          handleData: (event, sink) {
+            final data = event['data'];
+            final value = data is Map ? data : const {};
+            if (event['type'] == 'push_token_error') {
+              sink.addError(
+                KlaviyoException(
+                  '${value['error'] ?? 'Unknown push token error'}',
+                  code: 'PUSH_TOKEN_ERROR',
+                ),
+              );
+              return;
+            }
+            final token = value['token'];
+            if (token is String && token.isNotEmpty) {
+              sink.add(
+                KlaviyoPushToken(
+                  token: token,
+                  type: defaultTargetPlatform == TargetPlatform.iOS
+                      ? KlaviyoPushTokenType.apns
+                      : KlaviyoPushTokenType.fcm,
+                ),
+              );
+            } else {
+              _logger.warning('Dropping push token event with no token');
+            }
+          },
+        ),
+      );
+
+  /// Klaviyo pushes the user tapped.
+  ///
+  /// Emits exactly one [KlaviyoPushOpened] per tap, whether the user tapped
+  /// the notification body, an action button, or a push that opens a web URL.
+  /// [KlaviyoPushOpened.tap] says which.
+  ///
+  /// An open that arrives before anyone subscribes (for example, the tap that
+  /// launched the app) is held; only the most recent one is kept. The first
+  /// subscriber receives it once, then the hold clears, so later subscribers
+  /// don't receive it. Use [getInitialPushNotification] to read the launch tap
+  /// whenever you need it.
+  Stream<KlaviyoPushOpened> get onPushOpened =>
+      _nativeWrapper.onPushOpenedEvent.map(KlaviyoPushOpened.fromMap);
+
+  /// Klaviyo push data received while the app is in the foreground.
+  ///
+  /// Emits for every silent push, and for every visible push that carries
+  /// key/value pairs. A visible push with key/value pairs therefore also
+  /// emits on [onPushOpened] if the user taps it. Push data that arrives in
+  /// the background or while the app is not running goes to the handler
+  /// registered with [onBackgroundPushData] instead.
+  ///
+  /// Push data that arrives with no listener goes to the first listener.
+  Stream<KlaviyoPushData> get onPushData =>
+      _nativeWrapper.onPushDataEvent.map((event) {
+        final data = event['data'];
+        return KlaviyoPushData(
+          data is Map<String, dynamic> ? data : <String, dynamic>{},
+        );
+      });
 
   /// The push notification tap that launched or relaunched the app from a
   /// killed state, or `null` if the app wasn't launched by a push tap.
   ///
-  /// The map has the same shape as the `push_notification_opened` event on
-  /// [onPushNotification]. Every call returns the same value for the life of
-  /// the process, including after the first [onPushNotification] subscriber
-  /// has received that event, so it can be read whenever it's needed (for
-  /// example, by a router at startup). Taps while the app is running never set
-  /// it, and [resetProfile] clears it.
+  /// Returns the same [KlaviyoPushOpened] that [onPushOpened] emits for that
+  /// tap, with [KlaviyoPushOpened.tap], [KlaviyoPushOpened.button] and
+  /// [KlaviyoPushOpened.webUrl] set the same way. Every call returns the same
+  /// tap for the life of the process, including after the first
+  /// [onPushOpened] subscriber has received that event, so it can be read
+  /// whenever it's needed (for example, by a router at startup). Taps while
+  /// the app is running never set it, and [resetProfile] clears it.
   ///
   /// Safe to call before [initialize].
-  Future<Map<String, dynamic>?> getInitialPushNotification() async {
+  Future<KlaviyoPushOpened?> getInitialPushNotification() async {
     try {
-      return await _nativeWrapper.getInitialPushNotification();
+      final launchTap = await _nativeWrapper.getInitialPushNotification();
+      return launchTap == null ? null : KlaviyoPushOpened.fromMap(launchTap);
     } catch (e) {
       throw KlaviyoException('Failed to get initial push notification: $e');
     }
   }
 
   /// Get form events stream
+  @Deprecated('Use onFormLifecycleEvent instead. Will be removed in 1.0.')
   Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
 
   /// Get typed form lifecycle events stream.
@@ -757,6 +881,10 @@ class KlaviyoSDK {
   /// subscriber receives it once, then the buffer is cleared, so later
   /// subscribers don't receive it. Use [getInitialPushNotification] to read
   /// the launch tap whenever you need it.
+  @Deprecated(
+    'Use onPushOpened instead; it carries the tapped button or web URL. '
+    'Will be removed in 1.0.',
+  )
   Stream<KlaviyoPushAction> get onPushAction => _nativeWrapper.onPushActionEvent
           .where(
         (event) =>
@@ -781,17 +909,12 @@ class KlaviyoSDK {
     }
   }
 
-  /// Dispose resources
+  /// Unregisters the auth token provider, if one is registered.
+  ///
+  /// Event streams stay open, so the SDK keeps working after this call.
+  @Deprecated('No longer needed. Will be removed in 1.0.')
   void dispose() {
-    // Tear down the auth bridge before the wrapper closes its event
-    // controllers. Otherwise a still-registered native provider keeps emitting
-    // `auth_token_requested` events into a closed stream — the add() throws and
-    // is swallowed, so the native request is never answered and stalls until the
-    // SDK timeout. Only act if a provider is registered (which implies the SDK
-    // was initialized, so the native call is safe).
     if (_authTokenProvider != null) {
-      _authTokenSubscription?.cancel();
-      _authTokenSubscription = null;
       _authTokenProvider = null;
       // dispose() is synchronous; fire-and-forget the native unregister.
       _nativeWrapper.unregisterAuthTokenProvider().catchError((Object e) {
@@ -800,6 +923,5 @@ class KlaviyoSDK {
         );
       });
     }
-    _nativeWrapper.dispose();
   }
 }
