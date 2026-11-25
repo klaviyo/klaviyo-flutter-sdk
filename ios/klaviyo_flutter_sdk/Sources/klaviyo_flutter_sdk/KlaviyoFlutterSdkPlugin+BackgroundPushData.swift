@@ -55,12 +55,13 @@ final class BackgroundPushDataDelivery {
 // MARK: - Background Push Data
 
 extension KlaviyoFlutterSdkPlugin {
-    /// Delivers push data to Dart, routed by app state. Call it from the Host App's AppDelegate in
+    /// Delivers Klaviyo push data to Dart, routed by app state. Call it from the Host App's AppDelegate in
     /// `didReceiveRemoteNotification:fetchCompletionHandler:` for every push, and pass the system
     /// completion handler.
     ///
-    /// Push data is a push with no `aps.alert` (silent), or any push with `key_value_pairs`. For any
-    /// other push, `completionHandler(.noData)` is called and nothing reaches Dart.
+    /// Push data requires a Klaviyo `_k` marker, at the top level or under `body`, and either no
+    /// `aps.alert` (silent) or `key_value_pairs`. Other pushes complete with `.noData` without
+    /// reaching Dart.
     ///
     /// - Foreground or inactive: emitted on `KlaviyoSDK.onPushData`, and on `onPushNotification` as
     ///   `silent_push_received`; `completionHandler` is called right away.
@@ -119,7 +120,7 @@ extension KlaviyoFlutterSdkPlugin {
         }
     }
 
-    /// Delivers the key/value pairs of a visible push that arrives while the app is not in the
+    /// Delivers the key/value pairs of a Klaviyo push that arrives while the app is not in the
     /// background, from `userNotificationCenter(_:willPresent:withCompletionHandler:)`. It only
     /// observes: it never calls the completion handler and never changes how the notification is
     /// presented. Hosts whose `willPresent` override doesn't call `super` call this themselves.
@@ -132,7 +133,7 @@ extension KlaviyoFlutterSdkPlugin {
         }
 
         let userInfo = notification.request.content.userInfo
-        guard userInfo["key_value_pairs"] != nil,
+        guard Self.isWillPresentPushData(userInfo),
               UIApplication.shared.applicationState != .background
         else { return }
 
@@ -167,11 +168,11 @@ extension KlaviyoFlutterSdkPlugin {
         emitPushDataToStream(userInfo: userInfo)
     }
 
-    /// The Klaviyo tracking dictionary (`_k`, top level or under `body`) identifies a push across
+    /// The Klaviyo tracking marker (`_k`, top level or under `body`) identifies a push across
     /// `willPresent` and `didReceiveRemoteNotification`. Without one, the notification request
     /// identifier is used when the caller has it. Returns nil when neither exists: no dedupe.
     static func pushDataDedupeKey(userInfo: [AnyHashable: Any], requestIdentifier: String?) -> String? {
-        if let tracking = userInfo["_k"] ?? (userInfo["body"] as? [String: Any])?["_k"] {
+        if let tracking = klaviyoPushMarker(userInfo) {
             if JSONSerialization.isValidJSONObject(tracking),
                let data = try? JSONSerialization.data(withJSONObject: tracking, options: [.sortedKeys]),
                let text = String(data: data, encoding: .utf8) {
@@ -185,10 +186,20 @@ extension KlaviyoFlutterSdkPlugin {
         return nil
     }
 
-    /// True for a push with no `aps.alert`, or any push carrying `key_value_pairs`.
+    private static func klaviyoPushMarker(_ userInfo: [AnyHashable: Any]) -> Any? {
+        userInfo["_k"] ?? (userInfo["body"] as? [String: Any])?["_k"]
+    }
+
+    /// True for a Klaviyo push with no `aps.alert`, or one carrying `key_value_pairs`.
     static func isPushData(_ userInfo: [AnyHashable: Any]) -> Bool {
+        guard klaviyoPushMarker(userInfo) != nil else { return false }
         let apsPayload = userInfo["aps"] as? [String: Any]
         return apsPayload?["alert"] == nil || userInfo["key_value_pairs"] != nil
+    }
+
+    /// True for a Klaviyo push carrying `key_value_pairs` in `willPresent`.
+    static func isWillPresentPushData(_ userInfo: [AnyHashable: Any]) -> Bool {
+        klaviyoPushMarker(userInfo) != nil && userInfo["key_value_pairs"] != nil
     }
 
     /// Marks the Dart background handler as registered and delivers a held push, if any.

@@ -881,7 +881,7 @@ extension KlaviyoFlutterSdkPlugin {
         }
     }
 
-    /// Routes push data by app state, like `handleSilentPush(userInfo:fetchCompletionHandler:)`,
+    /// Routes Klaviyo push data by app state, like `handleSilentPush(userInfo:fetchCompletionHandler:)`,
     /// but cannot delay the system completion handler, so iOS may suspend the app before the
     /// Dart background handler finishes.
     @available(*, deprecated, message: "Use handleSilentPush(userInfo:fetchCompletionHandler:)")

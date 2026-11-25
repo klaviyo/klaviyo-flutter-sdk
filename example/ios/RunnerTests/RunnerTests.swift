@@ -4,6 +4,54 @@ import UIKit
 import XCTest
 
 class RunnerTests: XCTestCase {
+    func testPushDataRequiresKlaviyoMarker() {
+        let cases: [([AnyHashable: Any], Bool)] = [
+            (["_k": ["c": "silent"], "aps": ["content-available": 1]], true),
+            (["_k": ["c": "visible"], "aps": ["alert": "Hello"], "key_value_pairs": ["a": "b"]], true),
+            (["body": ["_k": ["c": "nested"]], "aps": ["content-available": 1]], true),
+            (["aps": ["content-available": 1]], false),
+            (["aps": ["alert": "Hello"], "key_value_pairs": ["a": "b"]], false),
+            (["_k": ["c": "visible"], "aps": ["alert": "Hello"]], false)
+        ]
+        for (payload, expected) in cases {
+            XCTAssertEqual(KlaviyoFlutterSdkPlugin.isPushData(payload), expected, "Payload: \(payload)")
+        }
+    }
+
+    func testWillPresentPushDataRequiresKlaviyoMarkerAndKeyValuePairs() {
+        let cases: [([AnyHashable: Any], Bool)] = [
+            (["_k": ["c": "silent"], "aps": ["content-available": 1]], false),
+            (["_k": ["c": "visible"], "aps": ["alert": "Hello"], "key_value_pairs": ["a": "b"]], true),
+            ([
+                "body": ["_k": ["c": "nested"]],
+                "aps": ["alert": "Hello"],
+                "key_value_pairs": ["a": "b"]
+            ], true),
+            (["aps": ["content-available": 1]], false),
+            (["aps": ["alert": "Hello"], "key_value_pairs": ["a": "b"]], false),
+            (["_k": ["c": "visible"], "aps": ["alert": "Hello"]], false)
+        ]
+        for (payload, expected) in cases {
+            XCTAssertEqual(
+                KlaviyoFlutterSdkPlugin.isWillPresentPushData(payload), expected, "Payload: \(payload)"
+            )
+        }
+    }
+
+    func testPushDataDedupeUsesTheSameMarkerLocations() {
+        let topLevel: [AnyHashable: Any] = ["_k": ["c": "campaign"]]
+        let nested: [AnyHashable: Any] = ["body": ["_k": ["c": "campaign"]]]
+        let both: [AnyHashable: Any] = ["_k": ["c": "campaign"], "body": ["_k": ["c": "other"]]]
+        let expected = KlaviyoFlutterSdkPlugin.pushDataDedupeKey(userInfo: topLevel, requestIdentifier: nil)
+        XCTAssertNotNil(expected)
+        XCTAssertEqual(
+            KlaviyoFlutterSdkPlugin.pushDataDedupeKey(userInfo: nested, requestIdentifier: nil), expected
+        )
+        XCTAssertEqual(
+            KlaviyoFlutterSdkPlugin.pushDataDedupeKey(userInfo: both, requestIdentifier: nil), expected
+        )
+    }
+
     func testBackgroundChannelStaysWithFirstHandlerUntilItsEngineDetaches() {
         let plugin = KlaviyoFlutterSdkPlugin.shared
         let previousChannel = plugin.backgroundChannel
