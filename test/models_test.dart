@@ -352,6 +352,95 @@ void main() {
     });
   });
 
+  group('KlaviyoPushToken', () {
+    test('holds the token and its type', () {
+      const token = KlaviyoPushToken(
+        token: 'abc123',
+        type: KlaviyoPushTokenType.apns,
+      );
+
+      expect(token.token, 'abc123');
+      expect(token.type, KlaviyoPushTokenType.apns);
+    });
+
+    test('equality and hashCode consider the token and type', () {
+      const base = KlaviyoPushToken(
+        token: 'abc123',
+        type: KlaviyoPushTokenType.apns,
+      );
+
+      expect(
+        const KlaviyoPushToken(
+          token: 'abc123',
+          type: KlaviyoPushTokenType.apns,
+        ),
+        base,
+      );
+      expect(
+        const KlaviyoPushToken(
+          token: 'abc123',
+          type: KlaviyoPushTokenType.apns,
+        ).hashCode,
+        base.hashCode,
+      );
+      expect(
+        const KlaviyoPushToken(
+          token: 'def456',
+          type: KlaviyoPushTokenType.apns,
+        ),
+        isNot(base),
+      );
+      expect(
+        const KlaviyoPushToken(
+          token: 'abc123',
+          type: KlaviyoPushTokenType.fcm,
+        ),
+        isNot(base),
+      );
+    });
+
+    test('toString includes the token and type', () {
+      const token = KlaviyoPushToken(
+        token: 'abc123',
+        type: KlaviyoPushTokenType.fcm,
+      );
+
+      expect(token.toString(), contains('abc123'));
+      expect(token.toString(), contains('fcm'));
+    });
+  });
+
+  group('KlaviyoPushTokenType', () {
+    test('exposes apns and fcm with stable names', () {
+      expect(KlaviyoPushTokenType.apns.name, 'apns');
+      expect(KlaviyoPushTokenType.fcm.name, 'fcm');
+    });
+
+    test('fromName maps known names and keeps unknown ones', () {
+      expect(KlaviyoPushTokenType.fromName('apns'), KlaviyoPushTokenType.apns);
+      expect(KlaviyoPushTokenType.fromName('fcm'), KlaviyoPushTokenType.fcm);
+      final other = KlaviyoPushTokenType.fromName('web');
+      expect(other.name, 'web');
+      expect(other, isNot(KlaviyoPushTokenType.apns));
+      expect(other, isNot(KlaviyoPushTokenType.fcm));
+    });
+
+    test('equality and toString follow the sibling types', () {
+      expect(
+        KlaviyoPushTokenType.fromName('apns'),
+        KlaviyoPushTokenType.apns,
+      );
+      expect(
+        KlaviyoPushTokenType.apns.hashCode,
+        KlaviyoPushTokenType.fromName('apns').hashCode,
+      );
+      expect(
+        KlaviyoPushTokenType.fcm.toString(),
+        'KlaviyoPushTokenType(fcm)',
+      );
+    });
+  });
+
   group('KlaviyoLogLevel', () {
     test('maps each level to package:logging and back from its name', () {
       const expected = {

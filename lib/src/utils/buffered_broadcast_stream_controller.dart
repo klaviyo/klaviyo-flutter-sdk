@@ -5,12 +5,17 @@ import 'dart:async';
 ///
 /// Events for which [holdKey] returns a non-null key take one buffer slot per
 /// key: a newer event with the same key replaces the buffered one. All other
-/// events are buffered in arrival order.
+/// events are buffered in arrival order. When [maxBuffered] is set, the oldest
+/// buffered events are dropped once the buffer exceeds it.
 class BufferedBroadcastStreamController<T> {
-  BufferedBroadcastStreamController({Object? Function(T event)? holdKey})
-      : _holdKey = holdKey;
+  BufferedBroadcastStreamController({
+    Object? Function(T event)? holdKey,
+    int? maxBuffered,
+  })  : _holdKey = holdKey,
+        _maxBuffered = maxBuffered;
 
   final Object? Function(T event)? _holdKey;
+  final int? _maxBuffered;
   final _buffer = <T>[];
   late final StreamController<T> _controller = StreamController<T>.broadcast(
     onListen: _flush,
@@ -29,6 +34,10 @@ class BufferedBroadcastStreamController<T> {
       _buffer.removeWhere((buffered) => _holdKey?.call(buffered) == key);
     }
     _buffer.add(event);
+    final max = _maxBuffered;
+    if (max != null && _buffer.length > max) {
+      _buffer.removeRange(0, _buffer.length - max);
+    }
   }
 
   /// Drops every buffered event that has a hold key.

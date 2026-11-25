@@ -32,4 +32,22 @@ class WebLinkTapTest {
             KlaviyoFlutterSdkPlugin.webLinkTapPayload(intent, "https://example.com/shop"),
         )
     }
+
+    @Test
+    fun `web-link open carries the push payload and its action`() {
+        val intent =
+            Intent()
+                .putExtra(Constants.PACKAGE_PREFIX + "web_url", "https://example.com")
+                .putExtra(Constants.PACKAGE_PREFIX + "title", "Sale")
+                .putExtra("_klaviyo.browser_url", "https://example.com")
+
+        assertEquals(
+            mapOf(
+                "type" to "push_notification_opened",
+                "data" to mapOf("web_url" to "https://example.com", "title" to "Sale"),
+                "action" to mapOf("type" to "push_open_web_url", "data" to mapOf("url" to "https://example.com")),
+            ),
+            KlaviyoFlutterSdkPlugin.webLinkOpenedPayload(intent, "https://example.com"),
+        )
+    }
 }
