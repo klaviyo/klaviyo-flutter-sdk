@@ -16,7 +16,7 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
   s.resources        = ['klaviyo_flutter_sdk/Sources/klaviyo_flutter_sdk/klaviyo-sdk-configuration.plist']
 
   s.dependency 'Flutter'
-  # Frozen: never move these pins past the last KlaviyoSwift release published to CocoaPods trunk (5.7.0).
+  # Frozen CocoaPods dependencies.
   s.dependency 'KlaviyoSwift', '~> 5.7.0'
   # Forms: included by default, set to 'false' to exclude
   if ENV['KLAVIYO_INCLUDE_FORMS'] != 'false'
@@ -30,7 +30,7 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
     s.dependency 'KlaviyoLocation', '~> 5.7.0'
   end
 
-  s.platform = :ios, '13.0'
+  s.platform = :ios, '15.0'
 
   # Flutter.framework does not contain a i386 slice.
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }

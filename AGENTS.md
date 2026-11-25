@@ -54,7 +54,7 @@ Native SDK versions are pinned here; bump them with `scripts/configure-sdk.sh`:
 - **iOS**: `ios/klaviyo_flutter_sdk/Package.swift` — `.upToNextMinor(from: "X.Y.Z")`, mirrored in the example's Xcode project
 - **Android**: `android/build.gradle.kts` — `klaviyoSdkVersion = "X.Y.Z"`
 
-The podspec (`ios/klaviyo_flutter_sdk.podspec`) is frozen at `KlaviyoSwift ~> 5.7.0`, the last release on CocoaPods trunk (trunk stops taking releases Dec 2, 2026). Never bump its Klaviyo* pins; `check-native-pins.sh` fails if they move.
+The podspec (`ios/klaviyo_flutter_sdk.podspec`) is frozen at `KlaviyoSwift ~> 5.7.0`, the planned final release on CocoaPods trunk (trunk stops taking releases Dec 2, 2026). Never bump its Klaviyo* pins; `check-native-pins.sh` fails if they move.
 
 Optional features controlled by host app build properties (Android Gradle properties; on iOS, CocoaPods env vars only, since SwiftPM always links Forms and Location):
 - **Forms** (`klaviyoIncludeForms` / `KLAVIYO_INCLUDE_FORMS`): defaults to **true**
@@ -73,7 +73,7 @@ Key lint rules (`analysis_options.yaml`):
 
 To test against a local native SDK build:
 - **iOS**: Run `scripts/configure-sdk.sh --ios-local ../klaviyo-swift-sdk` (or `--ios-branch` / `--ios-commit`). It points `ios/klaviyo_flutter_sdk/Package.swift` and the example's Xcode project at that source; `--ios-version X.Y.Z` puts the release pin back.
-- **Android**: In `android/build.gradle.kts`, replace the version string with a local Maven path or use `includeBuild()` in `example/android/settings.gradle`
+- **Android**: Run `scripts/configure-sdk.sh --android-local ../klaviyo-android-sdk` (or `--android-branch` / `--android-commit`). A local path appends an `includeBuild()` block to `example/android/settings.gradle.kts`; a branch or commit rewrites `klaviyoSdkVersion` in `android/build.gradle.kts` to a JitPack ref. `--android-version X.Y.Z` puts the release pin back and removes the `includeBuild()` block.
 
 ### Gotchas
 

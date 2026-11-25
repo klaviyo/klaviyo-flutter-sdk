@@ -10,7 +10,7 @@ PACKAGE_SWIFT="$ROOT_DIR/ios/klaviyo_flutter_sdk/Package.swift"
 BUILD_GRADLE="$ROOT_DIR/android/build.gradle.kts"
 EXAMPLE_PBXPROJ="$ROOT_DIR/example/ios/Runner.xcodeproj/project.pbxproj"
 EXAMPLE_PACKAGE_RESOLVED="$ROOT_DIR/example/ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved"
-SETTINGS_GRADLE="$ROOT_DIR/example/android/settings.gradle"
+SETTINGS_GRADLE="$ROOT_DIR/example/android/settings.gradle.kts"
 
 SWIFT_REPO="https://github.com/klaviyo/klaviyo-swift-sdk.git"
 ANDROID_REPO="https://github.com/klaviyo/klaviyo-android-sdk.git"
@@ -350,7 +350,7 @@ configure_ios_local() {
 
 # ─── Android helpers ──────────────────────────────────────────────────
 
-# Remove any existing settings.gradle override block
+# Remove any existing settings.gradle.kts override block
 remove_android_override() {
     if grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$SETTINGS_GRADLE" 2>/dev/null; then
         sedi "\\#${ANDROID_MARKER_START}#,\\#${ANDROID_MARKER_END}#d" "$SETTINGS_GRADLE"
@@ -362,21 +362,21 @@ update_android_version() {
     sedi -E "s|val klaviyoSdkVersion = \".*\"|val klaviyoSdkVersion = \"$version\"|" "$BUILD_GRADLE"
 }
 
-# Inject an includeBuild block into settings.gradle for local development.
+# Inject an includeBuild block into settings.gradle.kts for local development.
 # $1 = absolute path to the local klaviyo-android-sdk checkout.
 inject_android_include_build() {
     local path="$1"
     cat >> "$SETTINGS_GRADLE" << EOF
 $ANDROID_MARKER_START_LITERAL
-includeBuild('$path') {
+includeBuild("$path") {
     dependencySubstitution {
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:analytics') using project(':sdk:analytics')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:core') using project(':sdk:core')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:push-fcm') using project(':sdk:push-fcm')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:location') using project(':sdk:location')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:location-core') using project(':sdk:location-core')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:forms') using project(':sdk:forms')
-        substitute module('com.github.klaviyo.klaviyo-android-sdk:forms-core') using project(':sdk:forms-core')
+        substitute(module("com.github.klaviyo.klaviyo-android-sdk:analytics")).using(project(":sdk:analytics"))
+        substitute(module("com.github.klaviyo.klaviyo-android-sdk:core")).using(project(":sdk:core"))
+        substitute(module("com.github.klaviyo.klaviyo-android-sdk:push-fcm")).using(project(":sdk:push-fcm"))
+        substitute(module("com.github.klaviyo.klaviyo-android-sdk:location")).using(project(":sdk:location"))
+        substitute(module("com.github.klaviyo.klaviyo-android-sdk:location-core")).using(project(":sdk:location-core"))
+        substitute(module("com.github.klaviyo.klaviyo-android-sdk:forms")).using(project(":sdk:forms"))
+        substitute(module("com.github.klaviyo.klaviyo-android-sdk:forms-core")).using(project(":sdk:forms-core"))
     }
 }
 $ANDROID_MARKER_END_LITERAL
@@ -441,7 +441,7 @@ show_status() {
     android_version=$(grep -oE 'val klaviyoSdkVersion = "[^"]*"' "$BUILD_GRADLE")
     printf '%b\n' "  ${CYAN}Android${NC}: $android_version"
     if grep -q 'KLAVIYO-SDK-OVERRIDE-START' "$SETTINGS_GRADLE" 2>/dev/null; then
-        printf '%b\n' "          ${YELLOW}(settings.gradle override active — local includeBuild)${NC}"
+        printf '%b\n' "          ${YELLOW}(settings.gradle.kts override active — local includeBuild)${NC}"
     fi
     echo ""
 }

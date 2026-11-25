@@ -1,0 +1,275 @@
+package com.klaviyo.klaviyo_flutter_sdk
+
+import android.app.Activity
+import android.app.Application
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import com.klaviyo.analytics.Klaviyo
+import com.klaviyo.analytics.Klaviyo.isKlaviyoNotificationIntent
+import com.klaviyo.core.Registry
+import com.klaviyo.core.config.hasManifestKey
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
+import io.mockk.Runs
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.mockkStatic
+import io.mockk.slot
+import io.mockk.unmockkAll
+import io.mockk.verify
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Before
+import org.junit.Test
+
+class PushLaunchTapTest {
+    private lateinit var plugin: KlaviyoFlutterSdkPlugin
+    private lateinit var engineBinding: FlutterPlugin.FlutterPluginBinding
+    private lateinit var attachedActivity: Activity
+    private val newIntentListeners = mutableListOf<PluginRegistry.NewIntentListener>()
+    private val lifecycleCallbacks = mutableListOf<Application.ActivityLifecycleCallbacks>()
+    private val sent = mutableListOf<Any?>()
+    private val sink =
+        mockk<EventChannel.EventSink>(relaxed = true).also {
+            every { it.success(any()) } answers { sent.add(firstArg()) }
+        }
+
+    private fun clearStaticEventCaches() {
+        listOf("cachedSilentPush", "cachedOpenedNotification", "cachedPushAction").forEach { name ->
+            KlaviyoFlutterSdkPlugin::class.java.getDeclaredField(name).apply {
+                isAccessible = true
+                set(null, null)
+            }
+        }
+    }
+
+    @Before
+    fun setUp() {
+        clearStaticEventCaches()
+        mockkObject(Registry)
+        every { Registry.log } returns mockk(relaxed = true)
+        every { Registry.lifecycleMonitor } returns mockk(relaxed = true)
+        mockkObject(Klaviyo)
+        mockkStatic(Klaviyo::class)
+        every { Klaviyo.handlePush(any()) } returns Klaviyo
+        every { Klaviyo.resetProfile() } returns Klaviyo
+        every { with(Klaviyo) { any<Intent>().isKlaviyoNotificationIntent } } returns true
+        mockkStatic("com.klaviyo.core.config.KlaviyoConfigKt")
+        every { any<Context>().hasManifestKey(any()) } returns false
+
+        val application = mockk<Application>(relaxed = true)
+        every { application.registerActivityLifecycleCallbacks(capture(lifecycleCallbacks)) } just Runs
+        every { application.unregisterActivityLifecycleCallbacks(any()) } just Runs
+
+        plugin = KlaviyoFlutterSdkPlugin()
+        engineBinding =
+            mockk<FlutterPlugin.FlutterPluginBinding>(relaxed = true) {
+                every { applicationContext } returns application
+            }
+        plugin.onAttachedToEngine(engineBinding)
+    }
+
+    @After
+    fun tearDown() {
+        plugin.onDetachedFromEngine(engineBinding)
+        KlaviyoFlutterSdkPlugin.instance = null
+        clearStaticEventCaches()
+        unmockkAll()
+    }
+
+    private fun tapIntent(
+        id: String,
+        buttonId: String? = null,
+        flags: Int = 0,
+    ): Intent {
+        val extras = mutableMapOf<String, Any?>("com.klaviyo.id" to id)
+        if (buttonId != null) {
+            extras["com.klaviyo.Button ID"] = buttonId
+            extras["com.klaviyo.Button Action"] = "Open App"
+            extras["com.klaviyo.Button Label"] = "Shop"
+        }
+        val bundle =
+            mockk<Bundle>().also { bundle ->
+                every { bundle.keySet() } returns extras.keys
+                every { bundle.get(any()) } answers { extras[firstArg()] }
+            }
+        return mockk<Intent>(relaxed = true).also { intent ->
+            every { intent.extras } returns bundle
+            every { intent.flags } returns flags
+        }
+    }
+
+    private fun staleLauncherIntent(): Intent = mockk<Intent>(relaxed = true).also { every { it.extras } returns null }
+
+    private fun activityBinding(activity: Activity): ActivityPluginBinding =
+        mockk<ActivityPluginBinding>(relaxed = true) {
+            every { this@mockk.activity } returns activity
+            every { addOnNewIntentListener(capture(newIntentListeners)) } just Runs
+        }
+
+    private fun launchActivityWith(intent: Intent): ActivityPluginBinding {
+        val activity = mockk<Activity> { every { this@mockk.intent } returns intent }
+        attachedActivity = activity
+        return activityBinding(activity).also { plugin.onAttachedToActivity(it) }
+    }
+
+    private fun deliverNewIntent(intent: Intent) {
+        newIntentListeners.last().onNewIntent(intent)
+    }
+
+    private fun resumeAttachedActivity() {
+        lifecycleCallbacks.forEach { it.onActivityResumed(attachedActivity) }
+    }
+
+    private fun getInitialPushNotification(): Any? {
+        val captured = slot<Any?>()
+        val result = mockk<MethodChannel.Result>(relaxed = true)
+        every { result.success(captureNullable(captured)) } returns Unit
+        plugin.onMethodCall(MethodCall("getInitialPushNotification", null), result)
+        return captured.captured
+    }
+
+    private fun openedId(event: Any?): Any? = (event as? Map<*, *>)?.let { (it["data"] as? Map<*, *>)?.get("id") }
+
+    @Test
+    fun `cold-start tap is flushed to the first listener once and stays readable`() {
+        launchActivityWith(tapIntent("launch"))
+
+        plugin.attachEventSink(sink)
+        plugin.attachEventSink(sink)
+
+        assertEquals(1, sent.size)
+        assertEquals("push_notification_opened", (sent.single() as Map<*, *>)["type"])
+        assertEquals("launch", openedId(getInitialPushNotification()))
+        assertEquals("launch", openedId(getInitialPushNotification()))
+    }
+
+    @Test
+    fun `cold-start action button tap is flushed after the open`() {
+        launchActivityWith(tapIntent("launch", buttonId = "btn1"))
+
+        plugin.attachEventSink(sink)
+
+        assertEquals(listOf("push_notification_opened", "push_action_button_tapped"), sent.map { (it as Map<*, *>)["type"] })
+    }
+
+    @Test
+    fun `launch tap from an action button carries the button action`() {
+        launchActivityWith(tapIntent("launch", buttonId = "btn1"))
+
+        val action = (getInitialPushNotification() as Map<*, *>)["action"] as Map<*, *>
+
+        assertEquals("push_action_button_tapped", action["type"])
+        assertEquals("btn1", (action["data"] as Map<*, *>)["id"])
+    }
+
+    @Test
+    fun `relaunch from history is tracked natively but not emitted or recorded`() {
+        val intent = tapIntent("stale", flags = Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)
+        launchActivityWith(intent)
+
+        plugin.attachEventSink(sink)
+
+        verify(exactly = 1) { Klaviyo.handlePush(intent) }
+        assertEquals(emptyList<Any?>(), sent)
+        assertNull(getInitialPushNotification())
+    }
+
+    @Test
+    fun `warm tap is delivered but never recorded as the launch tap`() {
+        launchActivityWith(mockk<Intent>(relaxed = true).also { every { it.extras } returns null })
+        plugin.attachEventSink(sink)
+
+        plugin.handleIntent(tapIntent("warm"))
+
+        assertEquals("warm", openedId(sent.single()))
+        assertNull(getInitialPushNotification())
+    }
+
+    @Test
+    fun `a push tap delivered before the first resume is recorded as the launch tap`() {
+        launchActivityWith(staleLauncherIntent())
+
+        deliverNewIntent(tapIntent("relaunched"))
+
+        assertEquals("relaunched", openedId(getInitialPushNotification()))
+    }
+
+    @Test
+    fun `a push tap delivered after the first resume is not recorded as the launch tap`() {
+        launchActivityWith(staleLauncherIntent())
+        resumeAttachedActivity()
+
+        deliverNewIntent(tapIntent("warm"))
+
+        plugin.attachEventSink(sink)
+
+        assertEquals(listOf("warm"), sent.map { openedId(it) })
+        assertNull(getInitialPushNotification())
+    }
+
+    @Test
+    fun `a config change reattach does not reopen the launch window`() {
+        launchActivityWith(staleLauncherIntent())
+        resumeAttachedActivity()
+
+        plugin.onDetachedFromActivityForConfigChanges()
+        plugin.onReattachedToActivityForConfigChanges(activityBinding(mockk(relaxed = true)))
+
+        deliverNewIntent(tapIntent("after-config-change"))
+
+        assertNull(getInitialPushNotification())
+    }
+
+    @Test
+    fun `a later activity attach does not replace the launch tap`() {
+        launchActivityWith(tapIntent("launch"))
+        launchActivityWith(tapIntent("recreated"))
+
+        assertEquals("launch", openedId(getInitialPushNotification()))
+    }
+
+    @Test
+    fun `a new tap clears the cached action from an earlier tap`() {
+        plugin.handleIntent(tapIntent("first", buttonId = "btn1"))
+        plugin.handleIntent(tapIntent("second"))
+
+        plugin.attachEventSink(sink)
+
+        assertEquals(listOf("second"), sent.map { openedId(it) })
+    }
+
+    @Test
+    fun `resetProfile clears the launch tap`() {
+        launchActivityWith(tapIntent("launch"))
+
+        plugin.onMethodCall(MethodCall("resetProfile", null), mockk(relaxed = true))
+
+        assertNull(getInitialPushNotification())
+    }
+
+    @Test
+    fun `resetProfile clears a held push action`() {
+        KlaviyoFlutterSdkPlugin::class.java.getDeclaredField("cachedPushAction").apply {
+            isAccessible = true
+            set(null, mapOf("type" to "push_open_web_url", "data" to mapOf("url" to "https://example.com")))
+        }
+
+        plugin.onMethodCall(MethodCall("resetProfile", null), mockk(relaxed = true))
+
+        val held =
+            KlaviyoFlutterSdkPlugin::class.java.getDeclaredField("cachedPushAction").run {
+                isAccessible = true
+                get(null)
+            }
+        assertNull(held)
+    }
+}

@@ -6,12 +6,70 @@ This guide outlines how developers can migrate from older versions of the
 > Migrating from the community [`klaviyo_flutter`](https://pub.dev/packages/klaviyo_flutter)
 > package to the official SDK? See [MIGRATION.md](./MIGRATION.md) instead.
 
+## Migrating to v1.0.0
+
+### iOS 15.0 is the minimum deployment target
+
+The plugin now requires iOS 15.0 or later; 0.x declared 13.0. Builds fail if your app targets anything lower, so set the iOS deployment target to 15.0 or higher:
+
+- **Xcode**: in `ios/Runner.xcodeproj`, set **iOS Deployment Target** to 15.0 for every target, including any notification service extension.
+- **CocoaPods**: if your `ios/Podfile` has a `platform :ios` line, change it to `platform :ios, '15.0'` and run `pod install`.
+
+iOS 15 supports the same devices as iOS 13 (iPhone 6s and newer), so this doesn't drop any devices. Flutter itself requires iOS 15 as of 3.47.
+
 ## Migrating to v0.6.0
 
 - `KlaviyoProfile.toJson` now nests custom properties under `properties` instead of merging them into the top level, so code that reads custom keys from its output must read them from `json['properties']`; `KlaviyoProfile.fromJson` still accepts the old flat shape, but ignores unknown top-level keys when a nested `properties` map is present.
 - In 0.5.0, a snake_case standard key inside `properties`, such as `first_name` or `email`, set the standard field because `toJson` flattened `properties` into the top level. It still does, on both iOS and Android, and if the matching typed field is also set, the typed field wins. Standard attribute keys are now matched in camelCase too, so `firstName` inside `properties` sets the first name as well; in 0.5.0 it was dropped. Prefer the typed `KlaviyoProfile` fields or `setProfileAttribute` for standard fields, and keep `properties` for custom keys.
 - On iOS, `setProfileAttribute('email', …)` and `setProfileProperties({'email': …})` (also `phone_number` and `external_id`) used to create a custom property. They now set the identifier, as on Android, which can switch the tracked profile. Use a different key if you meant a custom property.
 - `setProfile`, `setProfileAttribute` and `setProfileProperties` now ignore null values on both platforms. Android already skipped them; iOS used to send them as JSON null. Null doesn't clear a property.
+
+### Silent push is now push data, split into `onPushData` and `onBackgroundPushData`
+
+Push data covers every silent push and every visible push that carries key/value pairs. Each
+push reaches Dart in exactly one place, chosen by app state when it arrives: the
+`onPushData` stream in the foreground, or a handler you register with
+`KlaviyoSDK.onBackgroundPushData` in the background or while the app isn't running. Without a
+handler, background push data is dropped.
+
+`silent_push_received` on `onPushNotification` still fires for the same foreground pushes, so
+existing listeners keep working, but it no longer fires in the background. It now also fires for
+visible pushes with key/value pairs.
+
+1. Move background work into a top-level function annotated with `@pragma('vm:entry-point')` and
+   register it in `main()` before `runApp`:
+
+   ```dart
+   @pragma('vm:entry-point')
+   Future<void> onKlaviyoPushData(KlaviyoPushData data) async {
+     // Background work. No UI.
+   }
+
+   void main() async {
+     WidgetsFlutterBinding.ensureInitialized();
+     await KlaviyoSDK.onBackgroundPushData(onKlaviyoPushData);
+     runApp(const MyApp());
+   }
+   ```
+
+2. **iOS**: in `AppDelegate.swift`, replace the body of
+   `application(_:didReceiveRemoteNotification:fetchCompletionHandler:)` with a single call to
+   `KlaviyoFlutterSdkPlugin.shared.handleSilentPush(userInfo:fetchCompletionHandler:)`, passing the
+   system completion handler, for every push. Remove your own `aps.alert` check and your own
+   `completionHandler` call: the plugin now decides which pushes are push data and calls the
+   completion handler for every push. If another provider also handles this callback, branch on its
+   payload before the Klaviyo call and complete those pushes yourself. See
+   [iOS Setup](README.md#ios-setup). `handleSilentPush(userInfo:)` still compiles but is deprecated. It runs the same routing, so
+   a push that arrives in the background is dropped when no `KlaviyoSDK.onBackgroundPushData` handler
+   is registered, even if a stream listener is attached.
+
+   Until you update, the old snippet keeps filtering out pushes with an `alert`, so visible pushes
+   with key/value pairs never reach Dart.
+
+3. **Android**: no setup change. If you used `firebase_messaging`'s `onBackgroundMessage` only to
+   catch Klaviyo silent pushes while the app was killed, you can remove it. If you keep it, see
+   [Push Data > Android](README.md#android) before skipping Klaviyo pushes there: that is only safe
+   once your merged manifest routes `MESSAGING_EVENT` to `KlaviyoFlutterPushService`.
 
 ## Migrating to v0.3.0
 
