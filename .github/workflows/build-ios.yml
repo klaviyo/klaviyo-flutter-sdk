@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: xcode-27
     defaults:
       run:
         working-directory: klaviyo_flutter_sdk
@@ -22,6 +22,13 @@ jobs:
         with:
           path: klaviyo_flutter_sdk
           persist-credentials: false
+
+      - name: Verify iOS SDK
+        run: |
+          xcodebuild -version
+          sdk_version=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iOS SDK: $sdk_version"
+          [[ "$sdk_version" == 27.* ]]
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
