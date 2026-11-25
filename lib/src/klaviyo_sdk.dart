@@ -17,6 +17,7 @@ import 'models/klaviyo_push_opened.dart';
 import 'models/klaviyo_push_token.dart';
 import 'models/profile_property.dart';
 import 'enums/klaviyo_log_level.dart';
+import 'services/background_push_data.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
 
@@ -699,7 +700,42 @@ class KlaviyoSDK {
     }
   }
 
+  /// Registers [handler] to receive Klaviyo push data that arrives while the
+  /// app is in the background or not running.
+  ///
+  /// Push data is delivered for every silent push, and for every visible push
+  /// that carries key/value pairs. Each push goes to exactly one place, chosen
+  /// natively from the app state when it arrives: while the app is in the
+  /// foreground it is emitted on [onPushData]; otherwise it is passed to
+  /// [handler]. With no handler registered, background push data is dropped.
+  ///
+  /// [handler] must be a top-level or static function annotated with
+  /// `@pragma('vm:entry-point')`. On Android it can run in a separate isolate
+  /// with no UI, so it must not touch widgets or in-memory app state. It should
+  /// complete within about 20 seconds on Android and 25 seconds on iOS; the
+  /// platform may suspend or kill the app after that.
+  ///
+  /// Call it in `main()` before `runApp`, on every launch. It can be called
+  /// before [initialize]. On Android, if the handler runs in a process with no
+  /// Flutter engine, the SDK is initialized with the last API key passed to
+  /// [initialize] before [handler] runs.
+  ///
+  /// Throws an [ArgumentError] if [handler] is not a top-level or static
+  /// function, and a [KlaviyoException] if the native registration fails.
+  static Future<void> onBackgroundPushData(
+    KlaviyoBackgroundPushDataHandler handler,
+  ) async {
+    final handles = attachBackgroundPushDataHandler(handler);
+    await KlaviyoNativeWrapper().registerBackgroundPushDataHandler(
+      dispatcherHandle: handles['dispatcherHandle']!,
+      handlerHandle: handles['handlerHandle']!,
+    );
+  }
+
   /// Get push notification events stream
+  ///
+  /// `silent_push_received` events carry the same pushes as [onPushData] and
+  /// fire only while the app is in the foreground.
   ///
   /// A `push_notification_opened` event that arrives before anyone subscribes
   /// (for example, the tap that launched the app) is buffered; only the most
@@ -768,13 +804,13 @@ class KlaviyoSDK {
   Stream<KlaviyoPushOpened> get onPushOpened =>
       _nativeWrapper.onPushOpenedEvent.map(KlaviyoPushOpened.fromMap);
 
-  /// Klaviyo push data received in the foreground or background.
-  ///
-  /// Delivery requires a live Flutter engine and OS delivery of the push.
+  /// Klaviyo push data received while the app is in the foreground.
   ///
   /// Emits for every silent push, and for every visible push that carries
   /// key/value pairs. A visible push with key/value pairs therefore also
-  /// emits on [onPushOpened] if the user taps it.
+  /// emits on [onPushOpened] if the user taps it. Push data that arrives in
+  /// the background or while the app is not running goes to the handler
+  /// registered with [onBackgroundPushData] instead.
   ///
   /// Push data that arrives with no listener goes to the first listener.
   Stream<KlaviyoPushData> get onPushData =>
