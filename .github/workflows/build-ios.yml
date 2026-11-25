@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: xcode-27
     defaults:
       run:
         working-directory: klaviyo_flutter_sdk
@@ -23,9 +23,16 @@ jobs:
           path: klaviyo_flutter_sdk
           persist-credentials: false
 
+      - name: Verify iOS SDK
+        run: |
+          xcodebuild -version
+          sdk_version=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iOS SDK: $sdk_version"
+          [[ "$sdk_version" == 27.* ]]
+
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          flutter-version: 3.47.9
+          flutter-version-file: klaviyo_flutter_sdk/.fvmrc
           cache: true
 
       - name: Install dependencies
