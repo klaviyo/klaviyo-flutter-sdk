@@ -26,8 +26,8 @@ iOS 15 supports the same devices as iOS 13 (iPhone 6s and newer), so this doesn'
 
 ### Silent push is now push data, split into `onPushData` and `onBackgroundPushData`
 
-Push data covers every silent push and every visible push that carries key/value pairs. Each
-push reaches Dart in exactly one place, chosen by app state when it arrives: the
+Push data covers Klaviyo silent pushes and visible pushes that carry key/value pairs. When the
+OS delivers a qualifying push, it reaches Dart in one place, chosen by app state when it arrives: the
 `onPushData` stream in the foreground, or a handler you register with
 `KlaviyoSDK.onBackgroundPushData` in the background or while the app isn't running. Without a
 handler, background push data is dropped.
@@ -35,6 +35,13 @@ handler, background push data is dropped.
 `silent_push_received` on `onPushNotification` still fires for the same foreground pushes, so
 existing listeners keep working, but it no longer fires in the background. It now also fires for
 visible pushes with key/value pairs.
+
+On iOS, visible pushes with key/value pairs can reach foreground `onPushData` through
+`willPresent` without `content-available`. Background delivery on arrival requires Background
+Processing on the Klaviyo message so it includes `content-available`. If iOS wakes the app, the
+remote-notification callback routes the data to `onBackgroundPushData`, not `onPushData`.
+A later tap emits `onPushOpened`. Both iOS data entry paths require a Klaviyo `_k` marker at the
+top level or under `body`. Hand-built test payloads need it too. See [iOS delivery rules](README.md#ios).
 
 1. Move background work into a top-level function annotated with `@pragma('vm:entry-point')` and
    register it in `main()` before `runApp`:
@@ -63,13 +70,52 @@ visible pushes with key/value pairs.
    a push that arrives in the background is dropped when no `KlaviyoSDK.onBackgroundPushData` handler
    is registered, even if a stream listener is attached.
 
-   Until you update, the old snippet keeps filtering out pushes with an `alert`, so visible pushes
-   with key/value pairs never reach Dart.
+   If your `userNotificationCenter(_:willPresent:withCompletionHandler:)` override does not call
+   `super`, add this call to that override:
+
+   ```swift
+   KlaviyoFlutterSdkPlugin.shared.handleWillPresent(notification)
+   ```
+
+   Keep your existing presentation options and completion-handler call in `willPresent`. This
+   helper only observes the notification. With no override, or an override that calls `super`,
+   the plugin observes `willPresent` automatically.
+
+   Until you update the remote-notification snippet, its `aps.alert` check still filters out
+   visible pushes with key/value pairs from that callback.
 
 3. **Android**: no setup change. If you used `firebase_messaging`'s `onBackgroundMessage` only to
    catch Klaviyo silent pushes while the app was killed, you can remove it. If you keep it, see
    [Push Data > Android](README.md#android) before skipping Klaviyo pushes there: that is only safe
    once your merged manifest routes `MESSAGING_EVENT` to `KlaviyoFlutterPushService`.
+
+### Deprecated APIs
+
+The following APIs remain available in 0.6.0 and are scheduled for removal in 1.0. Replace calls
+before upgrading to 1.0. The push-data routing changes above already apply in 0.6.0.
+
+| Deprecated API | Replacement or action |
+|---|---|
+| `KlaviyoSDK.onPushNotification` | `onPushToken` for tokens/errors, `onPushOpened` for taps, `onPushData` for foreground data and `onBackgroundPushData` for background work. |
+| `KlaviyoSDK.onPushAction` | `onPushOpened`, which carries action-button and web-link tap details. |
+| `KlaviyoPushAction` | `KlaviyoPushOpened` from `onPushOpened`. |
+| `OpenWebUrl` | `KlaviyoPushOpened` with `tap == KlaviyoPushTap.webUrl`; read `webUrl`. |
+| `ActionButtonTapped` | `KlaviyoPushOpened` with `tap == KlaviyoPushTap.actionButton`; read `button`. |
+| `KlaviyoSDK.onFormEvent` | `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s. |
+| `KlaviyoSDK.handlePushNotificationReceived` | Remove the Dart call; push tracking is automatic. Keep the required native forwarding. |
+| `KlaviyoSDK.handlePushNotificationOpened` | Remove the Dart call; push tracking is automatic. Keep the required native forwarding. |
+| `KlaviyoNativeWrapper` | Call the public `KlaviyoSDK` API; the wrapper becomes internal in 1.0. |
+| `KlaviyoSDK.dispose()` | Remove it; to turn off personalized forms, explicitly `await KlaviyoSDK().unregisterAuthTokenProvider()` instead. Event streams now stay open. |
+| `KlaviyoNativeWrapper.dispose()` | Remove it; it is now a no-op. |
+| `KlaviyoSDK.setLogLevel(...)` | `setLoggingEnabled(bool)` for Dart/native logging on or off. |
+| `KlaviyoLogLevel` | Remove the enum use when replacing `setLogLevel` with `setLoggingEnabled(bool)`. |
+| `Klaviyo.instance.isKlaviyoPush(data)` (community compatibility shim) | Use `data.isKlaviyoNotification` for raw messages from another library; remove the check only if it solely gated the old `handlePush` call. |
+
+`isKlaviyoNotification` remains supported for raw-message detection and is not deprecated. For
+Klaviyo-only delivery, prefer the [typed push streams](README.md#typed-push-streams) and registered
+background handler. Buffered push opens/actions reach the first subscriber of each stream once;
+use `getInitialPushNotification()` to reread the launch tap. Other community-package shims are
+covered in [MIGRATION.md](MIGRATION.md).
 
 ## Migrating to v0.3.0
 
