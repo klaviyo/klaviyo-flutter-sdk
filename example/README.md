@@ -6,23 +6,22 @@ This example app demonstrates how to use the Klaviyo Flutter SDK with a user-fri
 
 ### 1. API Key Setup
 
-When you first launch the app, you'll see an **API Key input field** at the top:
+Open **Profile** and use its **API Key** field to configure your account:
 
-- **Default Value**: The field is pre-filled with `Xr5bFG` (a demo API key for testing)
 - **Your API Key**: Replace this with your actual Klaviyo API key from your account
 - **Where to Find**: Log into your Klaviyo account → Settings → API Keys → Public API Key
 
 ### 2. Initialize the SDK
 
 1. Enter your API key in the text field
-2. Tap **"Initialize SDK"** button
-3. Wait for the status to show "Initialized successfully"
+2. Tap **"Initialize SDK"** in **Profile**
+3. Wait for the status to show "SDK initialized successfully!"
 4. Once initialized, you can use all the SDK features
 
 ### 3. Reset and Change API Key
 
-- If you need to test with a different API key, tap the **"Reset"** button
-- This will allow you to enter a new API key and reinitialize
+- If you need to test with a different API key, tap **"Reset SDK & Change API Key"** in **Profile**
+- This clears the saved key so you can enter another one and reinitialize. Otherwise, the saved key is reused on later launches.
 
 ## Features Demonstrated
 
@@ -39,15 +38,16 @@ When you first launch the app, you'll see an **API Key input field** at the top:
 - **Track Complex Event**: Send an event with structured data (like a purchase)
 
 ### 📱 Push Notifications
-- **Register for Push**: Request notification permissions and register for push notifications
-- **Get Push Token Info**: Retrieve detailed information about the push token
-- **Get Push Token**: Get the raw push token string
+- **Enable Push Notifications**: Request permission and register. The button becomes **Notifications Enabled** when permission is granted.
+- **Push Token (tap to copy)**: Display and copy the current APNs or FCM token. Tokens and registration errors arrive through `onPushToken`.
+- **Read Launch Tap**: Read the typed notification that launched the app with `getInitialPushNotification()`.
+- **Badge Count** (iOS): Set or clear the badge using **Set** and **Clear**.
 
 ### 🎯 In-App Forms
 - **Register for Forms**: Enable in-app forms that will show automatically based on Klaviyo targeting
 
 ### ⚙️ Configuration
-- **Set Log Level**: Change the verbosity of SDK logging
+For logging controls, see [SDK Logging](../README.md#sdk-logging). SDK integrations use `setLoggingEnabled(bool)`.
 
 ## Testing Location Permission Configurations
 
@@ -137,20 +137,28 @@ grep -o '"identity" : "klaviyo-swift-sdk"' ios/Runner.xcworkspace/xcshareddata/s
 
 ## Push Notification Testing
 
-To test push notifications:
+### Typed push streams
 
-1. **Use a Real Device**: Push notifications don't work in the iOS Simulator
-2. **Register for Push**: Tap "Register for Push" and allow permissions
-3. **Send a Test Push**: Use your Klaviyo dashboard to send a test push notification
-4. **Tap the Notification**: When you receive it, tap to open
-5. **Check the Status**: The app will show "Push notification opened!" with the data
+- The Push tab listens to `onPushToken` (`KlaviyoPushToken`) and shows the token type or registration error. Tap the displayed token to copy it.
+- `onPushOpened` (`KlaviyoPushOpened`) reports body, action-button and web-link taps. The Push status shows tap details. A tap carrying custom pairs also opens a **Push Opened** dialog.
+- `onPushData` (`KlaviyoPushData`) shows a **Push Data Received** dialog for qualifying foreground pushes.
+- `main()` registers `KlaviyoSDK.onBackgroundPushData(klaviyoBackgroundPushDataHandler)` before `runApp`. Background/killed delivery logs `Klaviyo background push data: ...` in the device console instead of showing UI.
+- **Read Launch Tap** calls `getInitialPushNotification()` and shows the recorded launch tap, or `null`. Repeated reads return the same tap until profile reset.
+
+The example also registers a Firebase background handler on Android to exercise coexistence. See the main [push-data guide](../README.md#push-data) for service routing, iOS Background Processing requirements and delivery limits.
+
+### Smoke steps
+
+1. Initialize with an account you control, identify a test profile in **Profile**, and visit **Push**.
+2. Tap **Enable Push Notifications** and allow permission. If permission is already granted, the button reads **Notifications Enabled**. Confirm that a push token appears. There is no separate token-fetch button.
+3. Send that profile a Klaviyo visible push with key/value pairs, for example `test_key: test_value`, while the app is foregrounded. Expect **Push Data Received** with those pairs.
+4. Background the app and send another qualifying push. Look for the background-handler log. On iOS, enable **Background Processing** for the message and use real APNs delivery. iOS background wakeups are best effort, so an absent log alone is not a definitive failure.
+5. Tap the notification. Expect an `onPushOpened` status update and a **Push Opened** dialog when it contains custom pairs. Arrival data and the later tap are separate events.
+6. To exercise a launch tap, terminate the process without force-stopping Android, send a visible push, and tap it to launch the app. Tap **Read Launch Tap** and confirm it records that tap. Reading it again should show the same value.
+
+Use real APNs/FCM delivery for background and terminated-state checks. Simulated notifications alone do not verify those paths. On iOS, force-quitting prevents background push delivery until the app is reopened or the device restarts. Hand-built iOS push-data payloads need the Klaviyo `_k` marker. See [iOS delivery rules](../README.md#ios).
 
 ## API Key Information
-
-### Demo API Key (`Xr5bFG`)
-- This is a test API key provided by Klaviyo for examples
-- It allows the SDK to initialize but may not send real data
-- Perfect for testing the app functionality
 
 ### Your Real API Key
 - Get this from your Klaviyo account settings
@@ -170,15 +178,14 @@ To test push notifications:
 **"Initialization failed"**
 - Check that your API key is correct
 - Ensure you have an internet connection
-- Try using the demo API key `Xr5bFG` first
 
 **"No network calls being made"**
-- Verify you're using a real API key (not the demo one)
+- Verify that the SDK is initialized with the intended account's public API key
 - Check your Klaviyo account dashboard for incoming data
-- Enable debug logging to see more details
+- Check SDK logging and the device console for more details
 
 **"Push notifications not working"**
-- Must use a physical device (not simulator)
+- Use real APNs/FCM delivery to verify background behavior. Simulated notifications do not exercise every delivery path
 - Ensure notification permissions are granted
 - Check that push certificates are configured in Klaviyo
 
