@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Fails unless every Klaviyo native SDK dependency is pinned to a released
 # version (X.Y.Z, or X.Y.Z-alpha/beta/rc with an optional number): no commit
-# SHA, branch, SNAPSHOT or local path on Android; no
-# unversioned podspec dependency; a version requirement (not a revision,
-# branch or path) for klaviyo-swift-sdk in Package.swift; and an example
-# Xcode project whose klaviyo-swift-sdk package reference is a version
-# requirement matching Package.swift.
+# SHA, branch, SNAPSHOT or local path on Android; a version requirement (not a
+# revision, branch or path) for klaviyo-swift-sdk in Package.swift; and an
+# example Xcode project whose klaviyo-swift-sdk package reference is a version
+# requirement matching Package.swift. The podspec's Klaviyo* dependencies must
+# stay at the frozen CocoaPods pin, whatever Package.swift is on.
 #
 # Usage: check-native-pins.sh [repo-root]   (defaults to the current directory)
 set -euo pipefail
@@ -15,6 +15,7 @@ gradle="android/build.gradle.kts"
 podspec="ios/klaviyo_flutter_sdk.podspec"
 pbxproj="example/ios/Runner.xcodeproj/project.pbxproj"
 package="ios/klaviyo_flutter_sdk/Package.swift"
+podspec_pin="~> 5.7.0"
 
 errors=()
 
@@ -23,11 +24,20 @@ if ! [[ "$android" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)(\.?[0-9]+)?)?$ ]]
   errors+=("${gradle}: klaviyoSdkVersion is '${android}', not a released version")
 fi
 
+podspec_deps=0
 while IFS= read -r line; do
-  errors+=("${podspec}: unversioned Klaviyo dependency: ${line}")
-done < <(grep -nE "^[[:space:]]*s\.dependency[[:space:](]+['\"]Klaviyo[A-Za-z]*['\"][[:space:])]*(#.*)?$" "$root/$podspec" || true)
+  podspec_deps=$((podspec_deps + 1))
+  if ! [[ "$line" =~ s\.dependency[[:space:]]*\(?[[:space:]]*[\'\"]Klaviyo[A-Za-z]*[\'\"][[:space:]]*,[[:space:]]*[\'\"]"${podspec_pin}"[\'\"] ]]; then
+    errors+=("${podspec}: Klaviyo dependency is not at the frozen CocoaPods pin '${podspec_pin}': ${line}")
+  fi
+done < <(grep -nE "^[[:space:]]*s\.dependency[[:space:](]+['\"]Klaviyo[A-Za-z]*['\"]" "$root/$podspec" || true)
+if [ "$podspec_deps" -eq 0 ]; then
+  errors+=("${podspec}: no Klaviyo dependencies found")
+fi
 
-if [ -f "$root/$package" ]; then
+if [ ! -f "$root/$package" ]; then
+  errors+=("${package}: not found")
+else
   swift_pin=$(awk '/klaviyo-swift-sdk/ { grab = 1 } grab { print; if (/\)/) exit }' "$root/$package" | tr -d '\n')
   if [ -z "$swift_pin" ]; then
     errors+=("${package}: no klaviyo-swift-sdk package dependency found")
@@ -88,4 +98,5 @@ if [ "${#errors[@]}" -gt 0 ]; then
   exit 1
 fi
 
-echo "Native SDK dependencies are pinned to released versions (Android ${android})"
+ios=$(swift_requirement "$root/$package" 2>/dev/null | awk '{print $2}' || true)
+echo "Native SDK dependencies are pinned to released versions (Android ${android}, iOS ${ios:-unknown}; podspec frozen at ${podspec_pin})"

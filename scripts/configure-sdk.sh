@@ -6,7 +6,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-PODSPEC="$ROOT_DIR/ios/klaviyo_flutter_sdk.podspec"
 PACKAGE_SWIFT="$ROOT_DIR/ios/klaviyo_flutter_sdk/Package.swift"
 BUILD_GRADLE="$ROOT_DIR/android/build.gradle.kts"
 EXAMPLE_PBXPROJ="$ROOT_DIR/example/ios/Runner.xcodeproj/project.pbxproj"
@@ -176,21 +175,6 @@ validate_remote_branch() {
 
 # ─── iOS helpers ──────────────────────────────────────────────────────
 
-# Update podspec dependency versions.
-# $1 = version string (e.g. "~> 5.2.1") or empty to remove version constraint.
-update_podspec_versions() {
-    local version="$1"
-    if [[ -n "$version" ]]; then
-        sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1, '$version'|" "$PODSPEC"
-        sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1, '$version'|" "$PODSPEC"
-        sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1, '$version'|" "$PODSPEC"
-    else
-        sedi -E "s|(s\.dependency 'KlaviyoSwift').*|\1|" "$PODSPEC"
-        sedi -E "s|(s\.dependency 'KlaviyoForms').*|\1|" "$PODSPEC"
-        sedi -E "s|(s\.dependency 'KlaviyoLocation').*|\1|" "$PODSPEC"
-    fi
-}
-
 # Resolve a path to absolute, or error if it doesn't exist.
 resolve_path() {
     local path="$1"
@@ -327,22 +311,14 @@ set_ios_sources() {
 configure_ios_version() {
     local version="$1"
     info "Configuring iOS SDK: published version ${BOLD}$version${NC}"
-    # Preflight version format and every target pin before mutating any file, so
-    # a bad version or missing pin cannot leave the manifests out of sync.
+    # Preflight version format before mutating any file, so a bad version
+    # cannot leave the manifests out of sync.
     if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$ ]]; then
         error "Invalid iOS SDK version: $version (expected semver, e.g. 5.4.0)"
         return 1
     fi
-    local dep
-    for dep in KlaviyoSwift KlaviyoForms KlaviyoLocation; do
-        if ! grep -qE "s\.dependency '$dep'" "$PODSPEC"; then
-            error "Expected podspec dependency '$dep' not found in $PODSPEC"
-            return 1
-        fi
-    done
     set_ios_sources "url: \"$SWIFT_PACKAGE_URL\",
             .upToNextMinor(from: \"$version\")" remote upToNextMinorVersion "$version" || return 1
-    update_podspec_versions "~> $version"
     success "iOS SDK → published version $version"
 }
 
@@ -352,7 +328,6 @@ configure_ios_branch() {
     info "Configuring iOS SDK: branch ${BOLD}$branch${NC}"
     set_ios_sources "url: \"$SWIFT_PACKAGE_URL\",
             branch: \"$branch\"" remote branch "$branch" || return 1
-    update_podspec_versions ""
     success "iOS SDK → branch '$branch'"
 }
 
@@ -361,7 +336,6 @@ configure_ios_commit() {
     info "Configuring iOS SDK: commit ${BOLD}$commit${NC}"
     set_ios_sources "url: \"$SWIFT_PACKAGE_URL\",
             revision: \"$commit\"" remote revision "$commit" || return 1
-    update_podspec_versions ""
     success "iOS SDK → commit '$commit'"
 }
 
@@ -371,7 +345,6 @@ configure_ios_local() {
     info "Configuring iOS SDK: local path ${BOLD}$path${NC}"
     set_ios_sources "name: \"klaviyo-swift-sdk\", path: \"$path\"" \
         local "$(relative_path "$path" "$(dirname "$(dirname "$EXAMPLE_PBXPROJ")")")" || return 1
-    update_podspec_versions ""
     success "iOS SDK → local path '$path'"
 }
 
@@ -454,10 +427,9 @@ show_status() {
     echo ""
 
     # iOS
-    local ios_version
-    ios_version=$(grep -oE "s\.dependency 'KlaviyoSwift'.*" "$PODSPEC" | head -1)
-    printf '%b\n' "  ${CYAN}iOS${NC}:     $ios_version"
-    PACKAGE_SWIFT_DEP_RE="$PACKAGE_SWIFT_DEP_RE" perl -0ne 'if (/($ENV{PACKAGE_SWIFT_DEP_RE})/) { (my $d = $1) =~ s/\s+/ /g; print "          (Package.swift: $d)\n" }' "$PACKAGE_SWIFT"
+    local ios_dep
+    ios_dep=$(PACKAGE_SWIFT_DEP_RE="$PACKAGE_SWIFT_DEP_RE" perl -0ne 'if (/($ENV{PACKAGE_SWIFT_DEP_RE})/) { (my $d = $1) =~ s/\s+/ /g; print "$d" }' "$PACKAGE_SWIFT")
+    printf '%b\n' "  ${CYAN}iOS${NC}:     Package.swift: ${ios_dep:-no klaviyo-swift-sdk dependency}"
     if has_example_package_reference; then
         printf '%s\n' "          (example Xcode project: $(perl -e "$PBXPROJ_TOOL" show "$EXAMPLE_PBXPROJ"))"
     else
@@ -552,7 +524,8 @@ iOS Options:
 
   iOS options rewrite the klaviyo-swift-sdk dependency in ios/klaviyo_flutter_sdk/Package.swift
   and in example/ios/Runner.xcodeproj/project.pbxproj, clear its pin from the example's
-  Package.resolved, and set the podspec's Klaviyo* version constraints.
+  Package.resolved. They never touch ios/klaviyo_flutter_sdk.podspec, whose
+  Klaviyo* pins stay frozen at the last CocoaPods trunk release.
 
 Android Options:
   --android-version VERSION  Use a published Android SDK version (e.g., 4.3.0)
