@@ -11,12 +11,10 @@ import 'models/in_app_form_config.dart';
 import 'models/geofence.dart';
 import 'models/form_lifecycle_event.dart';
 import 'models/auth_token.dart';
-import 'models/klaviyo_push_action.dart';
 import 'models/klaviyo_push_data.dart';
 import 'models/klaviyo_push_opened.dart';
 import 'models/klaviyo_push_token.dart';
 import 'models/profile_property.dart';
-import 'enums/klaviyo_log_level.dart';
 import 'services/background_push_data.dart';
 import 'services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
@@ -35,19 +33,16 @@ class KlaviyoSDK {
     // share the root logger's level. Setting it to true is additive and is
     // the standard pattern for Dart libraries that manage their own log level.
     hierarchicalLoggingEnabled = true;
-    _logger.level = _dartLogLevel;
+    _logger.level = _defaultLogLevel;
   }
 
   // Native wrapper service — singleton, safe to construct eagerly
-  // ignore: deprecated_member_use_from_same_package
   final KlaviyoNativeWrapper _nativeWrapper = KlaviyoNativeWrapper();
   final Logger _logger = Logger('KlaviyoSDK');
 
   // State
   bool _isInitialized = false;
-  String? _apiKey;
-  bool _loggingEnabled = true;
-  Level _dartLogLevel = Level.INFO;
+  static final Level _defaultLogLevel = Level.INFO;
 
   // A single, permanent subscription to native `auth_token_requested` events,
   // attached lazily on first registration and never cancelled. The events flow
@@ -62,7 +57,6 @@ class KlaviyoSDK {
 
   // Getters
   bool get isInitialized => _isInitialized;
-  String? get apiKey => _apiKey;
 
   /// Initialize the Klaviyo SDK with your public API key.
   ///
@@ -72,7 +66,6 @@ class KlaviyoSDK {
     try {
       await _nativeWrapper.initialize(apiKey: apiKey);
 
-      _apiKey = apiKey;
       _isInitialized = true;
       _logger.info('Klaviyo SDK initialized successfully');
 
@@ -294,30 +287,6 @@ class KlaviyoSDK {
   Future<String?> getPushToken() async {
     _ensureInitialized();
     return await _nativeWrapper.getPushToken();
-  }
-
-  /// Handle push notification received
-  @Deprecated(
-    'No longer needed; push tracking is automatic. Will be removed in 1.0.',
-  )
-  Future<void> handlePushNotificationReceived(
-    Map<String, dynamic> userInfo,
-  ) async {
-    _ensureInitialized();
-    // Native SDK handles this automatically
-    _logger.info('Push notification received');
-  }
-
-  /// Handle push notification opened
-  @Deprecated(
-    'No longer needed; push tracking is automatic. Will be removed in 1.0.',
-  )
-  Future<void> handlePushNotificationOpened(
-    Map<String, dynamic> userInfo,
-  ) async {
-    _ensureInitialized();
-    // Native SDK handles this automatically
-    _logger.info('Push notification opened');
   }
 
   /// Register for in-app forms
@@ -639,8 +608,9 @@ class KlaviyoSDK {
     }
   }
 
-  /// Reset the current profile (useful for logout)
-  /// Profile state is managed by the native SDK
+  /// Set the app icon badge count.
+  ///
+  /// iOS only. On Android this is a no-op that logs a warning.
   void setBadgeCount(int count) {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       _ensureInitialized();
@@ -654,18 +624,6 @@ class KlaviyoSDK {
       _logger.warning(
         'Setting badge count via the Klaviyo SDK is unsupported on Android.',
       );
-    }
-  }
-
-  /// Set log level for Flutter-side logging only
-  /// Note: This only affects Flutter console logs, not native SDK logs.
-  /// While logging is disabled via [setLoggingEnabled], the new level is
-  /// stored and takes effect once logging is re-enabled.
-  @Deprecated('Use setLoggingEnabled instead. Will be removed in 1.0.')
-  void setLogLevel(KlaviyoLogLevel logLevel) {
-    _dartLogLevel = logLevel.toLevel();
-    if (_loggingEnabled) {
-      _logger.level = _dartLogLevel;
     }
   }
 
@@ -690,8 +648,7 @@ class KlaviyoSDK {
 
     // Only mirror the state on the Dart side once the native call succeeds,
     // so Dart and native logging can't disagree after a failure.
-    _loggingEnabled = enabled;
-    _logger.level = enabled ? _dartLogLevel : Level.OFF;
+    _logger.level = enabled ? _defaultLogLevel : Level.OFF;
   }
 
   /// Whether native SDK logging is currently enabled.
@@ -736,23 +693,6 @@ class KlaviyoSDK {
       handlerHandle: handles['handlerHandle']!,
     );
   }
-
-  /// Get push notification events stream
-  ///
-  /// `silent_push_received` events carry the same pushes as [onPushData] and
-  /// fire only while the app is in the foreground.
-  ///
-  /// A `push_notification_opened` event that arrives before anyone subscribes
-  /// (for example, the tap that launched the app) is buffered; only the most
-  /// recent one is kept. The first subscriber receives it once, then the
-  /// buffer is cleared, so later subscribers don't receive it. Use
-  /// [getInitialPushNotification] to read the launch tap whenever you need it.
-  @Deprecated(
-    'Use onPushToken for tokens and token errors, onPushOpened for opens, '
-    'and onPushData for silent pushes. Will be removed in 1.0.',
-  )
-  Stream<Map<String, dynamic>> get onPushNotification =>
-      _nativeWrapper.onPushNotification;
 
   /// Push tokens delivered by the platform.
   ///
@@ -847,10 +787,6 @@ class KlaviyoSDK {
     }
   }
 
-  /// Get form events stream
-  @Deprecated('Use onFormLifecycleEvent instead. Will be removed in 1.0.')
-  Stream<Map<String, dynamic>> get onFormEvent => _nativeWrapper.onFormEvent;
-
   /// Get typed form lifecycle events stream.
   ///
   /// Filters for `form_lifecycle_event` type and parses the native map into a
@@ -868,60 +804,12 @@ class KlaviyoSDK {
         }
       });
 
-  /// Get typed push action events stream.
-  ///
-  /// Emits a [KlaviyoPushAction] when a user taps a push whose action opens an
-  /// external web URL ([OpenWebUrl]), or taps an action button on a push
-  /// ([ActionButtonTapped]). Filters for the `push_open_web_url` and
-  /// `push_action_button_tapped` event types and parses the native map.
-  /// Malformed events are logged and dropped rather than crashing the stream.
-  ///
-  /// A push action that arrives before anyone subscribes is buffered; only the
-  /// most recent one is kept, and each new push open clears it. The first
-  /// subscriber receives it once, then the buffer is cleared, so later
-  /// subscribers don't receive it. Use [getInitialPushNotification] to read
-  /// the launch tap whenever you need it.
-  @Deprecated(
-    'Use onPushOpened instead; it carries the tapped button or web URL. '
-    'Will be removed in 1.0.',
-  )
-  Stream<KlaviyoPushAction> get onPushAction => _nativeWrapper.onPushActionEvent
-          .where(
-        (event) =>
-            event['type'] == 'push_open_web_url' ||
-            event['type'] == 'push_action_button_tapped',
-      )
-          .expand((event) {
-        try {
-          return [KlaviyoPushAction.fromMap(event)];
-        } catch (e) {
-          _logger.warning('Dropping malformed push action event: $e');
-          return [];
-        }
-      });
-
   /// Private methods
   void _ensureInitialized() {
     if (!_isInitialized) {
       throw const KlaviyoException(
         'SDK not initialized. Call initialize() first.',
       );
-    }
-  }
-
-  /// Unregisters the auth token provider, if one is registered.
-  ///
-  /// Event streams stay open, so the SDK keeps working after this call.
-  @Deprecated('No longer needed. Will be removed in 1.0.')
-  void dispose() {
-    if (_authTokenProvider != null) {
-      _authTokenProvider = null;
-      // dispose() is synchronous; fire-and-forget the native unregister.
-      _nativeWrapper.unregisterAuthTokenProvider().catchError((Object e) {
-        _logger.warning(
-          'Failed to unregister auth token provider on dispose: $e',
-        );
-      });
     }
   }
 }

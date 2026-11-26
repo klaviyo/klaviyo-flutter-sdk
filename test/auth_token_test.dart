@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:klaviyo_flutter_sdk/src/models/auth_token.dart';
 
 /// Error exposing an explicit connectivity marker, used to verify the marker
 /// is authoritative over auto-detection in both directions.

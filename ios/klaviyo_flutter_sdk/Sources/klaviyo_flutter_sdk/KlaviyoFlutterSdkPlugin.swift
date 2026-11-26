@@ -57,7 +57,6 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedError: [String: Any]?
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
-    private var cachedPushAction: [String: Any]?
 
     // Background push data state, used by KlaviyoFlutterSdkPlugin+BackgroundPushData.swift.
     var backgroundChannel: FlutterMethodChannel?
@@ -609,10 +608,6 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedSilentPush)
             self.cachedSilentPush = nil
         }
-        if let cachedPushAction {
-            events(cachedPushAction)
-            self.cachedPushAction = nil
-        }
     }
 }
 
@@ -741,15 +736,10 @@ extension KlaviyoFlutterSdkPlugin {
         if response.actionIdentifier == UNNotificationDismissActionIdentifier {
             Logger.klaviyoFlutterSDK.info("Push notification dismissed")
             cachedOpenedNotification = nil
-            cachedPushAction = nil
             return
         }
         Logger.klaviyoFlutterSDK.info("Push notification opened")
 
-        // Each notification interaction supersedes any push action still cached
-        // for a not-yet-ready Flutter listener, including when this interaction
-        // produces no push-action payload (e.g. a deep-link body tap).
-        cachedPushAction = nil
         let pushAction = pushActionPayload(for: response, userInfo: userInfo)
 
         // 1. Prepare Payload, with the tapped button or web URL under `action`
@@ -772,12 +762,6 @@ extension KlaviyoFlutterSdkPlugin {
         } else {
             Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching notification open event.")
             cachedOpenedNotification = eventPayload
-        }
-
-        // 3. Surface the open_url action / action-button tap as a typed push action
-        // event, in parallel with the raw opened-notification event above.
-        if let pushAction {
-            forwardPushAction(pushAction)
         }
     }
 
@@ -823,8 +807,8 @@ extension KlaviyoFlutterSdkPlugin {
                 )
                 return nil
             }
-            // Dart's KlaviyoPushAction.fromMap requires `action`, so drop
-            // incomplete taps here with a log rather than silently downstream.
+            // Dart's KlaviyoPushOpened.fromMap needs `action` to build the
+            // button, so drop incomplete taps here with a log.
             guard let action = button["action"] as? String else {
                 Logger.klaviyoFlutterSDK.warning(
                     "Action button '\(actionIdentifier)' has no action type; dropping tap."
@@ -845,16 +829,6 @@ extension KlaviyoFlutterSdkPlugin {
         }
 
         return eventPayload
-    }
-
-    /// Sends a push-action event to Flutter, or caches it until Flutter listens.
-    private func forwardPushAction(_ eventPayload: [String: Any]) {
-        if let eventSink, !waitingForUI {
-            eventSink(eventPayload)
-        } else {
-            Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push action event.")
-            cachedPushAction = eventPayload
-        }
     }
 
     /// Routes Klaviyo push data by app state, like `handleSilentPush(userInfo:fetchCompletionHandler:)`,

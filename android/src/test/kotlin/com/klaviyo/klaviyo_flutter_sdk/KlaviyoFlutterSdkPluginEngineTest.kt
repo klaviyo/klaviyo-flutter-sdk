@@ -123,9 +123,7 @@ class KlaviyoFlutterSdkPluginEngineTest {
 
         fun pushOpens() = messenger.sent.filter { it["type"] == "push_notification_opened" }
 
-        fun pushActions() = messenger.sent.filter { it["type"] == "push_action_button_tapped" }
-
-        fun webUrlOpens() = messenger.sent.filter { it["type"] == "push_open_web_url" }
+        fun pushActions() = messenger.sent.filter { it["type"] == "push_action_button_tapped" || it["type"] == "push_open_web_url" }
 
         fun registerForms() =
             plugin.onMethodCall(
@@ -298,7 +296,8 @@ class KlaviyoFlutterSdkPluginEngineTest {
         ui.listen()
         assertSame(ui.plugin, KlaviyoFlutterSdkPlugin.instance)
         assertEquals(1, ui.pushOpens().size)
-        assertEquals(1, ui.pushActions().size)
+        assertEquals("push_action_button_tapped", (ui.pushOpens().single()["action"] as Map<*, *>)["type"])
+        assertEquals(0, ui.pushActions().size)
         assertEquals(1, ui.messenger.sent.count { it["type"] == "silent_push_received" })
     }
 
@@ -324,7 +323,8 @@ class KlaviyoFlutterSdkPluginEngineTest {
         headless.listen()
 
         assertEquals(1, headless.pushOpens().size)
-        assertEquals(1, headless.pushActions().size)
+        assertEquals("push_action_button_tapped", (headless.pushOpens().single()["action"] as Map<*, *>)["type"])
+        assertEquals(0, headless.pushActions().size)
         assertEquals(1, headless.messenger.sent.count { it["type"] == "silent_push_received" })
     }
 
@@ -346,19 +346,20 @@ class KlaviyoFlutterSdkPluginEngineTest {
     }
 
     @Test
-    fun `held push open and action replay once`() {
+    fun `held push open replays once with its action and no standalone action event`() {
         val ui = attach()
         ui.attachActivity(pushOpenIntent(buttonId = "btn-1"))
 
         ui.listen()
 
         assertEquals(1, ui.pushOpens().size)
-        assertEquals(1, ui.pushActions().size)
+        assertEquals("push_action_button_tapped", (ui.pushOpens().single()["action"] as Map<*, *>)["type"])
+        assertEquals(0, ui.pushActions().size)
 
         ui.cancel()
         ui.listen()
         assertEquals(1, ui.pushOpens().size)
-        assertEquals(1, ui.pushActions().size)
+        assertEquals(0, ui.pushActions().size)
     }
 
     @Test
@@ -451,7 +452,7 @@ class KlaviyoFlutterSdkPluginEngineTest {
     }
 
     @Test
-    fun `web-link tap with two engines attached emits one open and one action to the primary`() {
+    fun `web-link tap with two engines attached emits one open carrying its action to the primary`() {
         val primary = attach()
         primary.attachActivity()
         primary.listen()
@@ -460,10 +461,11 @@ class KlaviyoFlutterSdkPluginEngineTest {
 
         webLinkTap()
 
-        assertEquals(1, primary.webUrlOpens().size)
-        assertEquals(mapOf("url" to "https://example.com"), primary.webUrlOpens().single()["data"])
         assertEquals(1, primary.pushOpens().size)
-        assertEquals(primary.webUrlOpens().single(), primary.pushOpens().single()["action"])
+        val action = primary.pushOpens().single()["action"] as Map<*, *>
+        assertEquals("push_open_web_url", action["type"])
+        assertEquals(mapOf("url" to "https://example.com"), action["data"])
+        assertEquals(0, primary.pushActions().size)
         assertEquals(mapOf("web_url" to "https://example.com"), primary.pushOpens().single()["data"])
         assertEquals(0, secondary.messenger.sent.size)
     }
@@ -490,7 +492,8 @@ class KlaviyoFlutterSdkPluginEngineTest {
         engine.listen()
 
         assertEquals(1, engine.pushOpens().size)
-        assertEquals(0, engine.webUrlOpens().size)
+        assertNull(engine.pushOpens().single()["action"])
+        assertEquals(0, engine.pushActions().size)
     }
 
     @Test
@@ -507,9 +510,8 @@ class KlaviyoFlutterSdkPluginEngineTest {
         later.listen()
 
         assertEquals(1, engine.pushOpens().size)
-        assertEquals(1, engine.pushActions().size)
-        val action = engine.pushActions().single()
-        assertEquals(action, engine.pushOpens().single()["action"])
+        assertEquals(0, engine.pushActions().size)
+        val action = engine.pushOpens().single()["action"] as Map<*, *>
         assertEquals(
             mapOf("id" to "b1", "action" to "open_url", "url" to "https://example.com/shop", "label" to "Shop"),
             action["data"],

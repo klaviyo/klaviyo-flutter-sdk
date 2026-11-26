@@ -6,6 +6,21 @@
 
 - **iOS: minimum deployment target raised from 13.0 to 15.0** — `Package.swift` and the podspec now declare iOS 15.0, matching the README. Apps must set their iOS deployment target to 15.0 or higher. iOS 15 runs on every device that runs iOS 13 (iPhone 6s and newer), so no devices are dropped. The plugin's iOS 13 code paths are gone; logging that used to be skipped below iOS 14 now always runs.
 
+These APIs are removed. Most were deprecated in 0.6.0. See the [Migration Guide](MIGRATION_GUIDE.md#migrating-to-v100) for replacements.
+
+- **`KlaviyoSDK.handlePushNotificationReceived` and `KlaviyoSDK.handlePushNotificationOpened`** are removed. They only logged a message; push tracking is automatic.
+- **The `Klaviyo` compatibility class** (`Klaviyo.instance`, from the `klaviyo_flutter` community package) is removed. Use `KlaviyoSDK()`; [MIGRATION.md](MIGRATION.md) maps each method.
+- **`KlaviyoSDK.onFormEvent`** is removed. Use `onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s.
+- **`KlaviyoSDK.dispose()`** is removed. To stop supplying tokens for personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()`. Otherwise, delete the call.
+- **`KlaviyoNativeWrapper` is no longer exported**, along with its `dispose()` and `track()`. Use `KlaviyoSDK`.
+- **`KlaviyoSDK.setLogLevel` and the `KlaviyoLogLevel` enum** are removed. Use `setLoggingEnabled(bool)`, and on Android the `com.klaviyo.core.log_level` manifest meta-data for native verbosity.
+- **`KlaviyoSDK.onPushNotification` and `KlaviyoSDK.onPushAction` are removed, along with `KlaviyoPushAction`, `OpenWebUrl` and `ActionButtonTapped`.** Use `onPushToken`, `onPushOpened` and `onPushData`. The native plugins no longer send a separate `push_action_button_tapped` or `push_open_web_url` event, because only `onPushAction` read it. The same tap is still carried under `action` on the `push_notification_opened` event that `onPushOpened` reads.
+- **The nine `KlaviyoException` subclasses are removed**: `KlaviyoNotInitializedException`, `KlaviyoInvalidApiKeyException`, `KlaviyoNetworkException`, `KlaviyoProfileException`, `KlaviyoEventException`, `KlaviyoPushException`, `KlaviyoFormException`, `KlaviyoConfigurationException` and `KlaviyoPermissionException`. Apart from one internal not-initialized check, which now throws `KlaviyoException`, the SDK never threw them. Catch `KlaviyoException`.
+- **`KlaviyoException.originalError` is now `Object?`** instead of `dynamic`.
+- **The public package exports only `AuthTokenProvider` from `auth_token.dart`.** `ClassifiedProviderError`, `classifyAuthTokenProviderError` and `parseAuthTokenRequestedEventId` are internal.
+- **`InAppFormConfig.copyWith` no longer takes `isInfinite`.** Passing a duration makes the copy finite, a call with no arguments keeps the original timeout (including infinite), and `InAppFormConfig.infinite()` makes an infinite config. The `isInfinite` getter stays.
+- **`KlaviyoSDK.apiKey` is removed.** The native SDKs own the API key.
+
 ### Platform Support
 
 - **iOS**: Minimum deployment target 15.0

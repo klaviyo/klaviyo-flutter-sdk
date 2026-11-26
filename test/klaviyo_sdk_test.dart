@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
+import 'package:klaviyo_flutter_sdk/src/services/klaviyo_native_wrapper.dart';
 import 'package:logging/logging.dart';
 
 void main() {
@@ -45,7 +46,7 @@ void main() {
   group('KlaviyoSDK logging toggle', () {
     test('setLoggingEnabled works before initialize', () async {
       expect(KlaviyoSDK().isInitialized, isFalse);
-      // Must not throw KlaviyoNotInitializedException
+      // Must not throw the not-initialized KlaviyoException
       await expectLater(KlaviyoSDK().setLoggingEnabled(false), completes);
       await KlaviyoSDK().setLoggingEnabled(true);
     });
@@ -166,19 +167,10 @@ void main() {
   });
 
   group('KlaviyoSDK.initialize', () {
-    test('initializes and sets apiKey', () async {
+    test('initializes', () async {
       final sdk = KlaviyoSDK();
       await sdk.initialize(apiKey: 'KEY_1');
       expect(sdk.isInitialized, isTrue);
-      expect(sdk.apiKey, 'KEY_1');
-    });
-
-    test('re-initialization updates apiKey', () async {
-      final sdk = KlaviyoSDK();
-      await sdk.initialize(apiKey: 'KEY_1');
-      await sdk.initialize(apiKey: 'KEY_2');
-      expect(sdk.isInitialized, isTrue);
-      expect(sdk.apiKey, 'KEY_2');
     });
 
     test('re-initialization forwards new key to native layer', () async {
@@ -192,7 +184,7 @@ void main() {
       expect(initCalls[1].arguments['apiKey'], 'KEY_2');
     });
 
-    test('failed re-initialization preserves previous apiKey', () async {
+    test('failed re-initialization keeps the SDK initialized', () async {
       final sdk = KlaviyoSDK();
       await sdk.initialize(apiKey: 'KEY_1');
 
@@ -209,7 +201,7 @@ void main() {
         sdk.initialize(apiKey: 'KEY_BAD'),
         throwsA(isA<KlaviyoException>()),
       );
-      expect(sdk.apiKey, 'KEY_1');
+      expect(sdk.isInitialized, isTrue);
     });
   });
 

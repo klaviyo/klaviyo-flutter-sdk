@@ -17,6 +17,80 @@ The plugin now requires iOS 15.0 or later; 0.x declared 13.0. Builds fail if you
 
 iOS 15 supports the same devices as iOS 13 (iPhone 6s and newer), so this doesn't drop any devices. Flutter itself requires iOS 15 as of 3.47.
 
+### API removals
+
+1.0 removes APIs deprecated in 0.6.0 and additional APIs listed below. Fix the 0.6.0 deprecation warnings, then work through the table.
+
+| Removed | Replacement |
+|---|---|
+| `KlaviyoSDK().handlePushNotificationReceived(...)` | Delete the call. Push tracking is automatic. |
+| `KlaviyoSDK().handlePushNotificationOpened(...)` | Delete the call. Push opens are tracked automatically and arrive on `onPushOpened`. |
+| The `Klaviyo` class (`Klaviyo.instance`) | `KlaviyoSDK()`. [MIGRATION.md](./MIGRATION.md#quick-reference) maps every method. |
+| `KlaviyoSDK().onFormEvent` | `KlaviyoSDK().onFormLifecycleEvent`, which emits typed `FormLifecycleEvent`s instead of raw maps. |
+| `KlaviyoSDK().dispose()` | Delete the call. If you used it to stop supplying tokens for personalized forms, call `await KlaviyoSDK().unregisterAuthTokenProvider()`. To cancel your own listeners, cancel their `StreamSubscription`s. |
+| `KlaviyoNativeWrapper` (including its `dispose()` and `track()`) | `KlaviyoSDK()`. The class is internal and no longer exported. Use `createEvent(KlaviyoEvent.custom(...))` in place of `track()`. |
+| `KlaviyoSDK().setLogLevel(...)` and the `KlaviyoLogLevel` enum | `KlaviyoSDK().setLoggingEnabled(bool)` turns native and Dart logging on or off. For native verbosity on Android, set the `com.klaviyo.core.log_level` manifest meta-data (see the README's Android troubleshooting). |
+| `KlaviyoSDK().onPushNotification`, `push_token_received` and `push_token_error` events | `KlaviyoSDK().onPushToken`. Each `KlaviyoPushToken` contains a token string and its APNs or FCM type. Registration failures arrive through `onError` as a `KlaviyoException` with code `PUSH_TOKEN_ERROR`. |
+| `KlaviyoSDK().onPushNotification`, `push_notification_opened` events | `KlaviyoSDK().onPushOpened`, which emits a `KlaviyoPushOpened` with the push `payload`. |
+| `KlaviyoSDK().onPushNotification`, `silent_push_received` events | `KlaviyoSDK().onPushData` in the foreground. Use `KlaviyoSDK.onBackgroundPushData` for background delivery. Both receive `KlaviyoPushData`. |
+| `KlaviyoSDK().onPushAction` | `KlaviyoSDK().onPushOpened`. The action is on the same event, so a tap emits one event instead of two. |
+| `KlaviyoPushAction` | `KlaviyoPushOpened`, which says what was tapped in `tap`. |
+| `OpenWebUrl` (`url`) | `KlaviyoPushOpened` with `tap == KlaviyoPushTap.webUrl`. Read `webUrl`. |
+| `ActionButtonTapped` (`buttonId`, `label`, `action`, `url`) | `KlaviyoPushOpened.button`. If present, read `id`, `label`, `action` (a `KlaviyoPushButtonAction`) and `url`. The button may also be set for a web URL tap. |
+| `KlaviyoNotInitializedException`, `KlaviyoInvalidApiKeyException`, `KlaviyoNetworkException`, `KlaviyoProfileException`, `KlaviyoEventException`, `KlaviyoPushException`, `KlaviyoFormException`, `KlaviyoConfigurationException`, `KlaviyoPermissionException` | `KlaviyoException`. Catch `KlaviyoException` and check `code` for errors that provide one. |
+| `KlaviyoException.originalError` typed `dynamic` | Same field, now typed `Object?`. Code that called members on it without a check or cast stops compiling. |
+| `ClassifiedProviderError`, `classifyAuthTokenProviderError` and `parseAuthTokenRequestedEventId` | None. These were internal helpers for the auth token bridge. The public package now exports only `AuthTokenProvider` from `auth_token.dart`. |
+| `InAppFormConfig.copyWith(isInfinite: ...)` | Use `InAppFormConfig.infinite()` for an infinite config. Pass `sessionTimeoutDuration` to `copyWith` for a finite one. A `copyWith()` with no arguments keeps an infinite config infinite. |
+| `KlaviyoSDK().apiKey` | None. Keep the key in your own code if you need it after `initialize()`. The native SDKs own that state. |
+
+Before and after, for push opens:
+
+```dart
+// Before
+KlaviyoSDK().onPushNotification.listen((event) {
+  if (event['type'] == 'push_notification_opened') {
+    handleOpen(event['data']);
+  }
+});
+KlaviyoSDK().onPushAction.listen((action) {
+  switch (action) {
+    case OpenWebUrl(): logUrl(action.url);
+    case ActionButtonTapped(): logButton(action.buttonId);
+  }
+});
+
+// After
+KlaviyoSDK().onPushOpened.listen((opened) {
+  handleOpen(opened.payload);
+  switch (opened.tap) {
+    case KlaviyoPushTap.webUrl: handleUrl(opened.webUrl!);
+    default: break;
+  }
+  final button = opened.button;
+  if (button != null) {
+    handleButton(button.id);
+  }
+});
+```
+
+For the form stream:
+
+```dart
+// Before
+KlaviyoSDK().onFormEvent.listen((event) {
+  if (event['type'] == 'form_lifecycle_event') { ... }
+});
+
+// After
+KlaviyoSDK().onFormLifecycleEvent.listen((event) {
+  switch (event) {
+    case FormShown(): ...
+    case FormDismissed(): ...
+    case FormCtaClicked(): ...
+  }
+});
+```
+
 ## Migrating to v0.6.0
 
 - `KlaviyoProfile.toJson` now nests custom properties under `properties` instead of merging them into the top level, so code that reads custom keys from its output must read them from `json['properties']`; `KlaviyoProfile.fromJson` still accepts the old flat shape, but ignores unknown top-level keys when a nested `properties` map is present.

@@ -1,3 +1,5 @@
+import '../klaviyo_sdk.dart';
+
 /// Extensions on [Map] for Klaviyo push notification detection.
 extension KlaviyoNotificationMap on Map<String, dynamic> {
   /// Whether this map represents a Klaviyo push notification.

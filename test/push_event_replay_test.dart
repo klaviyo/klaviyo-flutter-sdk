@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use_from_same_package
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,97 +58,66 @@ void main() {
 
   group('cold-start stream delivery', () {
     test(
-      'the first subscriber gets the buffered open and action once',
+      'the first subscriber gets the buffered open, with its action, once',
       () async {
         expect(sink, isNotNull);
-        sink!
-          ..success(opened('first'))
-          ..success(buttonTap('btn1'));
+        sink!.success({...opened('first'), 'action': buttonTap('btn1')});
         await pumpEventQueue();
 
         final sdk = KlaviyoSDK();
-        final firstOpens = <Map<String, dynamic>>[];
-        final secondOpens = <Map<String, dynamic>>[];
-        final firstActions = <KlaviyoPushAction>[];
-        final secondActions = <KlaviyoPushAction>[];
+        final firstOpens = <KlaviyoPushOpened>[];
+        final secondOpens = <KlaviyoPushOpened>[];
 
-        final subs = [
-          sdk.onPushNotification.listen(firstOpens.add),
-          sdk.onPushAction.listen(firstActions.add),
-        ];
+        final firstSub = sdk.onPushOpened.listen(firstOpens.add);
         await pumpEventQueue();
-        subs.addAll([
-          sdk.onPushNotification.listen(secondOpens.add),
-          sdk.onPushAction.listen(secondActions.add),
-        ]);
+        final secondSub = sdk.onPushOpened.listen(secondOpens.add);
         await pumpEventQueue();
 
-        expect(firstOpens.map((e) => e['data']['id']), ['first']);
-        expect((firstActions.single as ActionButtonTapped).buttonId, 'btn1');
+        expect(firstOpens.map((e) => e.payload['id']), ['first']);
+        expect(firstOpens.single.tap, KlaviyoPushTap.actionButton);
+        expect(firstOpens.single.button?.id, 'btn1');
         expect(secondOpens, isEmpty);
-        expect(secondActions, isEmpty);
 
-        for (final sub in subs) {
-          await sub.cancel();
-        }
+        await firstSub.cancel();
+        await secondSub.cancel();
 
-        final later = <Map<String, dynamic>>[];
-        final laterSub = sdk.onPushNotification.listen(later.add);
+        final later = <KlaviyoPushOpened>[];
+        final laterSub = sdk.onPushOpened.listen(later.add);
         await pumpEventQueue();
         expect(later, isEmpty);
         await laterSub.cancel();
       },
     );
 
-    test(
-      'only the newest open is buffered, and an open clears the action',
-      () async {
-        sink!
-          ..success(opened('older'))
-          ..success(buttonTap('btn2'))
-          ..success(opened('newer'));
-        await pumpEventQueue();
-
-        final sdk = KlaviyoSDK();
-        final opens = <Map<String, dynamic>>[];
-        final actions = <KlaviyoPushAction>[];
-        final subs = [
-          sdk.onPushNotification.listen(opens.add),
-          sdk.onPushAction.listen(actions.add),
-        ];
-        await pumpEventQueue();
-
-        expect(opens.map((e) => e['data']['id']), ['newer']);
-        expect(actions, isEmpty);
-
-        for (final sub in subs) {
-          await sub.cancel();
-        }
-      },
-    );
-
-    test('resetProfile drops the buffered open and action', () async {
+    test('only the newest open is buffered', () async {
       sink!
-        ..success(opened('before-reset'))
-        ..success(buttonTap('btn-reset'));
+        ..success({...opened('older'), 'action': buttonTap('btn2')})
+        ..success(opened('newer'));
+      await pumpEventQueue();
+
+      final opens = <KlaviyoPushOpened>[];
+      final sub = KlaviyoSDK().onPushOpened.listen(opens.add);
+      await pumpEventQueue();
+
+      expect(opens.map((e) => e.payload['id']), ['newer']);
+      expect(opens.single.tap, KlaviyoPushTap.notification);
+
+      await sub.cancel();
+    });
+
+    test('resetProfile drops the buffered open', () async {
+      sink!.success({...opened('before-reset'), 'action': buttonTap('btn-r')});
       await pumpEventQueue();
 
       final sdk = KlaviyoSDK();
       await sdk.resetProfile();
 
-      final opens = <Map<String, dynamic>>[];
-      final actions = <KlaviyoPushAction>[];
-      final subs = [
-        sdk.onPushNotification.listen(opens.add),
-        sdk.onPushAction.listen(actions.add),
-      ];
+      final opens = <KlaviyoPushOpened>[];
+      final sub = sdk.onPushOpened.listen(opens.add);
       await pumpEventQueue();
 
       expect(opens, isEmpty);
-      expect(actions, isEmpty);
-      for (final sub in subs) {
-        await sub.cancel();
-      }
+      await sub.cancel();
     });
 
     test('token events still go to the first subscriber only', () async {
@@ -161,14 +128,14 @@ void main() {
       await pumpEventQueue();
 
       final sdk = KlaviyoSDK();
-      final first = <Map<String, dynamic>>[];
-      final second = <Map<String, dynamic>>[];
-      final firstSub = sdk.onPushNotification.listen(first.add);
+      final first = <KlaviyoPushToken>[];
+      final second = <KlaviyoPushToken>[];
+      final firstSub = sdk.onPushToken.listen(first.add);
       await pumpEventQueue();
-      final secondSub = sdk.onPushNotification.listen(second.add);
+      final secondSub = sdk.onPushToken.listen(second.add);
       await pumpEventQueue();
 
-      expect(first.map((e) => e['type']), ['push_token_received']);
+      expect(first.single.token, 'abc');
       expect(second, isEmpty);
 
       await firstSub.cancel();
@@ -233,9 +200,6 @@ void main() {
 
         await firstSub.cancel();
         await secondSub.cancel();
-        final drain = KlaviyoSDK().onPushNotification.listen((_) {});
-        await pumpEventQueue();
-        await drain.cancel();
       },
     );
   });
@@ -254,11 +218,11 @@ void main() {
         await pumpEventQueue();
 
         final sdk = KlaviyoSDK();
-        final opens = <Map<String, dynamic>>[];
-        final sub = sdk.onPushNotification.listen(opens.add);
+        final opens = <KlaviyoPushOpened>[];
+        final sub = sdk.onPushOpened.listen(opens.add);
         await pumpEventQueue();
         await sub.cancel();
-        expect(opens.map((e) => e['data']['id']), ['launch']);
+        expect(opens.map((e) => e.payload['id']), ['launch']);
 
         final first = await sdk.getInitialPushNotification();
         final second = await sdk.getInitialPushNotification();

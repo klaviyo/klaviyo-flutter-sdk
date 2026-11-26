@@ -458,7 +458,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     _buildProfileValueRow(
                       'profile_current_company_id_text',
                       'Company ID',
-                      _klaviyo.apiKey,
+                      _apiKeyController.text.trim(),
                     ),
                     _buildProfileValueRow(
                       'profile_current_email_text',
