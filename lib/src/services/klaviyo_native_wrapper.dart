@@ -10,6 +10,11 @@ import '../utils/channel_value_sanitizer.dart';
 import '../utils/profile_payload.dart';
 import 'package:logging/logging.dart';
 
+const _maxBufferedPushEvents = 50;
+
+@Deprecated(
+  'Use KlaviyoSDK instead; this class becomes internal. Will be removed in 1.0.',
+)
 class KlaviyoNativeWrapper {
   static const MethodChannel _channel = MethodChannel('klaviyo_sdk');
   static const EventChannel _eventChannel = EventChannel('klaviyo_events');
@@ -28,16 +33,43 @@ class KlaviyoNativeWrapper {
 
   // Stream controllers for native events – buffer events that arrive
   // before any listener subscribes, then flush on first subscription.
+  // The pending push open and the pending push action take one slot each.
   final _pushNotificationController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (event) => event['type'] == 'push_notification_opened'
+        ? 'push_notification_opened'
+        : null,
+  );
   final _formEventController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _authTokenRequestController =
       BufferedBroadcastStreamController<Map<String, dynamic>>();
   final _pushActionController =
-      BufferedBroadcastStreamController<Map<String, dynamic>>();
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (_) => 'push_action',
+  );
+  final _pushTokenController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    maxBuffered: _maxBufferedPushEvents,
+  );
+  final _pushOpenedController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    holdKey: (_) => 'push_notification_opened',
+  );
+  final _pushDataController =
+      BufferedBroadcastStreamController<Map<String, dynamic>>(
+    maxBuffered: _maxBufferedPushEvents,
+  );
 
   // Getters for streams
+
+  /// Push token, token error, silent push and push opened events.
+  ///
+  /// A `push_notification_opened` event that arrives while no listener is
+  /// subscribed is buffered; only the most recent one is kept. The first
+  /// subscriber receives it once, then the buffer is cleared, so later
+  /// subscribers don't receive it. Use [getInitialPushNotification] to read
+  /// the tap that launched the app at any time.
   Stream<Map<String, dynamic>> get onPushNotification =>
       _pushNotificationController.stream;
 
@@ -55,13 +87,40 @@ class KlaviyoNativeWrapper {
   /// `push_action_button_tapped`). Kept on a dedicated stream so they do not
   /// surface on [onPushNotification]; see [KlaviyoSDK.onPushAction] for the
   /// typed view.
+  ///
+  /// A push action that arrives while no listener is subscribed is buffered;
+  /// only the most recent one is kept, and each new push open clears it. The
+  /// first subscriber receives it once, then the buffer is cleared, so later
+  /// subscribers don't receive it.
   Stream<Map<String, dynamic>> get onPushActionEvent =>
       _pushActionController.stream;
 
+  /// Raw `push_token_received` and `push_token_error` events backing
+  /// [KlaviyoSDK.onPushToken]. Events that arrive before any listener
+  /// subscribes go to the first subscriber.
+  @internal
+  Stream<Map<String, dynamic>> get onPushTokenEvent =>
+      _pushTokenController.stream;
+
+  /// Raw `push_notification_opened` events backing [KlaviyoSDK.onPushOpened].
+  ///
+  /// An open that arrives before any listener subscribes is held; only the
+  /// most recent one is kept. The first subscriber receives it once, then the
+  /// hold clears, so later subscribers don't receive it. Use
+  /// [getInitialPushNotification] to read the tap that launched the app.
+  @internal
+  Stream<Map<String, dynamic>> get onPushOpenedEvent =>
+      _pushOpenedController.stream;
+
+  /// Raw `silent_push_received` events backing [KlaviyoSDK.onPushData].
+  /// Events that arrive before any listener subscribes go to the first
+  /// subscriber.
+  @internal
+  Stream<Map<String, dynamic>> get onPushDataEvent =>
+      _pushDataController.stream;
+
   /// Initialize the native SDK wrapper
-  Future<void> initialize({
-    required String apiKey,
-  }) async {
+  Future<void> initialize({required String apiKey}) async {
     try {
       // Set up event listener only once — re-subscribing would cause duplicate
       // events or orphaned subscriptions. Use a dedicated flag rather than
@@ -72,9 +131,7 @@ class KlaviyoNativeWrapper {
       }
 
       // Always forward to native — allows re-initialization with a new API key
-      await _channel.invokeMethod('initialize', {
-        'apiKey': apiKey,
-      });
+      await _channel.invokeMethod('initialize', {'apiKey': apiKey});
 
       _apiKey = apiKey;
       _isInitialized = true;
@@ -263,9 +320,7 @@ class KlaviyoNativeWrapper {
     _ensureInitialized();
 
     try {
-      await _channel.invokeMethod('setPushToken', {
-        'token': token,
-      });
+      await _channel.invokeMethod('setPushToken', {'token': token});
     } catch (e) {
       throw KlaviyoException('Failed to set push token: $e');
     }
@@ -281,6 +336,27 @@ class KlaviyoNativeWrapper {
       return result;
     } catch (e) {
       throw KlaviyoException('Failed to get push token: $e');
+    }
+  }
+
+  /// The push notification tap that launched or relaunched the app from a
+  /// killed state, or `null` if the app wasn't launched by a push tap.
+  ///
+  /// The map has the same shape as the `push_notification_opened` event on
+  /// [onPushNotification]. The same value is returned on every call for the
+  /// life of the process, whether or not a stream subscriber already received
+  /// that event. Taps while the app is running never set it, and
+  /// [resetProfile] clears it.
+  ///
+  /// Callable before initialize().
+  Future<Map<String, dynamic>?> getInitialPushNotification() async {
+    try {
+      final result = await _channel.invokeMethod<Object?>(
+        'getInitialPushNotification',
+      );
+      return result == null ? null : _deepConvertMap(result);
+    } catch (e) {
+      throw KlaviyoException('Failed to get initial push notification: $e');
     }
   }
 
@@ -443,19 +519,23 @@ class KlaviyoNativeWrapper {
 
     try {
       await _channel.invokeMethod('resetProfile');
+      _pushNotificationController.clearHeld();
+      _pushActionController.clearHeld();
+      _pushOpenedController.clearHeld();
     } catch (e) {
       throw KlaviyoException('Failed to reset profile: $e');
     }
   }
 
   /// Set badge count on the app icon (iOS only)
-  /// This is a synchronous fire-and-forget operation
-  void setBadgeCount(int count) {
+  Future<void> setBadgeCount(int count) async {
     _ensureInitialized();
 
-    // Fire-and-forget - we don't await or handle errors
-    // since this is a synchronous operation from the caller's perspective
-    _channel.invokeMethod('setBadgeCount', {'count': count});
+    try {
+      await _channel.invokeMethod('setBadgeCount', {'count': count});
+    } catch (e) {
+      throw KlaviyoException('Failed to set badge count: $e');
+    }
   }
 
   /// Enable or disable native SDK logging.
@@ -483,11 +563,29 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Stores the callback handles native code uses to run a background push
+  /// data handler. Callable before initialize().
+  Future<void> registerBackgroundPushDataHandler({
+    required int dispatcherHandle,
+    required int handlerHandle,
+  }) async {
+    try {
+      await _channel.invokeMethod('registerBackgroundPushDataHandler', {
+        'dispatcherHandle': dispatcherHandle,
+        'handlerHandle': handlerHandle,
+      });
+    } catch (e) {
+      throw KlaviyoException(
+        'Failed to register background push data handler: $e',
+      );
+    }
+  }
+
   /// Handle a Klaviyo universal tracking link URL
   /// Returns true if the URL is a valid Klaviyo tracking link, false otherwise
+  ///
+  /// Callable before initialize().
   Future<bool> handleUniversalTrackingLink(String url) async {
-    _ensureInitialized();
-
     try {
       final result = await _channel.invokeMethod<bool>(
         'handleUniversalTrackingLink',
@@ -506,23 +604,33 @@ class KlaviyoNativeWrapper {
       final String eventType = eventData['type'] as String? ?? '';
 
       switch (eventType) {
-        case 'push_notification_received':
         case 'push_notification_opened':
         case 'silent_push_received':
         case 'push_token_received':
         case 'push_token_error':
-          _logger.info('Native push notification event: $eventData');
+          final action = eventData.remove('action');
+          _logger.info('Native push notification event: $eventType');
           _pushNotificationController.add(eventData);
+          switch (eventType) {
+            case 'push_notification_opened':
+              _pushActionController.clearHeld();
+              _pushOpenedController.add(
+                action is Map<String, dynamic>
+                    ? {...eventData, 'action': action}
+                    : eventData,
+              );
+            case 'push_token_received':
+            case 'push_token_error':
+              _pushTokenController.add(eventData);
+            case 'silent_push_received':
+              _pushDataController.add(eventData);
+          }
           break;
-        case 'form_event':
         case 'form_lifecycle_event':
-          _logger.info('Native form event: $eventData');
+          _logger.info('Native form event: $eventType');
           _formEventController.add(eventData);
           break;
         case 'auth_token_requested':
-          // Bridge diagnostic only — the request payload carries a correlation
-          // id, never a token, so this is safe to log.
-          _logger.info('Native auth token request event received');
           _authTokenRequestController.add(eventData);
           break;
         case 'push_open_web_url':
@@ -579,11 +687,7 @@ class KlaviyoNativeWrapper {
   /// Get current API key
   String? get apiKey => _apiKey;
 
-  /// Dispose resources
-  void dispose() {
-    _pushNotificationController.close();
-    _formEventController.close();
-    _authTokenRequestController.close();
-    _pushActionController.close();
-  }
+  /// No-op. Event streams stay open for the life of the app.
+  @Deprecated('No longer needed. Will be removed in 1.0.')
+  void dispose() {}
 }

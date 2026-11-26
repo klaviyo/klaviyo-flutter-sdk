@@ -3,8 +3,15 @@
 
 KLAVIYO_TOOLS_DIR ?= $(HOME)/.cache/klaviyo-flutter-sdk-tools
 
+empty :=
+space := $(empty) $(empty)
+
 ifneq ($(wildcard $(KLAVIYO_TOOLS_DIR)/env.sh),)
-export PATH := $(KLAVIYO_TOOLS_DIR)/bin:$(KLAVIYO_TOOLS_DIR)/flutter/bin:$(KLAVIYO_TOOLS_DIR)/jdk/bin:$(PATH)
+# Only directories setup-linux.sh installed into; tools it skipped come from PATH.
+KLAVIYO_TOOLS_PATH := $(wildcard $(KLAVIYO_TOOLS_DIR)/bin $(KLAVIYO_TOOLS_DIR)/flutter/bin $(KLAVIYO_TOOLS_DIR)/jdk/bin)
+ifneq ($(KLAVIYO_TOOLS_PATH),)
+export PATH := $(subst $(space),:,$(KLAVIYO_TOOLS_PATH)):$(PATH)
+endif
 ifneq ($(wildcard $(KLAVIYO_TOOLS_DIR)/jdk),)
 export JAVA_HOME := $(KLAVIYO_TOOLS_DIR)/jdk
 endif
@@ -57,6 +64,11 @@ lint: format-check analyze ktlint swiftlint ## Every check in the lint CI job
 .PHONY: test
 test: deps ## Dart unit tests with coverage (CI: test)
 	flutter test --coverage
+
+.PHONY: coverage
+coverage: deps ## Dart unit tests with coverage, then per-file line coverage for lib/
+	flutter test --coverage
+	scripts/coverage-summary.sh coverage/lcov.info
 
 .PHONY: test-example
 test-example: deps ## Example app widget tests

@@ -71,7 +71,7 @@ Key lint rules (`analysis_options.yaml`):
 
 To test against a local native SDK build:
 - **iOS**: Run `scripts/configure-sdk.sh --ios-local ../klaviyo-swift-sdk` (or `--ios-branch` / `--ios-commit`). It points `ios/klaviyo_flutter_sdk/Package.swift` and the example's Xcode project at that source; `--ios-version X.Y.Z` puts the release pin back.
-- **Android**: In `android/build.gradle.kts`, replace the version string with a local Maven path or use `includeBuild()` in `example/android/settings.gradle`
+- **Android**: Run `scripts/configure-sdk.sh --android-local ../klaviyo-android-sdk` (or `--android-branch` / `--android-commit`). A local path appends an `includeBuild()` block to `example/android/settings.gradle.kts`; a branch or commit rewrites `klaviyoSdkVersion` in `android/build.gradle.kts` to a JitPack ref. `--android-version X.Y.Z` puts the release pin back and removes the `includeBuild()` block.
 
 ### Gotchas
 

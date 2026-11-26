@@ -5,6 +5,7 @@ import 'package:klaviyo_flutter_sdk_example/build_info.dart';
 import 'package:klaviyo_flutter_sdk_example/main.dart';
 import 'package:klaviyo_flutter_sdk_example/tabs/auth_tab.dart';
 import 'package:klaviyo_flutter_sdk_example/tabs/events_tab.dart';
+import 'package:klaviyo_flutter_sdk_example/tabs/push_tab.dart';
 import 'package:klaviyo_flutter_sdk_example/widgets/build_info_button.dart';
 
 /// Each ID must surface exactly once as a semantics identifier (what native
@@ -52,6 +53,19 @@ void main() {
       'events_added_to_cart_button',
       'events_started_checkout_button',
       'events_test_event_button',
+    ]);
+    semantics.dispose();
+  });
+
+  testWidgets('push tab exposes test IDs', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(const MaterialApp(home: PushTab()));
+
+    _expectTestIds([
+      'push_status_text',
+      'push_permission_status_text',
+      'push_read_launch_tap_button',
+      'push_request_permission_button',
     ]);
     semantics.dispose();
   });
