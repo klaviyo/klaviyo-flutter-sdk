@@ -1,7 +1,7 @@
 import 'event_metric.dart';
 
 /// Represents an event to be tracked in Klaviyo
-class KlaviyoEvent {
+final class KlaviyoEvent {
   /// Name of the event. Must be less than 128 characters.
   /// Use [EventMetric] for predefined events or [EventMetric.custom] for custom event names.
   final EventMetric name;

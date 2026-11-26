@@ -70,7 +70,8 @@ final class KlaviyoPushButtonAction {
 
 /// The action button a user tapped on a push.
 @immutable
-class KlaviyoPushButton {
+final class KlaviyoPushButton {
+  /// Creates a push action button.
   const KlaviyoPushButton({
     required this.id,
     required this.label,
@@ -113,7 +114,7 @@ class KlaviyoPushButton {
 /// or on a push that opens a web URL. [tap] says which, and [button] or
 /// [webUrl] carries what was tapped.
 @immutable
-class KlaviyoPushOpened {
+final class KlaviyoPushOpened {
   /// Creates an opened push from the full push [payload].
   KlaviyoPushOpened({
     required Map<String, dynamic> payload,

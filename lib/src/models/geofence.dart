@@ -2,7 +2,7 @@
 ///
 /// A geofence defines a circular region using a center point (latitude/longitude)
 /// and radius in meters. The SDK can monitor when users enter or exit these regions.
-class Geofence {
+final class Geofence {
   /// Unique identifier for this geofence
   final String identifier;
 
@@ -15,6 +15,8 @@ class Geofence {
   /// Radius of the geofence in meters
   final double radius;
 
+  /// Creates a geofence centered on [latitude] and [longitude] with the given
+  /// [radius] in meters.
   const Geofence({
     required this.identifier,
     required this.latitude,

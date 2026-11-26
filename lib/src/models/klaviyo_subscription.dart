@@ -36,7 +36,7 @@ enum MessagingConsent {
 /// Each channel exposes only the consent sub-types the API supports for it, so
 /// invalid combinations (transactional email, open-tracking SMS) cannot be
 /// expressed. A `null` channel is left untouched.
-class KlaviyoSubscriptionChannels {
+final class KlaviyoSubscriptionChannels {
   /// Consent sub-types to request on the email channel,
   /// or `null` to leave email untouched.
   final Set<EmailConsent>? email;
@@ -139,7 +139,7 @@ class KlaviyoSubscriptionChannels {
 /// and drop it with a warning if a requested channel has no identifier.
 ///
 /// Push subscriptions are not created through this API.
-class KlaviyoSubscription {
+final class KlaviyoSubscription {
   /// ID of the Klaviyo list to subscribe the profile to.
   final String listId;
 

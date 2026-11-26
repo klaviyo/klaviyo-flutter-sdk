@@ -20,6 +20,7 @@ These APIs are removed. Most were deprecated in 0.6.0. See the [Migration Guide]
 - **The public package exports only `AuthTokenProvider` from `auth_token.dart`.** `ClassifiedProviderError`, `classifyAuthTokenProviderError` and `parseAuthTokenRequestedEventId` are internal.
 - **`InAppFormConfig.copyWith` no longer takes `isInfinite`.** Passing a duration makes the copy finite, a call with no arguments keeps the original timeout (including infinite), and `InAppFormConfig.infinite()` makes an infinite config. The `isInfinite` getter stays.
 - **`KlaviyoSDK.apiKey` is removed.** The native SDKs own the API key.
+- **Public data classes are now `final`.** `KlaviyoProfile`, `KlaviyoLocation`, `KlaviyoEvent`, `KlaviyoSubscription`, `KlaviyoSubscriptionChannels`, `InAppFormConfig`, `Geofence`, `FormShown`, `FormDismissed`, `FormCtaClicked`, `KlaviyoPushOpened`, `KlaviyoPushButton` and `KlaviyoPushData` can no longer be extended, implemented or mixed in outside the package. Construct them instead. This lets later 1.x releases add fields without breaking your code.
 
 ### Platform Support
 
