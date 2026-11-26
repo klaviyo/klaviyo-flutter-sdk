@@ -106,8 +106,6 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-    env:
-      FLUTTER_VERSION: 3.38.7
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
@@ -118,7 +116,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         id: flutter
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Dry-run the pub.dev publish

@@ -1,8 +1,21 @@
 import 'dart:async';
 
-/// A broadcast [StreamController] that buffers events arriving before
-/// any listener subscribes, then flushes them to the first subscriber.
+/// A broadcast [StreamController] that buffers events arriving while no
+/// listener is subscribed, then flushes them to the next subscriber once.
+///
+/// Events for which [holdKey] returns a non-null key take one buffer slot per
+/// key: a newer event with the same key replaces the buffered one. All other
+/// events are buffered in arrival order. When [maxBuffered] is set, the oldest
+/// buffered events are dropped once the buffer exceeds it.
 class BufferedBroadcastStreamController<T> {
+  BufferedBroadcastStreamController({
+    Object? Function(T event)? holdKey,
+    int? maxBuffered,
+  })  : _holdKey = holdKey,
+        _maxBuffered = maxBuffered;
+
+  final Object? Function(T event)? _holdKey;
+  final int? _maxBuffered;
   final _buffer = <T>[];
   late final StreamController<T> _controller = StreamController<T>.broadcast(
     onListen: _flush,
@@ -12,7 +25,26 @@ class BufferedBroadcastStreamController<T> {
   bool get hasListener => _controller.hasListener;
 
   void add(T event) {
-    _controller.hasListener ? _controller.add(event) : _buffer.add(event);
+    if (_controller.hasListener) {
+      _controller.add(event);
+      return;
+    }
+    final key = _holdKey?.call(event);
+    if (key != null) {
+      _buffer.removeWhere((buffered) => _holdKey?.call(buffered) == key);
+    }
+    _buffer.add(event);
+    final max = _maxBuffered;
+    if (max != null && _buffer.length > max) {
+      _buffer.removeRange(0, _buffer.length - max);
+    }
+  }
+
+  /// Drops every buffered event that has a hold key.
+  void clearHeld() {
+    final holdKey = _holdKey;
+    if (holdKey == null) return;
+    _buffer.removeWhere((buffered) => holdKey(buffered) != null);
   }
 
   void _flush() {
@@ -20,5 +52,8 @@ class BufferedBroadcastStreamController<T> {
     _buffer.clear();
   }
 
-  void close() => _controller.close();
+  void close() {
+    _buffer.clear();
+    _controller.close();
+  }
 }

@@ -1,5 +1,77 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- Push data now routes to `onPushData` in the foreground or `onBackgroundPushData` in the background. Register a handler with `onBackgroundPushData` to keep receiving background push data. Without a handler, background data is dropped. See the [migration guide](MIGRATION_GUIDE.md#migrating-to-v060).
+- Legacy `onPushNotification` emits `silent_push_received` only for qualifying foreground pushes, now including visible pushes with key/value pairs. It no longer emits background push data.
+
+### Added
+
+- Typed `onPushToken`, `onPushOpened` and `onPushData` streams expose token types, tapped actions and push key/value pairs. Token registration failures arrive through `onError`.
+- `getInitialPushNotification()` returns the typed launch tap repeatedly until `resetProfile()` clears it, including before initialization. ([Launch tap getter (klaviyo-flutter-sdk#86)](https://github.com/klaviyo/klaviyo-flutter-sdk/issues/86))
+- `onBackgroundPushData` runs a registered handler for background push data, including a headless Flutter engine on Android when the process was killed.
+- Preview draft forms on a device with `startFormsPreview` or a link handled by `handleFormsPreviewLink`. End the preview with `endFormsPreview`. ([Device forms preview (klaviyo-flutter-sdk#200)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/200))
+- `ProfileProperty` provides constants for standard profile attribute keys.
+- Events accept an optional ISO 4217 `valueCurrency`.
+- Android supports AGP 9 built-in Kotlin while retaining the `kotlin-android` path for older hosts. ([AGP 9 support (klaviyo-flutter-sdk#190)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/190))
+- Android apps can subclass `KlaviyoFlutterPushService`. Overrides must call `super.onMessageReceived` and `super.onNewToken` to retain SDK handling.
+
+### Changed
+
+- Qualifying push data includes Klaviyo silent pushes and visible pushes with key/value pairs. Arrival and a later tap are separate data/open events.
+- On iOS, forward every remote notification with its fetch completion handler. Foreground visible-push data also uses `willPresent`, with manual forwarding required when an override does not call `super`.
+- Buffered opens and actions reach the first subscriber of each stream once. A new open clears an older held action, and `resetProfile()` clears both holds.
+- `dispose()` leaves streams open and only unregisters an auth token provider if one is registered. `KlaviyoNativeWrapper.dispose()` is a no-op.
+- `setLoggingEnabled(bool)` is the single documented logging switch. The iOS plugin's bridge logs now follow it too.
+- SDK logs no longer include push tokens, full push/form payloads or per-call profile identifiers.
+- iOS setup now documents SwiftPM, notification service extensions and CocoaPods-only module flags. Unavailable-module messages explain that SwiftPM includes forms and location.
+- The Android setup guide documents FCM service routing when using `firebase_messaging`.
+- iOS guidance clarifies silent-push delivery after a force quit.
+
+### Deprecated
+
+These APIs are scheduled for removal in 1.0. Use the [migration table](MIGRATION_GUIDE.md#deprecated-apis) for replacements.
+
+- `onPushNotification`: use `onPushToken`, `onPushOpened` and foreground `onPushData`, plus `onBackgroundPushData` for background work.
+- `onPushAction`, `KlaviyoPushAction`, `OpenWebUrl` and `ActionButtonTapped`: use `onPushOpened` and `KlaviyoPushOpened`.
+- `onFormEvent`: use typed `onFormLifecycleEvent` events.
+- `handlePushNotificationReceived` and `handlePushNotificationOpened`: remove these Dart calls. Retain the required native push forwarding.
+- `KlaviyoNativeWrapper`: use the public `KlaviyoSDK` API. The wrapper becomes internal in 1.0.
+- `KlaviyoSDK.dispose()` and `KlaviyoNativeWrapper.dispose()`: remove calls, or explicitly await `unregisterAuthTokenProvider()` when turning off personalized forms.
+- `setLogLevel` and `KlaviyoLogLevel`: use `setLoggingEnabled(bool)` for logging on/off.
+
+### Fixed
+
+- Android FCM rotations reach `onPushToken` independently of automatic native forwarding. The newest undelivered Dart token event is held in memory only until delivery or process death.
+- Android push opens and action-button taps that launch the app now reach Dart. Reopening from Recents does not replay the original tap.
+- Android web-link taps reach typed `onPushOpened` and legacy `onPushAction`. Undelivered events are held in memory only until delivery or process death.
+- Push and form events stay with the primary UI engine when secondary Flutter engines attach, cancel or detach. ([Primary engine delivery (klaviyo-flutter-sdk#189)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/189))
+- iOS notification dismissals no longer emit push-open events. ([Dismiss handling (klaviyo-flutter-sdk#184)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/184))
+- iOS push-data forwarding rejects non-Klaviyo payloads: both entry paths require `_k` at the top level or under `body`, and duplicate foreground callbacks emit once.
+- Android host apps using Kotlin Gradle Plugin 1.8 can compile the plugin.
+- Standard profile keys accept camelCase and snake_case on both platforms.
+- iOS timezone attributes now set the standard field instead of custom properties.
+- Tracking links no longer throw before initialization. Android queues a failed pre-init click for retry, while iOS drops it unless native pre-init disk capture is enabled.
+- `setProfile` sends custom attributes under `properties`. `fromJson` also accepts the old flat shape, and typed fields win over conflicting standard keys. ([Nested profile properties (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- iOS identifier keys in `setProfileAttribute` and `setProfileProperties` now update email, phone number and external ID instead of custom properties. ([Profile identifiers (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- Standard profile text fields accept numbers and booleans as strings, and coordinates accept numbers or numeric strings. Invalid values are dropped with a warning. ([Profile value conversion (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- Null profile properties are ignored on both platforms rather than sent as JSON null on iOS. ([Null profile properties (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- Conflicts between typed profile fields and `properties` are logged, with the typed field retained. ([Profile property conflicts (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- Nested `DateTime` profile/event values serialize as ISO 8601 strings. Unsupported values are dropped with a warning instead of failing the call. ([Custom value serialization (klaviyo-flutter-sdk#178)](https://github.com/klaviyo/klaviyo-flutter-sdk/pull/178))
+- `InAppFormConfig.infinite().copyWith()` preserves its infinite timeout unless explicitly changed.
+- Form session timeouts clamp negative durations to zero and round positive sub-second durations up to whole seconds.
+- iOS `setBadgeCount` failures are caught and logged instead of escaping as uncaught asynchronous errors.
+
+### Known limitations
+
+- `KlaviyoProfile` and `KlaviyoEvent` equality and hash codes ignore custom properties, as in 0.5.0 and earlier. Compare those properties separately when needed.
+
+### Coming in 1.0
+
+- **iOS: Swift Package Manager becomes the primary install path in 1.0 (December).** CocoaPods trunk stops taking new releases on Dec 2, 2026. Starting with 1.0, the podspec is frozen at the last KlaviyoSwift version on trunk, so new native iOS fixes ship only through Swift Package Manager. SPM needs Flutter 3.41+. Apps on older Flutter versions can still install through CocoaPods, but they won't get native iOS updates. To switch now, see Flutter's [Swift Package Manager guide for app developers](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers).
+
 ## 0.5.0
 
 ### Changes

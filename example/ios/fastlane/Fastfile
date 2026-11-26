@@ -72,7 +72,7 @@ platform :ios do
   end
 
   # Expects `flutter build ios --release --config-only` to have run first so
-  # Pods are in place; it runs again here so Generated.xcconfig carries the
+  # the plugin config is in place; it runs again here so Generated.xcconfig carries the
   # real build number and derived version.
   desc "Archive + export a signed IPA to example/build/ios/ipa/Runner.ipa"
   lane :build_ipa do |options|
@@ -92,7 +92,6 @@ platform :ios do
       configuration: "Release",
       destination: "generic/platform=iOS",
       export_method: "app-store",
-      codesigning_identity: "Apple Distribution",
       # The extension hardcodes CURRENT_PROJECT_VERSION = 1; App Store Connect
       # wants it to match the host app's CFBundleVersion.
       xcargs: "CURRENT_PROJECT_VERSION=#{build_number} FLUTTER_BUILD_NUMBER=#{build_number} KLAVIYO_APP_VERSION='#{app_version}'",
@@ -107,6 +106,16 @@ platform :ios do
         },
       }
     )
+
+    archive = Actions.lane_context.fetch(SharedValues::XCODEBUILD_ARCHIVE)
+    app = File.join(archive, "Products", "Applications", "Runner.app")
+    extension = File.join(app, "PlugIns", "NotificationServiceExtension.appex")
+    [app, extension].each do |bundle|
+      sdk = sh("/usr/bin/plutil", "-extract", "DTSDKName", "raw", File.join(bundle, "Info.plist"), log: false).strip
+      UI.message("#{File.basename(bundle)} SDK: #{sdk}")
+      sdk_major = sdk[/\Aiphoneos(\d+)\./, 1].to_i
+      UI.user_error!("Expected iOS SDK 27 or later, got #{sdk}") if sdk_major < 27
+    end
   end
 
   desc "Print and export (BUILD_NUMBER, ASC_APP_ID) the next TestFlight build number for a marketing version"

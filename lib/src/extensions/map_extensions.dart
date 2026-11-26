@@ -5,6 +5,11 @@ extension KlaviyoNotificationMap on Map<String, dynamic> {
   /// Works with:
   /// - **Raw iOS APNs payloads** (checks for `_k` inside the `body` dictionary)
   /// - **Raw Android FCM payloads** (checks for `_k`)
+  ///
+  /// Use it to pick out Klaviyo pushes in messages your app receives from
+  /// another library, such as `firebase_messaging`. To receive Klaviyo push
+  /// data directly, use [KlaviyoSDK.onPushData] and
+  /// [KlaviyoSDK.onBackgroundPushData].
   bool get isKlaviyoNotification =>
       (this['body'] is Map && (this['body'] as Map).containsKey('_k')) ||
       containsKey('_k');

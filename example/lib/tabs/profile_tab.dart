@@ -4,7 +4,7 @@ import 'package:klaviyo_flutter_sdk/klaviyo_flutter_sdk.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import '../main.dart' show setupSilentPushListener, setupPushActionListener;
+import '../main.dart' show setupPushDataListener, setupPushActionListener;
 import '../widgets/build_info_button.dart';
 import '../widgets/test_id.dart';
 import 'forms_tab.dart';
@@ -65,6 +65,8 @@ class _ProfileTabState extends State<ProfileTab> {
         if (!_klaviyo.isInitialized) {
           await _initializeSDK();
         } else {
+          await _syncCurrentProfile();
+          if (!mounted) return;
           setState(() {
             _isInitialized = true;
             _status = 'SDK already initialized';
@@ -117,8 +119,8 @@ class _ProfileTabState extends State<ProfileTab> {
         }
       }
 
-      // Set up silent push listener now that SDK is initialized
-      setupSilentPushListener();
+      // Set up push data listener now that SDK is initialized
+      setupPushDataListener();
 
       // Set up push action (open_url / action button) listener
       setupPushActionListener();
@@ -208,6 +210,7 @@ class _ProfileTabState extends State<ProfileTab> {
           lastName: _lastNameController.text.isNotEmpty
               ? _lastNameController.text
               : null,
+          properties: {'example_app_source': 'flutter_profile_tab'},
         ),
       );
       await _syncCurrentProfile();
@@ -452,6 +455,11 @@ class _ProfileTabState extends State<ProfileTab> {
                       ],
                     ),
                     const Divider(),
+                    _buildProfileValueRow(
+                      'profile_current_company_id_text',
+                      'Company ID',
+                      _klaviyo.apiKey,
+                    ),
                     _buildProfileValueRow(
                       'profile_current_email_text',
                       'Email',

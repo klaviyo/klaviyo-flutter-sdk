@@ -15,10 +15,15 @@ import UserNotifications
 
 @available(iOS 14.0, *)
 extension Logger {
-    static let klaviyoFlutterSDK = Logger(
+    private static let enabledKlaviyoFlutterSDK = Logger(
         subsystem: "com.klaviyo.flutter",
         category: "KlaviyoFlutterSDK"
     )
+
+    /// The plugin's logger, or a disabled logger while `KlaviyoSDK().isLoggingEnabled` is false.
+    static var klaviyoFlutterSDK: Logger {
+        KlaviyoSDK().isLoggingEnabled ? enabledKlaviyoFlutterSDK : Logger(OSLog.disabled)
+    }
 }
 
 public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
@@ -27,7 +32,25 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     /// Singleton instance to allow the Host App's AppDelegate to forward events manually.
     public static let shared = KlaviyoFlutterSdkPlugin()
 
-    private var eventSink: FlutterEventSink?
+    /// Event sinks of engines whose Dart side is listening, in listen order.
+    private var engineSinks: [EngineSink] = []
+    private let registeredEngines = NSHashTable<EngineEventStream>.weakObjects()
+
+    /// The primary engine receives every event: the first listening engine that
+    /// has a view controller, or the first listening engine if none has one.
+    private var primarySink: EngineSink? {
+        engineSinks.first { $0.hasViewController() } ?? engineSinks.first
+    }
+
+    private var eventSink: FlutterEventSink? {
+        primarySink?.sink
+    }
+
+    private var waitingForUI: Bool {
+        primarySink?.hasViewController() != true && registeredEngines.allObjects.contains { $0.waitingForUI }
+    }
+
+    private static var didAddApplicationDelegate = false
 
     // Cache values to handle the race condition where the value arrives
     // before Flutter has finished initializing the EventChannel.
@@ -37,24 +60,87 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedSilentPush: [String: Any]?
     private var cachedPushAction: [String: Any]?
 
+    // Background push data state, used by KlaviyoFlutterSdkPlugin+BackgroundPushData.swift.
+    var backgroundChannel: FlutterMethodChannel?
+    var isBackgroundHandlerRegistered = false
+    var pendingBackgroundPushData: BackgroundPushDataDelivery?
+    var recentPushDataKeys: [(key: String, date: Date)] = []
+    static let recentPushDataWindow: TimeInterval = 30
+    static let recentPushDataLimit = 10
+
+    var hasStreamListener: Bool {
+        eventSink != nil
+    }
+
+    // The `push_notification_opened` payload for the tap that launched the app,
+    // recorded from the first notification response delivered before the app first
+    // became active. Read by getInitialPushNotification; not cleared by onListen.
+    private var initialPushNotification: [String: Any]?
+    private var hasBecomeActive = false
+    private var launchResponseRecorded = false
+    private var activationObserver: NSObjectProtocol?
+
     // MARK: - Flutter Plugin Registration
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         // Use the SHARED instance to ensure the AppDelegate accesses the same object
         let instance = KlaviyoFlutterSdkPlugin.shared
 
-        // 1. Setup Method Channel (For Commands: initialize, setProfile, etc.)
-        let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: registrar.messenger())
-        registrar.addMethodCallDelegate(instance, channel: channel)
-
-        // 2. Setup Event Channel (For Data Streams: tokens, opened notifications)
+        // Each engine gets its own stream handler; the shared instance routes events
+        // to the primary engine. Publishing it delivers the engine's detach callback.
         let eventChannel = FlutterEventChannel(name: "klaviyo_events", binaryMessenger: registrar.messenger())
-        eventChannel.setStreamHandler(instance)
+        let engineStream = EngineEventStream(registrar: registrar)
+        instance.registeredEngines.add(engineStream)
+        eventChannel.setStreamHandler(engineStream)
+        registrar.publish(engineStream)
 
-        // 3. Register as Application Delegate
+        let channel = FlutterMethodChannel(name: "klaviyo_sdk", binaryMessenger: registrar.messenger())
+        channel.setMethodCallHandler { [weak engineStream] call, result in
+            if call.method == "registerBackgroundPushDataHandler" {
+                if let engineStream {
+                    instance.registerBackgroundPushDataHandler(for: engineStream)
+                }
+                result(nil)
+            } else {
+                instance.handle(call, result: result)
+            }
+        }
+
+        // Register as Application Delegate, once per process
         // This allows us to automatically intercept 'didRegisterForRemoteNotifications'
         // without requiring code in the Host App's AppDelegate.
-        registrar.addApplicationDelegate(instance)
+        if !didAddApplicationDelegate {
+            didAddApplicationDelegate = true
+            registrar.addApplicationDelegate(instance)
+        }
+
+        // Track when the app first becomes active, to tell the launch tap apart from later taps.
+        instance.observeFirstActivation()
+    }
+
+    private func registerBackgroundPushDataHandler(for engine: EngineEventStream) {
+        guard backgroundChannel == nil, registeredEngines.contains(engine) else { return }
+        backgroundChannel = engine.backgroundChannel
+        registerBackgroundPushDataHandler()
+    }
+
+    private func observeFirstActivation() {
+        if Thread.isMainThread, UIApplication.shared.applicationState == .active {
+            hasBecomeActive = true
+        }
+        guard activationObserver == nil, !hasBecomeActive else { return }
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.hasBecomeActive = true
+            if let observer = self.activationObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self.activationObserver = nil
+            }
+        }
     }
 }
 
@@ -168,11 +254,13 @@ extension KlaviyoFlutterSdkPlugin {
             }
             let properties = eventData["properties"] as? [String: Any] ?? [:]
             let value = eventData["value"] as? Double
+            let valueCurrency = eventData["value_currency"] as? String
             let uniqueId = eventData["unique_id"] as? String
             let event = Event(
                 name: .customEvent(name),
                 properties: properties,
                 value: value,
+                valueCurrency: valueCurrency,
                 uniqueId: uniqueId
             )
             KlaviyoSDK().create(event: event)
@@ -222,13 +310,7 @@ extension KlaviyoFlutterSdkPlugin {
             result(nil)
 
         case "getPushToken":
-            let token = KlaviyoSDK().pushToken
-            if let token {
-                if #available(iOS 14.0, *) {
-                    Logger.klaviyoFlutterSDK.info("Retrieved push token from SDK: \(token, privacy: .public)")
-                }
-            }
-            result(token)
+            result(KlaviyoSDK().pushToken)
 
         case "registerForInAppForms":
             #if canImport(KlaviyoForms)
@@ -253,7 +335,73 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "FORMS_NOT_AVAILABLE",
                 message: "In-App Forms requires the forms module. " +
-                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
+                details: nil
+            ))
+            #endif
+
+        case "startFormsPreview":
+            #if canImport(KlaviyoForms)
+            guard let token = (call.arguments as? [String: Any])?["token"] as? String else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "A forms preview token is required",
+                    details: nil
+                ))
+                return
+            }
+            Task { @MainActor in
+                KlaviyoSDK().startFormsPreview(token)
+            }
+            result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
+                details: nil
+            ))
+            #endif
+
+        case "handleFormsPreviewLink":
+            #if canImport(KlaviyoForms)
+            guard let urlString = (call.arguments as? [String: Any])?["url"] as? String,
+                  let link = URL(string: urlString)
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "A forms preview link URL is required",
+                    details: nil
+                ))
+                return
+            }
+            Task { @MainActor in
+                result(KlaviyoSDK().handleFormsPreviewLink(link))
+            }
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
+                details: nil
+            ))
+            #endif
+
+        case "endFormsPreview":
+            #if canImport(KlaviyoForms)
+            Task { @MainActor in
+                KlaviyoSDK().endFormsPreview()
+            }
+            result(nil)
+            #else
+            result(FlutterError(
+                code: "FORMS_NOT_AVAILABLE",
+                message: "In-App Forms requires the forms module. " +
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
                 details: nil
             ))
             #endif
@@ -269,7 +417,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "FORMS_NOT_AVAILABLE",
                 message: "In-App Forms requires the forms module. " +
-                    "Ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile.",
+                    "CocoaPods only: ensure KLAVIYO_INCLUDE_FORMS is not set to 'false' in your Podfile. " +
+                    "Swift Package Manager builds always include forms.",
                 details: nil
             ))
             #endif
@@ -284,7 +433,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
-                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                    "CocoaPods only: set KLAVIYO_INCLUDE_LOCATION=true in your Podfile. " +
+                    "Swift Package Manager builds always include the location module.",
                 details: nil
             ))
             #endif
@@ -299,7 +449,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
-                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                    "CocoaPods only: set KLAVIYO_INCLUDE_LOCATION=true in your Podfile. " +
+                    "Swift Package Manager builds always include the location module.",
                 details: nil
             ))
             #endif
@@ -322,7 +473,8 @@ extension KlaviyoFlutterSdkPlugin {
             result(FlutterError(
                 code: "GEOFENCING_NOT_AVAILABLE",
                 message: "Geofencing requires the location module. " +
-                    "Set KLAVIYO_INCLUDE_LOCATION=true in your podfile.",
+                    "CocoaPods only: set KLAVIYO_INCLUDE_LOCATION=true in your Podfile. " +
+                    "Swift Package Manager builds always include the location module.",
                 details: nil
             ))
             #endif
@@ -344,8 +496,12 @@ extension KlaviyoFlutterSdkPlugin {
         case "respondToAuthTokenRequest":
             handleRespondToAuthTokenRequest(call: call, result: result)
 
+        case "getInitialPushNotification":
+            result(initialPushNotification)
+
         case "resetProfile":
             KlaviyoSDK().resetProfile()
+            initialPushNotification = nil
             result(nil)
 
         case "setBadgeCount":
@@ -395,8 +551,38 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         withArguments arguments: Any?,
         eventSink events: @escaping FlutterEventSink
     ) -> FlutterError? {
-        eventSink = events
+        addListener(EngineSink(owner: ObjectIdentifier(self), sink: events) { false })
+        return nil
+    }
 
+    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        removeListener(ObjectIdentifier(self))
+        return nil
+    }
+
+    /// Adds an engine's sink and replays cached events if it becomes the primary.
+    fileprivate func addListener(_ engineSink: EngineSink) {
+        engineSinks.removeAll { $0.owner == engineSink.owner }
+        engineSinks.append(engineSink)
+        if primarySink?.owner == engineSink.owner {
+            replayCachedEvents(to: engineSink.sink)
+        }
+    }
+
+    /// Removes an engine's sink. If it was the primary, the next engine chosen by
+    /// `primarySink` takes over and the auth bridge is torn down.
+    fileprivate func removeListener(_ owner: ObjectIdentifier) {
+        let wasPrimary = primarySink?.owner == owner
+        engineSinks.removeAll { $0.owner == owner }
+        guard wasPrimary else { return }
+        // The Dart side keeps a permanent auth-event listener, so this fires at
+        // engine teardown. Give parity with Android's onDetachedFromEngine:
+        // unregister the auth-token provider and fail any in-flight requests
+        // immediately rather than leaving them suspended until the SDK timeout.
+        unregisterAuthTokenProvider(reason: "Flutter engine detached")
+    }
+
+    private func replayCachedEvents(to events: FlutterEventSink) {
         // If we have cached values from early app launch, send them now.
         // This solves the race condition where values arrive before Flutter is ready.
         if let cachedToken = cachedToken {
@@ -407,6 +593,25 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedError)
             self.cachedError = nil
         }
+        replayCachedPushEvents(to: events)
+    }
+
+    fileprivate func releaseCachedPushEvents() {
+        guard let eventSink else { return }
+        replayCachedPushEvents(to: eventSink)
+    }
+
+    fileprivate func removeRegisteredEngine(_ engine: EngineEventStream) {
+        registeredEngines.remove(engine)
+        if backgroundChannel === engine.backgroundChannel {
+            backgroundChannel = nil
+            isBackgroundHandlerRegistered = false
+        }
+        releaseCachedPushEvents()
+    }
+
+    private func replayCachedPushEvents(to events: FlutterEventSink) {
+        guard !waitingForUI else { return }
         if let cachedOpenedNotification = cachedOpenedNotification {
             events(cachedOpenedNotification)
             self.cachedOpenedNotification = nil
@@ -419,17 +624,59 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
             events(cachedPushAction)
             self.cachedPushAction = nil
         }
+    }
+}
+
+/// A listening engine's event sink.
+private struct EngineSink {
+    let owner: ObjectIdentifier
+    let sink: FlutterEventSink
+    let hasViewController: () -> Bool
+}
+
+/// Per-engine `klaviyo_events` stream handler that registers the engine's sink
+/// with the shared plugin.
+private final class EngineEventStream: NSObject, FlutterStreamHandler {
+    let backgroundChannel: FlutterMethodChannel
+    private weak var registrar: FlutterPluginRegistrar?
+    private var hasListened = false
+
+    var waitingForUI: Bool {
+        !hasListened && registrar?.viewController != nil
+    }
+
+    init(registrar: FlutterPluginRegistrar) {
+        self.registrar = registrar
+        backgroundChannel = FlutterMethodChannel(
+            name: "klaviyo_sdk_background",
+            binaryMessenger: registrar.messenger()
+        )
+    }
+
+    func onListen(
+        withArguments arguments: Any?,
+        eventSink events: @escaping FlutterEventSink
+    ) -> FlutterError? {
+        hasListened = true
+        KlaviyoFlutterSdkPlugin.shared.addListener(
+            EngineSink(owner: ObjectIdentifier(self), sink: events) { [weak self] in
+                self?.registrar?.viewController != nil
+            }
+        )
         return nil
     }
 
-    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        eventSink = nil
-        // The Dart side keeps a permanent auth-event listener, so this fires at
-        // engine teardown. Give parity with Android's onDetachedFromEngine:
-        // unregister the auth-token provider and fail any in-flight requests
-        // immediately rather than leaving them suspended until the SDK timeout.
-        unregisterAuthTokenProvider(reason: "Flutter engine detached")
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
+        KlaviyoFlutterSdkPlugin.shared.releaseCachedPushEvents()
         return nil
+    }
+
+    /// Called by the Flutter engine on deallocation for published values.
+    @objc(detachFromEngineForRegistrar:)
+    func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+        KlaviyoFlutterSdkPlugin.shared.removeListener(ObjectIdentifier(self))
+        KlaviyoFlutterSdkPlugin.shared.removeRegisteredEngine(self)
     }
 }
 
@@ -445,7 +692,7 @@ extension KlaviyoFlutterSdkPlugin {
     ) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
         if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("APNs token received: \(tokenString, privacy: .public)")
+            Logger.klaviyoFlutterSDK.info("APNs token received")
         }
 
         // Respect `klaviyo_automatic_push_token_forwarding` in Info.plist when explicitly set:
@@ -507,18 +754,43 @@ extension KlaviyoFlutterSdkPlugin {
 
     public func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
+        defer {
+            _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
+        }
+        if response.actionIdentifier == UNNotificationDismissActionIdentifier {
+            if #available(iOS 14.0, *) {
+                Logger.klaviyoFlutterSDK.info("Push notification dismissed")
+            }
+            cachedOpenedNotification = nil
+            cachedPushAction = nil
+            return
+        }
         if #available(iOS 14.0, *) {
             Logger.klaviyoFlutterSDK.info("Push notification opened")
         }
 
-        // 1. Prepare Payload
-        let eventPayload: [String: Any] = [
+        // Each notification interaction supersedes any push action still cached
+        // for a not-yet-ready Flutter listener, including when this interaction
+        // produces no push-action payload (e.g. a deep-link body tap).
+        cachedPushAction = nil
+        let pushAction = pushActionPayload(for: response, userInfo: userInfo)
+
+        // 1. Prepare Payload, with the tapped button or web URL under `action`
+        var eventPayload: [String: Any] = [
             "type": "push_notification_opened",
             "data": userInfo
         ]
+        if let pushAction {
+            eventPayload["action"] = pushAction
+        }
+
+        if !hasBecomeActive, !launchResponseRecorded {
+            initialPushNotification = eventPayload
+            launchResponseRecorded = true
+        }
 
         // 2. Send to Flutter (or Cache if Flutter is asleep)
-        if let eventSink = eventSink {
+        if let eventSink = eventSink, !waitingForUI {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
@@ -529,34 +801,24 @@ extension KlaviyoFlutterSdkPlugin {
 
         // 3. Surface the open_url action / action-button tap as a typed push action
         // event, in parallel with the raw opened-notification event above.
-        forwardPushAction(for: response, userInfo: userInfo)
-
-        // 4. Pass to Native Klaviyo SDK
-        // We pass a dummy completion handler because the Host App owns the real one.
-        // No-op: We let the host app finish the system callback
-        _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: {})
+        if let pushAction {
+            forwardPushAction(pushAction)
+        }
     }
 
-    /// Mirrors an `open_url` body tap or an action-button tap to Flutter as a
-    /// typed push-action event. The native SDK still performs the actual
-    /// dispatch (opening the URL / launching the app); this only forwards the
-    /// event so Flutter apps can react.
+    /// Builds the push-action event for an `open_url` body tap or an
+    /// action-button tap, or nil for any other interaction. The native SDK still
+    /// performs the actual dispatch (opening the URL / launching the app); this
+    /// only describes the tap so Flutter apps can react.
     ///
     /// Scheme handling is deliberately left to the native SDK: whatever URL the
     /// payload carries is forwarded verbatim, including special schemes such as
     /// `mailto:`/`tel:`/`sms:`. The plugin does not re-implement the SDK's
     /// scheme allowlist.
-    private func forwardPushAction(
+    private func pushActionPayload(
         for response: UNNotificationResponse,
         userInfo: [AnyHashable: Any]
-    ) {
-        // Each notification interaction supersedes any push action still cached
-        // for a not-yet-ready Flutter listener. Clear it up front so that an
-        // earlier, superseded event can't be delivered on `onListen` when this
-        // interaction produces no push-action payload (e.g. a deep-link body tap
-        // or a notification dismiss, both of which return without caching below).
-        cachedPushAction = nil
-
+    ) -> [String: Any]? {
         let actionIdentifier = response.actionIdentifier
 
         var eventPayload: [String: Any]?
@@ -586,7 +848,7 @@ extension KlaviyoFlutterSdkPlugin {
                         "No action button matches identifier '\(actionIdentifier)'; dropping tap."
                     )
                 }
-                return
+                return nil
             }
             // Dart's KlaviyoPushAction.fromMap requires `action`, so drop
             // incomplete taps here with a log rather than silently downstream.
@@ -596,7 +858,7 @@ extension KlaviyoFlutterSdkPlugin {
                         "Action button '\(actionIdentifier)' has no action type; dropping tap."
                     )
                 }
-                return
+                return nil
             }
             var data: [String: Any] = ["id": actionIdentifier, "action": action]
             if let label = button["label"] as? String {
@@ -611,9 +873,12 @@ extension KlaviyoFlutterSdkPlugin {
             ]
         }
 
-        guard let eventPayload else { return }
+        return eventPayload
+    }
 
-        if let eventSink {
+    /// Sends a push-action event to Flutter, or caches it until Flutter listens.
+    private func forwardPushAction(_ eventPayload: [String: Any]) {
+        if let eventSink, !waitingForUI {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
@@ -623,13 +888,17 @@ extension KlaviyoFlutterSdkPlugin {
         }
     }
 
-    /// Manual Forwarding Helper - Silent Push
-    /// This should be called from the Host App's AppDelegate
-    /// in `didReceiveRemoteNotification:fetchCompletionHandler:`.
-    /// Note: The host app is responsible for calling the completion handler after this method returns.
+    /// Routes Klaviyo push data by app state, like `handleSilentPush(userInfo:fetchCompletionHandler:)`,
+    /// but cannot delay the system completion handler, so iOS may suspend the app before the
+    /// Dart background handler finishes.
+    @available(*, deprecated, message: "Use handleSilentPush(userInfo:fetchCompletionHandler:)")
     public func handleSilentPush(userInfo: [AnyHashable: Any]) {
+        handleSilentPush(userInfo: userInfo, fetchCompletionHandler: { _ in })
+    }
+
+    func emitPushDataToStream(userInfo: [AnyHashable: Any]) {
         if #available(iOS 14.0, *) {
-            Logger.klaviyoFlutterSDK.info("Silent push received")
+            Logger.klaviyoFlutterSDK.info("Push data received")
         }
 
         // Prepare payload
@@ -639,11 +908,11 @@ extension KlaviyoFlutterSdkPlugin {
         ]
 
         // Send to Flutter (or cache if Flutter is not ready)
-        if let eventSink = eventSink {
+        if let eventSink = eventSink, !waitingForUI {
             eventSink(eventPayload)
         } else {
             if #available(iOS 14.0, *) {
-                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching silent push event.")
+                Logger.klaviyoFlutterSDK.notice("Flutter not ready. Caching push data event.")
             }
             cachedSilentPush = eventPayload
         }
