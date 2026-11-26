@@ -78,6 +78,8 @@ flutter config --enable-swift-package-manager
 
 Apps on Flutter 3.27–3.40, or with SwiftPM turned off, use the frozen [CocoaPods (legacy)](#cocoapods-legacy) path instead.
 
+For migration steps, see Flutter's [Swift Package Manager guide for app developers](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers).
+
 A complete working example is available in the [`example/`](example/) directory.
 
 ## Initialization
