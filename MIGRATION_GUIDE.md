@@ -98,7 +98,7 @@ before upgrading to 1.0. The push-data routing changes above already apply in 0.
 | `KlaviyoNativeWrapper.dispose()` | Remove it; it is now a no-op. |
 | `KlaviyoSDK.setLogLevel(...)` | `setLoggingEnabled(bool)` for Dart/native logging on or off. |
 | `KlaviyoLogLevel` | Remove the enum use when replacing `setLogLevel` with `setLoggingEnabled(bool)`. |
-| `Klaviyo.isKlaviyoPush(data)` (community compatibility shim) | Use `data.isKlaviyoNotification` for raw messages from another library; remove the check only if it solely gated the old `handlePush` call. |
+| `Klaviyo.instance.isKlaviyoPush(data)` (community compatibility shim) | Use `data.isKlaviyoNotification` for raw messages from another library; remove the check only if it solely gated the old `handlePush` call. |
 
 `isKlaviyoNotification` remains supported for raw-message detection and is not deprecated. For
 Klaviyo-only delivery, prefer the [typed push streams](README.md#typed-push-streams) and registered

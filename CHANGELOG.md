@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- Push data now routes to `onPushData` in the foreground or `onBackgroundPushData` in the background. Register a handler with `onBackgroundPushData` to keep receiving background push data. Without a handler, background data is dropped. See the [migration guide](MIGRATION_GUIDE.md#migrating-to-v060).
+- Legacy `onPushNotification` emits `silent_push_received` only for qualifying foreground pushes, now including visible pushes with key/value pairs. It no longer emits background push data.
+
 ### Added
 
 - Typed `onPushToken`, `onPushOpened` and `onPushData` streams expose token types, tapped actions and push key/value pairs. Token registration failures arrive through `onError`.
@@ -15,8 +20,6 @@
 
 ### Changed
 
-- Push data now routes to `onPushData` in the foreground or `onBackgroundPushData` in the background. Without a handler, background data is dropped. See the [migration guide](MIGRATION_GUIDE.md#migrating-to-v060).
-- Legacy `onPushNotification` still emits `silent_push_received` for qualifying foreground pushes, now including visible pushes with key/value pairs. It no longer emits background push data.
 - Qualifying push data includes Klaviyo silent pushes and visible pushes with key/value pairs. Arrival and a later tap are separate data/open events.
 - On iOS, forward every remote notification with its fetch completion handler. Foreground visible-push data also uses `willPresent`, with manual forwarding required when an override does not call `super`.
 - Buffered opens and actions reach the first subscriber of each stream once. A new open clears an older held action, and `resetProfile()` clears both holds.
