@@ -31,6 +31,7 @@ A Flutter plugin that wraps the native [Klaviyo iOS](https://github.com/klaviyo/
 - [Optional Module Configuration](#optional-module-configuration)
   - [Enabling Geofencing](#enabling-geofencing)
   - [Disabling In-App Forms](#disabling-in-app-forms)
+  - [Enabling Mobile Inbox](#enabling-mobile-inbox)
 - [Profile Reset (Logout)](#profile-reset-logout)
 - [SDK Logging](#sdk-logging)
 - [API Reference](#api-reference)
@@ -1063,6 +1064,26 @@ ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'
 ```
 
 Without the forms module, forms methods will log an error and no-op gracefully (error code: `FORMS_NOT_AVAILABLE`).
+
+### Enabling Mobile Inbox
+
+The Mobile Inbox module is **not** included by default. To opt in:
+
+**Android** — add to `android/gradle.properties`:
+
+```properties
+klaviyoIncludeInbox=true
+```
+
+**iOS (Swift Package Manager)** — set `KLAVIYO_INCLUDE_INBOX=true` in the environment of the command that resolves the package (for example `KLAVIYO_INCLUDE_INBOX=true flutter build ios`). The plugin's manifest reads it at resolve time.
+
+**iOS (CocoaPods)** — add to `ios/Podfile` before `flutter_install_all_ios_pods`:
+
+```ruby
+ENV['KLAVIYO_INCLUDE_INBOX'] = 'true'
+```
+
+Without the inbox module, inbox methods throw a `KlaviyoInboxException` with `KlaviyoInboxErrorReason.unavailable`, and `KlaviyoSDK.inboxChanged` never fires.
 
 ## Profile Reset (Logout)
 
