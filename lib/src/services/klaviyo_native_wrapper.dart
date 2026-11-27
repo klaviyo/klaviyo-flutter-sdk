@@ -588,6 +588,26 @@ class KlaviyoNativeWrapper {
     }
   }
 
+  /// Put the messages with [messageIds] into [state], returning how many
+  /// changed.
+  ///
+  /// Native ignores IDs it has no message for and counts a repeated ID once.
+  Future<int> updateInboxMessageStatesByIds(
+    InboxMessageState state,
+    List<String> messageIds,
+  ) async {
+    _ensureInitialized();
+    try {
+      final result = await _channel.invokeMethod<int>(
+        'updateInboxMessageStatesByIds',
+        {'state': state.wireValue, 'messageIds': messageIds},
+      );
+      return result ?? 0;
+    } on PlatformException catch (e, stackTrace) {
+      throw _inboxException(e, stackTrace);
+    }
+  }
+
   /// Remove every message this device has for the current company, returning
   /// how many were removed.
   Future<int> clearInbox() async {

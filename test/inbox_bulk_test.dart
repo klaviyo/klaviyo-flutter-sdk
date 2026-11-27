@@ -163,6 +163,82 @@ void main() {
     });
   });
 
+  group('updateInboxMessageStatesByIds', () {
+    test('sends the state and ids, and returns the changed count', () async {
+      replies['updateInboxMessageStatesByIds'] = () => 2;
+
+      final changed = await KlaviyoSDK().updateInboxMessageStatesByIds(
+        InboxMessageState.archived,
+        ['msg-1', 'msg-2', 'msg-3'],
+      );
+
+      final call = calls.lastWhere(
+        (c) => c.method == 'updateInboxMessageStatesByIds',
+      );
+      expect(call.arguments['state'], 'archived');
+      expect(call.arguments['messageIds'], ['msg-1', 'msg-2', 'msg-3']);
+      expect(changed, 2);
+    });
+
+    test('sends an empty list rather than dropping the argument', () async {
+      replies['updateInboxMessageStatesByIds'] = () => 0;
+
+      expect(
+        await KlaviyoSDK().updateInboxMessageStatesByIds(
+          InboxMessageState.read,
+          const [],
+        ),
+        0,
+      );
+      final call = calls.lastWhere(
+        (c) => c.method == 'updateInboxMessageStatesByIds',
+      );
+      expect(call.arguments['messageIds'], isEmpty);
+    });
+
+    test('treats a null native result as zero', () async {
+      expect(
+        await KlaviyoSDK().updateInboxMessageStatesByIds(
+          InboxMessageState.unread,
+          ['msg-1'],
+        ),
+        0,
+      );
+    });
+
+    test('forwards every state as its wire value', () async {
+      replies['updateInboxMessageStatesByIds'] = () => 1;
+
+      for (final state in InboxMessageState.values) {
+        await KlaviyoSDK().updateInboxMessageStatesByIds(state, ['msg-1']);
+        final call = calls.lastWhere(
+          (c) => c.method == 'updateInboxMessageStatesByIds',
+        );
+        expect(call.arguments['state'], state.name);
+      }
+    });
+
+    test('wraps a native failure in a typed inbox exception', () async {
+      replies['updateInboxMessageStatesByIds'] = () => throw PlatformException(
+            code: 'INBOX_STORAGE_FAILURE',
+          );
+
+      await expectLater(
+        KlaviyoSDK().updateInboxMessageStatesByIds(
+          InboxMessageState.read,
+          ['msg-1'],
+        ),
+        throwsA(
+          isA<KlaviyoInboxException>().having(
+            (e) => e.reason,
+            'reason',
+            KlaviyoInboxErrorReason.storageFailure,
+          ),
+        ),
+      );
+    });
+  });
+
   group('clearInbox', () {
     test('returns how many were removed', () async {
       replies['clearInbox'] = () => 5;
