@@ -879,9 +879,6 @@ class KlaviyoSDK {
   /// resume (e.g. `AppLifecycleState.resumed`), and immediately after
   /// subscribing. Treat this stream as a hint that shortens the wait, never as
   /// the source of truth.
-  ///
-  /// Android has no native invalidation signal yet, so this stream stays silent
-  /// there; the startup/resume fetches are what keep Android correct.
   Stream<void> get inboxChanged => _nativeWrapper.onInboxChanged;
 
   /// Private methods

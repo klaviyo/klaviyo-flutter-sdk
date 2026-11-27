@@ -84,12 +84,13 @@ class InboxMessage {
   /// The push's collapse identifier, where the platform exposes one.
   final String? collapseId;
 
-  /// The push's app-icon badge count, when the payload set one.
+  /// The app-icon badge count the push requested, or null when it requested no
+  /// badge change.
   ///
-  /// The iOS SDK models the badge as a struct; the native bridge flattens it to
-  /// this single integer, preferring the configured value and falling back to
-  /// `aps.badge`. The inbox's own unread count is
-  /// `KlaviyoSDK.inbox.fetchUnreadCount()`, not this field.
+  /// iOS only: the Klaviyo `badge_value` when the push set one, otherwise
+  /// `aps.badge`. Android has no per-message badge, so it is always null there.
+  /// This is not the inbox's unread count: use
+  /// [KlaviyoSDK.fetchInboxUnreadCount] for that.
   final int? badge;
 
   /// Whether the message has been read.
