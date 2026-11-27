@@ -65,6 +65,33 @@ class KlaviyoFlutterSdkPluginInboxTest {
     }
 
     @Test
+    fun `updateInboxMessageStatesByIds reports INBOX_UNAVAILABLE`() {
+        plugin.onMethodCall(
+            MethodCall(
+                "updateInboxMessageStatesByIds",
+                mapOf("state" to "read", "messageIds" to listOf("msg-1", "msg-2")),
+            ),
+            result,
+        )
+
+        verify(exactly = 1) { result.error(InboxErrorCodes.UNAVAILABLE, any(), null) }
+        confirmVerified(result)
+    }
+
+    @Test
+    fun `updateInboxMessageStatesByIds without ids is rejected before native`() {
+        plugin.onMethodCall(
+            MethodCall("updateInboxMessageStatesByIds", mapOf("state" to "read")),
+            result,
+        )
+
+        verify(exactly = 1) {
+            result.error("INVALID_ARGUMENTS", "An inbox state and message ids are required", null)
+        }
+        confirmVerified(result)
+    }
+
+    @Test
     fun `clearInbox reports INBOX_UNAVAILABLE`() {
         plugin.onMethodCall(MethodCall("clearInbox", null), result)
 

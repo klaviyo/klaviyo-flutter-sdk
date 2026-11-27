@@ -921,6 +921,27 @@ class KlaviyoSDK {
     return _nativeWrapper.updateInboxMessageStates(state, filter);
   }
 
+  /// Puts the messages with [messageIds] into [state], returning how many
+  /// changed.
+  ///
+  /// For an explicit selection, for example archiving the messages a user
+  /// picked. IDs this device has no message for, including another company's,
+  /// are ignored and not counted, and a repeated ID counts once. A message
+  /// already in [state] is not changed or counted, so repeating the call
+  /// returns 0. An empty list returns 0 and emits no change.
+  ///
+  /// [inboxChanged] listeners fire once per call, and not at all when nothing
+  /// changed. The state is local to this device, like
+  /// [updateInboxMessageState]. Throws [KlaviyoInboxException] when the native
+  /// store fails.
+  Future<int> updateInboxMessageStatesByIds(
+    InboxMessageState state,
+    List<String> messageIds,
+  ) async {
+    _ensureInitialized();
+    return _nativeWrapper.updateInboxMessageStatesByIds(state, messageIds);
+  }
+
   /// Remove every message this device has for the current company, returning
   /// how many were removed.
   ///
