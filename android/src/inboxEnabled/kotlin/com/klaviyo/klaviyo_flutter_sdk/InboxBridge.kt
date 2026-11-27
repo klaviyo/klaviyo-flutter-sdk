@@ -193,7 +193,8 @@ internal object InboxBridge {
             "sentAt" to sentAt,
             "receivedAt" to receivedAt,
             "collapseId" to collapseId,
-            "badge" to badge,
+            // Android has no per-message app-icon badge, so this is always null.
+            "badge" to null,
             "isRead" to isRead,
             "isArchived" to isArchived,
             "source" to source.rawValue,
