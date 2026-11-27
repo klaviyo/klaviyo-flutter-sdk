@@ -41,6 +41,16 @@ internal object InboxBridge {
         onResult: (InboxBridgeResult<Boolean>) -> Unit,
     ) = onResult(unavailable)
 
+    /** @see updateMessageState, which reports the same unavailable result */
+    fun updateMessageStates(
+        @Suppress("UNUSED_PARAMETER") state: String,
+        @Suppress("UNUSED_PARAMETER") filter: Map<*, *>?,
+        onResult: (InboxBridgeResult<Int>) -> Unit,
+    ) = onResult(unavailable)
+
+    /** @see KlaviyoInbox.clearAll */
+    fun clearAll(onResult: (InboxBridgeResult<Int>) -> Unit) = onResult(unavailable)
+
     /**
      * No-op: without the inbox module there is no change signal to collect.
      */

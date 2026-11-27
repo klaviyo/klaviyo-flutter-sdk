@@ -33,6 +33,46 @@ class KlaviyoFlutterSdkPluginInboxTest {
     }
 
     @Test
+    fun `updateInboxMessageStates reports INBOX_UNAVAILABLE`() {
+        plugin.onMethodCall(
+            MethodCall(
+                "updateInboxMessageStates",
+                mapOf(
+                    "state" to "read",
+                    "filter" to mapOf("readFilter" to "unread", "archiveFilter" to "active"),
+                ),
+            ),
+            result,
+        )
+
+        verify(exactly = 1) { result.error(InboxErrorCodes.UNAVAILABLE, any(), null) }
+        confirmVerified(result)
+    }
+
+    @Test
+    fun `updateInboxMessageStates without a filter is rejected before native`() {
+        // The filter is required with no default, so the plugin says so rather
+        // than letting a bulk change guess which messages were meant.
+        plugin.onMethodCall(
+            MethodCall("updateInboxMessageStates", mapOf("state" to "read")),
+            result,
+        )
+
+        verify(exactly = 1) {
+            result.error("INVALID_ARGUMENTS", "An inbox state and filter are required", null)
+        }
+        confirmVerified(result)
+    }
+
+    @Test
+    fun `clearInbox reports INBOX_UNAVAILABLE`() {
+        plugin.onMethodCall(MethodCall("clearInbox", null), result)
+
+        verify(exactly = 1) { result.error(InboxErrorCodes.UNAVAILABLE, any(), null) }
+        confirmVerified(result)
+    }
+
+    @Test
     fun `fetchInboxPage reports INBOX_UNAVAILABLE without the module`() {
         plugin.onMethodCall(MethodCall("fetchInboxPage", mapOf("pageSize" to 20)), result)
 
