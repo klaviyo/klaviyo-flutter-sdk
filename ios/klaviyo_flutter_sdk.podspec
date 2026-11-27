@@ -29,22 +29,11 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
     s.dependency 'KlaviyoLocation'
   end
 
-  # Mobile Inbox: opt-in while the native module is unreleased.
-  # Default is FALSE. The Dart API works either way; without this the native
-  # side reports INBOX_UNAVAILABLE.
-  #
-  # KlaviyoInbox is not in a published release yet, so with KLAVIYO_INCLUDE_INBOX
-  # set the whole SDK is normally pointed at a branch first with
-  # `scripts/configure-sdk.sh --ios-branch <branch>`, which drops the version
-  # constraints below. Set KLAVIYO_INBOX_VERSION to pin this dependency alone.
+  # Conditional inbox dependency based on environment variable
+  # Default is FALSE (opt-in for Mobile Inbox)
   include_inbox = ENV['KLAVIYO_INCLUDE_INBOX'] == 'true'
   if include_inbox
-    inbox_version = ENV['KLAVIYO_INBOX_VERSION']
-    if inbox_version && !inbox_version.empty?
-      s.dependency 'KlaviyoInbox', inbox_version
-    else
-      s.dependency 'KlaviyoInbox'
-    end
+    s.dependency 'KlaviyoInbox'
   end
 
   s.platform = :ios, '13.0'

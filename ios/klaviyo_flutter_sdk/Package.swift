@@ -2,19 +2,10 @@
 import Foundation
 import PackageDescription
 
-// Mobile Inbox is opt-in while the native KlaviyoInbox module is unreleased.
-//
-// Swift Package Manager cannot toggle a target's product dependencies from the
-// host's build settings, but it does evaluate a package manifest in the
-// environment of the command that resolves it, and that includes a dependency's
-// own manifest. So a host opts in by setting KLAVIYO_INCLUDE_INBOX=true in the
-// environment of `xcodebuild`/`swift build`, the same name the podspec reads.
-// Unset — the default — the product is not linked and the plugin reports
-// INBOX_UNAVAILABLE, exactly as the CocoaPods and Gradle paths do.
-//
-// The alternative, an always-on product, would force every SPM host to fetch
-// and link the inbox module whether or not it can be used yet, so it was
-// rejected.
+// Mobile Inbox is opt-in. Swift Package Manager evaluates this manifest in the
+// environment of the command that resolves the package, so a host opts in by
+// setting KLAVIYO_INCLUDE_INBOX=true there, the same name the podspec reads.
+// Unset, the product is not linked and the plugin reports INBOX_UNAVAILABLE.
 let includeInbox = ProcessInfo.processInfo.environment["KLAVIYO_INCLUDE_INBOX"] == "true"
 
 var inboxDependencies: [PackageDescription.Target.Dependency] = []

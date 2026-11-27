@@ -1357,10 +1357,6 @@ extension KlaviyoFlutterSdkPlugin {
 #else
 extension KlaviyoFlutterSdkPlugin {
     /// No-op: without the inbox module there is no change signal to forward.
-    ///
-    /// Follow-up (MAGE-1139): once the inbox module is part of the default
-    /// build, remove this stub. Android's equivalent hook lives in
-    /// `src/inboxDisabled/.../InboxBridge.kt` and is tracked by MAGE-1102.
     func subscribeToInboxChanges() {}
 
     func cancelInboxChanges() {}
