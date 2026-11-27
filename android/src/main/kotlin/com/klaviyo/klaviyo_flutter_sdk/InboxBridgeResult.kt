@@ -3,9 +3,8 @@ package com.klaviyo.klaviyo_flutter_sdk
 // The Mobile Inbox seam between the Flutter plugin and the native
 // `com.klaviyo:inbox` module.
 //
-// The native inbox module is not published yet, so the implementation of
-// `InboxBridge` is chosen at build time by the `klaviyoIncludeInbox` Gradle
-// property (default `false`):
+// The implementation of `InboxBridge` is chosen at build time by the
+// `klaviyoIncludeInbox` Gradle property (default `false`):
 //
 // - `klaviyoIncludeInbox=true` compiles `src/inboxEnabled`, a full bridge onto
 //   `com.klaviyo:inbox`.
