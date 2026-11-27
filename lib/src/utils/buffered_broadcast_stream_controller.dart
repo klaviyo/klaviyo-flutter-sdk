@@ -6,11 +6,23 @@ import 'dart:async';
 /// Events for which [holdKey] returns a non-null key take one buffer slot per
 /// key: a newer event with the same key replaces the buffered one. All other
 /// events are buffered in arrival order.
+///
+/// With [coalesce] set, at most one event is held while nothing is listening:
+/// further adds are dropped until a listener flushes the buffer. Use it for
+/// payload-free "something changed, re-read it" signals, where a burst
+/// collapses into one notification with no loss of meaning.
 class BufferedBroadcastStreamController<T> {
-  BufferedBroadcastStreamController({Object? Function(T event)? holdKey})
-      : _holdKey = holdKey;
+  BufferedBroadcastStreamController({
+    Object? Function(T event)? holdKey,
+    bool coalesce = false,
+  })  : _holdKey = holdKey,
+        _coalesce = coalesce;
 
   final Object? Function(T event)? _holdKey;
+
+  /// Whether a burst of buffered events collapses into a single delivered one.
+  final bool _coalesce;
+
   final _buffer = <T>[];
   late final StreamController<T> _controller = StreamController<T>.broadcast(
     onListen: _flush,
@@ -24,6 +36,7 @@ class BufferedBroadcastStreamController<T> {
       _controller.add(event);
       return;
     }
+    if (_coalesce && _buffer.isNotEmpty) return;
     final key = _holdKey?.call(event);
     if (key != null) {
       _buffer.removeWhere((buffered) => _holdKey?.call(buffered) == key);
