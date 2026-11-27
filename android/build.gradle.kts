@@ -77,10 +77,43 @@ fun booleanProperty(
 // Set klaviyoIncludeForms=false in your host app's gradle.properties to exclude forms.
 val includeForms = booleanProperty("klaviyoIncludeForms", true)
 
+// Whether to include the Mobile Inbox module. It is excluded by default: the default
+// build compiles the `inboxDisabled` stub and needs no inbox artifact on its classpath.
+// Set klaviyoIncludeInbox=true in your host app's gradle.properties to compile the
+// real bridge in `src/inboxEnabled`.
+val includeInbox = booleanProperty("klaviyoIncludeInbox", false)
+
+extensions.configure<com.android.build.api.dsl.LibraryExtension> {
+    sourceSets {
+        // Exactly one of these is on the compile classpath: both declare the
+        // same `internal object InboxBridge`, so plugin code is identical.
+        getByName("main") {
+            java.srcDir(if (includeInbox) "src/inboxEnabled/kotlin" else "src/inboxDisabled/kotlin")
+        }
+        // Each bridge's own tests, compiled only alongside that bridge: the
+        // disabled tests assert INBOX_UNAVAILABLE and the enabled ones assert
+        // the native observer contract, so neither applies to the other build.
+        getByName("test") {
+            java.srcDir(
+                if (includeInbox) {
+                    "src/inboxEnabled/test/kotlin"
+                } else {
+                    "src/inboxDisabled/test/kotlin"
+                },
+            )
+        }
+    }
+}
+
 dependencies {
     "implementation"("com.github.klaviyo.klaviyo-android-sdk:core:$klaviyoSdkVersion")
     "api"("com.github.klaviyo.klaviyo-android-sdk:analytics:$klaviyoSdkVersion")
     "api"("com.github.klaviyo.klaviyo-android-sdk:push-fcm:$klaviyoSdkVersion")
+
+    // Inbox: opt-in, the full module only when included
+    if (includeInbox) {
+        "api"("com.github.klaviyo.klaviyo-android-sdk:inbox:$klaviyoSdkVersion")
+    }
 
     // Location: full module (includes -core transitively), or just -core for lightweight
     val includeLocation = booleanProperty("klaviyoIncludeLocation", false)
