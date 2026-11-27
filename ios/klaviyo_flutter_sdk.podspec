@@ -29,6 +29,13 @@ A Flutter plugin that provides a wrapper around the native Klaviyo SDKs for iOS 
     s.dependency 'KlaviyoLocation'
   end
 
+  # Conditional inbox dependency based on environment variable
+  # Default is FALSE (opt-in for Mobile Inbox)
+  include_inbox = ENV['KLAVIYO_INCLUDE_INBOX'] == 'true'
+  if include_inbox
+    s.dependency 'KlaviyoInbox'
+  end
+
   s.platform = :ios, '13.0'
 
   # Flutter.framework does not contain a i386 slice.

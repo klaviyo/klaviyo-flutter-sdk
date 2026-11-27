@@ -3,6 +3,9 @@ import Flutter
 #if canImport(KlaviyoForms)
 import KlaviyoForms
 #endif
+#if canImport(KlaviyoInbox)
+import KlaviyoInbox
+#endif
 import KlaviyoSwift
 #if canImport(KlaviyoLocation)
 @_spi(KlaviyoPrivate) import KlaviyoLocation
@@ -54,6 +57,10 @@ public class KlaviyoFlutterSdkPlugin: NSObject, FlutterPlugin {
     private var cachedOpenedNotification: [String: Any]?
     private var cachedSilentPush: [String: Any]?
     private var cachedPushAction: [String: Any]?
+
+    /// The task forwarding native inbox changes to Dart, when the inbox module
+    /// is in this build.
+    private var inboxChangeTask: Task<Void, Never>?
 
     // The `push_notification_opened` payload for the tap that launched the app,
     // recorded from the first notification response delivered before the app first
@@ -488,6 +495,98 @@ extension KlaviyoFlutterSdkPlugin {
             KlaviyoSDK().setBadgeCount(count)
             result(nil)
 
+        case "fetchInboxPage":
+            #if canImport(KlaviyoInbox)
+            let args = call.arguments as? [String: Any]
+            let pageSize = args?["pageSize"] as? Int ?? InboxQuery.defaultPageSize
+            // The cursor is opaque: forward the token verbatim, never parse it.
+            // Native validation is what rejects a token from another inbox or
+            // one issued under different filters.
+            let cursor = (args?["cursor"] as? String).map { InboxCursor(token: $0) }
+            guard let readFilter = Self.inboxReadFilter(
+                from: args?["readFilter"] as? String
+            ) else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Unknown inbox read filter",
+                    details: nil
+                ))
+                return
+            }
+            guard let archiveFilter = Self.inboxArchiveFilter(
+                from: args?["archiveFilter"] as? String
+            ) else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Unknown inbox archive filter",
+                    details: nil
+                ))
+                return
+            }
+            Task {
+                do {
+                    let page = try await KlaviyoSDK().mobileInbox.fetchPage(
+                        InboxQuery(
+                            pageSize: pageSize,
+                            cursor: cursor,
+                            readFilter: readFilter,
+                            archiveFilter: archiveFilter
+                        )
+                    )
+                    result(Self.bridgeMap(for: page))
+                } catch {
+                    result(Self.inboxError(error))
+                }
+            }
+            #else
+            result(Self.inboxUnavailableError())
+            #endif
+
+        case "fetchInboxUnreadCount":
+            #if canImport(KlaviyoInbox)
+            Task {
+                do {
+                    result(try await KlaviyoSDK().mobileInbox.fetchUnreadCount())
+                } catch {
+                    result(Self.inboxError(error))
+                }
+            }
+            #else
+            result(Self.inboxUnavailableError())
+            #endif
+
+        case "updateInboxMessageState":
+            #if canImport(KlaviyoInbox)
+            guard let args = call.arguments as? [String: Any],
+                  let messageId = args["messageId"] as? String,
+                  let state = args["state"] as? String
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "An inbox message id and state are required",
+                    details: nil
+                ))
+                return
+            }
+            guard let messageState = Self.inboxMessageState(from: state) else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Unknown inbox message state: \(state)",
+                    details: nil
+                ))
+                return
+            }
+            Task {
+                do {
+                    result(try await KlaviyoSDK().mobileInbox.setMessageState(messageState, for: messageId))
+                } catch {
+                    result(Self.inboxError(error))
+                }
+            }
+            #else
+            result(Self.inboxUnavailableError())
+            #endif
+
         case "handleUniversalTrackingLink":
             guard let args = call.arguments as? [String: Any],
                   let urlString = args["url"] as? String,
@@ -533,6 +632,11 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         engineSinks.removeAll { $0.owner == engineSink.owner }
         engineSinks.append(engineSink)
         if primarySink?.owner == engineSink.owner {
+            // Inbox invalidation is best-effort and payload-free: each native
+            // change becomes one `inbox_changed` event. Nothing is cached — a
+            // missed change is covered by the consumer's fetch-on-startup and
+            // fetch-on-resume.
+            subscribeToInboxChanges()
             replayCachedEvents(to: engineSink.sink)
         }
     }
@@ -543,6 +647,9 @@ extension KlaviyoFlutterSdkPlugin: FlutterStreamHandler {
         let wasPrimary = primarySink?.owner == owner
         engineSinks.removeAll { $0.owner == owner }
         guard wasPrimary else { return }
+        // Nothing is left to deliver to, so stop forwarding native inbox changes
+        // rather than looping them into a sink nobody reads.
+        cancelInboxChanges()
         // The Dart side keeps a permanent auth-event listener, so this fires at
         // engine teardown. Give parity with Android's onDetachedFromEngine:
         // unregister the auth-token provider and fail any in-flight requests
@@ -1118,9 +1225,159 @@ extension KlaviyoFlutterSdkPlugin {
     }
 }
 
+// MARK: - Mobile Inbox
+
+#if canImport(KlaviyoInbox)
+extension KlaviyoFlutterSdkPlugin {
+    /// Maps the Dart wire value onto the native read filter.
+    static func inboxReadFilter(from wireValue: String?) -> InboxReadFilter? {
+        switch wireValue {
+        // An absent value keeps the native default rather than being an error.
+        case nil, "all": return .all
+        case "unread": return .unread
+        case "read": return .read
+        default: return nil
+        }
+    }
+
+    /// Maps the Dart wire value onto the native archive filter.
+    static func inboxArchiveFilter(from wireValue: String?) -> InboxArchiveFilter? {
+        switch wireValue {
+        // An absent value keeps the native default rather than being an error.
+        case nil, "active": return .active
+        case "archived": return .archived
+        case "all": return .all
+        default: return nil
+        }
+    }
+
+    /// Maps the Dart wire value onto the native state enum.
+    static func inboxMessageState(from wireValue: String) -> InboxMessageState? {
+        switch wireValue {
+        case "read": return .read
+        case "unread": return .unread
+        case "archived": return .archived
+        case "unarchived": return .unarchived
+        default: return nil
+        }
+    }
+
+    /// Maps a native inbox failure onto the Dart-facing error code.
+    static func inboxError(_ error: Error) -> FlutterError {
+        switch error {
+        case InboxError.invalidCursor:
+            return FlutterError(
+                code: "INBOX_INVALID_CURSOR",
+                message: "The inbox cursor is not from this inbox",
+                details: nil
+            )
+        default:
+            return FlutterError(
+                code: "INBOX_STORAGE_FAILURE",
+                message: "The inbox store could not complete the call",
+                details: nil
+            )
+        }
+    }
+
+    /// Serializes a page into the normalized bridge shape.
+    /// Serializes a page into the normalized bridge shape.
+    ///
+    /// Only the fields the Dart model declares are emitted — never a raw APNs
+    /// payload or a persistence type.
+    static func bridgeMap(for page: InboxPage) -> [String: Any?] {
+        [
+            "messages": page.messages.map { bridgeMap(for: $0) },
+            // The cursor is opaque: forward the native token verbatim.
+            "nextCursor": page.nextCursor?.token
+        ]
+    }
+
+    static func bridgeMap(for message: InboxMessage) -> [String: Any?] {
+        [
+            "id": message.id,
+            "title": message.title,
+            "body": message.body,
+            "defaultDestination": bridgeMap(for: message.defaultDestination),
+            "mediaUrl": message.mediaURL?.absoluteString,
+            "mediaType": message.mediaType,
+            "customData": message.customData,
+            "actions": message.actions.map { action in
+                [
+                    "id": action.id,
+                    "label": action.label,
+                    "destination": bridgeMap(for: action.destination)
+                ] as [String: Any?]
+            },
+            "sentAt": epochMillis(message.sentAt),
+            "receivedAt": epochMillis(message.receivedAt),
+            "collapseId": message.collapseID,
+            // The native badge is a struct; flatten it to the single integer the
+            // Dart model exposes, preferring the configured value and falling
+            // back to aps.badge.
+            "badge": message.badge.map { $0.value ?? $0.apsBadge } ?? nil,
+            "isRead": message.isRead,
+            "isArchived": message.isArchived,
+            "source": message.source.rawValue
+        ]
+    }
+
+    static func bridgeMap(for destination: InboxDestination) -> [String: Any?] {
+        ["type": destination.type.rawValue, "url": destination.url?.absoluteString]
+    }
+
+    /// Converts an optional date to epoch milliseconds, or nil.
+    static func epochMillis(_ date: Date?) -> Int? {
+        date.map { Int(($0.timeIntervalSince1970 * 1000).rounded()) }
+    }
+
+    /// Starts forwarding native inbox changes to Dart as payload-free
+    /// `inbox_changed` events, replacing any existing subscription.
+    ///
+    /// The native `changes` stream fires for a captured push, a message state
+    /// change, or a clear — in this process or the Notification Service
+    /// Extension. It carries no data, so Dart re-fetches whatever it shows.
+    func subscribeToInboxChanges() {
+        cancelInboxChanges()
+        inboxChangeTask = Task { @MainActor [weak self] in
+            for await _ in KlaviyoSDK().mobileInbox.changes {
+                guard let self else { return }
+                self.eventSink?(["type": "inbox_changed"])
+            }
+        }
+    }
+
+    /// Stops forwarding inbox changes.
+    func cancelInboxChanges() {
+        inboxChangeTask?.cancel()
+        inboxChangeTask = nil
+    }
+}
+
+#else
+extension KlaviyoFlutterSdkPlugin {
+    /// No-op: without the inbox module there is no change signal to forward.
+    func subscribeToInboxChanges() {}
+
+    func cancelInboxChanges() {}
+}
+#endif
+
 // MARK: - Helpers
 
 extension KlaviyoFlutterSdkPlugin {
+    /// The single "inbox module absent from this build" error, used by both the
+    /// inbox-enabled and inbox-disabled paths so the Dart-facing code and
+    /// message cannot drift apart.
+    static func inboxUnavailableError() -> FlutterError {
+        FlutterError(
+            code: "INBOX_UNAVAILABLE",
+            message: "Mobile Inbox requires the inbox module. " +
+                "Set KLAVIYO_INCLUDE_INBOX=true in your Podfile.",
+            details: nil
+        )
+    }
+
     enum SubscriptionParsingError: Error {
         case unknownConsentType(String)
     }
