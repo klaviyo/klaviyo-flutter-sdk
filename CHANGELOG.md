@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 ### Breaking Changes
 
@@ -20,6 +20,8 @@
 
 ### Changed
 
+- **Updated native iOS SDK to 5.7.0**. See [klaviyo-swift-sdk 5.7.0](https://github.com/klaviyo/klaviyo-swift-sdk/releases/tag/5.7.0).
+- **Updated native Android SDK to 4.7.0**. See [klaviyo-android-sdk 4.7.0](https://github.com/klaviyo/klaviyo-android-sdk/releases/tag/4.7.0).
 - Qualifying push data includes Klaviyo silent pushes and visible pushes with key/value pairs. Arrival and a later tap are separate data/open events.
 - On iOS, forward every remote notification with its fetch completion handler. Foreground visible-push data also uses `willPresent`, with manual forwarding required when an override does not call `super`.
 - Buffered opens and actions reach the first subscriber of each stream once. A new open clears an older held action, and `resetProfile()` clears both holds.
