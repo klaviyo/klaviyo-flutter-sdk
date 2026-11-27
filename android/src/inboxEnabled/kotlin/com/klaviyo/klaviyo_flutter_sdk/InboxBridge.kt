@@ -111,6 +111,29 @@ internal object InboxBridge {
         }
     }
 
+    /**
+     * @see KlaviyoInbox.updateMessageState
+     *
+     * Sets [state] on the messages with [messageIds] and resolves how many
+     * changed. Unknown IDs are ignored and a repeated ID counts once.
+     */
+    fun updateMessageStatesByIds(
+        state: String,
+        messageIds: List<String>,
+        onResult: (InboxBridgeResult<Int>) -> Unit,
+    ) {
+        val change =
+            try {
+                state.toStateChange()
+            } catch (e: IllegalArgumentException) {
+                onResult(InboxBridgeResult.Failure(InboxErrorCodes.STORAGE_FAILURE, e.message))
+                return
+            }
+        deliver(onResult, { it }) { done ->
+            KlaviyoInbox.updateMessageState(change, messageIds, done)
+        }
+    }
+
     /** @see KlaviyoInbox.clearAll */
     fun clearAll(onResult: (InboxBridgeResult<Int>) -> Unit) =
         deliver(onResult, { it }) { done ->

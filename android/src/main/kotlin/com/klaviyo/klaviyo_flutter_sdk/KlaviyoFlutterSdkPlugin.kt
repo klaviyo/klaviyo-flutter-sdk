@@ -961,6 +961,22 @@ class KlaviyoFlutterSdkPlugin :
                 }
             }
 
+            "updateInboxMessageStatesByIds" -> {
+                val state = call.argument<String>("state")
+                val messageIds = call.argument<List<String>>("messageIds")
+                if (state == null || messageIds == null) {
+                    result.error(
+                        "INVALID_ARGUMENTS",
+                        "An inbox state and message ids are required",
+                        null,
+                    )
+                    return
+                }
+                deliverInboxResult(result) { done ->
+                    InboxBridge.updateMessageStatesByIds(state, messageIds, done)
+                }
+            }
+
             "clearInbox" ->
                 deliverInboxResult(result) { done ->
                     InboxBridge.clearAll(done)
