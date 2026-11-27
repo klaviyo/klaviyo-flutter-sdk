@@ -634,6 +634,38 @@ extension KlaviyoFlutterSdkPlugin {
             result(Self.inboxUnavailableError())
             #endif
 
+        case "updateInboxMessageStatesByIds":
+            #if canImport(KlaviyoInbox)
+            guard let args = call.arguments as? [String: Any],
+                  let state = args["state"] as? String,
+                  let messageIds = args["messageIds"] as? [String]
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "An inbox state and message ids are required",
+                    details: nil
+                ))
+                return
+            }
+            guard let messageState = Self.inboxMessageState(from: state) else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Unknown inbox message state: \(state)",
+                    details: nil
+                ))
+                return
+            }
+            Task {
+                do {
+                    result(try await KlaviyoSDK().mobileInbox.setMessageState(messageState, for: messageIds))
+                } catch {
+                    result(Self.inboxError(error))
+                }
+            }
+            #else
+            result(Self.inboxUnavailableError())
+            #endif
+
         case "clearInbox":
             #if canImport(KlaviyoInbox)
             Task {
